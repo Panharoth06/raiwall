@@ -141,7 +141,7 @@ flowchart TD
 
 ### Prerequisites
 - **Go 1.27+**
-- **100% Pure Go:** No C compiler or CGO required (`CGO_ENABLED=0` fully supported)
+- **100% Pure Go:** Zero CGO dependencies (`CGO_ENABLED=0` fully supported)
 - `make`
 
 ### 1. Build from Source
