@@ -63,6 +63,22 @@ func TestExtractClientIP(t *testing.T) {
 			wantIP:     "2001:db8::1",
 		},
 		{
+			name: "IPv6 in CF-Connecting-IP with brackets and port",
+			headers: map[string]string{
+				"CF-Connecting-IP": "[2001:db8::1]:8080",
+			},
+			remoteAddr: "[::1]:54321",
+			wantIP:     "2001:db8::1",
+		},
+		{
+			name: "IPv6 in XFF with brackets and port",
+			headers: map[string]string{
+				"X-Forwarded-For": "[2001:db8:85a3::8a2e:370:7334]:443, 10.0.0.1",
+			},
+			remoteAddr: "[::1]:54321",
+			wantIP:     "2001:db8:85a3::8a2e:370:7334",
+		},
+		{
 			name: "IPv6 in RemoteAddr with bracket port",
 			headers: map[string]string{},
 			remoteAddr: "[2001:db8:85a3::8a2e:370:7334]:8080",
@@ -137,5 +153,8 @@ func TestContextClientIP(t *testing.T) {
 	// Nil request safety
 	if GetClientIP(nil) != nil {
 		t.Errorf("expected nil for nil request")
+	}
+	if ExtractClientIP(nil) != nil {
+		t.Errorf("expected nil for ExtractClientIP(nil)")
 	}
 }

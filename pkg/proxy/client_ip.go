@@ -17,6 +17,10 @@ const clientIPContextKey contextKey = "raiwall.client_ip"
 // 3. X-Forwarded-For (left-most client IP in chain)
 // 4. RemoteAddr (direct socket connection)
 func ExtractClientIP(r *http.Request) net.IP {
+	if r == nil {
+		return nil
+	}
+
 	// 1. Cloudflare header
 	if cfIP := strings.TrimSpace(r.Header.Get("CF-Connecting-IP")); cfIP != "" {
 		if ip := parseValidIP(cfIP); ip != nil {
@@ -68,23 +72,23 @@ func GetClientIP(r *http.Request) net.IP {
 }
 
 func parseValidIP(raw string) net.IP {
-	// Strip square brackets if IPv6 literal like "[2001:db8::1]"
-	raw = strings.Trim(raw, "[]")
-	// If it contains port, strip it
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+	// If it contains host:port (e.g. "[2001:db8::1]:8080" or "192.0.2.1:8080"), split it first
 	if host, _, err := net.SplitHostPort(raw); err == nil {
 		raw = host
 	}
+	// Strip square brackets if IPv6 literal like "[2001:db8::1]"
+	raw = strings.Trim(raw, "[]")
 	return net.ParseIP(raw)
 }
 
 func parseRemoteAddr(remoteAddr string) net.IP {
+	remoteAddr = strings.TrimSpace(remoteAddr)
 	if remoteAddr == "" {
 		return nil
 	}
-	host, _, err := net.SplitHostPort(remoteAddr)
-	if err != nil {
-		host = remoteAddr
-	}
-	host = strings.Trim(host, "[]")
-	return net.ParseIP(host)
+	return parseValidIP(remoteAddr)
 }

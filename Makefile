@@ -5,7 +5,7 @@ COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_DATE := $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 LDFLAGS := -ldflags "-X main.Version=$(VERSION) -X main.Commit=$(COMMIT) -X main.BuildDate=$(BUILD_DATE)"
 
-.PHONY: all build test test-race lint run clean
+.PHONY: all build test test-race test-integration test-all lint run clean
 
 all: build
 
@@ -18,6 +18,12 @@ test:
 
 test-race:
 	go test -v -race ./...
+
+test-integration:
+	go test -v -race -tags=integration ./tests/e2e/...
+
+test-all:
+	go test -v -race -tags=integration ./...
 
 lint:
 	go vet ./...

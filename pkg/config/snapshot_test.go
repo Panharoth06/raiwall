@@ -46,7 +46,7 @@ func TestConfigSnapshotLookup(t *testing.T) {
 	app2 := &AppConfig{
 		ID:        "app-2",
 		Name:      "App Two",
-		Hostnames: []string{"admin.internal"},
+		Hostnames: []string{"admin.internal", "[2001:db8::1]"},
 		Mode:      ModeOffline,
 	}
 
@@ -62,6 +62,9 @@ func TestConfigSnapshotLookup(t *testing.T) {
 		{name: "host with port", host: "example.com:8443", wantFound: true, wantID: "app-1"},
 		{name: "subdomain host", host: "api.example.com", wantFound: true, wantID: "app-1"},
 		{name: "case-insensitive host", host: "Admin.Internal:443", wantFound: true, wantID: "app-2"},
+		{name: "ipv6 host with brackets and port", host: "[2001:db8::1]:8443", wantFound: true, wantID: "app-2"},
+		{name: "ipv6 host with brackets", host: "[2001:db8::1]", wantFound: true, wantID: "app-2"},
+		{name: "ipv6 host bare", host: "2001:db8::1", wantFound: true, wantID: "app-2"},
 		{name: "unmatched host", host: "unknown.org", wantFound: false, wantID: ""},
 		{name: "empty host", host: "", wantFound: false, wantID: ""},
 	}

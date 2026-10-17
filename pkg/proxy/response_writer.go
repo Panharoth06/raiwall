@@ -20,6 +20,9 @@ type ResponseInterceptor struct {
 
 // NewResponseInterceptor creates a ResponseInterceptor wrapping w.
 func NewResponseInterceptor(w http.ResponseWriter, stripHeaders []string) *ResponseInterceptor {
+	if len(stripHeaders) == 0 {
+		stripHeaders = DefaultSensitiveHeaders
+	}
 	return &ResponseInterceptor{
 		ResponseWriter: w,
 		statusCode:     http.StatusOK,
@@ -43,10 +46,19 @@ func (ri *ResponseInterceptor) Header() http.Header {
 }
 
 // WriteHeader strips sensitive headers and records the status code before delegating.
+// Informational 1xx responses (except 101 Switching Protocols) do not seal the headers.
 func (ri *ResponseInterceptor) WriteHeader(statusCode int) {
 	if ri.wroteHeader {
 		return
 	}
+
+	// 1xx Informational responses (e.g. 103 Early Hints, 100 Continue) do not seal the response
+	if statusCode >= 100 && statusCode <= 199 && statusCode != http.StatusSwitchingProtocols {
+		ri.statusCode = statusCode
+		ri.ResponseWriter.WriteHeader(statusCode)
+		return
+	}
+
 	ri.statusCode = statusCode
 	ri.wroteHeader = true
 

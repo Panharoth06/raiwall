@@ -147,3 +147,29 @@ func TestUpstreamPoolAllUnhealthy(t *testing.T) {
 		t.Fatal("expected error when all backends unhealthy, got nil")
 	}
 }
+
+func TestUpstreamPoolWeightedRoundRobin(t *testing.T) {
+	targets := []config.UpstreamTarget{
+		{Dial: "backend-a:8080", Weight: 3},
+		{Dial: "backend-b:8080", Weight: 1},
+	}
+	pool := NewUpstreamPool(targets)
+	defer pool.Stop()
+
+	counts := make(map[string]int)
+	const totalRequests = 40
+	for i := 0; i < totalRequests; i++ {
+		b, err := pool.NextBackend()
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		counts[b.Dial]++
+	}
+
+	if counts["backend-a:8080"] != 30 {
+		t.Errorf("backend-a count = %d, want 30", counts["backend-a:8080"])
+	}
+	if counts["backend-b:8080"] != 10 {
+		t.Errorf("backend-b count = %d, want 10", counts["backend-b:8080"])
+	}
+}

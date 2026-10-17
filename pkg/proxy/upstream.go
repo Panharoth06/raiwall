@@ -22,11 +22,12 @@ type UpstreamBackend struct {
 	ExpectedStatus      int
 	Transport           http.RoundTripper
 
-	healthy   atomic.Bool
-	fails     atomic.Int32
-	client    *http.Client
-	stopChan  chan struct{}
-	closeOnce sync.Once
+	healthy       atomic.Bool
+	fails         atomic.Int32
+	client        *http.Client
+	stopChan      chan struct{}
+	closeOnce     sync.Once
+	currentWeight int
 }
 
 // IsHealthy returns whether this backend is currently considered healthy.
@@ -124,6 +125,9 @@ func (ub *UpstreamBackend) runHealthChecks(ctx context.Context) {
 	ticker := time.NewTicker(ub.HealthCheckInterval)
 	defer ticker.Stop()
 
+	// Initial immediate probe on startup
+	ub.probe(ctx)
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -131,14 +135,14 @@ func (ub *UpstreamBackend) runHealthChecks(ctx context.Context) {
 		case <-ub.stopChan:
 			return
 		case <-ticker.C:
-			ub.probe()
+			ub.probe(ctx)
 		}
 	}
 }
 
-func (ub *UpstreamBackend) probe() {
+func (ub *UpstreamBackend) probe(ctx context.Context) {
 	url := fmt.Sprintf("http://%s%s", ub.Dial, ub.HealthCheckPath)
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		ub.recordFailure()
 		return
@@ -170,19 +174,21 @@ func (ub *UpstreamBackend) recordFailure() {
 	}
 }
 
-// NextBackend selects the next healthy backend using round-robin distribution.
+// NextBackend selects the next healthy backend using smooth weighted round-robin distribution.
 func (p *UpstreamPool) NextBackend() (*UpstreamBackend, error) {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
+	p.mu.Lock()
+	defer p.mu.Unlock()
 
 	if len(p.backends) == 0 {
 		return nil, fmt.Errorf("no upstream backends configured")
 	}
 
 	healthy := make([]*UpstreamBackend, 0, len(p.backends))
+	totalWeight := 0
 	for _, b := range p.backends {
 		if b.IsHealthy() {
 			healthy = append(healthy, b)
+			totalWeight += b.Weight
 		}
 	}
 
@@ -190,9 +196,20 @@ func (p *UpstreamPool) NextBackend() (*UpstreamBackend, error) {
 		return nil, fmt.Errorf("all upstream backends are unhealthy")
 	}
 
-	idx := p.counter.Add(1) - 1
-	selected := healthy[idx%uint64(len(healthy))]
-	return selected, nil
+	if len(healthy) == 1 {
+		return healthy[0], nil
+	}
+
+	var best *UpstreamBackend
+	for _, b := range healthy {
+		b.currentWeight += b.Weight
+		if best == nil || b.currentWeight > best.currentWeight {
+			best = b
+		}
+	}
+
+	best.currentWeight -= totalWeight
+	return best, nil
 }
 
 // HealthyBackends returns a snapshot of currently healthy backends.

@@ -93,6 +93,12 @@ func (m *Middleware) Validate() error {
 	if !m.runMode.IsValid() {
 		return fmt.Errorf("invalid run mode: %s", m.runMode)
 	}
+	if m.BlockStatusCode != 0 && (m.BlockStatusCode < 200 || m.BlockStatusCode > 599) {
+		return fmt.Errorf("invalid block_status_code: %d (must be between 200 and 599)", m.BlockStatusCode)
+	}
+	if m.OfflineStatusCode != 0 && (m.OfflineStatusCode < 200 || m.OfflineStatusCode > 599) {
+		return fmt.Errorf("invalid offline_status_code: %d (must be between 200 and 599)", m.OfflineStatusCode)
+	}
 	return nil
 }
 
@@ -157,20 +163,44 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 
 	// 4. Phase 1 - Request Inspection
 	var bodyBytes []byte
-	if r.Body != nil && r.ContentLength > 0 && r.ContentLength <= MaxInspectionBodySize {
-		if m.bufferPool == nil {
-			m.bufferPool = &sync.Pool{
-				New: func() any { return new(bytes.Buffer) },
+	if r.Body != nil {
+		if r.ContentLength > MaxInspectionBodySize {
+			// Payload exceeds inspection limit: selective streaming directly to upstream
+		} else {
+			if m.bufferPool == nil {
+				m.bufferPool = &sync.Pool{
+					New: func() any { return new(bytes.Buffer) },
+				}
 			}
-		}
-		buf := m.bufferPool.Get().(*bytes.Buffer)
-		buf.Reset()
-		defer m.bufferPool.Put(buf)
+			buf := m.bufferPool.Get().(*bytes.Buffer)
+			buf.Reset()
 
-		_, err := io.Copy(buf, r.Body)
-		if err == nil {
-			bodyBytes = buf.Bytes()
-			r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+			var readErr error
+			if r.ContentLength > 0 {
+				_, readErr = io.Copy(buf, r.Body)
+				_ = r.Body.Close()
+			} else if r.ContentLength < 0 {
+				// Chunked or unknown length: read up to MaxInspectionBodySize + 1
+				lr := io.LimitReader(r.Body, MaxInspectionBodySize+1)
+				_, readErr = io.Copy(buf, lr)
+			}
+
+			if readErr == nil {
+				if buf.Len() <= MaxInspectionBodySize {
+					bodyBytes = make([]byte, buf.Len())
+					copy(bodyBytes, buf.Bytes())
+					r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+				} else {
+					// Exceeded MaxInspectionBodySize while reading chunked stream:
+					// Stream remaining to upstream
+					bodyBytes = nil
+					r.Body = io.NopCloser(io.MultiReader(bytes.NewReader(buf.Bytes()), r.Body))
+				}
+			}
+
+			if buf.Cap() <= MaxInspectionBodySize*2 {
+				m.bufferPool.Put(buf)
+			}
 		}
 	}
 
@@ -198,39 +228,48 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 		m.logger.Error("WAF inspection error", zap.Error(err))
 	}
 
-	// In Defense mode, block if the verdict is ActionBlock
-	if currentMode == config.ModeDefense && verdict != nil && verdict.Action == engine.ActionBlock {
-		eventID := uuid.New().String()
-		if m.logger != nil {
-			m.logger.Warn("WAF blocked request",
-				zap.String("event_id", eventID),
+	// Evaluate verdict according to run mode
+	if verdict != nil && verdict.Action == engine.ActionBlock {
+		if currentMode == config.ModeDefense {
+			eventID := uuid.New().String()
+			if m.logger != nil {
+				m.logger.Warn("WAF blocked request",
+					zap.String("event_id", eventID),
+					zap.String("client_ip", clientIP.String()),
+					zap.String("path", r.URL.Path),
+					zap.String("rule_id", verdict.RuleID),
+					zap.String("reason", verdict.Reason),
+				)
+			}
+
+			statusCode := m.BlockStatusCode
+			if verdict.StatusCode != 0 {
+				statusCode = verdict.StatusCode
+			}
+			body := m.BlockResponseBody
+			if appCfg != nil {
+				if appCfg.BlockStatusCode != 0 {
+					statusCode = appCfg.BlockStatusCode
+				}
+				if appCfg.BlockResponseBody != "" {
+					body = appCfg.BlockResponseBody
+				}
+			}
+
+			rendered := strings.ReplaceAll(body, "{{EVENT_ID}}", eventID)
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.Header().Set("X-Raiwall-Event-ID", eventID)
+			w.WriteHeader(statusCode)
+			_, _ = w.Write([]byte(rendered))
+			return nil
+		} else if currentMode == config.ModeAudit && m.logger != nil {
+			m.logger.Info("WAF audit event (threat detected, not blocked)",
 				zap.String("client_ip", clientIP.String()),
 				zap.String("path", r.URL.Path),
 				zap.String("rule_id", verdict.RuleID),
 				zap.String("reason", verdict.Reason),
 			)
 		}
-
-		statusCode := m.BlockStatusCode
-		if verdict.StatusCode != 0 {
-			statusCode = verdict.StatusCode
-		}
-		body := m.BlockResponseBody
-		if appCfg != nil {
-			if appCfg.BlockStatusCode != 0 {
-				statusCode = appCfg.BlockStatusCode
-			}
-			if appCfg.BlockResponseBody != "" {
-				body = appCfg.BlockResponseBody
-			}
-		}
-
-		rendered := strings.ReplaceAll(body, "{{EVENT_ID}}", eventID)
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Header().Set("X-Raiwall-Event-ID", eventID)
-		w.WriteHeader(statusCode)
-		_, _ = w.Write([]byte(rendered))
-		return nil
 	}
 
 	// 5. Phase 2 - Response Interception Wrapper

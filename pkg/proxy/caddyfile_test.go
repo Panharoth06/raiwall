@@ -47,16 +47,50 @@ func TestUnmarshalCaddyfile(t *testing.T) {
 			wantErr:      false,
 		},
 		{
-			name: "invalid block_status",
+			name: "invalid block_status not a number",
 			input: `raiwall {
 				block_status notanumber
 			}`,
 			wantErr: true,
 		},
 		{
-			name: "invalid offline_status",
+			name: "block_status out of range high",
+			input: `raiwall {
+				block_status 9999
+			}`,
+			wantErr: true,
+		},
+		{
+			name: "block_status out of range low",
+			input: `raiwall {
+				block_status 150
+			}`,
+			wantErr: true,
+		},
+		{
+			name: "invalid offline_status not a number",
 			input: `raiwall {
 				offline_status badcode
+			}`,
+			wantErr: true,
+		},
+		{
+			name: "offline_status out of range low",
+			input: `raiwall {
+				offline_status 80
+			}`,
+			wantErr: true,
+		},
+		{
+			name: "positional mode with extra arguments",
+			input: `raiwall defense extra_arg {
+			}`,
+			wantErr: true,
+		},
+		{
+			name: "mode directive with extra arguments",
+			input: `raiwall {
+				mode defense extra_arg
 			}`,
 			wantErr: true,
 		},

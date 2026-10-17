@@ -12,7 +12,7 @@
 	}
 
 	reverse_proxy 127.0.0.1:9001 127.0.0.1:9002 {
-		lb_policy round_robin
+		lb_policy weighted_round_robin 3 1
 		health_uri /healthz
 		health_interval 2s
 		health_timeout 1s

@@ -3,6 +3,7 @@ package proxy
 import (
 	"bufio"
 	"context"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -319,3 +320,154 @@ func TestDynamicSnapshotModeSwitch(t *testing.T) {
 		t.Fatal("other host should be allowed under defense mode")
 	}
 }
+
+func TestResponseInterceptorInformational1xx(t *testing.T) {
+	rec := httptest.NewRecorder()
+	interceptor := NewResponseInterceptor(rec, []string{"Server", "X-Powered-By"})
+
+	// 1. Send 103 Early Hints with a Link header and sensitive header
+	interceptor.Header().Set("Link", "</style.css>; rel=preload; as=style")
+	interceptor.Header().Set("Server", "Backend/1.0")
+	interceptor.WriteHeader(http.StatusEarlyHints)
+
+	if interceptor.StatusCode() != http.StatusEarlyHints {
+		t.Errorf("interceptor status after 103 = %d, want 103", interceptor.StatusCode())
+	}
+
+	// 2. Now send final 200 OK with body and more headers
+	interceptor.Header().Set("X-Custom", "active")
+	interceptor.WriteHeader(http.StatusOK)
+	_, _ = interceptor.Write([]byte("final body"))
+
+	if interceptor.StatusCode() != http.StatusOK {
+		t.Errorf("final interceptor status = %d, want 200", interceptor.StatusCode())
+	}
+	if rec.Header().Get("Server") != "" {
+		t.Errorf("Server header was not stripped on 200 OK: %s", rec.Header().Get("Server"))
+	}
+	if rec.Header().Get("X-Custom") != "active" {
+		t.Errorf("X-Custom header missing on 200 OK")
+	}
+	if rec.Body.String() != "final body" {
+		t.Errorf("body = %q, want 'final body'", rec.Body.String())
+	}
+}
+
+func TestChunkedRequestBodyInspection(t *testing.T) {
+	var inspectedBody string
+	mockEng := engine.NewMockEngine()
+	mockEng.InspectRequestHandler = func(ctx *engine.RequestContext) (*engine.Verdict, error) {
+		inspectedBody = string(ctx.Body)
+		if strings.Contains(inspectedBody, "union select") {
+			return &engine.Verdict{
+				Action:     engine.ActionBlock,
+				RuleID:     "SQLI_CHUNKED",
+				Reason:     "SQL injection detected in chunked body",
+				StatusCode: http.StatusForbidden,
+			}, nil
+		}
+		return engine.VerdictAllow, nil
+	}
+
+	m := setupTestMiddleware(t, "defense", mockEng)
+
+	// Test 1: Chunked request containing threat (ContentLength == -1)
+	chunkedPayload := "param=val&query=union select 1,2,3"
+	reqThreat := httptest.NewRequest("POST", "http://example.com/api", io.NopCloser(strings.NewReader(chunkedPayload)))
+	reqThreat.ContentLength = -1 // simulate chunked encoding without Content-Length
+	recThreat := httptest.NewRecorder()
+
+	mockH := newMockHandler(http.StatusOK, nil, []byte("backend"))
+	err := m.ServeHTTP(recThreat, reqThreat, mockH)
+	if err != nil {
+		t.Fatalf("ServeHTTP error: %v", err)
+	}
+
+	if mockH.served {
+		t.Fatal("backend handler should NOT have been called for malicious chunked request")
+	}
+	if recThreat.Code != http.StatusForbidden {
+		t.Errorf("expected 403 on malicious chunked request, got %d", recThreat.Code)
+	}
+	if inspectedBody != chunkedPayload {
+		t.Errorf("inspected body = %q, want %q", inspectedBody, chunkedPayload)
+	}
+
+	// Test 2: Safe chunked request passes through and downstream handler can read full body
+	safePayload := "param=val&query=safe"
+	reqSafe := httptest.NewRequest("POST", "http://example.com/api", io.NopCloser(strings.NewReader(safePayload)))
+	reqSafe.ContentLength = -1
+	recSafe := httptest.NewRecorder()
+
+	var downstreamReceivedBody string
+	safeH := newMockHandler(http.StatusOK, nil, []byte("ok"))
+	// Override mockHandler to read request body
+	safeCustomH := &safeBodyReadHandler{
+		handler: safeH,
+		onRead: func(b []byte) {
+			downstreamReceivedBody = string(b)
+		},
+	}
+
+	err = m.ServeHTTP(recSafe, reqSafe, safeCustomH)
+	if err != nil {
+		t.Fatalf("ServeHTTP error on safe chunked: %v", err)
+	}
+	if recSafe.Code != http.StatusOK {
+		t.Errorf("expected 200 on safe chunked, got %d", recSafe.Code)
+	}
+	if downstreamReceivedBody != safePayload {
+		t.Errorf("downstream received body = %q, want %q", downstreamReceivedBody, safePayload)
+	}
+}
+
+type safeBodyReadHandler struct {
+	handler *mockHandler
+	onRead  func([]byte)
+}
+
+func (s *safeBodyReadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) error {
+	b, _ := io.ReadAll(r.Body)
+	if s.onRead != nil {
+		s.onRead(b)
+	}
+	return s.handler.ServeHTTP(w, r)
+}
+
+func TestMiddlewareValidate(t *testing.T) {
+	m := &Middleware{
+		runMode:           config.ModeDefense,
+		BlockStatusCode:   403,
+		OfflineStatusCode: 503,
+	}
+	if err := m.Validate(); err != nil {
+		t.Errorf("expected valid middleware, got err: %v", err)
+	}
+
+	// Invalid run mode
+	mBadMode := &Middleware{
+		runMode: "bad",
+	}
+	if err := mBadMode.Validate(); err == nil {
+		t.Error("expected error for invalid run mode")
+	}
+
+	// Invalid block status code
+	mBadBlock := &Middleware{
+		runMode:         config.ModeDefense,
+		BlockStatusCode: 700,
+	}
+	if err := mBadBlock.Validate(); err == nil {
+		t.Error("expected error for block status code 700")
+	}
+
+	// Invalid offline status code
+	mBadOffline := &Middleware{
+		runMode:           config.ModeDefense,
+		OfflineStatusCode: 150,
+	}
+	if err := mBadOffline.Validate(); err == nil {
+		t.Error("expected error for offline status code 150")
+	}
+}
+

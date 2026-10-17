@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net"
 	"strings"
 	"time"
 )
@@ -103,6 +104,10 @@ func NewConfigSnapshot(version uint64, defaultMode RunMode, apps []*AppConfig) *
 		snap.Apps[app.ID] = app
 		for _, host := range app.Hostnames {
 			cleanHost := strings.ToLower(strings.TrimSpace(host))
+			if h, _, err := net.SplitHostPort(cleanHost); err == nil {
+				cleanHost = h
+			}
+			cleanHost = strings.Trim(cleanHost, "[]")
 			if cleanHost != "" {
 				snap.hostToAppID[cleanHost] = app.ID
 			}
@@ -118,9 +123,10 @@ func (s *ConfigSnapshot) GetAppForHost(host string) (*AppConfig, bool) {
 		return nil, false
 	}
 	cleanHost := strings.ToLower(strings.TrimSpace(host))
-	if colonIdx := strings.IndexByte(cleanHost, ':'); colonIdx != -1 {
-		cleanHost = cleanHost[:colonIdx]
+	if h, _, err := net.SplitHostPort(cleanHost); err == nil {
+		cleanHost = h
 	}
+	cleanHost = strings.Trim(cleanHost, "[]")
 
 	if appID, ok := s.hostToAppID[cleanHost]; ok {
 		if app, found := s.Apps[appID]; found {
@@ -129,3 +135,4 @@ func (s *ConfigSnapshot) GetAppForHost(host string) (*AppConfig, bool) {
 	}
 	return nil, false
 }
+

@@ -31,9 +31,12 @@ func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error)
 //	}
 func (m *Middleware) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 	for d.Next() {
-		// Optional first positional argument: raiwall <mode>
+		// Optional first positional argument: raiwall [<mode>]
 		if d.NextArg() {
 			m.Mode = d.Val()
+			if d.NextArg() {
+				return d.ArgErr()
+			}
 		}
 
 		for d.NextBlock(0) {
@@ -43,14 +46,20 @@ func (m *Middleware) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 					return d.ArgErr()
 				}
 				m.Mode = d.Val()
+				if d.NextArg() {
+					return d.ArgErr()
+				}
 
 			case "block_status":
 				if !d.NextArg() {
 					return d.ArgErr()
 				}
 				code, err := strconv.Atoi(d.Val())
-				if err != nil {
-					return d.Errf("invalid block_status code: %v", err)
+				if err != nil || code < 200 || code > 599 {
+					return d.Errf("invalid block_status code: %s (must be between 200 and 599)", d.Val())
+				}
+				if d.NextArg() {
+					return d.ArgErr()
 				}
 				m.BlockStatusCode = code
 
@@ -59,8 +68,11 @@ func (m *Middleware) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 					return d.ArgErr()
 				}
 				code, err := strconv.Atoi(d.Val())
-				if err != nil {
-					return d.Errf("invalid offline_status code: %v", err)
+				if err != nil || code < 200 || code > 599 {
+					return d.Errf("invalid offline_status code: %s (must be between 200 and 599)", d.Val())
+				}
+				if d.NextArg() {
+					return d.ArgErr()
 				}
 				m.OfflineStatusCode = code
 
