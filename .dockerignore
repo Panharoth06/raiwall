@@ -1,0 +1,6 @@
+.git
+bin/
+*.log
+tasks/
+.DS_Store
+scratch/
