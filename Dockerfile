@@ -1,6 +1,6 @@
 # Multi-stage build for Raiwall reverse proxy & WAF gateway
 # Stage 1: Builder
-FROM golang:1.23-alpine AS builder
+FROM golang:1.27-alpine AS builder
 
 WORKDIR /src
 

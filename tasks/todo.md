@@ -6,7 +6,7 @@
 **Description:** Initialize the Go module `github.com/raiwall/raiwall`, set up the project folder structure (`cmd/raiwall`, `pkg/proxy`, `pkg/engine`, `pkg/config`), write a `Makefile` with build/test/lint targets, and create `cmd/raiwall/main.go` embedding Caddy v2's CLI runtime.
 
 **Acceptance criteria:**
-- [x] `go.mod` exists with Go 1.23+ and imports `github.com/caddyserver/caddy/v2`.
+- [x] `go.mod` exists with Go 1.27+ and imports `github.com/caddyserver/caddy/v2`.
 - [x] Standard directory layout created (`cmd/`, `pkg/`, `tests/`, `examples/`).
 - [x] `cmd/raiwall/main.go` compiles and executes `caddy.Main()`, outputting Caddy/Raiwall version on `--version`.
 - [x] `Makefile` provides working `build`, `test`, `lint`, and `run` targets.
@@ -180,7 +180,7 @@
 **Acceptance criteria:**
 - [x] Integration test spins up Raiwall and proxies HTTP/1.1, HTTP/2, and WebSocket traffic to mock upstreams.
 - [x] Validates dynamic run mode flipping (`Defense` -> `Offline` -> `Audit`) on live connections without dropping sockets.
-- [x] Multi-stage `Dockerfile` (`golang:1.23-alpine` builder $\to$ `alpine:latest` runner) compiles Raiwall into $<50\text{ MB}$ image.
+- [x] Multi-stage `Dockerfile` (`golang:1.27-alpine` builder $\to$ `alpine:latest` runner) compiles Raiwall into $<50\text{ MB}$ image.
 
 **Verification:**
 - [x] Integration test passes: `go test -v -tags=integration ./tests/e2e/...`
