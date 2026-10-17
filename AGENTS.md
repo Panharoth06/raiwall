@@ -37,37 +37,53 @@ The entire stack ships as a **single Go binary** with the Vue admin UI embedded 
 
 ## Architecture
 
-```
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                        CONTROL PLANE (Admin & API)                          │
-│  [Vue 3 + shadcn-vue + ECharts + Globe.gl]  ◄──►  [Huma OpenAPI + sqlc/SQLite] │
-│  • Config Validation & Atomic Rollback Engine                                │
-│  • Granular Rule Exception & False-Positive Tuning Portal                    │
-└──────────────────────────────────────────────┬───────────────────────────────┘
-                                               │ Hot-Reload (In-Memory Atomic Sync)
-┌──────────────────────────────────────────────▼───────────────────────────────┐
-│                        DATA PLANE (Caddy + WAF Engine)                       │
-│                                                                              │
-│  Client ──► 1. TLS Hook (CertMagic + JA4 Fingerprint + CIDR/bart)           │
-│             2. Route Classifier:                                             │
-│                ├─► [API / Machine Path] ──► Bearer/API Key Fast Path         │
-│                └─► [Browser Path]       ──► Altcha/Anubis HTTP 468 PoW       │
-│             3. Rate Limiter (Composite Keys: IP + JA4 + Session Cookie)      │
-│             4. Rule Exception Gate (Check path/param bypasses first)          │
-│             5. Custom ACLs (expr-lang/expr + MaxMind GeoIP)                  │
-│             6. Stream Filter (Stream large bodies >1MB; selective inspect)    │
-│             7. Normalizer (Coraza: URL/HTML/Unicode/Base64 decode)            │
-│             8. Semantic Engine:                                               │
-│                ├─► Lexical Triage (libinjection CGO <2µs)                    │
-│                └─► AST Verifier (tidb/mvdan/tdewolff; 32KB cap, 5ms limit)   │
-│             9. Reverse Proxy (Caddy Upstream + 403/404 Scanner Trap Hook)    │
-└──────────────────────────────────────────────┬───────────────────────────────┘
-                                               │ Async Ring Buffer (Batch)
-┌──────────────────────────────────────────────▼───────────────────────────────┐
-│                     TELEMETRY & ALERTING PIPELINE                            │
-│  • PII / PCI-DSS Sanitizer (auto-mask passwords, tokens & CVVs)              │
-│  • [ClickHouse / SQLite WAL Logs]           • [Shoutrrr: Multi-Channel Push] │
-└──────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph ControlPlane["CONTROL PLANE (Admin & API)"]
+        UI["Vue 3 + shadcn-vue<br/>(ECharts + Globe.gl)"] <--> API["Huma OpenAPI 3.1 REST API"]
+        API <--> DB[("SQLite WAL (sqlc)")]
+        API --> EngineConfig["Config Validation & Rollback"]
+    end
+
+    subgraph DataPlane["DATA PLANE (Caddy v2 + WAF Engine)"]
+        Client(["Client Request"]) --> Step1["1. TLS Hook<br/>(CertMagic + JA4 Fingerprint + bart CIDR)"]
+        
+        Step1 --> Step2{"2. Route Classifier"}
+        Step2 -->|"API Route / Bearer Token"| FastPath["API Fast-Path<br/>(Token Validation)"]
+        Step2 -->|"Browser Path (HTML)"| Step3["3. Bot Defense<br/>(Altcha / Anubis HTTP 468 PoW)"]
+        
+        FastPath --> Step4["4. Rate Limiter<br/>(Composite: IP + JA4 + Cookie)"]
+        Step3 --> Step4
+        
+        Step4 --> Step5["5. Exception Gate<br/>(Path / Param False-Positive Bypass)"]
+        Step5 --> Step6["6. Custom ACLs<br/>(expr-lang/expr + MaxMind GeoIP)"]
+        Step6 --> Step7["7. Stream Filter<br/>(Payloads >1MB Direct Stream)"]
+        Step7 --> Step8["8. Normalizer<br/>(Coraza: URL / HTML / Base64)"]
+        
+        Step8 --> Step9{"9. Semantic WAF"}
+        Step9 -->|"Lexical Triage (<2µs)"| LibInj["libinjection CGO"]
+        Step9 -->|"Suspicious Tokens"| AST["AST Context Verifier<br/>(TiDB SQL / mvdan Shell / tdewolff XSS)"]
+        
+        LibInj -->|"Verdict: Allow"| Proxy["10. Reverse Proxy<br/>(Upstream SWRR + 403/404 Scanner Trap)"]
+        AST -->|"Verdict: Allow"| Proxy
+        AST -->|"Verdict: Block"| Block403(["HTTP 403 Blocked"])
+        
+        Proxy --> Upstreams[("Protected Backend Services")]
+    end
+
+    subgraph Telemetry["TELEMETRY & ALERTING PIPELINE"]
+        RingBuffer["Async Ring Buffer<br/>(500ms Batch Flush)"]
+        PII["PII / PCI-DSS Sanitizer<br/>(Auto-mask Tokens & Secrets)"]
+        Logs[("SQLite WAL / ClickHouse")]
+        Alerts["Shoutrrr Push Alerts<br/>(Slack, Discord, Telegram)"]
+        
+        RingBuffer --> PII
+        PII --> Logs
+        PII --> Alerts
+    end
+
+    EngineConfig -.->|"Hot-Reload (atomic.Pointer)"| DataPlane
+    DataPlane -.->|"Forensic Events"| RingBuffer
 ```
 
 ---
