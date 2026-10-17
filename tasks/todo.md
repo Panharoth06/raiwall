@@ -199,4 +199,4 @@
 - [x] All 8 tasks completed and verified with automated tests.
 - [x] Standalone binary compiles cleanly with zero warnings.
 - [x] Docker container runs and passes end-to-end reverse proxying and mode switching tests.
-- [x] Ready to proceed to Milestone 2 (Domain 2: CGO libinjection & AST Semantic Threat Engine).
+- [x] Ready to proceed to Milestone 2 (Domain 2: pure-Go libinjection-go & AST Semantic Threat Engine).

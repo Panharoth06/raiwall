@@ -25,7 +25,7 @@
 Raiwall is a self-hosted, SafeLine-class WAF that combines:
 
 - **High-throughput reverse proxying** (HTTP/1.1, HTTP/2, HTTP/3/QUIC, WebSockets, gRPC) via Caddy v2.
-- **Semantic threat detection** using a three-stage funnel: recursive normalization → native C `libinjection` CGO lexical triage (< 2 µs) → bounded AST context verification (SQL, Shell, XSS).
+- **Semantic threat detection** using a three-stage funnel: recursive normalization → pure-Go `libinjection-go` lexical triage (< 2 µs) → bounded AST context verification (SQL, Shell, XSS).
 - **Active bot defense** with JA4 TLS fingerprinting, intelligent API/browser route classification, and stateless Proof-of-Work challenges.
 - **Three-tiered composite rate limiting** with anti-CGNAT protection.
 - **Granular access control** with parameter-level false-positive exceptions, compiled bytecode ACL rules, and zero-code pre-application auth.
@@ -61,7 +61,7 @@ flowchart TD
         Step7 --> Step8["8. Normalizer<br/>(Coraza: URL / HTML / Base64)"]
         
         Step8 --> Step9{"9. Semantic WAF"}
-        Step9 -->|"Lexical Triage (<2µs)"| LibInj["libinjection CGO"]
+        Step9 -->|"Lexical Triage (<2µs)"| LibInj["libinjection-go (Pure Go)"]
         Step9 -->|"Suspicious Tokens"| AST["AST Context Verifier<br/>(TiDB SQL / mvdan Shell / tdewolff XSS)"]
         
         LibInj -->|"Verdict: Allow"| Proxy["10. Reverse Proxy<br/>(Upstream SWRR + 403/404 Scanner Trap)"]
@@ -93,7 +93,7 @@ flowchart TD
 | # | Domain | Summary |
 |---|--------|---------|
 | 1 | **Reverse Proxy & Gateway** | Caddy v2 data plane: multi-protocol proxying, automated SSL/ACME, `atomic.Pointer[ConfigSnapshot]` hot-reload, `sync.Pool` buffer pooling, weighted round-robin load balancing, active health checks. |
-| 2 | **Semantic Threat Detection** | Three-stage funnel: recursive normalization (Coraza) → native C `libinjection` lexical triage (< 2 µs) → bounded AST verification (SQL via TiDB parser, Shell via `mvdan/sh`, XSS via `tdewolff/parse`). Hard 32 KB cap and 5 ms timeout per parameter. |
+| 2 | **Semantic Threat Detection** | Three-stage funnel: recursive normalization (Coraza) → pure-Go `libinjection-go` lexical triage (< 2 µs) → bounded AST verification (SQL via TiDB parser, Shell via `mvdan/sh`, XSS via `tdewolff/parse`). Hard 32 KB cap and 5 ms timeout per parameter. |
 | 3 | **Bot Mitigation & Active Defense** | JA4/JA4H TLS fingerprinting, HTTP/2 frame fingerprinting, intelligent API vs. browser route classification, stateless SHA-256 Proof-of-Work (HTTP 468), HMAC clearance cookies, SPA hydration protection. |
 | 4 | **DDoS & Rate Limiting** | Three-tiered rate limiting: Tier 1 (access velocity → PoW), Tier 2 (attack frequency → auto-ban), Tier 3 (scanner trap on upstream 403/404 → ban). Composite keys (IP + JA4 + Cookie) for CGNAT safety. Ristretto (single-node) / Redis (cluster). |
 | 5 | **Access Control & Identity** | Parameter-level false-positive exception engine, compiled bytecode ACLs (`expr-lang/expr`, < 15 ns), balanced routing table CIDR matching (`gaissmai/bart`, ~15 ns for 500K+ IPs), MaxMind GeoIP, OIDC/SSO zero-code pre-auth. |
@@ -117,7 +117,7 @@ flowchart TD
 | Structured Logging | **Zap** (`go.uber.org/zap`) — consistent with Caddy internals |
 | Metrics | **Prometheus** (`prometheus/client_golang`) |
 | Alerting | **Shoutrrr** (`containrrr/shoutrrr`) |
-| WAF Lexer | **libinjection** (native C via CGO FFI) |
+| WAF Lexer | **libinjection-go** (`corazawaf/libinjection-go`, Pure Go / CGO-free) |
 | WAF Normalization | **Coraza** (`corazawaf/coraza`) |
 | WAF AST (SQL) | **TiDB Parser** (`pingcap/tidb/pkg/parser`) or `xwb1989/sqlparser` |
 | WAF AST (Shell) | **mvdan/sh** (`mvdan/sh/v3/syntax`) |
@@ -210,7 +210,7 @@ raiwall/
 | `sqlc` (build tool) | SQL → type-safe Go code | No ORM overhead, SQL stays readable, compile-time safety |
 | `go.uber.org/zap` | Structured logging | Already in Caddy's dependency tree, high-performance |
 | `corazawaf/coraza` | Input normalization | ModSecurity-compatible transformations |
-| `libinjection` (C, CGO) | Fast SQLi/XSS lexical scan | Industry standard, < 2 µs per evaluation |
+| `corazawaf/libinjection-go` | Fast SQLi/XSS lexical scan | Pure Go port, zero CGO, < 2 µs evaluation |
 | `expr-lang/expr` | Compiled boolean ACL rules | Bytecode evaluation in < 15 ns |
 | `gaissmai/bart` | CIDR routing table | ~15 ns lookups across 500K+ IP entries |
 | `stretchr/testify` | Test assertions | Widely used, `require` + `assert` ergonomics |
@@ -306,7 +306,7 @@ These are **hard constraints** that must be respected in every implementation:
 
 | Milestone | Scope & Deliverables | Timeline | Status |
 |-----------|---------------------|----------|--------|
-| **1: Core Proxy & Control Plane** | Caddy Proxy + Auto-SSL + Normalization + `libinjection` • Minimal Control Plane API (`huma`) + Web UI Log Viewer + Rule Exception Engine | Weeks 1–8 | 🟡 Domain 1 complete, Domains 2–7 in progress |
+| **1: Core Proxy & Control Plane** | Caddy Proxy + Auto-SSL + Normalization + `libinjection-go` • Minimal Control Plane API (`huma`) + Web UI Log Viewer + Rule Exception Engine | Weeks 1–8 | 🟡 Domain 1 complete, Domains 2–7 in progress |
 | **2: Stateful Defense & AST Verification** | 3-Tier Composite Rate Limiting + Fast CIDR (`bart`) + MaxMind GeoIP + AST Verification (32KB/5ms cap) + ClickHouse batch logging + PII Sanitizer | Weeks 9–16 | ⬜ Not started |
 | **3: Active Defense & Sidecar Mode** | JA4 Fingerprinting + HTTP 468 PoW (`altcha`/`anubis` with API bypass) + Envoy/Nginx `ext_proc` sidecar connector + Web UI charts & alerts | Weeks 17–24 | ⬜ Not started |
 

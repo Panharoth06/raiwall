@@ -38,4 +38,4 @@ Tasks are tracked in `tasks/todo.md`:
 | **Upstream WebSocket & SSE Connection Severing** | **Medium** | Implement graceful connection draining on configuration reloads without abruptly terminating open sockets. |
 
 ## Open Questions & Future Work
-- *Domain 2 Hand-off:* Next milestone will implement native C `libinjection` (CGO FFI) and bounded AST context verification inside `pkg/engine`.
+- *Domain 2 Hand-off:* Next milestone will implement pure-Go `libinjection-go` (zero CGO) and bounded AST context verification inside `pkg/engine`.

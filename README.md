@@ -49,7 +49,7 @@ Built natively as a **Caddy v2** module, Raiwall combines extreme proxy throughp
 ### 🧠 2. Semantic Threat Detection Engine (Core WAF)
 - **Three-Stage Funnel:**
   1. *Recursive Normalization:* Multi-pass decoding of URL, HTML entities, Base64, and Unicode escapes with SQL/script comment stripping.
-  2. *CGO Lexical Triage:* Ultra-fast token analysis using native C `libinjection` ($<2\text{ µs}$) for immediate SQLi/XSS triage.
+  2. *Pure-Go Lexical Triage:* Ultra-fast token analysis using pure-Go `libinjection-go` ($<2\text{ µs}$) for immediate SQLi/XSS triage with zero CGO overhead.
   3. *Bounded AST Context Verification:* Synthesizes grammar trees to detect execution breakouts (SQL via TiDB parser, Bash via `mvdan/sh`, DOM/JS via `tdewolff/parse`).
 - **CPU Starvation Defenses:** Hard 32 KB per-parameter caps and strict 5 ms parser timeouts maintain $p99 < 15\text{ ms}$ under heavy load.
 
@@ -110,7 +110,7 @@ flowchart TD
         Step7 --> Step8["8. Normalizer<br/>(Coraza: URL / HTML / Base64)"]
         
         Step8 --> Step9{"9. Semantic WAF"}
-        Step9 -->|"Lexical Triage (<2µs)"| LibInj["libinjection CGO"]
+        Step9 -->|"Lexical Triage (<2µs)"| LibInj["libinjection-go (Pure Go)"]
         Step9 -->|"Suspicious Tokens"| AST["AST Context Verifier<br/>(TiDB SQL / mvdan Shell / tdewolff XSS)"]
         
         LibInj -->|"Verdict: Allow"| Proxy["10. Reverse Proxy<br/>(Upstream SWRR + 403/404 Scanner Trap)"]
@@ -141,7 +141,7 @@ flowchart TD
 
 ### Prerequisites
 - **Go 1.27+**
-- C compiler (`gcc` or `clang`) for CGO (used by `libinjection`)
+- **100% Pure Go:** No C compiler or CGO required (`CGO_ENABLED=0` fully supported)
 - `make`
 
 ### 1. Build from Source
@@ -236,7 +236,7 @@ go test -v -race -tags=integration ./...
 
 ## Tech Stack
 
-- **Data Plane:** Go 1.27+, Caddy v2 (`caddyhttp`), CertMagic, `libinjection`, Coraza, TiDB Parser, `mvdan/sh`, `tdewolff/parse`, `exaring/ja4plus`, `gaissmai/bart`, `ristretto`.
+- **Data Plane:** Go 1.27+, Caddy v2 (`caddyhttp`), CertMagic, `libinjection-go` (Pure Go), Coraza, TiDB Parser, `mvdan/sh`, `tdewolff/parse`, `exaring/ja4plus`, `gaissmai/bart`, `ristretto`.
 - **Control Plane:** Huma v2 (OpenAPI 3.1 REST API), `sqlc`, SQLite (`modernc.org/sqlite`), Zap logging, Prometheus metrics, Shoutrrr alerting.
 - **Dashboard UI:** Vue 3 (latest), TypeScript, Vite, `shadcn-vue` (Radix primitives + Tailwind CSS), Pinia, Vue Router 4, Apache ECharts, `globe.gl`.
 
@@ -245,7 +245,7 @@ go test -v -race -tags=integration ./...
 ## Roadmap
 
 - [x] **Milestone 1 (Data Plane Core):** Caddy v2 reverse proxy middleware, `atomic.Pointer[ConfigSnapshot]` hot swaps, priority client IP extraction, two-phase request/response interception, decoupled `WAFEngine` interface, Smooth Weighted Round-Robin load balancing, and active health checks.
-- [ ] **Milestone 2 (Stateful Defense & Semantic WAF):** Recursive normalization (Coraza), native C `libinjection` CGO lexical triage ($<2\text{ µs}$), bounded AST context evaluation (SQL, Shell, XSS), 3-Tier composite rate limiting, BART CIDR threat feeds, and SQLite/ClickHouse logging.
+- [ ] **Milestone 2 (Stateful Defense & Semantic WAF):** Recursive normalization (Coraza), pure-Go `libinjection-go` lexical triage ($<2\text{ µs}$), bounded AST context evaluation (SQL, Shell, XSS), 3-Tier composite rate limiting, BART CIDR threat feeds, and SQLite/ClickHouse logging.
 - [ ] **Milestone 3 (Active Defense & Control Plane):** JA4/JA4H TLS fingerprinting, HTTP 468 stateless PoW challenges, Vue 3 + TypeScript dashboard embedding, 3D attack globe, and Envoy `ext_proc/v3` sidecar mode.
 
 ---
