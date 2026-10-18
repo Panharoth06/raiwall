@@ -52,28 +52,28 @@ Pre-App Auth Core (pkg/auth/oidc.go, simple.go)
 Tasks are tracked in `tasks/todo.md`:
 
 ### Phase 1: Granular Parameter-Level Exception Engine
-- [ ] **Task 37: Parameter-Level Exception Engine Core & Pattern Matcher** (Size: S)
-- [ ] **Task 38: Exception Gate Integration with Semantic Threat Engine** (Size: S)
-- [ ] *Checkpoint: Parameter Exception Engine successfully suppresses false positives at parameter precision while keeping adjacent parameters protected.*
+- [x] **Task 37: Parameter-Level Exception Engine Core & Pattern Matcher** (Size: S)
+- [x] **Task 38: Exception Gate Integration with Semantic Threat Engine** (Size: S)
+- [x] *Checkpoint: Parameter Exception Engine successfully suppresses false positives at parameter precision while keeping adjacent parameters protected.*
 
 ### Phase 2: High-Performance CIDR Routing (`bart`) & GeoIP Engine (`maxminddb`)
-- [ ] **Task 39: Balanced Routing Table CIDR & Threat Feed Engine (`gaissmai/bart`)** (Size: M)
-- [ ] **Task 40: MaxMind GeoIP Lookup Reader & ASN Extractor (`oschwald/maxminddb-golang`)** (Size: S)
-- [ ] *Checkpoint: BART CIDR table and MaxMind GeoIP readers provide sub-microsecond IP threat and geographic intelligence.*
+- [x] **Task 39: Balanced Routing Table CIDR & Threat Feed Engine (`gaissmai/bart`)** (Size: M)
+- [x] **Task 40: MaxMind GeoIP Lookup Reader & ASN Extractor (`oschwald/maxminddb-golang`)** (Size: S)
+- [x] *Checkpoint: BART CIDR table and MaxMind GeoIP readers provide sub-microsecond IP threat and geographic intelligence.*
 
 ### Phase 3: Compiled Bytecode Boolean ACL Engine (`expr-lang/expr`)
-- [ ] **Task 41: Compiled Bytecode ACL Engine & Expression Environment** (Size: M)
-- [ ] *Checkpoint: Compiled bytecode ACL engine executes multi-condition rules in $<15\text{ ns}$ with rich action outcomes.*
+- [x] **Task 41: Compiled Bytecode ACL Engine & Expression Environment** (Size: M)
+- [x] *Checkpoint: Compiled bytecode ACL engine executes multi-condition rules in $<15\text{ ns}$ with rich action outcomes.*
 
 ### Phase 4: Zero-Code Pre-Application Authentication Gateway (`pkg/auth`)
-- [ ] **Task 42: Dual-Mode Auth Core (Simple Local Auth + OIDC Discovery Client)** (Size: M)
-- [ ] **Task 43: JWT Session Management, Upstream Identity Injection & Auth Endpoints** (Size: M)
-- [ ] *Checkpoint: Zero-code pre-app auth wall secures legacy apps with OIDC/Simple auth and injects identity headers upstream.*
+- [x] **Task 42: Dual-Mode Auth Core (Simple Local Auth + OIDC Discovery Client)** (Size: M)
+- [x] **Task 43: JWT Session Management, Upstream Identity Injection & Auth Endpoints** (Size: M)
+- [x] *Checkpoint: Zero-code pre-app auth wall secures legacy apps with OIDC/Simple auth and injects identity headers upstream.*
 
 ### Phase 5: Caddy Middleware Integration, Nested Caddyfile Directives & End-to-End Validation
-- [ ] **Task 44: Caddy Middleware Wiring & Nested Caddyfile Directives (`exceptions`, `acl`, `auth`)** (Size: M)
-- [ ] **Task 45: Domain 5 End-to-End Integration Tests & Micro-Benchmark Suite** (Size: M)
-- [ ] *Checkpoint: Milestone 5 complete, all tests passing with `-race`, single binary builds cleanly under 50MB.*
+- [x] **Task 44: Caddy Middleware Wiring & Nested Caddyfile Directives (`exceptions`, `acl`, `auth`)** (Size: M)
+- [x] **Task 45: Domain 5 End-to-End Integration Tests & Micro-Benchmark Suite** (Size: M)
+- [x] *Checkpoint: Milestone 5 complete, all tests passing with `-race`, single binary builds cleanly under 50MB.*
 
 ---
 

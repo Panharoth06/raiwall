@@ -89,6 +89,8 @@ func (r *ExceptionRule) Matches(host, path, method, location, paramName, ruleID 
 			// Special case: cookie parameters might be reported under Header location with name Cookie
 			if strings.EqualFold(r.Location, "cookie") && strings.EqualFold(location, "header") && strings.EqualFold(paramName, "cookie") {
 				// matches
+			} else if strings.EqualFold(r.Location, "body") && (strings.EqualFold(location, "json") || strings.EqualFold(location, "multipart")) {
+				// JSON and Multipart payloads reside within the request body
 			} else {
 				return false
 			}

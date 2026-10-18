@@ -30,9 +30,10 @@ type mmdbASNRecord struct {
 // GeoIPReader performs thread-safe geographic and autonomous system lookups
 // using MaxMind MMDB databases with safe zero-panic fallback.
 type GeoIPReader struct {
-	countryReader *maxminddb.Reader
-	asnReader     *maxminddb.Reader
-	mu            sync.RWMutex
+	countryReader   *maxminddb.Reader
+	asnReader       *maxminddb.Reader
+	staticOverrides map[string]GeoData
+	mu              sync.RWMutex
 }
 
 // NewGeoIPReader creates a GeoIPReader. If countryPath or asnPath are empty,
@@ -142,12 +143,34 @@ func (r *GeoIPReader) LookupAddr(addr netip.Addr) GeoData {
 	return r.Lookup(ip)
 }
 
+// SetStaticLookup maps an IP to static GeoData for testing or manual overrides.
+func (r *GeoIPReader) SetStaticLookup(ip net.IP, data GeoData) {
+	if r == nil || ip == nil {
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.staticOverrides == nil {
+		r.staticOverrides = make(map[string]GeoData)
+	}
+	r.staticOverrides[ip.String()] = data
+}
+
 // Lookup queries geographic and ASN data for an IP.
 // Gracefully returns empty GeoData for loopback/private IPs or when databases are unconfigured.
 func (r *GeoIPReader) Lookup(ip net.IP) GeoData {
 	if r == nil || ip == nil {
 		return GeoData{}
 	}
+
+	r.mu.RLock()
+	if len(r.staticOverrides) > 0 {
+		if data, ok := r.staticOverrides[ip.String()]; ok {
+			r.mu.RUnlock()
+			return data
+		}
+	}
+	r.mu.RUnlock()
 
 	// Fast path: bypass private, loopback, or unspecified IP ranges
 	addr, ok := NetipAddrFromIP(ip)

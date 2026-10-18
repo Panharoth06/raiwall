@@ -263,18 +263,15 @@ func (e *ACLEngine) acquireEnv(reqCtx *engine.RequestContext, geo GeoData) *Eval
 		if reqCtx.ClientIP != nil {
 			env.IP = reqCtx.ClientIP.String()
 			env.ClientIP = env.IP
-			env.Client_IP = env.IP
 		} else {
 			env.IP = ""
 			env.ClientIP = ""
-			env.Client_IP = ""
 		}
 		env.JA4 = reqCtx.JA4
 		env.Method = reqCtx.Method
 		env.Path = reqCtx.Path
 		env.Host = reqCtx.Host
 		env.UserAgent = reqCtx.UserAgent
-		env.User_Agent = env.UserAgent
 
 		for k, v := range reqCtx.Headers {
 			if len(v) > 0 {

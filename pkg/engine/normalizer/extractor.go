@@ -49,13 +49,7 @@ func ExtractParameters(path string, query string, headers http.Header, body []by
 
 	// 2. Query
 	if query != "" {
-		params = append(params, Parameter{
-			Name:     "query",
-			Value:    query,
-			Location: LocationQuery,
-		})
-
-		if parsedQuery, err := url.ParseQuery(query); err == nil {
+		if parsedQuery, err := url.ParseQuery(query); err == nil && len(parsedQuery) > 0 {
 			for key, values := range parsedQuery {
 				for _, val := range values {
 					params = append(params, Parameter{
@@ -65,6 +59,12 @@ func ExtractParameters(path string, query string, headers http.Header, body []by
 					})
 				}
 			}
+		} else {
+			params = append(params, Parameter{
+				Name:     "query",
+				Value:    query,
+				Location: LocationQuery,
+			})
 		}
 	}
 
