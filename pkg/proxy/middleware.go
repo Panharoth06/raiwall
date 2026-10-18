@@ -15,6 +15,7 @@ import (
 	"github.com/Panharoth06/raiwall/pkg/bot"
 	"github.com/Panharoth06/raiwall/pkg/config"
 	"github.com/Panharoth06/raiwall/pkg/engine"
+	"github.com/Panharoth06/raiwall/pkg/rate"
 	"go.uber.org/zap"
 )
 
@@ -24,6 +25,30 @@ func init() {
 
 // MaxInspectionBodySize is the maximum body size buffered for threat inspection (1 MB).
 const MaxInspectionBodySize = 1024 * 1024
+
+// RateLimitSettings configures three-tiered rate limiting policies.
+type RateLimitSettings struct {
+	Tier1Rate        int64          `json:"tier1_rate,omitempty"`
+	Tier1Period      caddy.Duration `json:"tier1_period,omitempty"`
+	Tier1Burst       int64          `json:"tier1_burst,omitempty"`
+	Tier2Threshold   int64          `json:"tier2_threshold,omitempty"`
+	Tier2Window      caddy.Duration `json:"tier2_window,omitempty"`
+	Tier2BanDuration caddy.Duration `json:"tier2_ban_duration,omitempty"`
+	Tier3Threshold   int64          `json:"tier3_threshold,omitempty"`
+	Tier3Window      caddy.Duration `json:"tier3_window,omitempty"`
+	Tier3BanDuration caddy.Duration `json:"tier3_ban_duration,omitempty"`
+	StorageType      string         `json:"storage_type,omitempty"`
+	StorageAddr      string         `json:"storage_addr,omitempty"`
+}
+
+// WaitingRoomSettings configures the bounded virtual waiting room.
+type WaitingRoomSettings struct {
+	Enabled               bool           `json:"enabled,omitempty"`
+	MaxConcurrentInFlight int64          `json:"max_concurrent,omitempty"`
+	MaxQueueDepth         int64          `json:"max_queue_depth,omitempty"`
+	AdmissionRate         int64          `json:"admission_rate,omitempty"`
+	AdmissionTokenTTL     caddy.Duration `json:"admission_token_ttl,omitempty"`
+}
 
 // Middleware is the Caddy HTTP handler implementing Raiwall WAF and Gateway interception.
 type Middleware struct {
@@ -43,6 +68,10 @@ type Middleware struct {
 	HoneypotTrap  *bool          `json:"honeypot_trap,omitempty"`
 	PoWSecret     string         `json:"pow_secret,omitempty"`
 
+	// Domain 4: DDoS, HTTP Flood & Rate Limiting configuration
+	RateLimitConfig   *RateLimitSettings   `json:"rate_limit,omitempty"`
+	WaitingRoomConfig *WaitingRoomSettings `json:"waiting_room,omitempty"`
+
 	engine     engine.WAFEngine
 	logger     *zap.Logger
 	bufferPool *sync.Pool
@@ -54,6 +83,12 @@ type Middleware struct {
 	clearanceMgr  *bot.ClearanceManager
 	honeypotInj   *bot.HoneypotInjector
 	trapCtrl      *bot.TrapController
+
+	banManager   *rate.BanManager
+	tier1Limiter *rate.Tier1VelocityLimiter
+	tier2Limiter *rate.Tier2AttackLimiter
+	tier3Trap    *rate.Tier3ScannerTrap
+	waitingRoom  *rate.WaitingRoomManager
 }
 
 // CaddyModule returns the Caddy module information.
@@ -146,7 +181,145 @@ func (m *Middleware) Provision(ctx caddy.Context) error {
 		m.trapCtrl = bot.NewTrapController(nil, bot.DefaultBanDuration, m.logger)
 	}
 
+	// Initialize Domain 4 components
+	if m.banManager == nil {
+		m.banManager = rate.NewBanManager(m.logger)
+	}
+
+	var rateStorage rate.RateStorage
+	if m.RateLimitConfig != nil && strings.ToLower(m.RateLimitConfig.StorageType) == "redis" && m.RateLimitConfig.StorageAddr != "" {
+		redisClient := rate.NewSimpleRESPClient(m.RateLimitConfig.StorageAddr, 2*time.Second)
+		rateStorage = rate.NewRedisStorage(rate.RedisStorageConfig{
+			Client:            redisClient,
+			FallbackOnFailure: true,
+		})
+	} else {
+		rateStorage = rate.NewMemoryStorage()
+	}
+
+	if m.tier1Limiter == nil && m.RateLimitConfig != nil && m.RateLimitConfig.Tier1Rate > 0 {
+		period := time.Duration(m.RateLimitConfig.Tier1Period)
+		if period <= 0 {
+			period = 10 * time.Second
+		}
+		burst := m.RateLimitConfig.Tier1Burst
+		if burst < 0 {
+			burst = 20
+		}
+		m.tier1Limiter = rate.NewTier1VelocityLimiter(rate.Tier1Config{
+			Rate:            m.RateLimitConfig.Tier1Rate,
+			Period:          period,
+			Burst:           burst,
+			Storage:         rateStorage,
+			RouteClassifier: m.routeClass,
+			PoWEngine:       m.powEngine,
+		})
+	}
+
+	if m.tier2Limiter == nil && m.RateLimitConfig != nil && m.RateLimitConfig.Tier2Threshold > 0 {
+		window := time.Duration(m.RateLimitConfig.Tier2Window)
+		if window <= 0 {
+			window = 60 * time.Second
+		}
+		banDur := time.Duration(m.RateLimitConfig.Tier2BanDuration)
+		if banDur <= 0 {
+			banDur = 24 * time.Hour
+		}
+		m.tier2Limiter = rate.NewTier2AttackLimiter(rate.Tier2Config{
+			Threshold:   m.RateLimitConfig.Tier2Threshold,
+			Window:      window,
+			BanDuration: banDur,
+			BanManager:  m.banManager,
+			Storage:     rateStorage,
+			Logger:      m.logger,
+		})
+	}
+
+	if m.tier3Trap == nil && m.RateLimitConfig != nil && m.RateLimitConfig.Tier3Threshold > 0 {
+		window := time.Duration(m.RateLimitConfig.Tier3Window)
+		if window <= 0 {
+			window = 30 * time.Second
+		}
+		banDur := time.Duration(m.RateLimitConfig.Tier3BanDuration)
+		if banDur <= 0 {
+			banDur = 24 * time.Hour
+		}
+		m.tier3Trap = rate.NewTier3ScannerTrap(rate.Tier3Config{
+			Threshold:   m.RateLimitConfig.Tier3Threshold,
+			Window:      window,
+			BanDuration: banDur,
+			BanManager:  m.banManager,
+			Storage:     rateStorage,
+			Logger:      m.logger,
+		})
+	}
+
+	if m.waitingRoom == nil && m.WaitingRoomConfig != nil && (m.WaitingRoomConfig.Enabled || m.WaitingRoomConfig.MaxConcurrentInFlight > 0) {
+		ttl := time.Duration(m.WaitingRoomConfig.AdmissionTokenTTL)
+		if ttl <= 0 {
+			ttl = 15 * time.Minute
+		}
+		m.waitingRoom = rate.NewWaitingRoomManager(rate.WaitingRoomConfig{
+			MaxConcurrentInFlight: m.WaitingRoomConfig.MaxConcurrentInFlight,
+			MaxQueueDepth:         m.WaitingRoomConfig.MaxQueueDepth,
+			AdmissionRate:         m.WaitingRoomConfig.AdmissionRate,
+			AdmissionTokenTTL:     ttl,
+			Secret:                m.PoWSecret,
+			Logger:                m.logger,
+		})
+	}
+
 	return nil
+}
+
+// SetBanManager overrides the BanManager (used for testing).
+func (m *Middleware) SetBanManager(bm *rate.BanManager) {
+	m.banManager = bm
+}
+
+// BanManager returns the active BanManager.
+func (m *Middleware) BanManager() *rate.BanManager {
+	return m.banManager
+}
+
+// SetTier1Limiter overrides the Tier1VelocityLimiter (used for testing).
+func (m *Middleware) SetTier1Limiter(l *rate.Tier1VelocityLimiter) {
+	m.tier1Limiter = l
+}
+
+// Tier1Limiter returns the active Tier1VelocityLimiter.
+func (m *Middleware) Tier1Limiter() *rate.Tier1VelocityLimiter {
+	return m.tier1Limiter
+}
+
+// SetTier2Limiter overrides the Tier2AttackLimiter (used for testing).
+func (m *Middleware) SetTier2Limiter(l *rate.Tier2AttackLimiter) {
+	m.tier2Limiter = l
+}
+
+// Tier2Limiter returns the active Tier2AttackLimiter.
+func (m *Middleware) Tier2Limiter() *rate.Tier2AttackLimiter {
+	return m.tier2Limiter
+}
+
+// SetTier3Trap overrides the Tier3ScannerTrap (used for testing).
+func (m *Middleware) SetTier3Trap(t *rate.Tier3ScannerTrap) {
+	m.tier3Trap = t
+}
+
+// Tier3Trap returns the active Tier3ScannerTrap.
+func (m *Middleware) Tier3Trap() *rate.Tier3ScannerTrap {
+	return m.tier3Trap
+}
+
+// SetWaitingRoom overrides the WaitingRoomManager (used for testing).
+func (m *Middleware) SetWaitingRoom(wm *rate.WaitingRoomManager) {
+	m.waitingRoom = wm
+}
+
+// WaitingRoom returns the active WaitingRoomManager.
+func (m *Middleware) WaitingRoom() *rate.WaitingRoomManager {
+	return m.waitingRoom
 }
 
 // SetBotClassifier overrides the bot classifier (used for testing).
@@ -237,7 +410,33 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 	}
 	r = r.WithContext(ctx)
 
-	// 2. Fast-Path: Check Auto-Ban state (banned crawlers / botnets)
+	// 2. Fast-Path: Check Auto-Ban state (banned crawlers / botnets / rate abusers)
+	if m.banManager != nil {
+		if banned, entry := m.banManager.IsBanned(clientIP, ja4); banned {
+			eventID := uuid.New().String()
+			if m.logger != nil {
+				m.logger.Warn("Blocked auto-banned client (ban store)",
+					zap.String("event_id", eventID),
+					zap.String("client_ip", clientIP.String()),
+					zap.String("ja4", ja4),
+					zap.String("reason", entry.Reason),
+				)
+			}
+			statusCode := m.BlockStatusCode
+			if statusCode == 0 {
+				statusCode = http.StatusForbidden
+			}
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.Header().Set("X-Raiwall-Event-ID", eventID)
+			w.WriteHeader(statusCode)
+			banMsg := "<!DOCTYPE html><html><head><title>403 Forbidden</title></head><body><h1>403 Forbidden</h1><p>Client is blocked due to security violations.</p></body></html>"
+			if m.BlockResponseBody != defaultBlockHTML && m.BlockResponseBody != "" {
+				banMsg = strings.ReplaceAll(m.BlockResponseBody, "{{EVENT_ID}}", eventID)
+			}
+			_, _ = w.Write([]byte(banMsg))
+			return nil
+		}
+	}
 	if m.trapCtrl != nil {
 		if banned, entry := m.trapCtrl.IsClientBanned(clientIP, ja4); banned {
 			eventID := uuid.New().String()
@@ -263,6 +462,16 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 			_, _ = w.Write([]byte(banMsg))
 			return nil
 		}
+	}
+
+	// 2b. Waiting Room SSE Endpoint (/.raiwall/waiting-room/events)
+	if r.URL.Path == rate.WaitingRoomEventsPath {
+		if m.waitingRoom != nil {
+			m.waitingRoom.HandleSSE(w, r, clientIP, ja4)
+			return nil
+		}
+		http.Error(w, "Waiting room not active", http.StatusNotFound)
+		return nil
 	}
 
 	// 3. Honeypot Trap Interception (/.raiwall/trap/*)
@@ -318,6 +527,39 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 		return nil
 	}
 
+	// 6b. Virtual Waiting Room Gate
+	var waitingRoomRelease func()
+	if m.waitingRoom != nil {
+		if !m.waitingRoom.IsAdmitted(r, clientIP, ja4) {
+			if m.waitingRoom.ShouldEnterWaitingRoom() {
+				if m.routeClass == nil {
+					m.routeClass = bot.NewRouteClassifier(nil)
+				}
+				route := m.routeClass.Classify(r)
+				if route == bot.RouteAPI || bot.ShouldBypassChallenge(route) {
+					rate.WriteWaitingRoomOverloadedJSON(w, 30)
+					return nil
+				}
+				entry, pos, waitSecs, err := m.waitingRoom.Enqueue(clientIP, ja4)
+				if err != nil {
+					rate.WriteWaitingRoomOverloadedJSON(w, 30)
+					return nil
+				}
+				return rate.RenderWaitingRoomPage(w, entry.ID, pos, waitSecs, r.URL.RequestURI())
+			}
+		}
+		waitingRoomRelease = m.waitingRoom.AcquireLease()
+		defer waitingRoomRelease()
+	}
+
+	// 6c. Tier 1 Access Velocity Limiter
+	if m.tier1Limiter != nil {
+		allowed, err := m.tier1Limiter.Enforce(w, r, clientIP, ja4)
+		if !allowed {
+			return err
+		}
+	}
+
 	// 7. Domain 3: Bot Mitigation & Route Classification
 	botDefenseMode := strings.ToLower(m.BotDefense)
 	if botDefenseMode != "" && botDefenseMode != "off" && botDefenseMode != "disabled" {
@@ -343,6 +585,9 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 						)
 					}
 				} else if currentMode == config.ModeDefense {
+					if m.tier2Limiter != nil {
+						_, _, _ = m.tier2Limiter.RecordAttack(r.Context(), clientIP, ja4, "BOT_SPOOF", botVerdict.Reason)
+					}
 					eventID := uuid.New().String()
 					if m.logger != nil {
 						m.logger.Warn("Bot defense blocked client",
@@ -472,6 +717,9 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 
 	// Evaluate verdict according to run mode
 	if verdict != nil && verdict.Action == engine.ActionBlock {
+		if m.tier2Limiter != nil {
+			_, _, _ = m.tier2Limiter.RecordAttack(r.Context(), clientIP, ja4, verdict.RuleID, verdict.Reason)
+		}
 		if currentMode == config.ModeDefense {
 			eventID := uuid.New().String()
 			if m.logger != nil {
@@ -525,6 +773,11 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 
 	// Ensure any buffered HTML response is injected and finished
 	interceptor.Finish()
+
+	// Tier 3 Scanner Trap response inspection
+	if m.tier3Trap != nil {
+		_, _, _ = m.tier3Trap.InspectResponse(r.Context(), r, clientIP, ja4, interceptor.StatusCode())
+	}
 
 	// Post-proxy response inspection
 	respContext := &engine.ResponseContext{

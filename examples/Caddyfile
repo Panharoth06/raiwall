@@ -15,6 +15,20 @@
 		pow_difficulty 50000
 		clearance_ttl 2h
 		honeypot true
+
+		rate_limit {
+			tier1_velocity 100 10s 20
+			tier2_attack 10 60s 24h
+			tier3_scanner 20 30s 24h
+			storage memory
+		}
+
+		waiting_room {
+			max_concurrent 500
+			max_queue_depth 1000
+			admission_rate 50
+			token_ttl 15m
+		}
 	}
 
 	reverse_proxy 127.0.0.1:9001 127.0.0.1:9002 {
