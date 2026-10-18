@@ -762,21 +762,25 @@ const toggleHumansExpanded = () => {
               }"
             />
 
-            <!-- Continuous Flowing Light Shine Pulses (Client -> Middle -> Destination) -->
+            <!-- Single Continuous Long Bridge Light Shine (Client -> Middle -> Destination) -->
             <path
               v-for="ribbon in sankeyRibbons"
               :key="`pulse-${ribbon.id}`"
               :d="ribbon.d"
               fill="none"
               :stroke="ribbon.isThreat ? '#F87171' : '#38BDF8'"
-              :stroke-width="Math.max(2.5, ribbon.strokeWidth * 0.45)"
+              :stroke-width="Math.max(2.8, ribbon.strokeWidth * 0.55)"
               stroke-linecap="round"
-              class="ribbon-pulse-beam pointer-events-none"
+              :class="[
+                'pointer-events-none',
+                (ribbon.sourceId === 'waf-core' || ribbon.sourceId === 'edge-defense')
+                  ? 'ribbon-bridge-stage2'
+                  : 'ribbon-bridge-stage1'
+              ]"
               :style="{
-                opacity: ribbon.dimmed ? 0 : 0.85,
-                strokeDasharray: '32 180',
+                opacity: ribbon.dimmed ? 0 : 0.9,
+                strokeDasharray: '200 1200',
                 filter: ribbon.isThreat ? 'url(#ribbonGlowRed)' : 'url(#ribbonGlowCyan)',
-                animationDuration: ribbon.isThreat ? '2.1s' : '2.6s',
               }"
             />
           </g>
@@ -1222,18 +1226,57 @@ const toggleHumansExpanded = () => {
   overflow: hidden;
 }
 
-@keyframes flowLight {
-  from {
-    stroke-dashoffset: 212;
+@keyframes flowBridgeStage1 {
+  0% {
+    stroke-dashoffset: 200;
+    opacity: 0;
   }
-  to {
-    stroke-dashoffset: 0;
+  4% {
+    opacity: 0.95;
+  }
+  36% {
+    opacity: 0.95;
+  }
+  42% {
+    stroke-dashoffset: -580;
+    opacity: 0;
+  }
+  43%, 100% {
+    stroke-dashoffset: -580;
+    opacity: 0;
   }
 }
 
-.ribbon-pulse-beam {
-  animation-name: flowLight;
-  animation-timing-function: linear;
-  animation-iteration-count: infinite;
+@keyframes flowBridgeStage2 {
+  0%, 41% {
+    stroke-dashoffset: 200;
+    opacity: 0;
+  }
+  42% {
+    stroke-dashoffset: 200;
+    opacity: 0;
+  }
+  46% {
+    opacity: 0.95;
+  }
+  78% {
+    opacity: 0.95;
+  }
+  84% {
+    stroke-dashoffset: -580;
+    opacity: 0;
+  }
+  85%, 100% {
+    stroke-dashoffset: -580;
+    opacity: 0;
+  }
+}
+
+.ribbon-bridge-stage1 {
+  animation: flowBridgeStage1 4.4s cubic-bezier(0.35, 0, 0.25, 1) infinite;
+}
+
+.ribbon-bridge-stage2 {
+  animation: flowBridgeStage2 4.4s cubic-bezier(0.35, 0, 0.25, 1) infinite;
 }
 </style>
