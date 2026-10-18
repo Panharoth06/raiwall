@@ -46,6 +46,7 @@ type RequestContext struct {
 	Body       []byte          `json:"body,omitempty"`
 	TLSVersion uint16          `json:"tls_version,omitempty"`
 	UserAgent  string          `json:"user_agent,omitempty"`
+	JA4        string          `json:"ja4,omitempty"`
 	AppID      string          `json:"app_id,omitempty"`
 	Context    context.Context `json:"-"`
 }

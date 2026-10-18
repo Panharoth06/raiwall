@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
@@ -31,6 +32,10 @@ func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error)
 //	    strip_headers <header1> [<header2>...]
 //	    ast_timeout <duration>
 //	    max_param_size <bytes>
+//	    bot_defense <defense|challenge|audit|off>
+//	    pow_difficulty <int>
+//	    clearance_ttl <duration>
+//	    honeypot <bool>
 //	}
 func (m *Middleware) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 	for d.Next() {
@@ -111,6 +116,66 @@ func (m *Middleware) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 					return d.ArgErr()
 				}
 				m.MaxParamSize = size
+
+			case "bot_defense":
+				if !d.NextArg() {
+					return d.ArgErr()
+				}
+				val := strings.ToLower(d.Val())
+				switch val {
+				case "defense", "challenge", "strict", "audit", "off", "disabled":
+					m.BotDefense = val
+				default:
+					return d.Errf("invalid bot_defense: %s (must be defense, challenge, strict, audit, or off)", d.Val())
+				}
+				if d.NextArg() {
+					return d.ArgErr()
+				}
+
+			case "pow_difficulty":
+				if !d.NextArg() {
+					return d.ArgErr()
+				}
+				diff, err := strconv.ParseInt(d.Val(), 10, 64)
+				if err != nil || diff <= 0 {
+					return d.Errf("invalid pow_difficulty: %s (must be a positive integer)", d.Val())
+				}
+				if d.NextArg() {
+					return d.ArgErr()
+				}
+				m.PoWDifficulty = diff
+
+			case "clearance_ttl":
+				if !d.NextArg() {
+					return d.ArgErr()
+				}
+				dur, err := caddy.ParseDuration(d.Val())
+				if err != nil {
+					return d.Errf("invalid clearance_ttl: %s (%v)", d.Val(), err)
+				}
+				if d.NextArg() {
+					return d.ArgErr()
+				}
+				m.ClearanceTTL = caddy.Duration(dur)
+
+			case "honeypot", "honeypot_trap":
+				if !d.NextArg() {
+					return d.ArgErr()
+				}
+				val := d.Val()
+				if d.NextArg() {
+					return d.ArgErr()
+				}
+				var enabled bool
+				switch strings.ToLower(val) {
+				case "true", "on", "yes", "1", "enabled":
+					enabled = true
+				case "false", "off", "no", "0", "disabled":
+					enabled = false
+				default:
+					return d.Errf("invalid honeypot value: %s (must be true/false/on/off)", val)
+				}
+				m.HoneypotTrap = &enabled
 
 			default:
 				return d.Errf("unrecognized raiwall subdirective: %s", d.Val())

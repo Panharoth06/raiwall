@@ -235,3 +235,275 @@
 - [x] Recursive normalization, fast lexical triage, and bounded AST context verification (SQL, Shell, XSS) fully operational.
 - [x] All unit, integration, and benchmark tests pass with `-race`.
 - [x] Ready to proceed to Milestone 3 (Domain 3: Bot Mitigation & Dynamic Active Defense).
+
+
+---
+
+# Tasks: Raiwall Domain 3 (Bot Mitigation & Dynamic Active Defense / Chaos Engine)
+
+## Phase 1: TLS Fingerprinting (JA4) & Bot Lexical Scanner
+
+### Task 18: JA4 TLS Fingerprinting Engine & Header Ingestion
+**Description:** Implement `pkg/bot/ja4.go` using `github.com/exaring/ja4plus` to extract JA4 TLS client fingerprints from `tls.ClientHelloInfo`. Support dual-mode capture: direct TLS handshake extraction in Caddy and upstream header fallback (`X-JA4-Fingerprint` or `JA4`) when deployed behind edge CDNs or external proxies. Propagate JA4 onto `RequestContext` and `http.Request` context.
+
+**Acceptance criteria:**
+- [x] Implement `ComputeJA4(hello *tls.ClientHelloInfo) string` via `ja4plus.JA4`.
+- [x] Implement `ExtractJA4(r *http.Request) string` with upstream header fallback (`X-JA4-Fingerprint`, `JA4`).
+- [x] Add `JA4` field to `engine.RequestContext` and context helper functions (`WithJA4`, `GetJA4`).
+- [x] Unit tests verify fingerprint calculation across TLS 1.2 / TLS 1.3 ClientHello fixtures and header extraction fallbacks.
+
+**Verification:**
+- [x] Tests pass: `go test -v -race ./pkg/bot/...`
+- [x] Build succeeds: `go build ./pkg/bot/...`
+
+**Dependencies:** None
+**Files likely touched:**
+- `pkg/bot/ja4.go`
+- `pkg/bot/ja4_test.go`
+- `pkg/engine/types.go`
+**Estimated scope:** Small (2–3 files)
+
+---
+
+### Task 19: JA4-to-UA Bot Classifier & Spoofing Detector
+**Description:** Implement `pkg/bot/classifier.go` to detect anomalous and spoofed clients by comparing client `User-Agent` strings against JA4 fingerprints. Identify automated CLI tools (`python-requests`, `curl`, `sqlmap`, `Go-http-client`, `headless Chrome`) and detect spoofing when a non-browser JA4 signature presents a browser User-Agent header.
+
+**Acceptance criteria:**
+- [x] Maintain a known signature catalog/heuristics for common CLI tools and libraries.
+- [x] Detect User-Agent spoofing (e.g. `curl` or `python` JA4 hash claiming `Mozilla/5.0 ... Chrome`).
+- [x] Return `BotVerdict` (`IsBot`, `IsSpoofed`, `BotCategory`, `Confidence`, `Action`).
+- [x] Enforce immediate `ActionBlock` (HTTP 403) for confirmed spoofed clients in `ModeDefense`.
+- [x] Unit tests cover known tool signatures, spoofed browser requests, and legitimate browser fingerprints.
+
+**Verification:**
+- [x] Tests pass: `go test -v -race ./pkg/bot/...`
+- [x] Build succeeds: `go build ./pkg/bot/...`
+
+**Dependencies:** Task 18
+**Files likely touched:**
+- `pkg/bot/classifier.go`
+- `pkg/bot/classifier_test.go`
+- `pkg/bot/signatures.go`
+**Estimated scope:** Small (2–3 files)
+
+---
+
+## Checkpoint: TLS & JA4 Bot Triage
+- [x] JA4 fingerprint computed from ClientHello and fallback headers cleanly.
+- [x] Spoofed CLI/library clients accurately classified and blocked.
+- [x] Unit tests pass with `-race`.
+
+---
+
+## Phase 2: Intelligent Route Classifier & API Fast-Path
+
+### Task 20: Intelligent Route Classifier (API Fast-Path vs Browser Gate)
+**Description:** Implement `pkg/bot/route.go` to categorize incoming requests into `RouteAPI`, `RouteBrowser`, or `RouteStatic`. Provide an automated machine fast-path for API endpoints (`/api/*`, `Authorization: Bearer`, `Accept: application/json`) that guarantees zero interactive challenges, protecting mobile apps and B2B webhooks from breakage.
+
+**Acceptance criteria:**
+- [x] Classify requests into `RouteAPI`, `RouteBrowser`, `RouteStatic`.
+- [x] Bypass interactive bot challenges unconditionally for `RouteAPI`.
+- [x] Support custom API path prefixes and custom bypass headers configurable per app.
+- [x] Unit tests verify classification across diverse paths, Accept headers, Authorization tokens, and file extensions.
+
+**Verification:**
+- [x] Tests pass: `go test -v -race ./pkg/bot/...`
+- [x] Build succeeds: `go build ./pkg/bot/...`
+
+**Dependencies:** None
+**Files likely touched:**
+- `pkg/bot/route.go`
+- `pkg/bot/route_test.go`
+**Estimated scope:** Small (2 files)
+
+---
+
+## Checkpoint: Route Classifier
+- [x] Machine and API traffic cleanly routed to fast-path without interactive challenge interference.
+- [x] Browser routes correctly targeted for threat inspection and challenge eligibility.
+
+---
+
+## Phase 3: Stateless Altcha PoW Engine & Clearance Cookie Gate
+
+### Task 21: Stateless Proof-of-Work Engine via `altcha-lib-go` & HTTP 468 Challenge
+**Description:** Implement `pkg/bot/pow.go` using `github.com/altcha-org/altcha-lib-go` to generate and verify stateless SHA-256 WebCrypto Proof-of-Work challenges. Implement self-contained embedded HTML/JS challenge page served on HTTP 468 with `Cache-Control: no-store` and dark mode / responsive styling, requiring zero external CDNs or third-party scripts.
+
+**Acceptance criteria:**
+- [x] Integrate `altcha-lib-go` for challenge creation with HMAC signature and configurable complexity.
+- [x] Render embedded self-contained HTTP 468 HTML challenge page containing inline WebCrypto solver widget.
+- [x] Set `Cache-Control: no-store, no-cache, must-revalidate` and `Content-Type: text/html; charset=utf-8`.
+- [x] Unit tests verify challenge creation, serialization, and WebCrypto payload structure.
+
+**Verification:**
+- [x] Tests pass: `go test -v -race ./pkg/bot/...`
+- [x] Build succeeds: `go build ./pkg/bot/...`
+
+**Dependencies:** Task 20
+**Files likely touched:**
+- `pkg/bot/pow.go`
+- `pkg/bot/templates.go`
+- `pkg/bot/pow_test.go`
+**Estimated scope:** Medium (3 files)
+
+---
+
+### Task 22: Clearance Cookie Verification & Internal Challenge Endpoint
+**Description:** Implement `pkg/bot/clearance.go` to handle challenge verification at `/.raiwall/challenge/verify`. Validate solved PoW payloads, issue `HttpOnly` clearance cookies (`rw_clearance`) signed with `HMAC_SHA256(ClientIP + JA4 + Expiration, Secret)`, and redirect to the original URL. Inspect `rw_clearance` on incoming requests to admit cleared browser sessions.
+
+**Acceptance criteria:**
+- [x] Implement `HandleChallengeVerify(w http.ResponseWriter, r *http.Request)` endpoint at `/.raiwall/challenge/verify`.
+- [x] Validate Altcha solution against server secret.
+- [x] Issue `rw_clearance` cookie with `HttpOnly`, `SameSite=Lax`, `Secure`, and configurable TTL (default 2h).
+- [x] Validate `rw_clearance` on subsequent requests; verify signature, expiration, and binding to `ClientIP + JA4`.
+- [x] Unit tests cover full issue-validate-expire lifecycle, tampered signatures, and IP/JA4 mismatch invalidation.
+
+**Verification:**
+- [x] Tests pass: `go test -v -race ./pkg/bot/...`
+- [x] Build succeeds: `go build ./pkg/bot/...`
+
+**Dependencies:** Task 21
+**Files likely touched:**
+- `pkg/bot/clearance.go`
+- `pkg/bot/clearance_test.go`
+**Estimated scope:** Medium (2 files)
+
+---
+
+## Checkpoint: PoW Engine & Clearance Cookie
+- [x] Stateless PoW challenge renders on HTTP 468 with zero third-party assets.
+- [x] Solved challenge at `/.raiwall/challenge/verify` issues tamper-proof HMAC clearance cookie.
+- [x] Valid clearance cookie admits subsequent browser requests seamlessly.
+
+---
+
+## Phase 4: Chaos Engine: Pure-Go Honeypot Injection & SPA Hydration Safety
+
+### Task 23: SPA Hydration-Safe HTML Honeypot Injector
+**Description:** Implement `pkg/bot/honeypot.go` to dynamically inject hidden honeypot links into static HTML responses using a pure-Go streaming tokenizer (`golang.org/x/net/html` or `tdewolff/parse/v2/html`). Detect modern SPA/SSR framework signatures (`id="__next"`, `id="app"`, `id="root"`, hydration markers) and automatically deactivate injection on SPA routes to prevent hydration mismatch crashes.
+
+**Acceptance criteria:**
+- [x] Parse HTML response streams in pure Go without buffering entire documents when possible.
+- [x] Detect SPA framework signatures; leave SPA/SSR HTML completely unmodified.
+- [x] Inject hidden honeypot anchor tag `<a href="/.raiwall/trap/<token>" style="display:none" rel="nofollow" aria-hidden="true">` before `</body>` on static HTML.
+- [x] Unit tests verify correct injection in static HTML and confirm zero mutation on React/Next/Vue HTML.
+
+**Verification:**
+- [x] Tests pass: `go test -v -race ./pkg/bot/...`
+- [x] Build succeeds: `go build ./pkg/bot/...`
+
+**Dependencies:** Task 20
+**Files likely touched:**
+- `pkg/bot/honeypot.go`
+- `pkg/bot/honeypot_test.go`
+**Estimated scope:** Medium (2 files)
+
+---
+
+### Task 24: Chaos Trap Handler & Auto-Ban Controller
+**Description:** Implement `pkg/bot/trap.go` to handle requests to `/.raiwall/trap/*`. Offending crawlers that follow hidden honeypot links are immediately banned using a composite `ClientIP + JA4` key in an in-memory TTL cache for a configurable duration (default 24h) and returned HTTP 403 Forbidden.
+
+**Acceptance criteria:**
+- [x] Intercept requests targeting `/.raiwall/trap/*`.
+- [x] Record offending client in thread-safe memory ban store with 24h TTL.
+- [x] Fast-path block returning HTTP 403 for all subsequent requests from banned `ClientIP + JA4`.
+- [x] Emit structured security log and metric for honeypot trap trip.
+- [x] Unit tests verify trap trip, immediate auto-ban, and TTL expiration.
+
+**Verification:**
+- [x] Tests pass: `go test -v -race ./pkg/bot/...`
+- [x] Build succeeds: `go build ./pkg/bot/...`
+
+**Dependencies:** Task 23
+**Files likely touched:**
+- `pkg/bot/trap.go`
+- `pkg/bot/trap_test.go`
+**Estimated scope:** Small (2 files)
+
+---
+
+## Checkpoint: Chaos Engine & Honeypot Traps
+- [x] Honeypot links injected safely into static HTML with zero SPA hydration disruption.
+- [x] Crawler accessing trap URL is immediately banned with composite IP + JA4 key.
+- [x] Unit tests pass with `-race`.
+
+---
+
+## Phase 5: HTTP/2 Frame Fingerprinting, Caddy Wiring & End-to-End Validation
+
+### Task 25: HTTP/2 Frame Fingerprinting Engine
+**Description:** Implement `pkg/bot/h2fingerprint.go` to inspect HTTP/2 connection parameters (`SETTINGS` frame parameter ordering/values, window update sizes, pseudo-header ordering). Calculate HTTP/2 fingerprint and correlate with JA4 and User-Agent to detect headless browser clusters and automated botnets.
+
+**Acceptance criteria:**
+- [x] Extract HTTP/2 frame attributes from HTTP/2 connections.
+- [x] Generate standardized HTTP/2 fingerprint hash.
+- [x] Integrate HTTP/2 fingerprint into bot evaluation heuristics alongside JA4.
+- [x] Unit tests verify HTTP/2 fingerprinting and correlation with JA4.
+
+**Verification:**
+- [x] Tests pass: `go test -v -race ./pkg/bot/...`
+- [x] Build succeeds: `go build ./pkg/bot/...`
+
+**Dependencies:** Task 19
+**Files likely touched:**
+- `pkg/bot/h2fingerprint.go`
+- `pkg/bot/h2fingerprint_test.go`
+**Estimated scope:** Medium (2 files)
+
+---
+
+### Task 26: Caddy Middleware Integration & Caddyfile Directives for Domain 3
+**Description:** Integrate `pkg/bot` into Caddy `Middleware` in `pkg/proxy/middleware.go` and TLS ClientHello hooks. Expose Caddyfile directives (`bot_defense`, `pow_difficulty`, `clearance_ttl`, `honeypot_trap`) in `pkg/proxy/caddyfile.go`. Update `examples/Caddyfile`.
+
+**Acceptance criteria:**
+- [x] Wire JA4 extraction, route classification, clearance check, and honeypot trap into `ServeHTTP`.
+- [x] Implement Caddyfile parsing for `bot_defense <mode>`, `pow_difficulty <int>`, `clearance_ttl <duration>`, and `honeypot <bool>`.
+- [x] Update `examples/Caddyfile` with bot defense configurations.
+- [x] Unit tests verify Caddyfile unmarshaling and middleware integration.
+
+**Verification:**
+- [x] Tests pass: `go test -v -race ./pkg/proxy/...`
+- [x] Build succeeds: `go build ./cmd/raiwall`
+
+**Dependencies:** Tasks 18–25
+**Files likely touched:**
+- `pkg/proxy/middleware.go`
+- `pkg/proxy/caddyfile.go`
+- `pkg/proxy/caddyfile_test.go`
+- `examples/Caddyfile`
+**Estimated scope:** Medium (3–4 files)
+
+---
+
+### Task 27: Domain 3 End-to-End Integration & Bot Defense Benchmark Test Suite
+**Description:** Build end-to-end integration tests in `tests/e2e/bot_defense_test.go` and benchmarks in `pkg/bot/benchmark_test.go`. Verify full defense flows against real-world bot scenarios, API fast-path latency (<1 µs overhead), PoW verification, and crawler honeypot bans under concurrent load with `-race`.
+
+**Acceptance criteria:**
+- [x] Integration tests verify:
+  - API requests (`/api/*`, Bearer token) pass directly without challenge.
+  - Suspicious browser request receives HTTP 468 PoW challenge.
+  - Solving challenge grants access with `rw_clearance` cookie.
+  - User-Agent spoofing (curl JA4 with Chrome UA) is blocked with HTTP 403.
+  - Honeypot trap visit auto-bans client.
+  - SPA HTML responses are unmodified.
+- [x] Benchmarks confirm sub-microsecond classification and zero memory leak.
+- [x] Standalone build succeeds (`make build`).
+
+**Verification:**
+- [x] Integration tests pass: `go test -v -race -tags=integration ./tests/e2e/...`
+- [x] Benchmarks pass: `go test -bench=. ./pkg/bot/...`
+- [x] Build succeeds: `make build`
+
+**Dependencies:** Tasks 18–26
+**Files likely touched:**
+- `tests/e2e/bot_defense_test.go`
+- `pkg/bot/benchmark_test.go`
+**Estimated scope:** Medium (2 files)
+
+---
+
+## Final Checkpoint: Milestone 3 (Domain 3) Completion
+- [x] All 10 tasks (Tasks 18–27) implemented and verified.
+- [x] Passive JA4 TLS fingerprinting, route classification, stateless Altcha PoW (HTTP 468), clearance cookies, and Chaos honeypot engine fully operational.
+- [x] All unit, integration, and benchmark tests pass with `-race`.
+- [x] Single binary builds cleanly under 50MB.

@@ -11,6 +11,10 @@
 		strip_headers Server X-Powered-By X-AspNet-Version
 		ast_timeout 5ms
 		max_param_size 32768
+		bot_defense defense
+		pow_difficulty 50000
+		clearance_ttl 2h
+		honeypot true
 	}
 
 	reverse_proxy 127.0.0.1:9001 127.0.0.1:9002 {

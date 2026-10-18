@@ -126,6 +126,45 @@ func TestUnmarshalCaddyfile(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "valid bot defense configuration",
+			input: `raiwall {
+				bot_defense defense
+				pow_difficulty 60000
+				clearance_ttl 3h
+				honeypot true
+			}`,
+			expectedMode: "",
+			wantErr:      false,
+		},
+		{
+			name: "invalid bot_defense mode",
+			input: `raiwall {
+				bot_defense invalid_mode
+			}`,
+			wantErr: true,
+		},
+		{
+			name: "invalid pow_difficulty not a number",
+			input: `raiwall {
+				pow_difficulty bad
+			}`,
+			wantErr: true,
+		},
+		{
+			name: "invalid clearance_ttl duration",
+			input: `raiwall {
+				clearance_ttl notaduration
+			}`,
+			wantErr: true,
+		},
+		{
+			name: "invalid honeypot boolean",
+			input: `raiwall {
+				honeypot invalid_bool
+			}`,
+			wantErr: true,
+		},
+		{
 			name: "unrecognized subdirective",
 			input: `raiwall {
 				unknown_param foo
@@ -181,5 +220,15 @@ func TestMiddlewareProvision_SemanticEngineDefault(t *testing.T) {
 
 	if m.engine.Name() != "semantic" {
 		t.Errorf("expected engine name 'semantic', got %q", m.engine.Name())
+	}
+
+	if m.PoWEngine() == nil {
+		t.Fatal("expected m.powEngine to be provisioned, got nil")
+	}
+	if m.ClearanceManager() == nil {
+		t.Fatal("expected m.clearanceMgr to be provisioned, got nil")
+	}
+	if m.TrapController() == nil {
+		t.Fatal("expected m.trapCtrl to be provisioned, got nil")
 	}
 }

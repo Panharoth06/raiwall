@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"io"
 	"net"
@@ -11,6 +12,8 @@ import (
 	"testing"
 
 	"github.com/caddyserver/caddy/v2"
+	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
+	"github.com/Panharoth06/raiwall/pkg/bot"
 	"github.com/Panharoth06/raiwall/pkg/config"
 	"github.com/Panharoth06/raiwall/pkg/engine"
 )
@@ -468,6 +471,104 @@ func TestMiddlewareValidate(t *testing.T) {
 	}
 	if err := mBadOffline.Validate(); err == nil {
 		t.Error("expected error for offline status code 150")
+	}
+
+	// Invalid bot_defense mode
+	mBadBot := &Middleware{
+		runMode:    config.ModeDefense,
+		BotDefense: "invalid_defense",
+	}
+	if err := mBadBot.Validate(); err == nil {
+		t.Error("expected error for invalid bot_defense")
+	}
+
+	// Invalid pow_difficulty
+	mBadDiff := &Middleware{
+		runMode:       config.ModeDefense,
+		PoWDifficulty: -10,
+	}
+	if err := mBadDiff.Validate(); err == nil {
+		t.Error("expected error for negative pow_difficulty")
+	}
+}
+
+func TestResponseInterceptor_CompressedHTMLNotCorrupted(t *testing.T) {
+	rec := httptest.NewRecorder()
+	interceptor := NewResponseInterceptor(rec, nil)
+	interceptor.SetHoneypotInjector(bot.NewHoneypotInjector(bot.DefaultTrapPath))
+
+	interceptor.Header().Set("Content-Type", "text/html; charset=utf-8")
+	interceptor.Header().Set("Content-Encoding", "gzip")
+
+	// Fake gzip byte sequence
+	fakeGzip := []byte{0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0x01, 0x02, 0x03}
+	interceptor.WriteHeader(http.StatusOK)
+	_, _ = interceptor.Write(fakeGzip)
+	interceptor.Finish()
+
+	res := rec.Result()
+	body, _ := io.ReadAll(res.Body)
+
+	// Body must be byte-for-byte identical to the input gzip stream with no honeypot appended
+	if !bytes.Equal(body, fakeGzip) {
+		t.Errorf("Compressed HTML body corrupted: got %v, want %v", body, fakeGzip)
+	}
+}
+
+func TestResponseInterceptor_NotModified304(t *testing.T) {
+	rec := httptest.NewRecorder()
+	interceptor := NewResponseInterceptor(rec, nil)
+	interceptor.SetHoneypotInjector(bot.NewHoneypotInjector(bot.DefaultTrapPath))
+
+	interceptor.Header().Set("Content-Type", "text/html; charset=utf-8")
+	interceptor.WriteHeader(http.StatusNotModified)
+	interceptor.Finish()
+
+	res := rec.Result()
+	if res.StatusCode != http.StatusNotModified {
+		t.Errorf("expected 304, got %d", res.StatusCode)
+	}
+	body, _ := io.ReadAll(res.Body)
+	if len(body) != 0 {
+		t.Errorf("expected empty body for 304, got %d bytes", len(body))
+	}
+}
+
+func TestBotDefense_AuditModeDoesNotBlock(t *testing.T) {
+	m := &Middleware{
+		Mode:       "defense",
+		BotDefense: "audit",
+	}
+
+	caddyCtx, cancel := caddy.NewContext(caddy.Context{Context: context.Background()})
+	defer cancel()
+	if err := m.Provision(caddyCtx); err != nil {
+		t.Fatalf("Provision error: %v", err)
+	}
+
+	// Request with curl JA4 claiming to be Chrome UA (spoofed)
+	req := httptest.NewRequest("GET", "https://example.com/page", nil)
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+	req.Header.Set("X-JA4-Fingerprint", "t13d1516h2_curl_default")
+	rec := httptest.NewRecorder()
+
+	nextHandler := caddyhttp.HandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("backend passed"))
+		return nil
+	})
+
+	err := m.ServeHTTP(rec, req, nextHandler)
+	if err != nil {
+		t.Fatalf("ServeHTTP error: %v", err)
+	}
+
+	// In audit mode, request MUST NOT be blocked (code 200, reached backend)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK in audit mode, got %d", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), "backend passed") {
+		t.Errorf("Backend was not reached in audit mode: %s", rec.Body.String())
 	}
 }
 
