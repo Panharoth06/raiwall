@@ -34,7 +34,7 @@ func TestSimpleAuth(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected auth error: %v", err)
 	}
-	if identity.Subject != "local:admin" || identity.Email != "admin@example.com" {
+	if identity.Subject != "admin" || identity.Email != "admin@example.com" {
 		t.Errorf("unexpected identity: %+v", identity)
 	}
 	if len(identity.Roles) != 2 || identity.Roles[0] != "admin" {
@@ -52,8 +52,8 @@ func TestSimpleAuth(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected plain auth error: %v", err)
 	}
-	if identity2.Subject != "local:testuser" {
-		t.Errorf("expected local:testuser, got %s", identity2.Subject)
+	if identity2.Subject != "testuser" {
+		t.Errorf("expected testuser, got %s", identity2.Subject)
 	}
 
 	// 4. Non-existent user

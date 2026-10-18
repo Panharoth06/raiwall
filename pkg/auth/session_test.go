@@ -187,7 +187,7 @@ func TestAuthGateway_EndpointsAndProtection(t *testing.T) {
 	reqAuth := httptest.NewRequest("GET", "/admin/dashboard", nil)
 	reqAuth.AddCookie(sessionCookie)
 	ident, allowed = gateway.AuthenticateRequest(recAuth, reqAuth)
-	if !allowed || ident == nil || ident.Subject != "local:alice" {
+	if !allowed || ident == nil || ident.Subject != "alice" {
 		t.Errorf("expected authenticated request to be allowed, got allowed=%v, ident=%+v", allowed, ident)
 	}
 
@@ -200,8 +200,8 @@ func TestAuthGateway_EndpointsAndProtection(t *testing.T) {
 	}
 	InjectIdentityHeaders(spoofedHeader, ident)
 
-	if spoofedHeader.Get("X-Auth-Subject") != "local:alice" {
-		t.Errorf("expected Subject 'local:alice', got %q", spoofedHeader.Get("X-Auth-Subject"))
+	if spoofedHeader.Get("X-Auth-Subject") != "alice" {
+		t.Errorf("expected Subject 'alice', got %q", spoofedHeader.Get("X-Auth-Subject"))
 	}
 	if spoofedHeader.Get("X-Auth-Email") != "alice@corp.com" {
 		t.Errorf("expected Email 'alice@corp.com', got %q", spoofedHeader.Get("X-Auth-Email"))

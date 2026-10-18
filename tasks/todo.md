@@ -927,14 +927,14 @@
 **Description:** Implement `pkg/auth/simple.go` and `pkg/auth/oidc.go` supporting dual-mode pre-application authentication. Simple Auth provides local username/password verification (bcrypt/argon2 or secure hash). OIDC client integrates `github.com/coreos/go-oidc/v3/oidc` and `golang.org/x/oauth2` to perform IdP discovery, authorization code redirect generation, and code-for-token exchange against identity providers (Google, Keycloak, Okta).
 
 **Acceptance criteria:**
-- [ ] Implement `SimpleAuth` credential validation.
-- [ ] Implement `OIDCClient` with automatic discovery (`/.well-known/openid-configuration`), state generation, and code exchange.
-- [ ] Support configurable OIDC scopes, client credentials, and redirect URIs.
-- [ ] Unit tests cover Simple Auth credential checking, OIDC discovery parsing, state verification, and code exchange mocks.
+- [x] Implement `SimpleAuth` credential validation.
+- [x] Implement `OIDCClient` with automatic discovery (`/.well-known/openid-configuration`), state generation, and code exchange.
+- [x] Support configurable OIDC scopes, client credentials, and redirect URIs.
+- [x] Unit tests cover Simple Auth credential checking, OIDC discovery parsing, state verification, and code exchange mocks.
 
 **Verification:**
-- [ ] Tests pass: `go test -v -race ./pkg/auth/...`
-- [ ] Build succeeds: `go build ./pkg/auth/...`
+- [x] Tests pass: `go test -v -race ./pkg/auth/...`
+- [x] Build succeeds: `go build ./pkg/auth/...`
 
 **Dependencies:** None
 **Files likely touched:**
@@ -950,16 +950,16 @@
 **Description:** Implement `pkg/auth/session.go`, `pkg/auth/handler.go`, and `pkg/auth/templates.go`. Manage session state via tamper-proof signed JWT cookies (`rw_session`) using `github.com/golang-jwt/jwt/v5`. Serve embedded login page at `/.raiwall/auth/login`, handle OIDC callback at `/.raiwall/auth/callback`, and logout at `/.raiwall/auth/logout`. Inject verified identity headers (`X-Auth-Subject`, `X-Auth-Email`, `X-Auth-Name`, `X-Auth-Roles`) upstream and support configurable `BypassPaths`.
 
 **Acceptance criteria:**
-- [ ] Generate and validate HMAC-SHA256 signed JWT session cookies with configurable TTL and `HttpOnly`/`Secure` flags.
-- [ ] Implement auth HTTP endpoints (`/.raiwall/auth/login`, `callback`, `logout`).
-- [ ] Render embedded, responsive zero-CDN login UI supporting both local credentials and SSO button.
-- [ ] Strip incoming client `X-Auth-*` headers and inject verified identity claims into upstream requests.
-- [ ] Support bypass paths (`/public/*`, `/healthz`, webhook routes) skipping authentication.
-- [ ] Unit tests cover session issuance, tampered cookie rejection, expiration, callback flow, and header injection.
+- [x] Generate and validate HMAC-SHA256 signed JWT session cookies with configurable TTL and `HttpOnly`/`Secure` flags.
+- [x] Implement auth HTTP endpoints (`/.raiwall/auth/login`, `callback`, `logout`).
+- [x] Render embedded, responsive zero-CDN login UI supporting both local credentials and SSO button.
+- [x] Strip incoming client `X-Auth-*` headers and inject verified identity claims into upstream requests.
+- [x] Support bypass paths (`/public/*`, `/healthz`, webhook routes) skipping authentication.
+- [x] Unit tests cover session issuance, tampered cookie rejection, expiration, callback flow, and header injection.
 
 **Verification:**
-- [ ] Tests pass: `go test -v -race ./pkg/auth/...`
-- [ ] Build succeeds: `go build ./pkg/auth/...`
+- [x] Tests pass: `go test -v -race ./pkg/auth/...`
+- [x] Build succeeds: `go build ./pkg/auth/...`
 
 **Dependencies:** Task 42
 **Files likely touched:**
@@ -972,10 +972,10 @@
 ---
 
 ## Checkpoint: Pre-Application Auth Gateway
-- [ ] Dual-mode authentication (OIDC SSO + Simple Auth) fully operational.
-- [ ] Signed JWT session cookies maintain tamper-proof state without server-side database.
-- [ ] Upstream services receive verified identity headers (`X-Auth-Email`, etc.).
-- [ ] Unit tests pass with `-race`.
+- [x] Dual-mode authentication (OIDC SSO + Simple Auth) fully operational.
+- [x] Signed JWT session cookies maintain tamper-proof state without server-side database.
+- [x] Upstream services receive verified identity headers (`X-Auth-Email`, etc.).
+- [x] Unit tests pass with `-race`.
 
 ---
 
