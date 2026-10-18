@@ -8,15 +8,17 @@ export default defineConfig({
   workers: 1,
   reporter: 'list',
   use: {
-    baseURL: 'http://127.0.0.1:5173',
+    baseURL: 'http://127.0.0.1:5193',
     viewport: { width: 1440, height: 900 },
     trace: 'on-first-retry',
   },
   webServer: {
-    command: 'npm run dev -- --host 127.0.0.1 --port 5173',
-    url: 'http://127.0.0.1:5173',
+    command: 'npm run dev -- --host 127.0.0.1 --port 5193 --strictPort',
+    url: 'http://127.0.0.1:5193',
     reuseExistingServer: !process.env.CI,
     timeout: 30000,
+    stdout: 'pipe',
+    stderr: 'pipe',
   },
   projects: [
     {

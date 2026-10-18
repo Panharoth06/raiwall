@@ -15,6 +15,8 @@ import {
   Globe,
   Lock,
   Smartphone,
+  Key,
+  Minus,
   Info,
 } from 'lucide-vue-next'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
@@ -49,12 +51,36 @@ const tooltip = reactive<TooltipState>({
   subtext: '',
 })
 
-// Tooltip Handlers
+// Tooltip Handlers with boundary clamping to prevent offscreen clipping
 const handleShowTooltip = (event: MouseEvent, header: string, subtext: string) => {
   const clientX = event.clientX ?? 400
   const clientY = event.clientY ?? 300
-  tooltip.x = clientX + 16
-  tooltip.y = clientY + 16
+  const tooltipWidth = 275
+  const tooltipHeight = 110
+  const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1600
+  const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 900
+
+  let x = clientX + 16
+  let y = clientY + 16
+
+  // If overflowing right edge, flip to left of cursor
+  if (x + tooltipWidth > viewportWidth - 16) {
+    x = clientX - tooltipWidth - 16
+  }
+  if (x < 16) {
+    x = 16
+  }
+
+  // If overflowing bottom edge, flip upward
+  if (y + tooltipHeight > viewportHeight - 16) {
+    y = clientY - tooltipHeight - 16
+  }
+  if (y < 16) {
+    y = 16
+  }
+
+  tooltip.x = Math.round(x)
+  tooltip.y = Math.round(y)
   tooltip.header = header
   tooltip.subtext = subtext
   tooltip.visible = true
@@ -327,6 +353,8 @@ const sankeyRibbons = computed<SankeyRibbon[]>(() => {
     tooltipSubtext: 'Automated crawlers and threat actors routed through WAF Core Engine inspection',
   })
 
+  // Bots to edge defense (Rate limiting / JA4 bot probes)
+  const botEdgeDimmed = owaspOnly.value && viewMode.value === 'traffic'
   ribbons.push({
     id: 'ribbon-bots-edgedefense',
     d: computeCubicPath(270, 200, 800, 600),
@@ -335,13 +363,13 @@ const sankeyRibbons = computed<SankeyRibbon[]>(() => {
     stroke: hoveredRibbonId.value === 'ribbon-bots-edgedefense' ? 'rgba(239, 68, 68, 0.60)' : 'rgba(239, 68, 68, 0.28)',
     strokeWidth: 6,
     isThreat: true,
-    dimmed: false,
+    dimmed: botEdgeDimmed,
     tooltipHeader: '1.2M BOT PROBES INTERCEPTED',
     tooltipSubtext: 'Challenged by stateless PoW and TLS JA4 fingerprinting',
   })
 
   // Humans (270, 460) -> Clean
-  const humansDimmed = owaspOnly.value
+  const humansDimmed = (owaspOnly.value && viewMode.value === 'traffic') || viewMode.value === 'threats'
   ribbons.push({
     id: 'ribbon-humans-wafcore',
     d: computeCubicPath(270, 460, 800, 330),
@@ -369,7 +397,7 @@ const sankeyRibbons = computed<SankeyRibbon[]>(() => {
   })
 
   // API (270, 730) -> Clean
-  const apiDimmed = owaspOnly.value
+  const apiDimmed = (owaspOnly.value && viewMode.value === 'traffic') || viewMode.value === 'threats'
   ribbons.push({
     id: 'ribbon-api-wafcore',
     d: computeCubicPath(270, 730, 800, 330),
@@ -427,7 +455,7 @@ const sankeyRibbons = computed<SankeyRibbon[]>(() => {
     const isThreat = viewMode.value === 'threats'
     const ribbonId = `ribbon-lower-${idx}`
     const isHovered = hoveredRibbonId.value === ribbonId
-    const dimmed = owaspOnly.value
+    const dimmed = owaspOnly.value && viewMode.value === 'traffic'
 
     let stroke = isThreat
       ? (isHovered ? 'rgba(239, 68, 68, 0.60)' : 'rgba(239, 68, 68, 0.28)')
@@ -800,9 +828,16 @@ const toggleHumansExpanded = () => {
 
               <!-- Central Node Surface -->
               <circle cx="270" cy="460" r="52" fill="#11141A" stroke="#10B981" stroke-width="1.5" />
-              <text x="270" y="452" text-anchor="middle" fill="#FFFFFF" font-size="20" font-weight="bold" class="tabular-nums">142.8k</text>
-              <text x="270" y="470" text-anchor="middle" fill="#B0B8C4" font-size="11" font-weight="600" letter-spacing="1">HUMAN CLIENTS</text>
-              <text x="270" y="486" text-anchor="middle" fill="#848D9C" font-size="11">{{ humansSubtext }}</text>
+              <text x="270" y="450" text-anchor="middle" fill="#FFFFFF" font-size="20" font-weight="bold" class="tabular-nums">142.8k</text>
+              <text x="270" y="468" text-anchor="middle" fill="#B0B8C4" font-size="11" font-weight="600" letter-spacing="1">HUMAN CLIENTS</text>
+              <text x="270" y="484" text-anchor="middle" fill="#848D9C" font-size="11">{{ humansSubtext }}</text>
+
+              <!-- Expand / Collapse Indicator -->
+              <g transform="translate(263, 495)">
+                <rect x="0" y="0" width="14" height="14" rx="7" :fill="isHumansExpanded ? '#2574F5' : '#1E232D'" :stroke="isHumansExpanded ? '#2574F5' : '#363D4C'" stroke-width="1" />
+                <Minus v-if="isHumansExpanded" class="text-white" :size="10" :x="2" :y="2" />
+                <ChevronDown v-else class="text-[#848D9C]" :size="10" :x="2" :y="2" />
+              </g>
             </g>
 
             <!-- Expanded Sub-nodes when isHumansExpanded is true -->
@@ -862,7 +897,7 @@ const toggleHumansExpanded = () => {
                 <Globe class="w-3.5 h-3.5 text-[#848D9C]" x="208" y="668" width="14" height="14" />
 
                 <circle cx="325" cy="675" r="12" fill="#161A22" stroke="#2E3644" stroke-width="1.5" />
-                <Bot class="w-3.5 h-3.5 text-[#848D9C]" x="318" y="668" width="14" height="14" />
+                <Key class="w-3.5 h-3.5 text-[#848D9C]" x="318" y="668" width="14" height="14" />
               </g>
 
               <!-- Central Node Surface -->
@@ -882,6 +917,7 @@ const toggleHumansExpanded = () => {
               :style="{
                 transform: hoveredHubId === 'waf-core' ? 'scale(1.12)' : 'scale(1)',
                 transformOrigin: '800px 330px',
+                transformBox: 'view-box',
                 transition: 'transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
               }"
               @mouseenter="hoveredHubId = 'waf-core'"
@@ -925,6 +961,7 @@ const toggleHumansExpanded = () => {
               :style="{
                 transform: hoveredHubId === 'edge-defense' ? 'scale(1.12)' : 'scale(1)',
                 transformOrigin: '800px 600px',
+                transformBox: 'view-box',
                 transition: 'transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
               }"
               @mouseenter="hoveredHubId = 'edge-defense'"
@@ -1053,7 +1090,7 @@ const toggleHumansExpanded = () => {
             <!-- Lower Arc (y = 600) with Opacity Dimming when owaspOnly === true -->
             <g
               class="lower-arc-group transition-opacity duration-300"
-              :style="{ opacity: owaspOnly ? 0.15 : 1 }"
+              :style="{ opacity: (owaspOnly && viewMode === 'traffic') ? 0.15 : 1 }"
             >
               <!-- Dotted Circular Arc -->
               <path

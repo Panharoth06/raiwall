@@ -173,4 +173,71 @@ describe('WafCommandCenter.vue', () => {
     await ribbon.trigger('mouseleave')
     expect(wrapper.find('[data-testid="topology-tooltip"]').exists()).toBe(false)
   })
+
+  // Contract 6: Ingress Orbiting Perimeter Badges Micro-Telemetry
+  it('updates cluster subtext with micro-telemetry when hovering perimeter badges', async () => {
+    wrapper = mount(WafCommandCenter, {
+      attachTo: document.body,
+    })
+
+    const botsCluster = wrapper.find('[data-testid="source-node-bots"]')
+    expect(botsCluster.text()).toContain('3.4M Requests (68% Blocked)')
+
+    // Find orbit badge group and trigger mouseenter
+    const orbitBadge = botsCluster.find('.orbit-badge')
+    expect(orbitBadge.exists()).toBe(true)
+    await orbitBadge.trigger('mouseenter')
+
+    // Subtext should update to micro-telemetry
+    expect(botsCluster.text()).toContain('0.1 kB/s • TLS 1.3 Fingerprint')
+
+    // Trigger mouseleave
+    await orbitBadge.trigger('mouseleave')
+    expect(botsCluster.text()).toContain('3.4M Requests (68% Blocked)')
+  })
+
+  // Contract 7: Dual Hubs and Lower Arc Summaries Verification
+  it('verifies Edge & Bot Defense hub and lower summary in Traffic and Threats modes', async () => {
+    wrapper = mount(WafCommandCenter, {
+      attachTo: document.body,
+    })
+
+    // Edge & Bot Defense hub has 48 spikes
+    const edgeHub = wrapper.find('[data-testid="hub-edge-defense"]')
+    expect(edgeHub.exists()).toBe(true)
+    expect(edgeHub.findAll('line').length).toBe(48)
+    expect(edgeHub.text()).toContain('EDGE & BOT DEFENSE')
+    expect(edgeHub.text()).toContain('18 Rate Policies, Geo-IP & JA4 Fingerprinting')
+
+    // Lower summary in traffic mode
+    const lowerSummary = wrapper.find('[data-testid="dest-summary-lower"]')
+    expect(lowerSummary.exists()).toBe(true)
+    expect(lowerSummary.text()).toContain('14')
+    expect(lowerSummary.text()).toContain('WEB & MICROSERVICES')
+    expect(lowerSummary.text()).toContain('11.9M Reqs Inspected')
+
+    // Switch to threats mode
+    await wrapper.find('[data-testid="mode-btn-threats"]').trigger('click')
+    expect(lowerSummary.text()).toContain('4')
+    expect(lowerSummary.text()).toContain('ABUSE & BOT VECTORS')
+    expect(lowerSummary.text()).toContain('1.68M Requests Dropped')
+  })
+
+  // Contract 8: Tooltip Viewport Boundary Clamping
+  it('clamps tooltip position so it never overflows screen edge', async () => {
+    wrapper = mount(WafCommandCenter, {
+      attachTo: document.body,
+    })
+
+    const arcNode = wrapper.find('[data-testid="arc-node-item"]')
+    // Trigger near right edge (e.g. clientX: 1550 on a 1600 viewport)
+    await arcNode.trigger('mouseenter', { clientX: 1550, clientY: 850 })
+
+    const tooltip = wrapper.find('[data-testid="topology-tooltip"]')
+    expect(tooltip.exists()).toBe(true)
+    const style = tooltip.attributes('style')
+    expect(style).toBeDefined()
+    // left should be flipped to the left of the cursor (1550 - 275 - 16 = 1259)
+    expect(style).toContain('left: 1259px')
+  })
 })

@@ -76,4 +76,67 @@ test.describe('WAF Command Center Dashboard E2E', () => {
     expect(hoveredBox!.width).toBeGreaterThan(initialBox!.width);
     expect(hoveredBox!.height).toBeGreaterThan(initialBox!.height);
   });
+
+  // Test 4: Human Clients Orbital Click Expansion
+  test('expands human clients subnodes on click and verifies viewport positioning', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/');
+    await page.waitForSelector('[data-testid="source-node-humans"]');
+
+    // Click to expand
+    await page.locator('[data-testid="source-node-humans"]').click();
+    await page.waitForSelector('[data-testid="subnode-verified"]');
+    await page.waitForSelector('[data-testid="subnode-anonymous"]');
+
+    const verified = page.locator('[data-testid="subnode-verified"]');
+    const anonymous = page.locator('[data-testid="subnode-anonymous"]');
+    await expect(verified).toBeVisible();
+    await expect(anonymous).toBeVisible();
+
+    const boxV = await verified.boundingBox();
+    const boxA = await anonymous.boundingBox();
+    expect(boxV).not.toBeNull();
+    expect(boxA).not.toBeNull();
+    expect(boxV!.x + boxV!.width).toBeLessThanOrEqual(1440);
+    expect(boxA!.x + boxA!.width).toBeLessThanOrEqual(1440);
+  });
+
+  // Test 5: Tooltip Visibility and Strict Viewport Bounds
+  test('verifies topology tooltip stays strictly within viewport boundaries when hovering right-column nodes', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/');
+    await page.waitForSelector('[data-testid="arc-node-item"]');
+
+    const firstNode = page.locator('[data-testid="arc-node-item"]').first();
+    await firstNode.hover();
+    await page.waitForSelector('[data-testid="topology-tooltip"]');
+
+    const tooltip = page.locator('[data-testid="topology-tooltip"]');
+    await expect(tooltip).toBeVisible();
+
+    const box = await tooltip.boundingBox();
+    expect(box).not.toBeNull();
+    // Must be completely within 1440x900 viewport
+    expect(box!.x).toBeGreaterThanOrEqual(0);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(1440);
+    expect(box!.y).toBeGreaterThanOrEqual(0);
+    expect(box!.y + box!.height).toBeLessThanOrEqual(900);
+  });
+
+  // Test 6: Traffic vs Threats Mode Switch E2E
+  test('switches view mode to Threats and updates summary metrics', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/');
+    await page.waitForSelector('[data-testid="dest-summary-upper"]');
+
+    const upperSummary = page.locator('[data-testid="dest-summary-upper"]');
+    await expect(upperSummary).toContainText('API GATEWAY ROUTES');
+
+    await page.locator('[data-testid="mode-btn-threats"]').click();
+    await expect(upperSummary).toContainText('INJECTION VECTORS');
+    await expect(upperSummary).toContainText('2.14M Payloads Blocked');
+
+    await page.locator('[data-testid="mode-btn-traffic"]').click();
+    await expect(upperSummary).toContainText('API GATEWAY ROUTES');
+  });
 });
