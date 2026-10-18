@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/raiwall/raiwall/pkg/config"
+	"github.com/Panharoth06/raiwall/pkg/config"
 )
 
 type roundTripperFunc func(*http.Request) (*http.Response, error)

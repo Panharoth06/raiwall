@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/raiwall/raiwall/pkg/config"
+	"github.com/Panharoth06/raiwall/pkg/config"
 )
 
 // UpstreamBackend represents a single monitored backend destination.

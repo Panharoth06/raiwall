@@ -1,8 +1,10 @@
 package proxy
 
 import (
+	"context"
 	"testing"
 
+	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 )
 
@@ -95,6 +97,35 @@ func TestUnmarshalCaddyfile(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "ast_timeout and max_param_size valid",
+			input: `raiwall {
+				ast_timeout 15ms
+				max_param_size 65536
+			}`,
+			wantErr: false,
+		},
+		{
+			name: "invalid ast_timeout format",
+			input: `raiwall {
+				ast_timeout invalid_duration
+			}`,
+			wantErr: true,
+		},
+		{
+			name: "invalid max_param_size negative",
+			input: `raiwall {
+				max_param_size -50
+			}`,
+			wantErr: true,
+		},
+		{
+			name: "invalid max_param_size not a number",
+			input: `raiwall {
+				max_param_size notanumber
+			}`,
+			wantErr: true,
+		},
+		{
 			name: "unrecognized subdirective",
 			input: `raiwall {
 				unknown_param foo
@@ -130,5 +161,25 @@ func TestUnmarshalCaddyfile(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestMiddlewareProvision_SemanticEngineDefault(t *testing.T) {
+	m := &Middleware{
+		Mode: "defense",
+	}
+	caddyCtx, cancel := caddy.NewContext(caddy.Context{Context: context.Background()})
+	defer cancel()
+
+	if err := m.Provision(caddyCtx); err != nil {
+		t.Fatalf("Provision failed: %v", err)
+	}
+
+	if m.engine == nil {
+		t.Fatal("expected m.engine to be provisioned, got nil")
+	}
+
+	if m.engine.Name() != "semantic" {
+		t.Errorf("expected engine name 'semantic', got %q", m.engine.Name())
 	}
 }

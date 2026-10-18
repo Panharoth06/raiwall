@@ -3,6 +3,7 @@ package proxy
 import (
 	"strconv"
 
+	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
@@ -28,6 +29,8 @@ func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error)
 //	    block_status <code>
 //	    offline_status <code>
 //	    strip_headers <header1> [<header2>...]
+//	    ast_timeout <duration>
+//	    max_param_size <bytes>
 //	}
 func (m *Middleware) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 	for d.Next() {
@@ -82,6 +85,32 @@ func (m *Middleware) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 					return d.ArgErr()
 				}
 				m.StripHeaders = append(m.StripHeaders, args...)
+
+			case "ast_timeout":
+				if !d.NextArg() {
+					return d.ArgErr()
+				}
+				dur, err := caddy.ParseDuration(d.Val())
+				if err != nil {
+					return d.Errf("invalid ast_timeout: %s (%v)", d.Val(), err)
+				}
+				if d.NextArg() {
+					return d.ArgErr()
+				}
+				m.ASTTimeout = caddy.Duration(dur)
+
+			case "max_param_size":
+				if !d.NextArg() {
+					return d.ArgErr()
+				}
+				size, err := strconv.Atoi(d.Val())
+				if err != nil || size <= 0 {
+					return d.Errf("invalid max_param_size: %s (must be a positive integer in bytes)", d.Val())
+				}
+				if d.NextArg() {
+					return d.ArgErr()
+				}
+				m.MaxParamSize = size
 
 			default:
 				return d.Errf("unrecognized raiwall subdirective: %s", d.Val())

@@ -7,7 +7,7 @@ import (
 	_ "github.com/caddyserver/caddy/v2/modules/standard"
 
 	// Plug in Raiwall modules
-	_ "github.com/raiwall/raiwall/pkg/proxy"
+	_ "github.com/Panharoth06/raiwall/pkg/proxy"
 )
 
 func main() {

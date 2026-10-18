@@ -12,8 +12,8 @@ import (
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 	"github.com/google/uuid"
-	"github.com/raiwall/raiwall/pkg/config"
-	"github.com/raiwall/raiwall/pkg/engine"
+	"github.com/Panharoth06/raiwall/pkg/config"
+	"github.com/Panharoth06/raiwall/pkg/engine"
 	"go.uber.org/zap"
 )
 
@@ -31,7 +31,9 @@ type Middleware struct {
 	BlockResponseBody   string   `json:"block_response_body,omitempty"`
 	OfflineStatusCode   int      `json:"offline_status_code,omitempty"`
 	OfflineResponseBody string   `json:"offline_response_body,omitempty"`
-	StripHeaders        []string `json:"strip_headers,omitempty"`
+	StripHeaders        []string       `json:"strip_headers,omitempty"`
+	ASTTimeout          caddy.Duration `json:"ast_timeout,omitempty"`
+	MaxParamSize        int            `json:"max_param_size,omitempty"`
 
 	engine     engine.WAFEngine
 	logger     *zap.Logger
@@ -76,7 +78,14 @@ func (m *Middleware) Provision(ctx caddy.Context) error {
 	m.StripHeaders = CanonicalizeHeaderList(m.StripHeaders)
 
 	if m.engine == nil {
-		m.engine = engine.NewPassthroughEngine()
+		var opts []engine.SemanticOption
+		if m.ASTTimeout > 0 {
+			opts = append(opts, engine.WithASTTimeout(time.Duration(m.ASTTimeout)))
+		}
+		if m.MaxParamSize > 0 {
+			opts = append(opts, engine.WithMaxParamSize(m.MaxParamSize))
+		}
+		m.engine = engine.NewSemanticEngine(opts...)
 	}
 
 	m.bufferPool = &sync.Pool{

@@ -16,9 +16,9 @@ import (
 	"time"
 
 	"github.com/caddyserver/caddy/v2"
-	"github.com/raiwall/raiwall/pkg/config"
-	"github.com/raiwall/raiwall/pkg/engine"
-	"github.com/raiwall/raiwall/pkg/proxy"
+	"github.com/Panharoth06/raiwall/pkg/config"
+	"github.com/Panharoth06/raiwall/pkg/engine"
+	"github.com/Panharoth06/raiwall/pkg/proxy"
 )
 
 // pipeHijackResponseWriter connects an http.ResponseWriter to a net.Pipe for testing hijacking.
@@ -123,6 +123,10 @@ func TestEndToEndHTTPProxying(t *testing.T) {
 }
 
 func TestEndToEndWebSocketAndDynamicModeSwitch(t *testing.T) {
+	t.Cleanup(func() {
+		config.StoreSnapshot(config.NewConfigSnapshot(0, config.ModeDefense, nil))
+	})
+
 	// Setup threat detection engine
 	mockEng := engine.NewMockEngine()
 	mockEng.InspectRequestHandler = func(ctx *engine.RequestContext) (*engine.Verdict, error) {
