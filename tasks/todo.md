@@ -507,3 +507,269 @@
 - [x] Passive JA4 TLS fingerprinting, route classification, stateless Altcha PoW (HTTP 468), clearance cookies, and Chaos honeypot engine fully operational.
 - [x] All unit, integration, and benchmark tests pass with `-race`.
 - [x] Single binary builds cleanly under 50MB.
+
+
+---
+
+# Tasks: Raiwall Domain 4 (DDoS, HTTP Flood & Three-Tiered Rate Limiting)
+
+## Phase 1: High-Performance Rate Limiter Engine & Pluggable Storage
+
+### Task 28: Core Rate Limiter Abstraction & Pure-Go GCRA In-Memory Engine
+**Description:** Implement `pkg/rate/gcra.go` and `pkg/rate/types.go` providing an abstract `RateLimiter` interface and an in-memory Generic Cell Rate Algorithm (GCRA) implementation. The in-memory store utilizes thread-safe, partitioned structures (or `dgraph-io/ristretto`) with atomic time calculations to guarantee sub-microsecond ($<1\text{ µs}$) decision times, zero GC overhead, and zero lock contention under high concurrency.
+
+**Acceptance criteria:**
+- [x] Define `RateLimiter` interface (`Allow(ctx context.Context, key string, cost int64) (*RateResult, error)`), `RateLimitConfig`, and `RateResult`.
+- [x] Implement pure-Go GCRA algorithm (`gcra.go`) calculating emission intervals, theoretical arrival times (TAT), and burst tolerances.
+- [x] Implement thread-safe in-memory storage with automatic TTL cleanup and zero-allocation hot paths.
+- [x] Benchmarks verify sub-microsecond ($<1\text{ µs}$) per-request decision overhead and zero race conditions with `-race`.
+- [x] Unit tests verify rate shaping, burst tolerance, burst recovery, and concurrent access.
+
+**Verification:**
+- [x] Tests pass: `go test -v -race ./pkg/rate/...`
+- [x] Benchmarks pass: `go test -bench=BenchmarkGCRAInMem ./pkg/rate/...`
+- [x] Build succeeds: `go build ./pkg/rate/...`
+
+**Dependencies:** None
+**Files likely touched:**
+- `pkg/rate/types.go`
+- `pkg/rate/gcra.go`
+- `pkg/rate/gcra_test.go`
+- `pkg/rate/memory.go`
+- `pkg/rate/memory_test.go`
+**Estimated scope:** Medium (3–4 files)
+
+---
+
+### Task 29: Distributed Redis Storage Backend & Composite Key Builder
+**Description:** Implement `pkg/rate/redis.go` supporting distributed GCRA sliding-window rate limiting over Redis clusters via atomic Lua scripts or commands. Implement `pkg/rate/key.go` to construct composite tracking keys (`ClientIP + JA4_Hash + SessionCookie`) with anti-CGNAT protection, hashing, and graceful degradation when cookies are omitted.
+
+**Acceptance criteria:**
+- [x] Implement `RedisStorage` satisfying the GCRA storage interface with atomic multi-key rate tracking.
+- [x] Gracefully handle Redis connection failures with optional local in-memory fallback.
+- [x] Implement `BuildCompositeKey(ip net.IP, ja4 string, r *http.Request, cookieName string) string` with SHA-256 / xxhash hashing.
+- [x] Unit tests cover Redis script execution (or mock interface), connection recovery, and composite key generation across diverse IP/JA4/Cookie combinations.
+
+**Verification:**
+- [x] Tests pass: `go test -v -race ./pkg/rate/...`
+- [x] Build succeeds: `go build ./pkg/rate/...`
+
+**Dependencies:** Task 28
+**Files likely touched:**
+- `pkg/rate/redis.go`
+- `pkg/rate/redis_test.go`
+- `pkg/rate/key.go`
+- `pkg/rate/key_test.go`
+**Estimated scope:** Medium (3–4 files)
+
+---
+
+## Checkpoint: Core Rate Limiter Engine & Pluggable Storage
+- [x] Core `RateLimiter` interface and GCRA engine achieve sub-microsecond throughput.
+- [x] In-memory and Redis storage backends operate seamlessly.
+- [x] Composite keys correctly bind `IP + JA4 + Cookie` with CGNAT safeguards.
+
+---
+
+## Phase 2: Tier 1 (Access Velocity) & Tier 2 (Attack Frequency Limiter)
+
+### Task 30: Tier 1 Access Velocity Limiter with Route-Aware Enforcement
+**Description:** Implement `pkg/rate/tier1.go` to enforce access velocity thresholds at the front of the request pipeline (e.g. $>100\text{ req}/10\text{s}$). Route-aware enforcement checks `bot.RouteClassifier`: browser routes receive an HTTP 468 Altcha PoW challenge, while machine/API routes (`/api/*`, `Authorization: Bearer`, `Accept: application/json`) receive HTTP 429 Too Many Requests with `Retry-After` header and structured JSON error response.
+
+**Acceptance criteria:**
+- [x] Implement `Tier1VelocityLimiter` with configurable rate limits, burst sizes, and composite key tracking.
+- [x] Integrate with `bot.RouteClassifier` and `bot.PoWEngine`: unverified browsers exceeding velocity receive HTTP 468 challenge page.
+- [x] Machine / API requests exceeding velocity receive HTTP 429 Too Many Requests with `Retry-After: <seconds>` and standard JSON error response.
+- [x] Unit tests verify rate limit trips, PoW challenge delivery for browser routes, and HTTP 429 responses for API routes.
+
+**Verification:**
+- [x] Tests pass: `go test -v -race ./pkg/rate/...`
+- [x] Build succeeds: `go build ./pkg/rate/...`
+
+**Dependencies:** Tasks 28–29
+**Files likely touched:**
+- `pkg/rate/tier1.go`
+- `pkg/rate/tier1_test.go`
+**Estimated scope:** Medium (2 files)
+
+---
+
+### Task 31: Tier 2 Attack Frequency Limiter & Unified Ban Store
+**Description:** Implement `pkg/rate/tier2.go` tracking attack events emitted by `engine.WAFEngine` (SQLi, CMDi, XSS) and `bot.BotClassifier` (UA spoofing). Implement `pkg/rate/ban.go` providing a unified `BanManager` supporting composite `ClientIP + JA4` auto-bans with configurable duration (e.g. 1h / 24h). Unify ban lookup across honeypot traps and rate limiters into a single high-performance fast-path check.
+
+**Acceptance criteria:**
+- [x] Implement `Tier2AttackLimiter` recording threat blocks per client key within sliding window (e.g. 10 blocks in 60s).
+- [x] Implement `BanManager` with thread-safe TTL storage, composite `ClientIP + JA4` bans, and optional pure-IP escalation.
+- [x] Exceeding Tier 2 threshold triggers immediate auto-ban and logs structured security event.
+- [x] Fast-path check (`IsBanned(ip, ja4)`) executes in $<500\text{ ns}$.
+- [x] Unit tests verify attack counting, auto-ban triggering, TTL expiration, and composite vs. raw IP ban behavior.
+
+**Verification:**
+- [x] Tests pass: `go test -v -race ./pkg/rate/...`
+- [x] Build succeeds: `go build ./pkg/rate/...`
+
+**Dependencies:** Task 30
+**Files likely touched:**
+- `pkg/rate/tier2.go`
+- `pkg/rate/tier2_test.go`
+- `pkg/rate/ban.go`
+- `pkg/rate/ban_test.go`
+**Estimated scope:** Medium (3–4 files)
+
+---
+
+## Checkpoint: Tier 1 & Tier 2 Defense
+- [x] Tier 1 smoothly challenges browsers via PoW and rate limits APIs via HTTP 429.
+- [x] Tier 2 automatically bans repeated attack payloads with anti-CGNAT composite keys.
+- [x] Unified ban manager evaluates bans in $<500\text{ ns}$.
+
+---
+
+## Phase 3: Tier 3 Scanner Trap & Anti-Reconnaissance Engine
+
+### Task 32: Tier 3 Scanner Trap with Upstream Response Interception
+**Description:** Implement `pkg/rate/tier3.go` hooked into the reverse proxy response interceptor (`ModifyResponse`). Track backend `404 Not Found` and `403 Forbidden` responses. Exclude common static file extensions (`.ico`, `.css`, `.png`, `.jpg`, `.svg`, `.js`, etc.) to prevent false positives. Track error frequency per composite key (`ClientIP + JA4 + Cookie`); when threshold is breached (e.g. $>20\text{ errors}/30\text{s}$), automatically ban the scanner in `BanManager`.
+
+**Acceptance criteria:**
+- [x] Implement `Tier3ScannerTrap` with configurable status codes (default 403, 404), error thresholds, and ban durations.
+- [x] Filter out static file extensions from scanner trap accounting.
+- [x] Track reconnaissance bursts using composite `ClientIP + JA4 + Cookie` keys (fallback to `ClientIP + JA4`).
+- [x] Auto-ban directory brute-forcers (`ffuf`, `gobuster`, `dirsearch`) upon exceeding error thresholds.
+- [x] Unit tests cover static asset bypass, 403/404 incrementation, composite key isolation, and auto-ban enforcement.
+
+**Verification:**
+- [x] Tests pass: `go test -v -race ./pkg/rate/...`
+- [x] Build succeeds: `go build ./pkg/rate/...`
+
+**Dependencies:** Task 31
+**Files likely touched:**
+- `pkg/rate/tier3.go`
+- `pkg/rate/tier3_test.go`
+- `pkg/rate/static_filter.go`
+**Estimated scope:** Medium (3 files)
+
+---
+
+## Checkpoint: Anti-Reconnaissance Scanner Trap
+- [x] Upstream 404/403 brute-force attacks immediately detected and banned.
+- [x] Missing static assets do not trigger false-positive bans.
+- [x] Anti-CGNAT composite keys prevent innocent users from sharing a banned scanner's fate.
+
+---
+
+## Phase 4: Bounded Virtual Waiting Room (SSE Streaming & Surge Protection)
+
+### Task 33: Bounded Virtual Waiting Room Engine & SSE Queue Streamer
+**Description:** Implement `pkg/rate/waitingroom.go` managing concurrent in-flight requests and excess traffic during surges. Implement Server-Sent Events (SSE) streaming endpoint (`/.raiwall/waiting-room/events`) that pushes real-time queue position and estimated wait time to connected browser clients. Issue signed HMAC admission tokens upon queue clearance. Enforce a hard cap (`max_queue_depth`) to prevent socket and file descriptor exhaustion (`ulimit -n`), shedding excess requests with HTTP 503 and `Retry-After`.
+
+**Acceptance criteria:**
+- [x] Implement `WaitingRoomManager` tracking active in-flight requests, queued users, and admission rates.
+- [x] Implement SSE endpoint streaming JSON position updates: `{"position": N, "wait_seconds": S, "admitted": bool}`.
+- [x] Issue signed clearance cookie / token upon admission to bypass the waiting room on page reload.
+- [x] Enforce hard cap `max_queue_depth`: immediately reject excess requests beyond cap with HTTP 503 + `Retry-After: 30`.
+- [x] Unit tests verify queue admission, SSE broadcast, admission token issuance, and hard cap load shedding.
+
+**Verification:**
+- [x] Tests pass: `go test -v -race ./pkg/rate/...`
+- [x] Build succeeds: `go build ./pkg/rate/...`
+
+**Dependencies:** Task 28
+**Files likely touched:**
+- `pkg/rate/waitingroom.go`
+- `pkg/rate/waitingroom_test.go`
+- `pkg/rate/sse.go`
+**Estimated scope:** Medium (3 files)
+
+---
+
+### Task 34: Embedded Waiting Room UI & Client-Side Auto-Admit
+**Description:** Implement `pkg/rate/templates.go` providing a zero-dependency, responsive, dark-mode HTML/JS waiting room page. The client-side script connects to the SSE stream, updates the visual queue position and estimated wait time in real-time, and automatically reloads `window.location.reload()` upon receiving admission confirmation. Route machine/API traffic exceeding capacity directly to HTTP 503/429 JSON responses.
+
+**Acceptance criteria:**
+- [x] Provide embedded, self-contained HTML/JS template for the virtual waiting room with zero external CDN dependencies.
+- [x] JavaScript handles SSE reconnects, updates queue progress UI, and triggers seamless reload on admission.
+- [x] Machine / API routes receive clean JSON response (`{"error": "server_overloaded", "retry_after": 30}`) with HTTP 503.
+- [x] Unit tests verify template rendering, header flags (`Cache-Control: no-store`), and API JSON error output.
+
+**Verification:**
+- [x] Tests pass: `go test -v -race ./pkg/rate/...`
+- [x] Build succeeds: `go build ./pkg/rate/...`
+
+**Dependencies:** Task 33
+**Files likely touched:**
+- `pkg/rate/templates.go`
+- `pkg/rate/templates_test.go`
+**Estimated scope:** Small (2 files)
+
+---
+
+## Checkpoint: Virtual Waiting Room & Surge Protection
+- [x] Real-time queue position streamed via SSE to waiting browsers.
+- [x] Automatic reload and admission upon capacity availability.
+- [x] Hard socket / FD limit strictly enforced with HTTP 503 load shedding.
+
+---
+
+## Phase 5: Caddy Middleware Wiring, Caddyfile Parsing & End-to-End Validation
+
+### Task 35: Caddy Middleware Integration & Nested Caddyfile Directives
+**Description:** Wire `Tier1VelocityLimiter`, `Tier2AttackLimiter`, `Tier3ScannerTrap`, `BanManager`, and `WaitingRoomManager` into `pkg/proxy/middleware.go` and `pkg/proxy/response_writer.go`. Implement nested Caddyfile directives in `pkg/proxy/caddyfile.go`: `rate_limit { ... }` and `waiting_room { ... }`. Update `examples/Caddyfile`.
+
+**Acceptance criteria:**
+- [x] Integrate Tier 1 velocity check and Ban fast-path into `ServeHTTP`.
+- [x] Intercept backend responses in `ResponseInterceptor` to feed Tier 3 scanner trap.
+- [x] Parse nested Caddyfile blocks:
+  - `rate_limit { tier1_velocity <rate> <window>; tier2_attack <threshold> <window> <ban_ttl>; tier3_scanner <threshold> <window> <ban_ttl>; storage <type> <addr>; }`
+  - `waiting_room { max_concurrent <int>; max_queue_depth <int>; admission_rate <int>; }`
+- [x] Update `examples/Caddyfile` showcasing DDoS and rate limiting configuration.
+- [x] Unit tests verify Caddyfile unmarshaling and middleware provisioning.
+
+**Verification:**
+- [x] Tests pass: `go test -v -race ./pkg/proxy/...`
+- [x] Build succeeds: `go build ./cmd/raiwall`
+
+**Dependencies:** Tasks 28–34
+**Files likely touched:**
+- `pkg/proxy/middleware.go`
+- `pkg/proxy/response_writer.go`
+- `pkg/proxy/caddyfile.go`
+- `pkg/proxy/caddyfile_test.go`
+- `examples/Caddyfile`
+**Estimated scope:** Medium (4–5 files)
+
+---
+
+### Task 36: Domain 4 End-to-End Integration Tests & DDoS Flood Benchmark Suite
+**Description:** Build comprehensive end-to-end integration tests in `tests/e2e/rate_limit_test.go` and performance benchmarks in `pkg/rate/benchmark_test.go`. Validate full defense flows under heavy concurrent load: Tier 1 flood handling (browser PoW vs API 429), Tier 2 attack auto-bans, Tier 3 directory scanner neutralization with anti-CGNAT composite keys, and SSE waiting room admission and load shedding with `-race`.
+
+**Acceptance criteria:**
+- [x] End-to-end integration tests verify:
+  - High-velocity flood triggers HTTP 468 PoW for browsers and HTTP 429 for API routes.
+  - Repeated attacks trigger Tier 2 auto-ban.
+  - Reconnaissance tools (`ffuf` / 404 floods) trigger Tier 3 scanner auto-ban without impacting other clients on the same IP.
+  - Waiting room queues excess concurrent traffic and admits smoothly via SSE.
+  - Load shedding rejects traffic beyond max queue depth with HTTP 503.
+- [x] Benchmarks verify GCRA rate limiter throughput ($>100\text{K ops/sec}$ with $<1\text{ µs}$ latency) under concurrent load.
+- [x] Zero race conditions under concurrent requests (`go test -race`).
+- [x] Single binary builds cleanly under 50MB (`make build`).
+
+**Verification:**
+- [x] Integration tests pass: `go test -v -race -tags=integration ./tests/e2e/...`
+- [x] Benchmarks pass: `go test -bench=. ./pkg/rate/...`
+- [x] Build succeeds: `make build`
+
+**Dependencies:** Tasks 28–35
+**Files likely touched:**
+- `tests/e2e/rate_limit_test.go`
+- `pkg/rate/benchmark_test.go`
+**Estimated scope:** Medium (2 files)
+
+---
+
+## Final Checkpoint: Milestone 4 (Domain 4) Completion
+- [x] All 9 tasks (Tasks 28–36) implemented and verified.
+- [x] Three-tiered rate limiting (Access Velocity, Attack Frequency, Scanner Trap) fully operational.
+- [x] Anti-CGNAT composite keys prevent collateral damage across shared IP networks.
+- [x] Bounded SSE virtual waiting room protects backend against surge exhaustion.
+- [x] All unit, integration, and benchmark tests pass with `-race`.
+- [x] Production-ready single binary builds cleanly.
