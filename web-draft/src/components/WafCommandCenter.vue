@@ -495,21 +495,13 @@ const toggleHumansExpanded = () => {
       data-testid="nav-rail"
       class="w-14 h-full bg-[#11141A] border-r border-[#1E232D] flex flex-col items-center z-30 shrink-0 select-none"
     >
-      <!-- Top Brand Mark: Centered geometric shield/hex SVG in #FFC000 -->
+      <!-- Top Brand Mark: Raiwall Shield Logo -->
       <div class="mt-4 mb-6 flex items-center justify-center">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" class="w-6 h-6">
-          <path
-            d="M12 2L4 6V12C4 16.5 7.4 20.6 12 22C16.6 20.6 20 16.5 20 12V6L12 2Z"
-            fill="#FFC000"
-            stroke="#B48200"
-            stroke-width="1.5"
-            stroke-linejoin="round"
-          />
-          <path
-            d="M12 6L7 11H11V18L16 13H12V6Z"
-            fill="#11141A"
-          />
-        </svg>
+        <img
+          src="/logo.png"
+          alt="Raiwall Logo"
+          class="w-7 h-7 object-contain drop-shadow-[0_0_8px_rgba(56,189,248,0.35)]"
+        />
       </div>
 
       <!-- 7 Vertical Navigation Icon Buttons -->
@@ -727,10 +719,26 @@ const toggleHumansExpanded = () => {
               <stop offset="0%" stop-color="#EF4444" stop-opacity="0.35" />
               <stop offset="100%" stop-color="#EF4444" stop-opacity="0" />
             </radialGradient>
+            <!-- Soft glow filters for continuous ribbon light shine -->
+            <filter id="ribbonGlowCyan" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="2.5" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+            <filter id="ribbonGlowRed" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="2.5" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
           </defs>
 
           <!-- ==================== SANKEY RIBBONS LAYER ==================== -->
           <g class="sankey-ribbons-layer">
+            <!-- Base Ribbon Paths -->
             <path
               v-for="ribbon in sankeyRibbons"
               :key="ribbon.id"
@@ -751,6 +759,24 @@ const toggleHumansExpanded = () => {
               @mouseleave="() => {
                 hoveredRibbonId = null
                 handleHideTooltip()
+              }"
+            />
+
+            <!-- Continuous Flowing Light Shine Pulses (Client -> Middle -> Destination) -->
+            <path
+              v-for="ribbon in sankeyRibbons"
+              :key="`pulse-${ribbon.id}`"
+              :d="ribbon.d"
+              fill="none"
+              :stroke="ribbon.isThreat ? '#F87171' : '#38BDF8'"
+              :stroke-width="Math.max(2.5, ribbon.strokeWidth * 0.45)"
+              stroke-linecap="round"
+              class="ribbon-pulse-beam pointer-events-none"
+              :style="{
+                opacity: ribbon.dimmed ? 0 : 0.85,
+                strokeDasharray: '32 180',
+                filter: ribbon.isThreat ? 'url(#ribbonGlowRed)' : 'url(#ribbonGlowCyan)',
+                animationDuration: ribbon.isThreat ? '2.1s' : '2.6s',
               }"
             />
           </g>
@@ -914,12 +940,6 @@ const toggleHumansExpanded = () => {
             <g
               data-testid="hub-waf-core"
               class="cursor-pointer"
-              :style="{
-                transform: hoveredHubId === 'waf-core' ? 'scale(1.12)' : 'scale(1)',
-                transformOrigin: '800px 330px',
-                transformBox: 'view-box',
-                transition: 'transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
-              }"
               @mouseenter="hoveredHubId = 'waf-core'"
               @mouseleave="hoveredHubId = null"
             >
@@ -958,12 +978,6 @@ const toggleHumansExpanded = () => {
             <g
               data-testid="hub-edge-defense"
               class="cursor-pointer"
-              :style="{
-                transform: hoveredHubId === 'edge-defense' ? 'scale(1.12)' : 'scale(1)',
-                transformOrigin: '800px 600px',
-                transformBox: 'view-box',
-                transition: 'transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
-              }"
               @mouseenter="hoveredHubId = 'edge-defense'"
               @mouseleave="hoveredHubId = null"
             >
@@ -1206,5 +1220,20 @@ const toggleHumansExpanded = () => {
 :host {
   display: block;
   overflow: hidden;
+}
+
+@keyframes flowLight {
+  from {
+    stroke-dashoffset: 212;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.ribbon-pulse-beam {
+  animation-name: flowLight;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
 }
 </style>

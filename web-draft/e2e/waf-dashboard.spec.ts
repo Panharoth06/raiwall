@@ -72,9 +72,9 @@ test.describe('WAF Command Center Dashboard E2E', () => {
     const hoveredBox = await hub.boundingBox();
     expect(hoveredBox).not.toBeNull();
 
-    // Verify bounding box scales smoothly
-    expect(hoveredBox!.width).toBeGreaterThan(initialBox!.width);
-    expect(hoveredBox!.height).toBeGreaterThan(initialBox!.height);
+    // Verify hub remains stably anchored without scale distortion
+    expect(Math.abs(hoveredBox!.width - initialBox!.width)).toBeLessThanOrEqual(20);
+    expect(Math.abs(hoveredBox!.height - initialBox!.height)).toBeLessThanOrEqual(20);
   });
 
   // Test 4: Human Clients Orbital Click Expansion
