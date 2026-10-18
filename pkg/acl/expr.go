@@ -118,6 +118,20 @@ func NewACLEngine(bartTable *BARTTable, geoReader *GeoIPReader, rules ...*ACLRul
 	return e, nil
 }
 
+// SetBARTTable updates the BARTTable reference in ACLEngine.
+func (e *ACLEngine) SetBARTTable(bt *BARTTable) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.bartTable = bt
+}
+
+// SetGeoIPReader updates the GeoIPReader reference in ACLEngine.
+func (e *ACLEngine) SetGeoIPReader(r *GeoIPReader) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.geoReader = r
+}
+
 // AddRule compiles and registers an ACLRule in priority order.
 func (e *ACLEngine) AddRule(rule *ACLRule) error {
 	if rule == nil {
@@ -248,14 +262,19 @@ func (e *ACLEngine) acquireEnv(reqCtx *engine.RequestContext, geo GeoData) *Eval
 	if reqCtx != nil {
 		if reqCtx.ClientIP != nil {
 			env.IP = reqCtx.ClientIP.String()
+			env.ClientIP = env.IP
+			env.Client_IP = env.IP
 		} else {
 			env.IP = ""
+			env.ClientIP = ""
+			env.Client_IP = ""
 		}
 		env.JA4 = reqCtx.JA4
 		env.Method = reqCtx.Method
 		env.Path = reqCtx.Path
 		env.Host = reqCtx.Host
 		env.UserAgent = reqCtx.UserAgent
+		env.User_Agent = env.UserAgent
 
 		for k, v := range reqCtx.Headers {
 			if len(v) > 0 {

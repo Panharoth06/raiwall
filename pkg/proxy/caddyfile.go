@@ -4,6 +4,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Panharoth06/raiwall/pkg/acl"
+	"github.com/Panharoth06/raiwall/pkg/auth"
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
@@ -304,6 +306,250 @@ func (m *Middleware) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 						m.WaitingRoomConfig.AdmissionTokenTTL = caddy.Duration(dur)
 					default:
 						return d.Errf("unrecognized waiting_room subdirective: %s", d.Val())
+					}
+				}
+
+			case "exceptions":
+				if m.ExceptionConfig == nil {
+					m.ExceptionConfig = new(ExceptionSettings)
+				}
+				for d.NextBlock(1) {
+					switch d.Val() {
+					case "rule":
+						args := d.RemainingArgs()
+						if len(args) == 0 {
+							return d.ArgErr()
+						}
+						ruleID := args[0]
+						exRule := &acl.ExceptionRule{
+							ID:     ruleID,
+							RuleID: "*",
+						}
+						for d.NextBlock(2) {
+							sub := d.Val()
+							switch sub {
+							case "description":
+								descArgs := d.RemainingArgs()
+								exRule.Description = strings.Join(descArgs, " ")
+							case "host":
+								if !d.NextArg() {
+									return d.ArgErr()
+								}
+								exRule.Host = d.Val()
+							case "path":
+								if !d.NextArg() {
+									return d.ArgErr()
+								}
+								val := d.Val()
+								if strings.HasPrefix(val, "^") || strings.ContainsAny(val, "$()[]+?*") {
+									exRule.PathRegex = val
+								} else {
+									exRule.PathPrefix = val
+								}
+							case "path_regex":
+								if !d.NextArg() {
+									return d.ArgErr()
+								}
+								exRule.PathRegex = d.Val()
+							case "path_prefix":
+								if !d.NextArg() {
+									return d.ArgErr()
+								}
+								exRule.PathPrefix = d.Val()
+							case "method":
+								if !d.NextArg() {
+									return d.ArgErr()
+								}
+								exRule.Method = d.Val()
+							case "location":
+								if !d.NextArg() {
+									return d.ArgErr()
+								}
+								exRule.Location = d.Val()
+							case "param", "param_name":
+								if !d.NextArg() {
+									return d.ArgErr()
+								}
+								exRule.ParamName = d.Val()
+							case "param_regex":
+								if !d.NextArg() {
+									return d.ArgErr()
+								}
+								exRule.ParamRegex = d.Val()
+							case "rule_id":
+								if !d.NextArg() {
+									return d.ArgErr()
+								}
+								exRule.RuleID = d.Val()
+							default:
+								return d.Errf("unrecognized exceptions rule property: %s", sub)
+							}
+						}
+						m.ExceptionConfig.Rules = append(m.ExceptionConfig.Rules, exRule)
+					default:
+						return d.Errf("unrecognized exceptions subdirective: %s", d.Val())
+					}
+				}
+
+			case "acl":
+				if m.ACLConfig == nil {
+					m.ACLConfig = new(ACLSettings)
+				}
+				for d.NextBlock(1) {
+					switch d.Val() {
+					case "threat_feed":
+						args := d.RemainingArgs()
+						if len(args) < 2 {
+							return d.ArgErr()
+						}
+						if m.ACLConfig.ThreatFeeds == nil {
+							m.ACLConfig.ThreatFeeds = make(map[string]string)
+						}
+						m.ACLConfig.ThreatFeeds[args[0]] = args[1]
+					case "geoip_db", "geoip_country", "geoip_country_db":
+						if !d.NextArg() {
+							return d.ArgErr()
+						}
+						m.ACLConfig.GeoIPCountry = d.Val()
+					case "geoip_asn", "geoip_asn_db":
+						if !d.NextArg() {
+							return d.ArgErr()
+						}
+						m.ACLConfig.GeoIPASN = d.Val()
+					case "rule":
+						args := d.RemainingArgs()
+						if len(args) == 0 {
+							return d.ArgErr()
+						}
+						ruleName := args[0]
+						rule := &acl.ACLRule{
+							Name:   ruleName,
+							Action: acl.ActionBlock,
+						}
+						for d.NextBlock(2) {
+							sub := d.Val()
+							switch sub {
+							case "expr", "expression":
+								exprArgs := d.RemainingArgs()
+								if len(exprArgs) == 0 {
+									return d.ArgErr()
+								}
+								rule.Expression = strings.Join(exprArgs, " ")
+							case "action":
+								if !d.NextArg() {
+									return d.ArgErr()
+								}
+								rule.Action = acl.Action(strings.ToLower(d.Val()))
+							case "priority":
+								if !d.NextArg() {
+									return d.ArgErr()
+								}
+								pri, err := strconv.Atoi(d.Val())
+								if err != nil {
+									return d.Errf("invalid priority: %s", d.Val())
+								}
+								rule.Priority = pri
+							case "status_code", "status":
+								if !d.NextArg() {
+									return d.ArgErr()
+								}
+								sc, err := strconv.Atoi(d.Val())
+								if err != nil || sc < 200 || sc > 599 {
+									return d.Errf("invalid status_code: %s", d.Val())
+								}
+								rule.StatusCode = sc
+							case "redirect_url", "redirect":
+								if !d.NextArg() {
+									return d.ArgErr()
+								}
+								rule.RedirectURL = d.Val()
+							default:
+								return d.Errf("unrecognized acl rule property: %s", sub)
+							}
+						}
+						m.ACLConfig.Rules = append(m.ACLConfig.Rules, rule)
+					default:
+						return d.Errf("unrecognized acl subdirective: %s", d.Val())
+					}
+				}
+
+			case "auth":
+				if m.AuthConfig == nil {
+					m.AuthConfig = new(AuthSettings)
+				}
+				for d.NextBlock(1) {
+					switch d.Val() {
+					case "provider":
+						if !d.NextArg() {
+							return d.ArgErr()
+						}
+						m.AuthConfig.Provider = strings.ToLower(d.Val())
+					case "issuer", "issuer_url":
+						if !d.NextArg() {
+							return d.ArgErr()
+						}
+						m.AuthConfig.IssuerURL = d.Val()
+					case "client_id":
+						if !d.NextArg() {
+							return d.ArgErr()
+						}
+						m.AuthConfig.ClientID = d.Val()
+					case "client_secret":
+						if !d.NextArg() {
+							return d.ArgErr()
+						}
+						m.AuthConfig.ClientSecret = d.Val()
+					case "redirect_url":
+						if !d.NextArg() {
+							return d.ArgErr()
+						}
+						m.AuthConfig.RedirectURL = d.Val()
+					case "scopes", "scope":
+						args := d.RemainingArgs()
+						if len(args) == 0 {
+							return d.ArgErr()
+						}
+						m.AuthConfig.Scopes = append(m.AuthConfig.Scopes, args...)
+					case "bypass_path", "bypass_paths":
+						args := d.RemainingArgs()
+						if len(args) == 0 {
+							return d.ArgErr()
+						}
+						m.AuthConfig.BypassPaths = append(m.AuthConfig.BypassPaths, args...)
+					case "session_secret", "cookie_secret":
+						if !d.NextArg() {
+							return d.ArgErr()
+						}
+						m.AuthConfig.SessionSecret = d.Val()
+					case "session_cookie", "cookie_name":
+						if !d.NextArg() {
+							return d.ArgErr()
+						}
+						m.AuthConfig.SessionCookie = d.Val()
+					case "session_ttl", "cookie_ttl":
+						if !d.NextArg() {
+							return d.ArgErr()
+						}
+						dur, err := caddy.ParseDuration(d.Val())
+						if err != nil {
+							return d.Errf("invalid session_ttl: %s (%v)", d.Val(), err)
+						}
+						m.AuthConfig.SessionTTL = caddy.Duration(dur)
+					case "user":
+						args := d.RemainingArgs()
+						if len(args) < 2 {
+							return d.ArgErr()
+						}
+						u := auth.SimpleUser{
+							Username:     args[0],
+							PasswordHash: args[1],
+						}
+						if len(args) >= 3 {
+							u.Roles = strings.Split(args[2], ",")
+						}
+						m.AuthConfig.Users = append(m.AuthConfig.Users, u)
+					default:
+						return d.Errf("unrecognized auth subdirective: %s", d.Val())
 					}
 				}
 

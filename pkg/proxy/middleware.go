@@ -13,6 +13,8 @@ import (
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 	"github.com/google/uuid"
+	"github.com/Panharoth06/raiwall/pkg/acl"
+	"github.com/Panharoth06/raiwall/pkg/auth"
 	"github.com/Panharoth06/raiwall/pkg/bot"
 	"github.com/Panharoth06/raiwall/pkg/config"
 	"github.com/Panharoth06/raiwall/pkg/engine"
@@ -51,6 +53,34 @@ type WaitingRoomSettings struct {
 	AdmissionTokenTTL     caddy.Duration `json:"admission_token_ttl,omitempty"`
 }
 
+// ExceptionSettings holds parameter-level exception rules for false-positive suppression.
+type ExceptionSettings struct {
+	Rules []*acl.ExceptionRule `json:"rules,omitempty"`
+}
+
+// ACLSettings holds ACL rules, threat feeds, and GeoIP paths.
+type ACLSettings struct {
+	ThreatFeeds  map[string]string `json:"threat_feeds,omitempty"`
+	GeoIPCountry string            `json:"geoip_country,omitempty"`
+	GeoIPASN     string            `json:"geoip_asn,omitempty"`
+	Rules        []*acl.ACLRule    `json:"rules,omitempty"`
+}
+
+// AuthSettings holds Pre-App Authentication Gateway configuration.
+type AuthSettings struct {
+	Provider      string            `json:"provider,omitempty"`
+	IssuerURL     string            `json:"issuer_url,omitempty"`
+	ClientID      string            `json:"client_id,omitempty"`
+	ClientSecret  string            `json:"client_secret,omitempty"`
+	RedirectURL   string            `json:"redirect_url,omitempty"`
+	Scopes        []string          `json:"scopes,omitempty"`
+	Users         []auth.SimpleUser `json:"users,omitempty"`
+	SessionSecret string            `json:"session_secret,omitempty"`
+	SessionTTL    caddy.Duration    `json:"session_ttl,omitempty"`
+	SessionCookie string            `json:"session_cookie,omitempty"`
+	BypassPaths   []string          `json:"bypass_paths,omitempty"`
+}
+
 // Middleware is the Caddy HTTP handler implementing Raiwall WAF and Gateway interception.
 type Middleware struct {
 	Mode                string         `json:"mode,omitempty"`
@@ -73,6 +103,11 @@ type Middleware struct {
 	RateLimitConfig   *RateLimitSettings   `json:"rate_limit,omitempty"`
 	WaitingRoomConfig *WaitingRoomSettings `json:"waiting_room,omitempty"`
 
+	// Domain 5: Access Control & Zero-Trust Identity Gateway
+	ExceptionConfig *ExceptionSettings `json:"exceptions,omitempty"`
+	ACLConfig       *ACLSettings       `json:"acl,omitempty"`
+	AuthConfig      *AuthSettings      `json:"auth,omitempty"`
+
 	engine     engine.WAFEngine
 	logger     *zap.Logger
 	bufferPool *sync.Pool
@@ -91,6 +126,12 @@ type Middleware struct {
 	tier3Trap    *rate.Tier3ScannerTrap
 	waitingRoom  *rate.WaitingRoomManager
 	rateStorage  rate.RateStorage
+
+	exceptionEngine *acl.ExceptionEngine
+	bartTable       *acl.BARTTable
+	geoIPReader     *acl.GeoIPReader
+	aclEngine       *acl.ACLEngine
+	authGateway     *auth.AuthGateway
 }
 
 var (
@@ -136,6 +177,19 @@ func (m *Middleware) Provision(ctx caddy.Context) error {
 
 	m.StripHeaders = CanonicalizeHeaderList(m.StripHeaders)
 
+	// Domain 5: Provision Exception Engine early so it can be wired into SemanticEngine
+	if m.exceptionEngine == nil {
+		if m.ExceptionConfig != nil && len(m.ExceptionConfig.Rules) > 0 {
+			eng, err := acl.NewExceptionEngine(m.ExceptionConfig.Rules...)
+			if err != nil {
+				return fmt.Errorf("provision exception engine: %w", err)
+			}
+			m.exceptionEngine = eng
+		} else {
+			m.exceptionEngine, _ = acl.NewExceptionEngine()
+		}
+	}
+
 	if m.engine == nil {
 		var opts []engine.SemanticOption
 		if m.ASTTimeout > 0 {
@@ -144,7 +198,12 @@ func (m *Middleware) Provision(ctx caddy.Context) error {
 		if m.MaxParamSize > 0 {
 			opts = append(opts, engine.WithMaxParamSize(m.MaxParamSize))
 		}
+		if m.exceptionEngine != nil {
+			opts = append(opts, engine.WithExceptionEngine(m.exceptionEngine))
+		}
 		m.engine = engine.NewSemanticEngine(opts...)
+	} else if sem, ok := m.engine.(*engine.SemanticEngine); ok {
+		sem.SetExceptionEngine(m.exceptionEngine)
 	}
 
 	m.bufferPool = &sync.Pool{
@@ -281,7 +340,133 @@ func (m *Middleware) Provision(ctx caddy.Context) error {
 		})
 	}
 
+	// Domain 5: BART threat feeds, GeoIP, ACL Engine, and Auth Gateway
+	if m.bartTable == nil {
+		m.bartTable = acl.NewBARTTable()
+		if m.ACLConfig != nil && len(m.ACLConfig.ThreatFeeds) > 0 {
+			for name, path := range m.ACLConfig.ThreatFeeds {
+				_, err := acl.LoadFeedFile(path, name, m.bartTable)
+				if err != nil && m.logger != nil {
+					m.logger.Warn("Failed to load threat feed", zap.String("feed", name), zap.String("path", path), zap.Error(err))
+				}
+			}
+		}
+	}
+
+	if m.geoIPReader == nil {
+		countryPath := ""
+		asnPath := ""
+		if m.ACLConfig != nil {
+			countryPath = m.ACLConfig.GeoIPCountry
+			asnPath = m.ACLConfig.GeoIPASN
+		}
+		m.geoIPReader = acl.NewGeoIPReaderOptional(countryPath, asnPath)
+	}
+
+	if m.aclEngine == nil && m.ACLConfig != nil && len(m.ACLConfig.Rules) > 0 {
+		aclEng, err := acl.NewACLEngine(m.bartTable, m.geoIPReader, m.ACLConfig.Rules...)
+		if err != nil {
+			return fmt.Errorf("provision acl engine: %w", err)
+		}
+		m.aclEngine = aclEng
+	}
+
+	if m.authGateway == nil && m.AuthConfig != nil {
+		gwCfg := auth.GatewayConfig{
+			BypassPaths: m.AuthConfig.BypassPaths,
+		}
+		if len(m.AuthConfig.Users) > 0 || m.AuthConfig.Provider == "simple" || m.AuthConfig.Provider == "dual" {
+			gwCfg.SimpleAuth = auth.NewSimpleAuth(m.AuthConfig.Users...)
+		}
+		var sessionOpts []auth.SessionOption
+		if m.AuthConfig.SessionCookie != "" {
+			sessionOpts = append(sessionOpts, auth.WithCookieName(m.AuthConfig.SessionCookie))
+		}
+		if m.AuthConfig.SessionTTL > 0 {
+			sessionOpts = append(sessionOpts, auth.WithCookieTTL(time.Duration(m.AuthConfig.SessionTTL)))
+		}
+		gwCfg.SessionMgr = auth.NewSessionManager(m.AuthConfig.SessionSecret, sessionOpts...)
+
+		if m.AuthConfig.IssuerURL != "" && (m.AuthConfig.Provider == "oidc" || m.AuthConfig.Provider == "dual") {
+			oidcCfg := auth.OIDCConfig{
+				IssuerURL:    m.AuthConfig.IssuerURL,
+				ClientID:     m.AuthConfig.ClientID,
+				ClientSecret: m.AuthConfig.ClientSecret,
+				RedirectURL:  m.AuthConfig.RedirectURL,
+				Scopes:       m.AuthConfig.Scopes,
+			}
+			oidcClient, err := auth.NewOIDCClient(ctx, oidcCfg)
+			if err != nil {
+				if m.logger != nil {
+					m.logger.Warn("Failed to initialize OIDC client during provision", zap.Error(err))
+				}
+			} else {
+				gwCfg.OIDCClient = oidcClient
+			}
+		}
+		m.authGateway = auth.NewAuthGateway(gwCfg)
+	}
+
 	return nil
+}
+
+// SetExceptionEngine overrides the ExceptionEngine (used for testing).
+func (m *Middleware) SetExceptionEngine(ee *acl.ExceptionEngine) {
+	m.exceptionEngine = ee
+	if sem, ok := m.engine.(*engine.SemanticEngine); ok {
+		sem.SetExceptionEngine(ee)
+	}
+}
+
+// ExceptionEngine returns the active ExceptionEngine.
+func (m *Middleware) ExceptionEngine() *acl.ExceptionEngine {
+	return m.exceptionEngine
+}
+
+// SetBARTTable overrides the BARTTable (used for testing).
+func (m *Middleware) SetBARTTable(bt *acl.BARTTable) {
+	m.bartTable = bt
+	if m.aclEngine != nil {
+		m.aclEngine.SetBARTTable(bt)
+	}
+}
+
+// BARTTable returns the active BARTTable.
+func (m *Middleware) BARTTable() *acl.BARTTable {
+	return m.bartTable
+}
+
+// SetGeoIPReader overrides the GeoIPReader (used for testing).
+func (m *Middleware) SetGeoIPReader(r *acl.GeoIPReader) {
+	m.geoIPReader = r
+	if m.aclEngine != nil {
+		m.aclEngine.SetGeoIPReader(r)
+	}
+}
+
+// GeoIPReader returns the active GeoIPReader.
+func (m *Middleware) GeoIPReader() *acl.GeoIPReader {
+	return m.geoIPReader
+}
+
+// SetACLEngine overrides the ACLEngine (used for testing).
+func (m *Middleware) SetACLEngine(e *acl.ACLEngine) {
+	m.aclEngine = e
+}
+
+// ACLEngine returns the active ACLEngine.
+func (m *Middleware) ACLEngine() *acl.ACLEngine {
+	return m.aclEngine
+}
+
+// SetAuthGateway overrides the AuthGateway (used for testing).
+func (m *Middleware) SetAuthGateway(ag *auth.AuthGateway) {
+	m.authGateway = ag
+}
+
+// AuthGateway returns the active AuthGateway.
+func (m *Middleware) AuthGateway() *auth.AuthGateway {
+	return m.authGateway
 }
 
 // SetBanManager overrides the BanManager (used for testing).
@@ -682,6 +867,117 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 		}
 	}
 
+	// Domain 5: Pre-Application Authentication Gateway
+	if m.authGateway != nil {
+		_, ok := m.authGateway.AuthenticateRequest(w, r)
+		if !ok {
+			return nil
+		}
+	} else {
+		// Zero-Trust: strip untrusted client-supplied identity headers
+		auth.StripAuthHeaders(r.Header)
+	}
+
+	// Domain 5: Compiled Bytecode ACL Rules & Threat Feeds
+	aclBypassWAF := false
+	if m.aclEngine != nil || m.bartTable != nil {
+		aclReqCtx := &engine.RequestContext{
+			ClientIP:  clientIP,
+			Method:    r.Method,
+			Host:      r.Host,
+			Path:      r.URL.Path,
+			Query:     r.URL.RawQuery,
+			Headers:   r.Header,
+			UserAgent: r.UserAgent(),
+			JA4:       ja4,
+			Context:   r.Context(),
+		}
+		if appCfg != nil {
+			aclReqCtx.AppID = appCfg.ID
+		}
+
+		// Evaluate ACL bytecode rules
+		if m.aclEngine != nil {
+			aclVerdict, err := m.aclEngine.EvaluateRequest(aclReqCtx)
+			if err != nil && m.logger != nil {
+				m.logger.Error("ACL evaluation error", zap.Error(err))
+			}
+			if aclVerdict != nil && aclVerdict.Matched {
+				switch aclVerdict.Action {
+				case acl.ActionBlock:
+					statusCode := aclVerdict.StatusCode
+					if statusCode == 0 {
+						statusCode = http.StatusForbidden
+					}
+					eventID := uuid.New().String()
+					if m.logger != nil {
+						m.logger.Warn("ACL rule blocked request",
+							zap.String("event_id", eventID),
+							zap.String("client_ip", clientIP.String()),
+							zap.String("rule", aclVerdict.RuleName),
+							zap.String("reason", aclVerdict.Reason),
+						)
+					}
+					w.Header().Set("Content-Type", "text/html; charset=utf-8")
+					w.Header().Set("X-Raiwall-Event-ID", eventID)
+					w.WriteHeader(statusCode)
+					rendered := strings.ReplaceAll(m.BlockResponseBody, "{{EVENT_ID}}", eventID)
+					_, _ = w.Write([]byte(rendered))
+					return nil
+
+				case acl.ActionChallenge:
+					if m.powEngine != nil {
+						return m.powEngine.RenderChallengePage(w, r, r.URL.RequestURI())
+					}
+
+				case acl.ActionRedirect:
+					statusCode := aclVerdict.StatusCode
+					if statusCode == 0 {
+						statusCode = http.StatusFound
+					}
+					http.Redirect(w, r, aclVerdict.RedirectURL, statusCode)
+					return nil
+
+				case acl.ActionAllow:
+					aclBypassWAF = true
+
+				case acl.ActionAudit:
+					if m.logger != nil {
+						m.logger.Info("ACL audit rule matched",
+							zap.String("client_ip", clientIP.String()),
+							zap.String("rule", aclVerdict.RuleName),
+							zap.String("reason", aclVerdict.Reason),
+						)
+					}
+				}
+			}
+		}
+
+		// Direct BART Threat Feed fast-path check
+		if !aclBypassWAF && m.bartTable != nil {
+			if meta, found := m.bartTable.Lookup(clientIP); found && len(meta.Feeds) > 0 {
+				eventID := uuid.New().String()
+				if m.logger != nil {
+					m.logger.Warn("Threat feed blocked client IP",
+						zap.String("event_id", eventID),
+						zap.String("client_ip", clientIP.String()),
+						zap.Strings("feeds", meta.Feeds),
+					)
+				}
+				statusCode := m.BlockStatusCode
+				if statusCode == 0 {
+					statusCode = http.StatusForbidden
+				}
+				w.Header().Set("Content-Type", "text/html; charset=utf-8")
+				w.Header().Set("X-Raiwall-Event-ID", eventID)
+				w.WriteHeader(statusCode)
+				rendered := strings.ReplaceAll(m.BlockResponseBody, "{{EVENT_ID}}", eventID)
+				_, _ = w.Write([]byte(rendered))
+				return nil
+			}
+		}
+	}
+
 	// 8. Phase 1 - Request Inspection
 	var bodyBytes []byte
 	if r.Body != nil {
@@ -741,13 +1037,17 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 		reqContext.AppID = appCfg.ID
 	}
 
-	if m.engine == nil {
-		m.engine = engine.NewPassthroughEngine()
-	}
+	var verdict *engine.Verdict
+	var err error
+	if !aclBypassWAF {
+		if m.engine == nil {
+			m.engine = engine.NewPassthroughEngine()
+		}
 
-	verdict, err := m.engine.InspectRequest(reqContext)
-	if err != nil && m.logger != nil {
-		m.logger.Error("WAF inspection error", zap.Error(err))
+		verdict, err = m.engine.InspectRequest(reqContext)
+		if err != nil && m.logger != nil {
+			m.logger.Error("WAF inspection error", zap.Error(err))
+		}
 	}
 
 	// Evaluate verdict according to run mode
@@ -895,8 +1195,11 @@ func (a *banStoreAdapter) Close() {
 	}
 }
 
-// Cleanup releases all background resources, closing rate limit storage, ban manager, and waiting room loops.
+// Cleanup releases all background resources, closing rate limit storage, ban manager, waiting room loops, and GeoIP reader.
 func (m *Middleware) Cleanup() error {
+	if m.geoIPReader != nil {
+		_ = m.geoIPReader.Close()
+	}
 	if m.waitingRoom != nil {
 		_ = m.waitingRoom.Close()
 	}

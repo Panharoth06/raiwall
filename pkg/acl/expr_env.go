@@ -18,16 +18,19 @@ var (
 
 // EvalEnv defines the evaluation environment available within ACL expr expressions.
 type EvalEnv struct {
-	IP        string            `expr:"ip"`
-	JA4       string            `expr:"ja4"`
-	Method    string            `expr:"method"`
-	Path      string            `expr:"path"`
-	Host      string            `expr:"host"`
-	Headers   map[string]string `expr:"headers"`
-	Cookies   map[string]string `expr:"cookies"`
-	Query     map[string]string `expr:"query"`
-	UserAgent string            `expr:"user_agent"`
-	Geo       GeoData           `expr:"geo"`
+	IP         string            `expr:"ip"`
+	ClientIP   string            `expr:"client_ip"`
+	Client_IP  string            `expr:"client_ip"`
+	JA4        string            `expr:"ja4"`
+	Method     string            `expr:"method"`
+	Path       string            `expr:"path"`
+	Host       string            `expr:"host"`
+	Headers    map[string]string `expr:"headers"`
+	Cookies    map[string]string `expr:"cookies"`
+	Query      map[string]string `expr:"query"`
+	UserAgent  string            `expr:"user_agent"`
+	User_Agent string            `expr:"user_agent"`
+	Geo        GeoData           `expr:"geo"`
 
 	bartTable *BARTTable
 }
@@ -95,12 +98,15 @@ func BuildEvalEnv(reqCtx *engine.RequestContext, geo GeoData, bartTable *BARTTab
 
 	if reqCtx.ClientIP != nil {
 		env.IP = reqCtx.ClientIP.String()
+		env.ClientIP = env.IP
+		env.Client_IP = env.IP
 	}
 	env.JA4 = reqCtx.JA4
 	env.Method = reqCtx.Method
 	env.Path = reqCtx.Path
 	env.Host = reqCtx.Host
 	env.UserAgent = reqCtx.UserAgent
+	env.User_Agent = env.UserAgent
 
 	// Headers (case-insensitive keys stored lowercase)
 	for k, v := range reqCtx.Headers {

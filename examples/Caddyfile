@@ -29,6 +29,61 @@
 			admission_rate 50
 			token_ttl 15m
 		}
+
+		exceptions {
+			rule "allow_search_query" {
+				host "example.com"
+				path "/search"
+				method "GET"
+				location "query"
+				param "q"
+				rule_id "SEMANTIC_SQLI"
+			}
+			rule "allow_webhook_payload" {
+				path_prefix "/webhooks/"
+				method "POST"
+				location "body"
+				param "*"
+				rule_id "*"
+			}
+		}
+
+		acl {
+			threat_feed emerging_threats /etc/raiwall/feeds/emerging_threats.txt
+			geoip_country_db /usr/share/GeoIP/GeoLite2-Country.mmdb
+			geoip_asn_db /usr/share/GeoIP/GeoLite2-ASN.mmdb
+
+			rule "block_threat_intel" {
+				expr "in_feed(client_ip, 'emerging_threats')"
+				action block
+				priority 10
+				status_code 403
+			}
+
+			rule "geo_fence_high_risk" {
+				expr "geo.country in ['KP', 'IR', 'SY']"
+				action block
+				priority 20
+				status_code 403
+			}
+
+			rule "redirect_legacy_portal" {
+				expr "has_prefix(path, '/old-portal')"
+				action redirect
+				priority 30
+				status_code 301
+				redirect_url "/portal"
+			}
+		}
+
+		auth {
+			provider simple
+			user admin "$2a$10$wT8KzQh0XbVwB4hL0zC1..exampleHashHere" admin,ops
+			session_secret "super-secure-32-byte-secret-key-123"
+			session_ttl 24h
+			session_cookie "rw_session"
+			bypass_path /public/* /healthz /.well-known/*
+		}
 	}
 
 	reverse_proxy 127.0.0.1:9001 127.0.0.1:9002 {
