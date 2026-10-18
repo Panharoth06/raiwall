@@ -294,6 +294,40 @@ func TestMiddleware_ACLEngine_ServeHTTP(t *testing.T) {
 			t.Errorf("expected 403 Forbidden, got %d", rec.Code)
 		}
 	})
+
+	t.Run("Audit mode does not block ACL block rule or threat feed", func(t *testing.T) {
+		// Switch to audit mode
+		config.StoreSnapshot(config.NewConfigSnapshot(200, config.ModeAudit, nil))
+		defer config.StoreSnapshot(config.NewConfigSnapshot(200, config.ModeDefense, nil))
+
+		// 1. ACL Block rule in audit mode
+		req := httptest.NewRequest(http.MethodGet, "http://example.com/admin/settings", nil)
+		req.RemoteAddr = "198.51.100.25:12345"
+		rec := httptest.NewRecorder()
+		next := &mockNextHandler{}
+
+		err := mw.ServeHTTP(rec, req, next)
+		if err != nil {
+			t.Fatalf("ServeHTTP error: %v", err)
+		}
+		if !next.invoked {
+			t.Error("expected upstream to be invoked in audit mode for ACL block rule")
+		}
+
+		// 2. BART threat feed in audit mode
+		req2 := httptest.NewRequest(http.MethodGet, "http://example.com/index", nil)
+		req2.RemoteAddr = "203.0.113.100:54321"
+		rec2 := httptest.NewRecorder()
+		next2 := &mockNextHandler{}
+
+		err = mw.ServeHTTP(rec2, req2, next2)
+		if err != nil {
+			t.Fatalf("ServeHTTP error: %v", err)
+		}
+		if !next2.invoked {
+			t.Error("expected upstream to be invoked in audit mode for threat feed match")
+		}
+	})
 }
 
 func TestMiddleware_ExceptionEngine_ServeHTTP(t *testing.T) {
@@ -364,4 +398,106 @@ func TestMiddleware_ExceptionEngine_ServeHTTP(t *testing.T) {
 			t.Errorf("expected 403 Forbidden, got %d", rec.Code)
 		}
 	})
+
+	t.Run("Cookie parameter exception bypasses WAF while other cookies blocked", func(t *testing.T) {
+		_ = exEng.AddRule(&acl.ExceptionRule{
+			ID:        "EX_COOKIE_AUTH",
+			Host:      "example.com",
+			Location:  "cookie",
+			ParamName: "exempt_cookie",
+			RuleID:    "SEMANTIC_SQLI",
+		})
+
+		// A. Whitelisted cookie passes
+		req := httptest.NewRequest(http.MethodGet, "http://example.com/search", nil)
+		req.AddCookie(&http.Cookie{Name: "exempt_cookie", Value: "1' OR '1'='1"})
+		rec := httptest.NewRecorder()
+		next := &mockNextHandler{}
+
+		err := mw.ServeHTTP(rec, req, next)
+		if err != nil {
+			t.Fatalf("ServeHTTP error: %v", err)
+		}
+		if !next.invoked {
+			t.Error("expected excepted cookie parameter to be allowed")
+		}
+		if rec.Code != http.StatusOK {
+			t.Errorf("expected 200 OK, got %d", rec.Code)
+		}
+
+		// B. Non-whitelisted cookie with attack is blocked
+		req2 := httptest.NewRequest(http.MethodGet, "http://example.com/search", nil)
+		req2.AddCookie(&http.Cookie{Name: "malicious_cookie", Value: "1' OR '1'='1"})
+		rec2 := httptest.NewRecorder()
+		next2 := &mockNextHandler{}
+
+		err = mw.ServeHTTP(rec2, req2, next2)
+		if err != nil {
+			t.Fatalf("ServeHTTP error: %v", err)
+		}
+		if next2.invoked {
+			t.Error("expected non-excepted malicious cookie to be blocked")
+		}
+		if rec2.Code != http.StatusForbidden {
+			t.Errorf("expected 403 Forbidden, got %d", rec2.Code)
+		}
+	})
 }
+
+func TestMiddleware_AuditMode_ACLAndThreatFeeds(t *testing.T) {
+	config.StoreSnapshot(config.NewConfigSnapshot(100, config.ModeAudit, nil))
+	t.Cleanup(func() {
+		config.StoreSnapshot(config.NewConfigSnapshot(0, config.ModeDefense, nil))
+	})
+
+	bartTable := acl.NewBARTTable()
+	_ = bartTable.InsertCIDR("203.0.113.10/32", "threat_feed", "attacker IP")
+
+	rule := &acl.ACLRule{
+		Name:       "block_admin",
+		Expression: `has_prefix(path, "/admin")`,
+		Action:     acl.ActionBlock,
+		StatusCode: http.StatusForbidden,
+	}
+	aclEng, err := acl.NewACLEngine(bartTable, nil, rule)
+	if err != nil {
+		t.Fatalf("failed to create ACLEngine: %v", err)
+	}
+
+	mw := &Middleware{
+		Mode: "audit",
+	}
+	caddyCtx, cancel := caddy.NewContext(caddy.Context{Context: context.Background()})
+	defer cancel()
+	if err := mw.Provision(caddyCtx); err != nil {
+		t.Fatalf("Provision failed: %v", err)
+	}
+	mw.SetBARTTable(bartTable)
+	mw.SetACLEngine(aclEng)
+
+	// 1. ACL Block rule in Audit mode should NOT block request
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/admin/settings", nil)
+	rec := httptest.NewRecorder()
+	next := &mockNextHandler{}
+
+	if err := mw.ServeHTTP(rec, req, next); err != nil {
+		t.Fatalf("ServeHTTP error: %v", err)
+	}
+	if !next.invoked {
+		t.Errorf("expected ACL block rule in audit mode to pass to upstream, but was blocked")
+	}
+
+	// 2. Threat feed in Audit mode should NOT block request
+	req2 := httptest.NewRequest(http.MethodGet, "http://example.com/public/data", nil)
+	req2.RemoteAddr = "203.0.113.10:9876"
+	rec2 := httptest.NewRecorder()
+	next2 := &mockNextHandler{}
+
+	if err := mw.ServeHTTP(rec2, req2, next2); err != nil {
+		t.Fatalf("ServeHTTP error: %v", err)
+	}
+	if !next2.invoked {
+		t.Errorf("expected threat feed IP in audit mode to pass to upstream, but was blocked")
+	}
+}
+

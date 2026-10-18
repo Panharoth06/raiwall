@@ -38,6 +38,9 @@ func HashPassword(password string) (string, error) {
 
 // CheckPassword verifies a raw password against a hash or plain string.
 func CheckPassword(password, hash string) bool {
+	if password == "" || hash == "" {
+		return false
+	}
 	if strings.HasPrefix(hash, "$2a$") || strings.HasPrefix(hash, "$2b$") || strings.HasPrefix(hash, "$2y$") {
 		return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil
 	}

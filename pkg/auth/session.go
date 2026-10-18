@@ -3,6 +3,7 @@ package auth
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -149,11 +150,9 @@ func (s *SessionManager) CreateSessionToken(identity *UserIdentity) (string, err
 	}
 
 	now := time.Now()
-	exp := identity.ExpiresAt
-	if exp.IsZero() {
-		exp = now.Add(s.cookieTTL)
-	} else if s.cookieTTL < 0 {
-		exp = now.Add(s.cookieTTL)
+	exp := now.Add(s.cookieTTL)
+	if !identity.ExpiresAt.IsZero() && identity.ExpiresAt.Before(exp) {
+		exp = identity.ExpiresAt
 	}
 
 	claims := SessionClaims{
@@ -251,18 +250,26 @@ func (s *SessionManager) ValidateSessionToken(tokenString string) (*UserIdentity
 	}, nil
 }
 
-// ValidateSessionCookie reads and verifies the session cookie from an http.Request.
+// ValidateSessionCookie reads and verifies the session cookie or Authorization Bearer token from an http.Request.
 func (s *SessionManager) ValidateSessionCookie(r *http.Request) (*UserIdentity, error) {
 	if r == nil {
 		return nil, fmt.Errorf("nil request")
 	}
 
 	cookie, err := r.Cookie(s.cookieName)
-	if err != nil {
-		return nil, fmt.Errorf("session cookie %q not found", s.cookieName)
+	if err == nil && cookie.Value != "" {
+		return s.ValidateSessionToken(cookie.Value)
 	}
 
-	return s.ValidateSessionToken(cookie.Value)
+	// Also support Authorization: Bearer <session-token>
+	if authHdr := r.Header.Get("Authorization"); strings.HasPrefix(strings.ToLower(authHdr), "bearer ") {
+		tokenStr := strings.TrimSpace(authHdr[7:])
+		if tokenStr != "" {
+			return s.ValidateSessionToken(tokenStr)
+		}
+	}
+
+	return nil, fmt.Errorf("session cookie %q not found", s.cookieName)
 }
 
 // ClearSessionCookie produces an expired cookie to clear the client session.

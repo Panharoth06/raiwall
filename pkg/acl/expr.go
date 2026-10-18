@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"sort"
 	"strings"
 	"sync"
@@ -22,11 +23,13 @@ type ACLRule struct {
 	StatusCode  int    `json:"status_code,omitempty"`
 	RedirectURL string `json:"redirect_url,omitempty"`
 
-	compiled *vm.Program
+	compiled      *vm.Program
+	tableProvider func() *BARTTable
 }
 
-// Compile compiles the rule expression into bytecode using expr.
-func (r *ACLRule) Compile(bartTable *BARTTable) error {
+// CompileWithProvider compiles the rule expression into bytecode using expr with a dynamic BARTTable provider.
+func (r *ACLRule) CompileWithProvider(provider func() *BARTTable) error {
+	r.tableProvider = provider
 	if strings.TrimSpace(r.Expression) == "" {
 		return fmt.Errorf("empty expression for ACL rule %q", r.Name)
 	}
@@ -37,20 +40,28 @@ func (r *ACLRule) Compile(bartTable *BARTTable) error {
 		expr.Function("in_cidr", evalInCIDR, func(string, string) bool { return false }),
 		expr.Function("regex_match", evalRegexMatch, func(string, string) bool { return false }),
 		expr.Function("has_prefix", evalHasPrefix, func(string, string) bool { return false }),
+		expr.Function("str_contains", evalContains, func(string, string) bool { return false }),
 		expr.Function("in_feed", func(params ...any) (any, error) {
 			if len(params) != 2 {
 				return false, fmt.Errorf("in_feed requires 2 arguments (ip, feedName)")
 			}
 			ipStr, ok1 := params[0].(string)
 			feed, ok2 := params[1].(string)
-			if !ok1 || !ok2 || bartTable == nil {
+			if !ok1 || !ok2 {
 				return false, nil
 			}
-			ip := net.ParseIP(ipStr)
+			var bt *BARTTable
+			if provider != nil {
+				bt = provider()
+			}
+			if bt == nil {
+				return false, nil
+			}
+			ip := net.ParseIP(strings.TrimSpace(ipStr))
 			if ip == nil {
 				return false, nil
 			}
-			return bartTable.InFeed(ip, feed), nil
+			return bt.InFeed(ip, feed), nil
 		}, func(string, string) bool { return false }),
 	}
 
@@ -70,6 +81,11 @@ func (r *ACLRule) Compile(bartTable *BARTTable) error {
 	}
 
 	return nil
+}
+
+// Compile compiles the rule expression into bytecode using expr.
+func (r *ACLRule) Compile(bartTable *BARTTable) error {
+	return r.CompileWithProvider(func() *BARTTable { return bartTable })
 }
 
 // evalContains is a helper for expr.
@@ -118,11 +134,14 @@ func NewACLEngine(bartTable *BARTTable, geoReader *GeoIPReader, rules ...*ACLRul
 	return e, nil
 }
 
-// SetBARTTable updates the BARTTable reference in ACLEngine.
+// SetBARTTable updates the BARTTable reference in ACLEngine and recompiles rules.
 func (e *ACLEngine) SetBARTTable(bt *BARTTable) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.bartTable = bt
+	for _, r := range e.rules {
+		_ = r.Compile(bt)
+	}
 }
 
 // SetGeoIPReader updates the GeoIPReader reference in ACLEngine.
@@ -137,7 +156,12 @@ func (e *ACLEngine) AddRule(rule *ACLRule) error {
 	if rule == nil {
 		return fmt.Errorf("rule cannot be nil")
 	}
-	if err := rule.Compile(e.bartTable); err != nil {
+	provider := func() *BARTTable {
+		e.mu.RLock()
+		defer e.mu.RUnlock()
+		return e.bartTable
+	}
+	if err := rule.CompileWithProvider(provider); err != nil {
 		return err
 	}
 
@@ -246,6 +270,10 @@ func (e *ACLEngine) EvaluateRequest(reqCtx *engine.RequestContext) (*ACLVerdict,
 func (e *ACLEngine) acquireEnv(reqCtx *engine.RequestContext, geo GeoData) *EvalEnv {
 	env := e.envPool.Get().(*EvalEnv)
 	env.Geo = geo
+	env.Geo.Country_ = geo.Country
+	env.Geo.Continent_ = geo.Continent
+	env.Geo.ASN_ = geo.ASN
+	env.Geo.ASOrg_ = geo.ASOrg
 	env.bartTable = e.bartTable
 
 	// Reset maps
@@ -280,13 +308,24 @@ func (e *ACLEngine) acquireEnv(reqCtx *engine.RequestContext, geo GeoData) *Eval
 		}
 
 		if reqCtx.Query != "" {
-			// Fast split on &
 			parts := strings.Split(reqCtx.Query, "&")
 			for _, part := range parts {
+				k := part
+				v := ""
 				if eqIdx := strings.IndexByte(part, '='); eqIdx != -1 {
-					env.Query[part[:eqIdx]] = part[eqIdx+1:]
-				} else if part != "" {
-					env.Query[part] = ""
+					k = part[:eqIdx]
+					v = part[eqIdx+1:]
+				}
+				if unescapedK, err := url.QueryUnescape(k); err == nil {
+					k = unescapedK
+				}
+				if unescapedV, err := url.QueryUnescape(v); err == nil {
+					v = unescapedV
+				}
+				if k != "" {
+					if _, exists := env.Query[k]; !exists {
+						env.Query[k] = v
+					}
 				}
 			}
 		}

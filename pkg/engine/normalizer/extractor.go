@@ -19,6 +19,7 @@ const (
 	LocationPath      Location = "Path"
 	LocationQuery     Location = "Query"
 	LocationHeader    Location = "Header"
+	LocationCookie    Location = "Cookie"
 	LocationBody      Location = "Body"
 	LocationJSON      Location = "JSON"
 	LocationMultipart Location = "Multipart"
@@ -51,6 +52,13 @@ func ExtractParameters(path string, query string, headers http.Header, body []by
 	if query != "" {
 		if parsedQuery, err := url.ParseQuery(query); err == nil && len(parsedQuery) > 0 {
 			for key, values := range parsedQuery {
+				if key != "" {
+					params = append(params, Parameter{
+						Name:     "query_key",
+						Value:    key,
+						Location: LocationQuery,
+					})
+				}
 				for _, val := range values {
 					params = append(params, Parameter{
 						Name:     key,
@@ -82,13 +90,13 @@ func ExtractParameters(path string, query string, headers http.Header, body []by
 							params = append(params, Parameter{
 								Name:     cp[:eqIdx],
 								Value:    cp[eqIdx+1:],
-								Location: LocationHeader,
+								Location: LocationCookie,
 							})
 						} else if cp != "" {
 							params = append(params, Parameter{
 								Name:     "cookie",
 								Value:    cp,
-								Location: LocationHeader,
+								Location: LocationCookie,
 							})
 						}
 					}

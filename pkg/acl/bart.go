@@ -50,7 +50,15 @@ func ParsePrefix(cidrOrIP string) (netip.Prefix, error) {
 		if err != nil {
 			return netip.Prefix{}, fmt.Errorf("invalid CIDR prefix %q: %w", cleaned, err)
 		}
-		return netip.PrefixFrom(pfx.Addr().Unmap(), pfx.Bits()), nil
+		addr := pfx.Addr()
+		bits := pfx.Bits()
+		if addr.Is4In6() {
+			addr = addr.Unmap()
+			if bits >= 96 {
+				bits -= 96
+			}
+		}
+		return netip.PrefixFrom(addr, bits), nil
 	}
 
 	addr, err := netip.ParseAddr(cleaned)

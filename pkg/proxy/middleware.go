@@ -76,8 +76,9 @@ type AuthSettings struct {
 	Scopes        []string          `json:"scopes,omitempty"`
 	Users         []auth.SimpleUser `json:"users,omitempty"`
 	SessionSecret string            `json:"session_secret,omitempty"`
-	SessionTTL    caddy.Duration    `json:"session_ttl,omitempty"`
 	SessionCookie string            `json:"session_cookie,omitempty"`
+	SessionTTL    caddy.Duration    `json:"session_ttl,omitempty"`
+	SessionSecure *bool             `json:"session_secure,omitempty"`
 	BypassPaths   []string          `json:"bypass_paths,omitempty"`
 }
 
@@ -384,6 +385,9 @@ func (m *Middleware) Provision(ctx caddy.Context) error {
 		}
 		if m.AuthConfig.SessionTTL > 0 {
 			sessionOpts = append(sessionOpts, auth.WithCookieTTL(time.Duration(m.AuthConfig.SessionTTL)))
+		}
+		if m.AuthConfig.SessionSecure != nil {
+			sessionOpts = append(sessionOpts, auth.WithCookieSecure(*m.AuthConfig.SessionSecure))
 		}
 		gwCfg.SessionMgr = auth.NewSessionManager(m.AuthConfig.SessionSecret, sessionOpts...)
 
@@ -905,6 +909,16 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 			if aclVerdict != nil && aclVerdict.Matched {
 				switch aclVerdict.Action {
 				case acl.ActionBlock:
+					if currentMode == config.ModeAudit {
+						if m.logger != nil {
+							m.logger.Info("ACL block rule matched in audit mode (not blocked)",
+								zap.String("client_ip", clientIP.String()),
+								zap.String("rule", aclVerdict.RuleName),
+								zap.String("reason", aclVerdict.Reason),
+							)
+						}
+						break
+					}
 					statusCode := aclVerdict.StatusCode
 					if statusCode == 0 {
 						statusCode = http.StatusForbidden
@@ -918,14 +932,35 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 							zap.String("reason", aclVerdict.Reason),
 						)
 					}
+					body := m.BlockResponseBody
+					if appCfg != nil {
+						if appCfg.BlockStatusCode != 0 && aclVerdict.StatusCode == 0 {
+							statusCode = appCfg.BlockStatusCode
+						}
+						if appCfg.BlockResponseBody != "" {
+							body = appCfg.BlockResponseBody
+						}
+					}
+					if body == "" {
+						body = defaultBlockHTML
+					}
 					w.Header().Set("Content-Type", "text/html; charset=utf-8")
 					w.Header().Set("X-Raiwall-Event-ID", eventID)
 					w.WriteHeader(statusCode)
-					rendered := strings.ReplaceAll(m.BlockResponseBody, "{{EVENT_ID}}", eventID)
+					rendered := strings.ReplaceAll(body, "{{EVENT_ID}}", eventID)
 					_, _ = w.Write([]byte(rendered))
 					return nil
 
 				case acl.ActionChallenge:
+					if currentMode == config.ModeAudit {
+						if m.logger != nil {
+							m.logger.Info("ACL challenge rule matched in audit mode (not challenged)",
+								zap.String("client_ip", clientIP.String()),
+								zap.String("rule", aclVerdict.RuleName),
+							)
+						}
+						break
+					}
 					if m.powEngine != nil {
 						return m.powEngine.RenderChallengePage(w, r, r.URL.RequestURI())
 					}
@@ -956,24 +991,45 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 		// Direct BART Threat Feed fast-path check
 		if !aclBypassWAF && m.bartTable != nil {
 			if meta, found := m.bartTable.Lookup(clientIP); found && len(meta.Feeds) > 0 {
-				eventID := uuid.New().String()
-				if m.logger != nil {
-					m.logger.Warn("Threat feed blocked client IP",
-						zap.String("event_id", eventID),
-						zap.String("client_ip", clientIP.String()),
-						zap.Strings("feeds", meta.Feeds),
-					)
+				if currentMode == config.ModeAudit {
+					if m.logger != nil {
+						m.logger.Info("Threat feed matched client IP in audit mode (not blocked)",
+							zap.String("client_ip", clientIP.String()),
+							zap.Strings("feeds", meta.Feeds),
+						)
+					}
+				} else {
+					eventID := uuid.New().String()
+					if m.logger != nil {
+						m.logger.Warn("Threat feed blocked client IP",
+							zap.String("event_id", eventID),
+							zap.String("client_ip", clientIP.String()),
+							zap.Strings("feeds", meta.Feeds),
+						)
+					}
+					statusCode := m.BlockStatusCode
+					if statusCode == 0 {
+						statusCode = http.StatusForbidden
+					}
+					body := m.BlockResponseBody
+					if appCfg != nil {
+						if appCfg.BlockStatusCode != 0 {
+							statusCode = appCfg.BlockStatusCode
+						}
+						if appCfg.BlockResponseBody != "" {
+							body = appCfg.BlockResponseBody
+						}
+					}
+					if body == "" {
+						body = defaultBlockHTML
+					}
+					w.Header().Set("Content-Type", "text/html; charset=utf-8")
+					w.Header().Set("X-Raiwall-Event-ID", eventID)
+					w.WriteHeader(statusCode)
+					rendered := strings.ReplaceAll(body, "{{EVENT_ID}}", eventID)
+					_, _ = w.Write([]byte(rendered))
+					return nil
 				}
-				statusCode := m.BlockStatusCode
-				if statusCode == 0 {
-					statusCode = http.StatusForbidden
-				}
-				w.Header().Set("Content-Type", "text/html; charset=utf-8")
-				w.Header().Set("X-Raiwall-Event-ID", eventID)
-				w.WriteHeader(statusCode)
-				rendered := strings.ReplaceAll(m.BlockResponseBody, "{{EVENT_ID}}", eventID)
-				_, _ = w.Write([]byte(rendered))
-				return nil
 			}
 		}
 	}

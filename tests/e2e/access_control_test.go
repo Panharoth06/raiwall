@@ -345,7 +345,74 @@ func TestEndToEndAccessControlAndZeroTrustGateway(t *testing.T) {
 	})
 
 	// ------------------------------------------------------------------
-	// Scenario 7: Concurrent High-Load Verification (-race safety)
+	// Scenario 7: Bearer Token Authentication & Upstream Injection
+	// ------------------------------------------------------------------
+	t.Run("Bearer Token Authentication and Upstream Injection", func(t *testing.T) {
+		token, err := sessionMgr.CreateSessionToken(&auth.UserIdentity{
+			Subject: "bob_api",
+			Email:   "bob@api.corp",
+			Roles:   []string{"service_account"},
+		})
+		if err != nil {
+			t.Fatalf("failed to create session token: %v", err)
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "http://example.com/api/v1/data", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		rec := httptest.NewRecorder()
+		if err := mw.ServeHTTP(rec, req, next); err != nil {
+			t.Fatalf("ServeHTTP error: %v", err)
+		}
+		if rec.Code != http.StatusOK {
+			t.Errorf("expected Bearer authenticated request to pass (200), got %d", rec.Code)
+		}
+
+		val, ok := lastReceivedHeaders.Load("/api/v1/data")
+		if !ok {
+			t.Fatal("backend did not record headers for /api/v1/data")
+		}
+		upHeaders := val.(http.Header)
+		if upHeaders.Get(auth.HeaderAuthSubject) != "bob_api" {
+			t.Errorf("expected upstream X-Auth-Subject 'bob_api', got %q", upHeaders.Get(auth.HeaderAuthSubject))
+		}
+		if upHeaders.Get(auth.HeaderAuthRoles) != "service_account" {
+			t.Errorf("expected upstream X-Auth-Roles 'service_account', got %q", upHeaders.Get(auth.HeaderAuthRoles))
+		}
+	})
+
+	// ------------------------------------------------------------------
+	// Scenario 8: Audit Mode in Access Control and Threat Feeds
+	// ------------------------------------------------------------------
+	t.Run("Audit Mode Does Not Block Feeds or Rules", func(t *testing.T) {
+		config.StoreSnapshot(config.NewConfigSnapshot(301, config.ModeAudit, nil))
+		defer config.StoreSnapshot(config.NewConfigSnapshot(300, config.ModeDefense, nil))
+
+		// Blocked country KP in audit mode passes through to backend
+		reqKP := httptest.NewRequest(http.MethodGet, "http://example.com/public/audit-geo", nil)
+		reqKP.RemoteAddr = "192.0.2.10:1234"
+		recKP := httptest.NewRecorder()
+		if err := mw.ServeHTTP(recKP, reqKP, next); err != nil {
+			t.Fatalf("ServeHTTP error: %v", err)
+		}
+		if recKP.Code != http.StatusOK {
+			t.Errorf("expected KP request in audit mode to pass (200), got %d", recKP.Code)
+		}
+
+		// Threat feed IP in audit mode passes through to backend
+		reqFeed := httptest.NewRequest(http.MethodGet, "http://example.com/public/audit-feed", nil)
+		reqFeed.RemoteAddr = "203.0.113.50:4321"
+		recFeed := httptest.NewRecorder()
+		if err := mw.ServeHTTP(recFeed, reqFeed, next); err != nil {
+			t.Fatalf("ServeHTTP error: %v", err)
+		}
+		if recFeed.Code != http.StatusOK {
+			t.Errorf("expected threat feed IP in audit mode to pass (200), got %d", recFeed.Code)
+		}
+	})
+
+	// ------------------------------------------------------------------
+	// Scenario 9: Concurrent High-Load Verification (-race safety)
 	// ------------------------------------------------------------------
 	t.Run("Concurrent Access Control Under Load", func(t *testing.T) {
 		const concurrency = 20

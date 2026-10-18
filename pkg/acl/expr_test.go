@@ -249,6 +249,90 @@ func BenchmarkACLExpr_RawBytecode(b *testing.B) {
 	}
 }
 
+func TestACLEngine_ContainsFunction(t *testing.T) {
+	rule := &ACLRule{
+		Name:       "test-contains",
+		Expression: `user_agent contains "BadBot" || str_contains(path, "forbidden")`,
+		Action:     ActionBlock,
+		StatusCode: 403,
+	}
+	aclEng, err := NewACLEngine(nil, nil, rule)
+	if err != nil {
+		t.Fatalf("failed to compile rule with contains function: %v", err)
+	}
+
+	reqCtx := &engine.RequestContext{
+		Path:      "/public/forbidden/resource",
+		UserAgent: "Mozilla/5.0",
+	}
+	verdict, err := aclEng.EvaluateRequest(reqCtx)
+	if err != nil {
+		t.Fatalf("EvaluateRequest error: %v", err)
+	}
+	if !verdict.Matched || verdict.Action != ActionBlock {
+		t.Errorf("expected rule to match on contains(path, forbidden), got %v", verdict)
+	}
+}
+
+func TestACLEngine_SetBARTTable_Recompile(t *testing.T) {
+	rule := &ACLRule{
+		Name:       "feed-rule",
+		Expression: `in_feed(ip, "tor")`,
+		Action:     ActionBlock,
+		StatusCode: 403,
+	}
+	// Initialized with nil BARTTable
+	aclEng, err := NewACLEngine(nil, nil, rule)
+	if err != nil {
+		t.Fatalf("failed to create engine: %v", err)
+	}
+
+	reqCtx := &engine.RequestContext{
+		ClientIP: net.ParseIP("198.51.100.42"),
+	}
+
+	// Initially nil BARTTable -> does not match
+	v1, err := aclEng.EvaluateRequest(reqCtx)
+	if err != nil || v1.Matched {
+		t.Fatalf("expected no match before SetBARTTable, got %v", v1)
+	}
+
+	// Set BARTTable dynamically
+	bt := NewBARTTable()
+	_ = bt.InsertCIDR("198.51.100.0/24", "tor", "")
+	aclEng.SetBARTTable(bt)
+
+	// Now should match because rules were recompiled with bt
+	v2, err := aclEng.EvaluateRequest(reqCtx)
+	if err != nil || !v2.Matched {
+		t.Fatalf("expected match after SetBARTTable, got %v", v2)
+	}
+}
+
+func TestACLEngine_QueryUnescapeAndOrder(t *testing.T) {
+	rule := &ACLRule{
+		Name:       "query-rule",
+		Expression: `query["search"] == "cyber attack" && query["tag"] == "first"`,
+		Action:     ActionBlock,
+		StatusCode: 403,
+	}
+	aclEng, err := NewACLEngine(nil, nil, rule)
+	if err != nil {
+		t.Fatalf("failed to create engine: %v", err)
+	}
+
+	reqCtx := &engine.RequestContext{
+		Query: "search=cyber%20attack&tag=first&tag=second",
+	}
+	v, err := aclEng.EvaluateRequest(reqCtx)
+	if err != nil {
+		t.Fatalf("EvaluateRequest error: %v", err)
+	}
+	if !v.Matched {
+		t.Errorf("expected query parameters to be unescaped and preserve first value")
+	}
+}
+
 func BenchmarkPureBytecode(b *testing.B) {
 	rule := &ACLRule{
 		Name:       "bench-rule",

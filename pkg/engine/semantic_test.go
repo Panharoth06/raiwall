@@ -343,3 +343,83 @@ func TestSemanticEngine_ExceptionGate(t *testing.T) {
 	}
 }
 
+func TestSemanticEngine_QueryKeyInjectionDetection(t *testing.T) {
+	eng := NewSemanticEngine()
+
+	// Query string containing attack as key-only parameter (no '=' sign)
+	ctx := &RequestContext{
+		Method: "GET",
+		Path:   "/search",
+		Query:  "1%27%20OR%20%271%27%3D%271",
+	}
+
+	verdict, err := eng.InspectRequest(ctx)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if verdict.Action != ActionBlock {
+		t.Errorf("SECURITY RISK: expected ActionBlock for key-only query SQLi, got %v", verdict.Action)
+	}
+
+	// Query string with attack in key alongside another valid param
+	ctx2 := &RequestContext{
+		Method: "GET",
+		Path:   "/search",
+		Query:  "page=1&UNION%20SELECT%201,2,3",
+	}
+
+	verdict2, err := eng.InspectRequest(ctx2)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if verdict2.Action != ActionBlock {
+		t.Errorf("SECURITY RISK: expected ActionBlock for UNION SELECT in query, got %v", verdict2.Action)
+	}
+}
+
+func TestSemanticEngine_CookieParameterException(t *testing.T) {
+	matcher := &testExceptionMatcher{
+		matchesFunc: func(host, path, method, location, paramName, ruleID string) bool {
+			if path == "/app" && method == "GET" && (location == "Cookie" || location == "cookie") && paramName == "tracking_code" && ruleID == "SEMANTIC_SQLI" {
+				return true
+			}
+			return false
+		},
+	}
+
+	eng := NewSemanticEngine(WithExceptionEngine(matcher))
+
+	// Request with exempted cookie containing SQLi -> Should PASS
+	exemptCtx := &RequestContext{
+		Method: "GET",
+		Path:   "/app",
+		Headers: http.Header{
+			"Cookie": []string{"tracking_code=10' OR 1=1 --; session_id=safe_123"},
+		},
+	}
+	verdict, err := eng.InspectRequest(exemptCtx)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if verdict.Action != ActionAllow {
+		t.Fatalf("expected ActionAllow for exempted cookie, got %v (reason: %s)", verdict.Action, verdict.Reason)
+	}
+
+	// Request with attack in non-exempted cookie -> Should BLOCK
+	maliciousCtx := &RequestContext{
+		Method: "GET",
+		Path:   "/app",
+		Headers: http.Header{
+			"Cookie": []string{"tracking_code=safe_val; session_id=10' OR 1=1 --"},
+		},
+	}
+	verdict, err = eng.InspectRequest(maliciousCtx)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if verdict.Action != ActionBlock {
+		t.Fatalf("expected ActionBlock for adjacent malicious cookie, got %v", verdict.Action)
+	}
+}
+
+

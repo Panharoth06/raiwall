@@ -110,8 +110,22 @@ func NewMockOIDCClient(cfg OIDCConfig, exchangeFn func(ctx context.Context, code
 	}
 }
 
+// pruneExpiredStates removes state tokens older than 10 minutes.
+func (c *OIDCClient) pruneExpiredStates() {
+	now := time.Now()
+	c.states.Range(func(key, value any) bool {
+		entry, ok := value.(stateEntry)
+		if ok && now.Sub(entry.CreatedAt) > 10*time.Minute {
+			c.states.Delete(key)
+		}
+		return true
+	})
+}
+
 // GenerateState generates a secure random state tied to an optional target return URL.
 func (c *OIDCClient) GenerateState(targetURL string) string {
+	c.pruneExpiredStates()
+
 	b := make([]byte, 24)
 	_, _ = rand.Read(b)
 	state := base64.RawURLEncoding.EncodeToString(b)

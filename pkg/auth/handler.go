@@ -111,8 +111,8 @@ func (g *AuthGateway) IsBypass(path string) bool {
 			continue
 		}
 		if strings.HasSuffix(pattern, "/*") {
-			prefix := strings.TrimSuffix(pattern, "/*")
-			if strings.HasPrefix(path, prefix) {
+			prefix := strings.TrimSuffix(pattern, "*") // e.g. "/public/"
+			if strings.HasPrefix(path, prefix) || path == strings.TrimSuffix(prefix, "/") {
 				return true
 			}
 		} else if strings.HasSuffix(pattern, "*") {
@@ -142,13 +142,38 @@ func (g *AuthGateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// isSafeRedirect validates that a redirect target is a safe local relative URL.
+// Prevents Open Redirect and XSS via javascript:/data: pseudo-protocols
+// or protocol-relative //evil.com / \evil.com bypasses.
+func isSafeRedirect(urlStr string) bool {
+	if urlStr == "" {
+		return false
+	}
+	if !strings.HasPrefix(urlStr, "/") || strings.HasPrefix(urlStr, "//") || strings.HasPrefix(urlStr, "/\\") || strings.HasPrefix(urlStr, "\\") {
+		return false
+	}
+	u, err := url.Parse(urlStr)
+	if err != nil {
+		return false
+	}
+	if u.Scheme != "" || u.Host != "" {
+		return false
+	}
+	for _, b := range []byte(urlStr) {
+		if b < 0x20 || b == 0x7f {
+			return false
+		}
+	}
+	return true
+}
+
 // HandleLogin processes GET (render login UI) and POST (submit local credentials or trigger SSO).
 func (g *AuthGateway) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	targetRedirect := r.URL.Query().Get("redirect")
 	if targetRedirect == "" {
 		targetRedirect = r.FormValue("redirect")
 	}
-	if targetRedirect == "" || strings.HasPrefix(targetRedirect, "//") || strings.Contains(targetRedirect, "://") {
+	if !isSafeRedirect(targetRedirect) {
 		targetRedirect = "/"
 	}
 
@@ -222,7 +247,7 @@ func (g *AuthGateway) HandleCallback(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid or expired state token", http.StatusBadRequest)
 		return
 	}
-	if targetURL == "" {
+	if !isSafeRedirect(targetURL) {
 		targetURL = "/"
 	}
 
@@ -312,17 +337,17 @@ func (g *AuthGateway) AuthenticateRequest(args ...any) (*UserIdentity, bool) {
 		return nil, false
 	}
 
-	// 3. Bypass routes (e.g. /public/*, /healthz)
-	if g.IsBypass(r.URL.Path) {
-		return nil, true
-	}
-
-	// 4. Validate session cookie
+	// 3. Validate session cookie if present
 	identity, err := g.sessionMgr.ValidateSessionCookie(r)
 	if err == nil && identity != nil {
 		// Valid session: inject verified identity upstream
 		InjectIdentityHeaders(r.Header, identity)
 		return identity, true
+	}
+
+	// 4. Bypass routes (e.g. /public/*, /healthz)
+	if g.IsBypass(r.URL.Path) {
+		return nil, true
 	}
 
 	// If no ResponseWriter passed, return unauthenticated without writing response

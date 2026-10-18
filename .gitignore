@@ -4,3 +4,6 @@ bin/
 
 # Knowledge graph output (local only, do not commit to GitHub)
 graphify-out/
+
+# Video and media references
+reference/

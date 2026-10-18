@@ -35,11 +35,11 @@ func TestExtractParameters_PathAndQuery(t *testing.T) {
 	if !hasParam("sort", "desc", LocationQuery) {
 		t.Errorf("expected query param sort=desc")
 	}
-	if !hasParam("session_id", "abc123xyz", LocationHeader) {
-		t.Errorf("expected header param session_id=abc123xyz")
+	if !hasParam("session_id", "abc123xyz", LocationCookie) {
+		t.Errorf("expected cookie param session_id=abc123xyz")
 	}
-	if !hasParam("role", "operator", LocationHeader) {
-		t.Errorf("expected header param role=operator")
+	if !hasParam("role", "operator", LocationCookie) {
+		t.Errorf("expected cookie param role=operator")
 	}
 	if !hasParam("X-Custom-Header", "admin-value", LocationHeader) {
 		t.Errorf("expected X-Custom-Header parameter")

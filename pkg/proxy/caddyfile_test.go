@@ -556,3 +556,35 @@ func TestUnmarshalCaddyfile_AccessControlAndAuth(t *testing.T) {
 
 	defer func() { _ = m.Cleanup() }()
 }
+
+func TestUnmarshalCaddyfile_SessionSecure(t *testing.T) {
+	input := `raiwall {
+		auth {
+			provider simple
+			user user1 pass123
+			session_secret my-test-session-secret-that-is-32b
+			session_secure false
+		}
+	}`
+
+	d := caddyfile.NewTestDispenser(input)
+	m := new(Middleware)
+	if err := m.UnmarshalCaddyfile(d); err != nil {
+		t.Fatalf("UnmarshalCaddyfile failed: %v", err)
+	}
+
+	if m.AuthConfig == nil || m.AuthConfig.SessionSecure == nil {
+		t.Fatalf("expected SessionSecure to be parsed")
+	}
+	if *m.AuthConfig.SessionSecure != false {
+		t.Errorf("expected SessionSecure false, got %v", *m.AuthConfig.SessionSecure)
+	}
+
+	caddyCtx, cancel := caddy.NewContext(caddy.Context{Context: context.Background()})
+	defer cancel()
+	if err := m.Provision(caddyCtx); err != nil {
+		t.Fatalf("Provision failed: %v", err)
+	}
+	defer func() { _ = m.Cleanup() }()
+}
+

@@ -136,7 +136,7 @@ func (r *GeoIPReader) HasASNDB() bool {
 
 // LookupAddr queries geographic and ASN data for a netip.Addr.
 func (r *GeoIPReader) LookupAddr(addr netip.Addr) GeoData {
-	if !addr.IsValid() || addr.IsLoopback() || addr.IsPrivate() || addr.IsUnspecified() || addr.IsLinkLocalUnicast() {
+	if !addr.IsValid() {
 		return GeoData{}
 	}
 	ip := net.IP(addr.Unmap().AsSlice())
@@ -169,6 +169,12 @@ func (r *GeoIPReader) Lookup(ip net.IP) GeoData {
 			r.mu.RUnlock()
 			return data
 		}
+		if ip4 := ip.To4(); ip4 != nil {
+			if data, ok := r.staticOverrides[ip4.String()]; ok {
+				r.mu.RUnlock()
+				return data
+			}
+		}
 	}
 	r.mu.RUnlock()
 
@@ -176,6 +182,11 @@ func (r *GeoIPReader) Lookup(ip net.IP) GeoData {
 	addr, ok := NetipAddrFromIP(ip)
 	if !ok || addr.IsLoopback() || addr.IsPrivate() || addr.IsUnspecified() || addr.IsLinkLocalUnicast() {
 		return GeoData{}
+	}
+
+	queryIP := ip
+	if ip4 := ip.To4(); ip4 != nil {
+		queryIP = ip4
 	}
 
 	r.mu.RLock()
@@ -186,7 +197,7 @@ func (r *GeoIPReader) Lookup(ip net.IP) GeoData {
 	// Query Country
 	if r.countryReader != nil {
 		var rec mmdbCountryRecord
-		if err := r.countryReader.Lookup(ip, &rec); err == nil {
+		if err := r.countryReader.Lookup(queryIP, &rec); err == nil {
 			geo.Continent = rec.Continent.Code
 			if rec.Country.IsoCode != "" {
 				geo.Country = rec.Country.IsoCode
@@ -199,7 +210,7 @@ func (r *GeoIPReader) Lookup(ip net.IP) GeoData {
 	// Query ASN
 	if r.asnReader != nil {
 		var rec mmdbASNRecord
-		if err := r.asnReader.Lookup(ip, &rec); err == nil {
+		if err := r.asnReader.Lookup(queryIP, &rec); err == nil {
 			geo.ASN = rec.AutonomousSystemNumber
 			geo.ASOrg = rec.AutonomousSystemOrganization
 		}

@@ -154,6 +154,34 @@ func TestExceptionRule_Matches(t *testing.T) {
 			wantMatch: true,
 		},
 		{
+			name: "header location matches cookie parameter",
+			rule: ExceptionRule{
+				Location:  "Header",
+				ParamName: "session_id",
+			},
+			host:      "example.com",
+			path:      "/",
+			method:    "GET",
+			location:  "Cookie",
+			paramName: "session_id",
+			ruleID:    "SEMANTIC_SQLI",
+			wantMatch: true,
+		},
+		{
+			name: "cookie location with case-insensitive param name",
+			rule: ExceptionRule{
+				Location:  "Cookie",
+				ParamName: "Session_Id",
+			},
+			host:      "example.com",
+			path:      "/",
+			method:    "GET",
+			location:  "Cookie",
+			paramName: "session_id",
+			ruleID:    "SEMANTIC_SQLI",
+			wantMatch: true,
+		},
+		{
 			name: "method mismatch",
 			rule: ExceptionRule{
 				Method: "POST",
@@ -301,3 +329,46 @@ func TestExceptionEngine_LifecycleAndConcurrency(t *testing.T) {
 		t.Errorf("expected 0 rules after ClearRules, got %d", len(engine.Rules()))
 	}
 }
+
+func TestExceptionRule_IPv6AndCookieMatching(t *testing.T) {
+	ruleIPv6 := &ExceptionRule{
+		ID:        "ipv6-rule",
+		Host:      "[2001:db8::1]",
+		Location:  "body",
+		ParamName: "data",
+	}
+	if err := ruleIPv6.Compile(); err != nil {
+		t.Fatalf("Compile error: %v", err)
+	}
+
+	// Should match with or without port and with or without brackets
+	if !ruleIPv6.Matches("[2001:db8::1]:8080", "/submit", "POST", "body", "data", "SEMANTIC_SQLI") {
+		t.Errorf("expected match for bracketed IPv6 with port")
+	}
+	if !ruleIPv6.Matches("2001:db8::1", "/submit", "POST", "body", "data", "SEMANTIC_SQLI") {
+		t.Errorf("expected match for raw IPv6")
+	}
+	if ruleIPv6.Matches("[2001:db8::2]:8080", "/submit", "POST", "body", "data", "SEMANTIC_SQLI") {
+		t.Errorf("expected no match for different IPv6")
+	}
+
+	// Cookie location matching
+	ruleCookie := &ExceptionRule{
+		ID:        "cookie-rule",
+		Location:  "cookie",
+		ParamName: "session_id",
+	}
+	if err := ruleCookie.Compile(); err != nil {
+		t.Fatalf("Compile error: %v", err)
+	}
+
+	// Should match when reported as Cookie location
+	if !ruleCookie.Matches("example.com", "/", "GET", "Cookie", "session_id", "SEMANTIC_SQLI") {
+		t.Errorf("expected match for Cookie location")
+	}
+	// Should also match when reported under Header location
+	if !ruleCookie.Matches("example.com", "/", "GET", "Header", "session_id", "SEMANTIC_SQLI") {
+		t.Errorf("expected match for Header location when rule targets cookie")
+	}
+}
+

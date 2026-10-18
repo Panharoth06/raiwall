@@ -341,7 +341,11 @@ func (m *Middleware) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 									return d.ArgErr()
 								}
 								val := d.Val()
-								if strings.HasPrefix(val, "^") || strings.ContainsAny(val, "$()[]+?*") {
+								if strings.HasSuffix(val, "/*") && !strings.ContainsAny(val[:len(val)-2], "$()[]+?*^") {
+									exRule.PathPrefix = strings.TrimSuffix(val, "/*")
+								} else if strings.HasSuffix(val, "*") && !strings.ContainsAny(val[:len(val)-1], "$()[]+?*^") {
+									exRule.PathPrefix = strings.TrimSuffix(val, "*")
+								} else if strings.HasPrefix(val, "^") || strings.ContainsAny(val, "$()[]+?*") {
 									exRule.PathRegex = val
 								} else {
 									exRule.PathPrefix = val
@@ -535,6 +539,21 @@ func (m *Middleware) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 							return d.Errf("invalid session_ttl: %s (%v)", d.Val(), err)
 						}
 						m.AuthConfig.SessionTTL = caddy.Duration(dur)
+					case "session_secure", "cookie_secure":
+						if !d.NextArg() {
+							return d.ArgErr()
+						}
+						val := d.Val()
+						var sec bool
+						switch strings.ToLower(val) {
+						case "true", "on", "yes", "1", "enabled":
+							sec = true
+						case "false", "off", "no", "0", "disabled":
+							sec = false
+						default:
+							return d.Errf("invalid session_secure value: %s (must be true/false/on/off)", val)
+						}
+						m.AuthConfig.SessionSecure = &sec
 					case "user":
 						args := d.RemainingArgs()
 						if len(args) < 2 {

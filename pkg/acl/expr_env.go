@@ -33,9 +33,17 @@ type EvalEnv struct {
 	bartTable *BARTTable
 }
 
+func cleanIPStr(s string) net.IP {
+	s = strings.TrimSpace(s)
+	if idx := strings.IndexByte(s, ','); idx != -1 {
+		s = strings.TrimSpace(s[:idx])
+	}
+	return net.ParseIP(s)
+}
+
 // InCIDR checks if the provided IP belongs to a CIDR subnet.
 func (e *EvalEnv) InCIDR(ipStr, cidr string) bool {
-	ip := net.ParseIP(ipStr)
+	ip := cleanIPStr(ipStr)
 	if ip == nil {
 		return false
 	}
@@ -47,7 +55,7 @@ func (e *EvalEnv) InFeed(ipStr, feedName string) bool {
 	if e.bartTable == nil {
 		return false
 	}
-	ip := net.ParseIP(ipStr)
+	ip := cleanIPStr(ipStr)
 	if ip == nil {
 		return false
 	}
@@ -89,6 +97,10 @@ func BuildEvalEnv(reqCtx *engine.RequestContext, geo GeoData, bartTable *BARTTab
 		Geo:       geo,
 		bartTable: bartTable,
 	}
+	env.Geo.Country_ = geo.Country
+	env.Geo.Continent_ = geo.Continent
+	env.Geo.ASN_ = geo.ASN
+	env.Geo.ASOrg_ = geo.ASOrg
 
 	if reqCtx == nil {
 		return env
@@ -144,7 +156,7 @@ func evalInCIDR(params ...any) (any, error) {
 	if !ok1 || !ok2 {
 		return false, nil
 	}
-	ip := net.ParseIP(ipStr)
+	ip := cleanIPStr(ipStr)
 	if ip == nil {
 		return false, nil
 	}

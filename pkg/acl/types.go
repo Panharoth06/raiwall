@@ -33,6 +33,12 @@ type GeoData struct {
 	Continent string `json:"continent,omitempty"` // Continent code (e.g. "NA", "EU")
 	ASN       uint   `json:"asn,omitempty"`       // Autonomous System Number (e.g. 15169)
 	ASOrg     string `json:"as_org,omitempty"`    // Autonomous System Organization name
+
+	// Lowercase expr aliases for expr expressions (e.g. geo.country, geo.continent, geo.asn, geo.as_org)
+	Country_   string `json:"-" expr:"country"`
+	Continent_ string `json:"-" expr:"continent"`
+	ASN_       uint   `json:"-" expr:"asn"`
+	ASOrg_     string `json:"-" expr:"as_org"`
 }
 
 // FeedMetadata records threat feed membership and metadata for an IP or CIDR block.

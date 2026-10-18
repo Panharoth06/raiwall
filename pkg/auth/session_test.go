@@ -74,7 +74,18 @@ func TestSessionManager_Lifecycle(t *testing.T) {
 		t.Errorf("extracted subject mismatch: %s", extracted.Subject)
 	}
 
-	// 5. Clear cookie
+	// 5. Validate session via Authorization Bearer header
+	reqBearer := httptest.NewRequest("GET", "/api/data", nil)
+	reqBearer.Header.Set("Authorization", "Bearer "+tokenStr)
+	bearerIdent, err := sm.ValidateSessionCookie(reqBearer)
+	if err != nil {
+		t.Fatalf("ValidateSessionCookie with Bearer token error: %v", err)
+	}
+	if bearerIdent.Subject != "user:123" {
+		t.Errorf("bearer subject mismatch: %s", bearerIdent.Subject)
+	}
+
+	// 6. Clear cookie
 	clearCookie := sm.ClearSessionCookie()
 	if clearCookie.MaxAge != -1 || clearCookie.Value != "" {
 		t.Errorf("expected MaxAge: -1 cookie, got %+v", clearCookie)
@@ -250,3 +261,180 @@ func TestAuthGateway_EndpointsAndProtection(t *testing.T) {
 		t.Errorf("expected redirect to /profile, got %s", recCallback.Header().Get("Location"))
 	}
 }
+
+func TestAuthGateway_OpenRedirectProtection(t *testing.T) {
+	gateway := NewAuthGateway(GatewayConfig{
+		SimpleAuth: NewSimpleAuth(SimpleUser{
+			Username:     "alice",
+			PasswordHash: "secretpass",
+		}),
+	})
+
+	maliciousTargets := []string{
+		"javascript:alert(1)",
+		"//evil.com/phish",
+		"/\\evil.com/phish",
+		"\\evil.com",
+		"http://evil.com",
+		"https://evil.com",
+		"data:text/html,<script>alert(1)</script>",
+	}
+
+	for _, target := range maliciousTargets {
+		form := url.Values{
+			"username":  {"alice"},
+			"password":  {"secretpass"},
+			"redirect":  {target},
+			"auth_type": {"simple"},
+		}
+		req := httptest.NewRequest("POST", "/.raiwall/auth/login", strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		rec := httptest.NewRecorder()
+
+		gateway.HandleLogin(rec, req)
+
+		if rec.Code != http.StatusFound {
+			t.Fatalf("expected redirect (302), got %d", rec.Code)
+		}
+		loc := rec.Header().Get("Location")
+		if loc != "/" {
+			t.Errorf("expected safe fallback redirect '/', got %q for malicious target %q", loc, target)
+		}
+	}
+}
+
+func TestOIDCClient_StatePruning(t *testing.T) {
+	client := NewMockOIDCClient(OIDCConfig{
+		IssuerURL: "https://idp.mock",
+		ClientID:  "test-client",
+	}, nil)
+
+	// Generate state and manually simulate expiration
+	state := client.GenerateState("/secret")
+	client.states.Store(state, stateEntry{
+		TargetURL: "/secret",
+		CreatedAt: time.Now().Add(-15 * time.Minute),
+	})
+
+	// Generating a new state should trigger pruning of expired state
+	_ = client.GenerateState("/new")
+
+	if _, ok := client.VerifyAndConsumeState(state); ok {
+		t.Errorf("expected expired state to be pruned")
+	}
+}
+
+func TestAuthGateway_BypassPathSecurity(t *testing.T) {
+	gateway := NewAuthGateway(GatewayConfig{
+		BypassPaths: []string{"/public/*", "/healthz"},
+	})
+
+	// Legitimate bypass paths
+	if !gateway.IsBypass("/public") {
+		t.Errorf("expected /public to be bypassed")
+	}
+	if !gateway.IsBypass("/public/") {
+		t.Errorf("expected /public/ to be bypassed")
+	}
+	if !gateway.IsBypass("/public/resource") {
+		t.Errorf("expected /public/resource to be bypassed")
+	}
+	if !gateway.IsBypass("/healthz") {
+		t.Errorf("expected /healthz to be bypassed")
+	}
+
+	// Security: Sibling prefixes must NOT be bypassed
+	if gateway.IsBypass("/public-admin") {
+		t.Errorf("SECURITY RISK: /public-admin must NOT match /public/*")
+	}
+	if gateway.IsBypass("/publicity") {
+		t.Errorf("SECURITY RISK: /publicity must NOT match /public/*")
+	}
+	if gateway.IsBypass("/public_secrets") {
+		t.Errorf("SECURITY RISK: /public_secrets must NOT match /public/*")
+	}
+	if gateway.IsBypass("/healthz-extended") {
+		t.Errorf("SECURITY RISK: /healthz-extended must NOT match /healthz")
+	}
+}
+
+func TestAuthGateway_AuthenticatedUserOnBypassRoute(t *testing.T) {
+	sm := NewSessionManager("test-secret-key-that-is-32-bytes")
+	gateway := NewAuthGateway(GatewayConfig{
+		SessionMgr:  sm,
+		BypassPaths: []string{"/public/*"},
+	})
+
+	ident := &UserIdentity{
+		Subject: "alice",
+		Email:   "alice@example.com",
+		Roles:   []string{"admin"},
+	}
+	cookie, err := sm.CreateSessionCookie(ident)
+	if err != nil {
+		t.Fatalf("failed to create session cookie: %v", err)
+	}
+
+	req := httptest.NewRequest("GET", "/public/profile", nil)
+	req.AddCookie(cookie)
+	rec := httptest.NewRecorder()
+
+	identity, ok := gateway.AuthenticateRequest(rec, req)
+	if !ok || identity == nil {
+		t.Fatalf("expected request to succeed with authenticated identity")
+	}
+	if identity.Subject != "alice" {
+		t.Errorf("expected identity subject 'alice', got %q", identity.Subject)
+	}
+	if req.Header.Get(HeaderAuthSubject) != "alice" {
+		t.Errorf("expected upstream X-Auth-Subject to be injected on bypass route for authenticated user")
+	}
+}
+
+func TestSessionManager_CustomTTLEnforcement(t *testing.T) {
+	// 1 hour custom TTL
+	sm := NewSessionManager("test-secret-key-that-is-32-bytes", WithCookieTTL(1*time.Hour))
+
+	// Identity has 24 hour DefaultSessionTTL
+	ident := &UserIdentity{
+		Subject:   "bob",
+		ExpiresAt: time.Now().Add(24 * time.Hour),
+	}
+
+	tokenStr, err := sm.CreateSessionToken(ident)
+	if err != nil {
+		t.Fatalf("CreateSessionToken error: %v", err)
+	}
+
+	claims, err := sm.ValidateSessionToken(tokenStr)
+	if err != nil {
+		t.Fatalf("ValidateSessionToken error: %v", err)
+	}
+
+	// Token expiration should be within ~1 hour, NOT 24 hours
+	expectedMax := time.Now().Add(65 * time.Minute)
+	if claims.ExpiresAt.After(expectedMax) {
+		t.Errorf("token ExpiresAt %v exceeds configured 1h TTL (max %v)", claims.ExpiresAt, expectedMax)
+	}
+}
+
+func TestSimpleAuth_EmptyPasswordRejection(t *testing.T) {
+	sa := NewSimpleAuth(SimpleUser{
+		Username:     "empty_hash_user",
+		PasswordHash: "",
+	})
+
+	if _, err := sa.Authenticate("empty_hash_user", ""); err == nil {
+		t.Errorf("SECURITY RISK: Authenticate should fail with empty password and empty hash")
+	}
+
+	validUser := SimpleUser{
+		Username: "valid_user",
+	}
+	_ = sa.SetUser(validUser.Username, "realpass", "", "", nil)
+
+	if _, err := sa.Authenticate("valid_user", ""); err == nil {
+		t.Errorf("SECURITY RISK: Authenticate should fail with empty password against valid user")
+	}
+}
+

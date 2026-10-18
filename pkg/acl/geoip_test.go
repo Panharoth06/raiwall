@@ -66,3 +66,20 @@ func TestGeoIPReader_CloseIdempotent(t *testing.T) {
 		t.Fatalf("second Close() failed: %v", err)
 	}
 }
+
+func TestGeoIPReader_LookupAddr_StaticOverride(t *testing.T) {
+	reader := NewNoopGeoIPReader()
+	defer reader.Close()
+
+	reader.SetStaticLookup(net.ParseIP("10.0.0.1"), GeoData{Country: "US", ASN: 15169})
+	addr, ok := NetipAddrFromIP(net.ParseIP("10.0.0.1"))
+	if !ok {
+		t.Fatalf("NetipAddrFromIP failed")
+	}
+
+	geo := reader.LookupAddr(addr)
+	if geo.Country != "US" || geo.ASN != 15169 {
+		t.Errorf("expected static override Country 'US', got %+v", geo)
+	}
+}
+

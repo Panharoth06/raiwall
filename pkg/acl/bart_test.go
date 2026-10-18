@@ -71,6 +71,26 @@ func TestBARTTable_BasicAndCIDR(t *testing.T) {
 		t.Errorf("did not expect 172.16.0.1 in 192.168.1.0/24")
 	}
 
+	// IPv4-mapped IPv6 support
+	mappedIP := net.ParseIP("::ffff:192.168.1.55")
+	if !bt.Contains(mappedIP) {
+		t.Errorf("expected ::ffff:192.168.1.55 to be contained")
+	}
+	if !bt.InFeed(mappedIP, "crowdsec") {
+		t.Errorf("expected ::ffff:192.168.1.55 to be in crowdsec")
+	}
+
+	// Insert IPv4-mapped IPv6 CIDR prefix
+	if err := bt.InsertCIDR("::ffff:203.0.113.0/120", "mapped_feed", "ipv4 mapped subnet"); err != nil {
+		t.Fatalf("InsertCIDR IPv4-mapped error: %v", err)
+	}
+	if !bt.InFeed(net.ParseIP("203.0.113.42"), "mapped_feed") {
+		t.Errorf("expected 203.0.113.42 to match mapped_feed")
+	}
+	if !bt.InFeed(net.ParseIP("::ffff:203.0.113.42"), "mapped_feed") {
+		t.Errorf("expected ::ffff:203.0.113.42 to match mapped_feed")
+	}
+
 	// Negative lookup
 	ipOutside := net.ParseIP("172.16.0.1")
 	if bt.Contains(ipOutside) {

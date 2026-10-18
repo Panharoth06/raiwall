@@ -2,6 +2,7 @@ package acl
 
 import (
 	"fmt"
+	"net"
 	"regexp"
 	"strings"
 	"sync"
@@ -44,18 +45,23 @@ func (r *ExceptionRule) Compile() error {
 	return nil
 }
 
+func stripHostPort(host string) string {
+	if host == "" || host == "*" {
+		return host
+	}
+	h, _, err := net.SplitHostPort(host)
+	if err == nil {
+		return strings.Trim(h, "[]")
+	}
+	return strings.Trim(host, "[]")
+}
+
 // Matches checks if the exception rule matches the request and parameter criteria.
 func (r *ExceptionRule) Matches(host, path, method, location, paramName, ruleID string) bool {
 	// 1. Host match
 	if r.Host != "" && r.Host != "*" {
-		cleanHost := host
-		if idx := strings.IndexByte(host, ':'); idx != -1 {
-			cleanHost = host[:idx]
-		}
-		ruleHost := r.Host
-		if idx := strings.IndexByte(ruleHost, ':'); idx != -1 {
-			ruleHost = ruleHost[:idx]
-		}
+		cleanHost := stripHostPort(host)
+		ruleHost := stripHostPort(r.Host)
 
 		if strings.HasPrefix(ruleHost, "*.") {
 			suffix := ruleHost[1:] // e.g. ".example.com"
@@ -86,11 +92,11 @@ func (r *ExceptionRule) Matches(host, path, method, location, paramName, ruleID 
 	// 4. Location match
 	if r.Location != "" && r.Location != "*" {
 		if !strings.EqualFold(r.Location, location) {
-			// Special case: cookie parameters might be reported under Header location with name Cookie
-			if strings.EqualFold(r.Location, "cookie") && strings.EqualFold(location, "header") && strings.EqualFold(paramName, "cookie") {
-				// matches
-			} else if strings.EqualFold(r.Location, "body") && (strings.EqualFold(location, "json") || strings.EqualFold(location, "multipart")) {
+			if strings.EqualFold(r.Location, "body") && (strings.EqualFold(location, "json") || strings.EqualFold(location, "multipart")) {
 				// JSON and Multipart payloads reside within the request body
+			} else if (strings.EqualFold(r.Location, "header") && strings.EqualFold(location, "cookie")) ||
+				(strings.EqualFold(r.Location, "cookie") && strings.EqualFold(location, "header")) {
+				// Cookies reside within HTTP headers
 			} else {
 				return false
 			}
@@ -103,7 +109,7 @@ func (r *ExceptionRule) Matches(host, path, method, location, paramName, ruleID 
 			return false
 		}
 	} else if r.ParamName != "" && r.ParamName != "*" {
-		if strings.EqualFold(location, "header") {
+		if strings.EqualFold(location, "header") || strings.EqualFold(location, "cookie") {
 			if !strings.EqualFold(r.ParamName, paramName) {
 				return false
 			}
