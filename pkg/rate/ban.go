@@ -61,6 +61,9 @@ func BanKey(ip net.IP, ja4 string) string {
 
 // Ban registers an auto-ban for composite ClientIP + JA4.
 func (bm *BanManager) Ban(ip net.IP, ja4 string, ttl time.Duration, reason string) *BanEntry {
+	if bm == nil {
+		return nil
+	}
 	key := BanKey(ip, ja4)
 	if key == "" {
 		return nil
@@ -103,7 +106,7 @@ func (bm *BanManager) Ban(ip net.IP, ja4 string, ttl time.Duration, reason strin
 
 // BanIP registers a pure IP-level ban (escalation for all traffic from this IP).
 func (bm *BanManager) BanIP(ip net.IP, ttl time.Duration, reason string) *BanEntry {
-	if ip == nil {
+	if bm == nil || ip == nil {
 		return nil
 	}
 	return bm.Ban(ip, "", ttl, reason)
@@ -112,6 +115,9 @@ func (bm *BanManager) BanIP(ip net.IP, ttl time.Duration, reason string) *BanEnt
 // IsBanned performs a fast-path check (<500ns) to determine if the client is currently banned.
 // It checks composite ClientIP + JA4 first, then falls back to pure IP.
 func (bm *BanManager) IsBanned(ip net.IP, ja4 string) (bool, *BanEntry) {
+	if bm == nil {
+		return false, nil
+	}
 	now := time.Now()
 	ipStr := ""
 	if ip != nil {
@@ -154,6 +160,9 @@ func (bm *BanManager) IsBanned(ip net.IP, ja4 string) (bool, *BanEntry) {
 
 // Unban removes a ban by key.
 func (bm *BanManager) Unban(key string) {
+	if bm == nil {
+		return
+	}
 	bm.mu.Lock()
 	delete(bm.entries, key)
 	bm.mu.Unlock()
@@ -161,13 +170,16 @@ func (bm *BanManager) Unban(key string) {
 
 // UnbanIP removes an IP ban.
 func (bm *BanManager) UnbanIP(ip net.IP) {
-	if ip != nil {
+	if bm != nil && ip != nil {
 		bm.Unban(ip.String())
 	}
 }
 
 // Count returns the active ban count.
 func (bm *BanManager) Count() int {
+	if bm == nil {
+		return 0
+	}
 	bm.mu.RLock()
 	defer bm.mu.RUnlock()
 	return len(bm.entries)
@@ -175,6 +187,9 @@ func (bm *BanManager) Count() int {
 
 // Clear removes all active bans.
 func (bm *BanManager) Clear() {
+	if bm == nil {
+		return
+	}
 	bm.mu.Lock()
 	bm.entries = make(map[string]*BanEntry)
 	bm.mu.Unlock()
@@ -182,6 +197,9 @@ func (bm *BanManager) Clear() {
 
 // EvictExpired sweeps the ban store and purges expired entries.
 func (bm *BanManager) EvictExpired() int {
+	if bm == nil {
+		return 0
+	}
 	now := time.Now()
 	bm.mu.Lock()
 	defer bm.mu.Unlock()

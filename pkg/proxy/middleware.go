@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -89,7 +90,15 @@ type Middleware struct {
 	tier2Limiter *rate.Tier2AttackLimiter
 	tier3Trap    *rate.Tier3ScannerTrap
 	waitingRoom  *rate.WaitingRoomManager
+	rateStorage  rate.RateStorage
 }
+
+var (
+	_ caddyhttp.MiddlewareHandler = (*Middleware)(nil)
+	_ caddy.Provisioner           = (*Middleware)(nil)
+	_ caddy.Validator             = (*Middleware)(nil)
+	_ caddy.CleanerUpper          = (*Middleware)(nil)
+)
 
 // CaddyModule returns the Caddy module information.
 func (Middleware) CaddyModule() caddy.ModuleInfo {
@@ -177,25 +186,27 @@ func (m *Middleware) Provision(ctx caddy.Context) error {
 	if m.honeypotInj == nil {
 		m.honeypotInj = bot.NewHoneypotInjector(bot.DefaultTrapPath)
 	}
-	if m.trapCtrl == nil {
-		m.trapCtrl = bot.NewTrapController(nil, bot.DefaultBanDuration, m.logger)
-	}
 
 	// Initialize Domain 4 components
 	if m.banManager == nil {
 		m.banManager = rate.NewBanManager(m.logger)
 	}
-
-	var rateStorage rate.RateStorage
-	if m.RateLimitConfig != nil && strings.ToLower(m.RateLimitConfig.StorageType) == "redis" && m.RateLimitConfig.StorageAddr != "" {
-		redisClient := rate.NewSimpleRESPClient(m.RateLimitConfig.StorageAddr, 2*time.Second)
-		rateStorage = rate.NewRedisStorage(rate.RedisStorageConfig{
-			Client:            redisClient,
-			FallbackOnFailure: true,
-		})
-	} else {
-		rateStorage = rate.NewMemoryStorage()
+	if m.trapCtrl == nil {
+		m.trapCtrl = bot.NewTrapController(&banStoreAdapter{bm: m.banManager}, bot.DefaultBanDuration, m.logger)
 	}
+
+	if m.rateStorage == nil {
+		if m.RateLimitConfig != nil && strings.ToLower(m.RateLimitConfig.StorageType) == "redis" && m.RateLimitConfig.StorageAddr != "" {
+			redisClient := rate.NewSimpleRESPClient(m.RateLimitConfig.StorageAddr, 2*time.Second)
+			m.rateStorage = rate.NewRedisStorage(rate.RedisStorageConfig{
+				Client:            redisClient,
+				FallbackOnFailure: true,
+			})
+		} else {
+			m.rateStorage = rate.NewMemoryStorage()
+		}
+	}
+	rateStorage := m.rateStorage
 
 	if m.tier1Limiter == nil && m.RateLimitConfig != nil && m.RateLimitConfig.Tier1Rate > 0 {
 		period := time.Duration(m.RateLimitConfig.Tier1Period)
@@ -207,12 +218,13 @@ func (m *Middleware) Provision(ctx caddy.Context) error {
 			burst = 20
 		}
 		m.tier1Limiter = rate.NewTier1VelocityLimiter(rate.Tier1Config{
-			Rate:            m.RateLimitConfig.Tier1Rate,
-			Period:          period,
-			Burst:           burst,
-			Storage:         rateStorage,
-			RouteClassifier: m.routeClass,
-			PoWEngine:       m.powEngine,
+			Rate:             m.RateLimitConfig.Tier1Rate,
+			Period:           period,
+			Burst:            burst,
+			Storage:          rateStorage,
+			RouteClassifier:  m.routeClass,
+			PoWEngine:        m.powEngine,
+			ClearanceManager: m.clearanceMgr,
 		})
 	}
 
@@ -379,6 +391,34 @@ func (m *Middleware) Validate() error {
 	if m.PoWDifficulty < 0 {
 		return fmt.Errorf("invalid pow_difficulty: %d (must be non-negative)", m.PoWDifficulty)
 	}
+	if m.RateLimitConfig != nil {
+		if st := strings.ToLower(m.RateLimitConfig.StorageType); st != "" && st != "memory" && st != "redis" {
+			return fmt.Errorf("invalid rate_limit storage type: %s (must be memory or redis)", m.RateLimitConfig.StorageType)
+		}
+		if m.RateLimitConfig.Tier1Rate < 0 {
+			return fmt.Errorf("invalid tier1_rate: %d (must be non-negative)", m.RateLimitConfig.Tier1Rate)
+		}
+		if m.RateLimitConfig.Tier1Burst < 0 {
+			return fmt.Errorf("invalid tier1_burst: %d (must be non-negative)", m.RateLimitConfig.Tier1Burst)
+		}
+		if m.RateLimitConfig.Tier2Threshold < 0 {
+			return fmt.Errorf("invalid tier2_threshold: %d (must be non-negative)", m.RateLimitConfig.Tier2Threshold)
+		}
+		if m.RateLimitConfig.Tier3Threshold < 0 {
+			return fmt.Errorf("invalid tier3_threshold: %d (must be non-negative)", m.RateLimitConfig.Tier3Threshold)
+		}
+	}
+	if m.WaitingRoomConfig != nil {
+		if m.WaitingRoomConfig.MaxConcurrentInFlight < 0 {
+			return fmt.Errorf("invalid max_concurrent: %d (must be non-negative)", m.WaitingRoomConfig.MaxConcurrentInFlight)
+		}
+		if m.WaitingRoomConfig.MaxQueueDepth < 0 {
+			return fmt.Errorf("invalid max_queue_depth: %d (must be non-negative)", m.WaitingRoomConfig.MaxQueueDepth)
+		}
+		if m.WaitingRoomConfig.AdmissionRate < 0 {
+			return fmt.Errorf("invalid admission_rate: %d (must be non-negative)", m.WaitingRoomConfig.AdmissionRate)
+		}
+	}
 	return nil
 }
 
@@ -410,89 +450,7 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 	}
 	r = r.WithContext(ctx)
 
-	// 2. Fast-Path: Check Auto-Ban state (banned crawlers / botnets / rate abusers)
-	if m.banManager != nil {
-		if banned, entry := m.banManager.IsBanned(clientIP, ja4); banned {
-			eventID := uuid.New().String()
-			if m.logger != nil {
-				m.logger.Warn("Blocked auto-banned client (ban store)",
-					zap.String("event_id", eventID),
-					zap.String("client_ip", clientIP.String()),
-					zap.String("ja4", ja4),
-					zap.String("reason", entry.Reason),
-				)
-			}
-			statusCode := m.BlockStatusCode
-			if statusCode == 0 {
-				statusCode = http.StatusForbidden
-			}
-			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			w.Header().Set("X-Raiwall-Event-ID", eventID)
-			w.WriteHeader(statusCode)
-			banMsg := "<!DOCTYPE html><html><head><title>403 Forbidden</title></head><body><h1>403 Forbidden</h1><p>Client is blocked due to security violations.</p></body></html>"
-			if m.BlockResponseBody != defaultBlockHTML && m.BlockResponseBody != "" {
-				banMsg = strings.ReplaceAll(m.BlockResponseBody, "{{EVENT_ID}}", eventID)
-			}
-			_, _ = w.Write([]byte(banMsg))
-			return nil
-		}
-	}
-	if m.trapCtrl != nil {
-		if banned, entry := m.trapCtrl.IsClientBanned(clientIP, ja4); banned {
-			eventID := uuid.New().String()
-			if m.logger != nil {
-				m.logger.Warn("Blocked auto-banned client",
-					zap.String("event_id", eventID),
-					zap.String("client_ip", clientIP.String()),
-					zap.String("ja4", ja4),
-					zap.String("reason", entry.Reason),
-				)
-			}
-			statusCode := m.BlockStatusCode
-			if statusCode == 0 {
-				statusCode = http.StatusForbidden
-			}
-			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			w.Header().Set("X-Raiwall-Event-ID", eventID)
-			w.WriteHeader(statusCode)
-			banMsg := "<!DOCTYPE html><html><head><title>403 Forbidden</title></head><body><h1>403 Forbidden</h1><p>Client is blocked due to security violations.</p></body></html>"
-			if m.BlockResponseBody != defaultBlockHTML && m.BlockResponseBody != "" {
-				banMsg = strings.ReplaceAll(m.BlockResponseBody, "{{EVENT_ID}}", eventID)
-			}
-			_, _ = w.Write([]byte(banMsg))
-			return nil
-		}
-	}
-
-	// 2b. Waiting Room SSE Endpoint (/.raiwall/waiting-room/events)
-	if r.URL.Path == rate.WaitingRoomEventsPath {
-		if m.waitingRoom != nil {
-			m.waitingRoom.HandleSSE(w, r, clientIP, ja4)
-			return nil
-		}
-		http.Error(w, "Waiting room not active", http.StatusNotFound)
-		return nil
-	}
-
-	// 3. Honeypot Trap Interception (/.raiwall/trap/*)
-	if bot.IsTrapRequest(r.URL.Path) {
-		if m.trapCtrl != nil {
-			m.trapCtrl.HandleTrap(w, r, clientIP, ja4)
-			return nil
-		}
-		w.WriteHeader(http.StatusForbidden)
-		return nil
-	}
-
-	// 4. Internal Challenge Verification Endpoint (/.raiwall/challenge/verify)
-	if r.URL.Path == bot.ChallengeVerifyPath {
-		if m.clearanceMgr != nil {
-			m.clearanceMgr.HandleChallengeVerify(w, r, clientIP, ja4)
-			return nil
-		}
-	}
-
-	// 5. Resolve operational run mode from in-memory snapshot with fallback
+	// 2. Resolve operational run mode from in-memory snapshot with fallback
 	currentMode := m.runMode
 	if !currentMode.IsValid() {
 		currentMode = config.ModeDefense
@@ -504,10 +462,12 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 		if app, found := snap.GetAppForHost(r.Host); found && app != nil && app.Mode.IsValid() {
 			appCfg = app
 			currentMode = app.Mode
+		} else if snap.Version > 1 && snap.DefaultMode.IsValid() {
+			currentMode = snap.DefaultMode
 		}
 	}
 
-	// 6. Phase 1 - Evaluate Offline Mode immediately
+	// 3. Phase 1 - Evaluate Offline Mode immediately
 	if currentMode == config.ModeOffline {
 		statusCode := m.OfflineStatusCode
 		body := m.OfflineResponseBody
@@ -527,10 +487,85 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 		return nil
 	}
 
-	// 6b. Virtual Waiting Room Gate
+	// 4. Fast-Path: Check Auto-Ban state (banned crawlers / botnets / rate abusers)
+	if m.banManager != nil {
+		if banned, entry := m.banManager.IsBanned(clientIP, ja4); banned {
+			if currentMode == config.ModeAudit {
+				if m.logger != nil {
+					m.logger.Info("Banned client detected in audit mode (not blocked)",
+						zap.String("client_ip", clientIP.String()),
+						zap.String("ja4", ja4),
+						zap.String("reason", entry.Reason),
+					)
+				}
+			} else {
+				eventID := uuid.New().String()
+				if m.logger != nil {
+					m.logger.Warn("Blocked auto-banned client (ban store)",
+						zap.String("event_id", eventID),
+						zap.String("client_ip", clientIP.String()),
+						zap.String("ja4", ja4),
+						zap.String("reason", entry.Reason),
+					)
+				}
+				statusCode := m.BlockStatusCode
+				if statusCode == 0 {
+					statusCode = http.StatusForbidden
+				}
+				w.Header().Set("Content-Type", "text/html; charset=utf-8")
+				w.Header().Set("X-Raiwall-Event-ID", eventID)
+				w.WriteHeader(statusCode)
+				banMsg := "<!DOCTYPE html><html><head><title>403 Forbidden</title></head><body><h1>403 Forbidden</h1><p>Client is blocked due to security violations.</p></body></html>"
+				if m.BlockResponseBody != defaultBlockHTML && m.BlockResponseBody != "" {
+					banMsg = strings.ReplaceAll(m.BlockResponseBody, "{{EVENT_ID}}", eventID)
+				}
+				_, _ = w.Write([]byte(banMsg))
+				return nil
+			}
+		}
+	}
+
+	// 5. Waiting Room SSE Endpoint (/.raiwall/waiting-room/events)
+	if r.URL.Path == rate.WaitingRoomEventsPath {
+		if m.waitingRoom != nil {
+			m.waitingRoom.HandleSSE(w, r, clientIP, ja4)
+			return nil
+		}
+		http.Error(w, "Waiting room not active", http.StatusNotFound)
+		return nil
+	}
+
+	// 6. Honeypot Trap Interception (/.raiwall/trap/*)
+	if bot.IsTrapRequest(r.URL.Path) {
+		if m.trapCtrl != nil {
+			m.trapCtrl.HandleTrap(w, r, clientIP, ja4)
+			return nil
+		}
+		w.WriteHeader(http.StatusForbidden)
+		return nil
+	}
+
+	// 7. Internal Challenge Verification Endpoint (/.raiwall/challenge/verify)
+	if r.URL.Path == bot.ChallengeVerifyPath {
+		if m.clearanceMgr != nil {
+			m.clearanceMgr.HandleChallengeVerify(w, r, clientIP, ja4)
+			return nil
+		}
+	}
+
+	// 8. Virtual Waiting Room Gate
 	var waitingRoomRelease func()
 	if m.waitingRoom != nil {
 		if !m.waitingRoom.IsAdmitted(r, clientIP, ja4) {
+			// Check if client is already waiting in queue (e.g. on page refresh)
+			if qCookie, err := r.Cookie(rate.WaitingRoomQueueCookie); err == nil && qCookie.Value != "" {
+				if pos, waitSecs, admitted, _ := m.waitingRoom.FindActiveEntry(qCookie.Value); pos > 0 || admitted {
+					if !admitted {
+						return rate.RenderWaitingRoomPage(w, qCookie.Value, pos, waitSecs, r.URL.RequestURI())
+					}
+				}
+			}
+
 			if m.waitingRoom.ShouldEnterWaitingRoom() {
 				if m.routeClass == nil {
 					m.routeClass = bot.NewRouteClassifier(nil)
@@ -552,7 +587,7 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 		defer waitingRoomRelease()
 	}
 
-	// 6c. Tier 1 Access Velocity Limiter
+	// 9. Tier 1 Access Velocity Limiter
 	if m.tier1Limiter != nil {
 		allowed, err := m.tier1Limiter.Enforce(w, r, clientIP, ja4)
 		if !allowed {
@@ -717,10 +752,10 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 
 	// Evaluate verdict according to run mode
 	if verdict != nil && verdict.Action == engine.ActionBlock {
-		if m.tier2Limiter != nil {
-			_, _, _ = m.tier2Limiter.RecordAttack(r.Context(), clientIP, ja4, verdict.RuleID, verdict.Reason)
-		}
 		if currentMode == config.ModeDefense {
+			if m.tier2Limiter != nil {
+				_, _, _ = m.tier2Limiter.RecordAttack(r.Context(), clientIP, ja4, verdict.RuleID, verdict.Reason)
+			}
 			eventID := uuid.New().String()
 			if m.logger != nil {
 				m.logger.Warn("WAF blocked request",
@@ -775,7 +810,7 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 	interceptor.Finish()
 
 	// Tier 3 Scanner Trap response inspection
-	if m.tier3Trap != nil {
+	if m.tier3Trap != nil && currentMode == config.ModeDefense {
 		_, _, _ = m.tier3Trap.InspectResponse(r.Context(), r, clientIP, ja4, interceptor.StatusCode())
 	}
 
@@ -799,3 +834,78 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 
 	return nextErr
 }
+
+type banStoreAdapter struct {
+	bm *rate.BanManager
+}
+
+func (a *banStoreAdapter) Ban(ip net.IP, ja4 string, ttl time.Duration, reason string) {
+	if a.bm != nil {
+		a.bm.Ban(ip, ja4, ttl, reason)
+	}
+}
+
+func (a *banStoreAdapter) IsBanned(ip net.IP, ja4 string) (bool, *bot.BanEntry) {
+	if a.bm == nil {
+		return false, nil
+	}
+	banned, entry := a.bm.IsBanned(ip, ja4)
+	if !banned || entry == nil {
+		return false, nil
+	}
+	return true, &bot.BanEntry{
+		Key:       entry.Key,
+		ClientIP:  entry.ClientIP,
+		JA4:       entry.JA4,
+		Reason:    entry.Reason,
+		BannedAt:  entry.BannedAt,
+		ExpiresAt: entry.ExpiresAt,
+	}
+}
+
+func (a *banStoreAdapter) Unban(key string) {
+	if a.bm != nil {
+		a.bm.Unban(key)
+	}
+}
+
+func (a *banStoreAdapter) EvictExpired() int {
+	if a.bm != nil {
+		return a.bm.EvictExpired()
+	}
+	return 0
+}
+
+func (a *banStoreAdapter) Count() int {
+	if a.bm != nil {
+		return a.bm.Count()
+	}
+	return 0
+}
+
+func (a *banStoreAdapter) Clear() {
+	if a.bm != nil {
+		a.bm.Clear()
+	}
+}
+
+func (a *banStoreAdapter) Close() {
+	if a.bm != nil {
+		_ = a.bm.Close()
+	}
+}
+
+// Cleanup releases all background resources, closing rate limit storage, ban manager, and waiting room loops.
+func (m *Middleware) Cleanup() error {
+	if m.waitingRoom != nil {
+		_ = m.waitingRoom.Close()
+	}
+	if m.banManager != nil {
+		_ = m.banManager.Close()
+	}
+	if m.rateStorage != nil {
+		_ = m.rateStorage.Close()
+	}
+	return nil
+}
+

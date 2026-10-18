@@ -231,6 +231,7 @@ func toInt64(val any) int64 {
 type SimpleRESPClient struct {
 	addr    string
 	timeout time.Duration
+	dialer  func(network, addr string) (net.Conn, error)
 	mu      sync.Mutex
 	conn    net.Conn
 	reader  *bufio.Reader
@@ -247,11 +248,24 @@ func NewSimpleRESPClient(addr string, timeout time.Duration) *SimpleRESPClient {
 	}
 }
 
+// SetDialer allows overriding the network dialer (useful for testing or custom transports).
+func (c *SimpleRESPClient) SetDialer(dialer func(network, addr string) (net.Conn, error)) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.dialer = dialer
+}
+
 func (c *SimpleRESPClient) ensureConn() error {
 	if c.conn != nil {
 		return nil
 	}
-	conn, err := net.DialTimeout("tcp", c.addr, c.timeout)
+	var conn net.Conn
+	var err error
+	if c.dialer != nil {
+		conn, err = c.dialer("tcp", c.addr)
+	} else {
+		conn, err = net.DialTimeout("tcp", c.addr, c.timeout)
+	}
 	if err != nil {
 		return err
 	}
@@ -312,7 +326,12 @@ func (c *SimpleRESPClient) Del(ctx context.Context, keys ...string) error {
 		return err
 	}
 	_, err := parseRESP(c.reader)
-	return err
+	if err != nil {
+		c.conn.Close()
+		c.conn = nil
+		return err
+	}
+	return nil
 }
 
 func (c *SimpleRESPClient) Eval(ctx context.Context, script string, keys []string, args ...any) (any, error) {
@@ -335,7 +354,13 @@ func (c *SimpleRESPClient) Eval(ctx context.Context, script string, keys []strin
 		c.conn = nil
 		return nil, err
 	}
-	return parseRESP(c.reader)
+	resp, err := parseRESP(c.reader)
+	if err != nil {
+		c.conn.Close()
+		c.conn = nil
+		return nil, err
+	}
+	return resp, nil
 }
 
 func buildRESPCommand(parts ...string) []byte {

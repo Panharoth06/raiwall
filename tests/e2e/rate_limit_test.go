@@ -256,6 +256,7 @@ func TestEndToEndRateLimitAndDDoSDefense(t *testing.T) {
 		if wm == nil {
 			t.Fatal("waiting room not provisioned")
 		}
+		defer wm.Clear()
 
 		// Fill in-flight capacity (MaxConcurrentInFlight = 3)
 		rel1 := wm.AcquireLease()
@@ -360,5 +361,167 @@ func TestEndToEndRateLimitAndDDoSDefense(t *testing.T) {
 		}
 
 		wg.Wait()
+	})
+
+	// ------------------------------------------------------------------
+	// Scenario 6: Audit Mode Does Not Auto-Ban on Repeated Attacks
+	// ------------------------------------------------------------------
+	t.Run("Audit Mode Does Not Auto-Ban", func(t *testing.T) {
+		config.StoreSnapshot(config.NewConfigSnapshot(200, config.ModeAudit, nil))
+		defer config.StoreSnapshot(config.NewConfigSnapshot(200, config.ModeDefense, nil))
+
+		auditIP := "198.51.100.99"
+		auditJA4 := "t13d1516h2_audit_attacker"
+
+		// Send repeated attacks (SQL injection)
+		for i := 0; i < 5; i++ {
+			req := httptest.NewRequest(http.MethodGet, "https://example.com/api/data?q=1%27%20OR%20%271%27=%271", nil)
+			req.Header.Set("Authorization", "Bearer token-audit")
+			req.Header.Set("X-Real-IP", auditIP)
+			req.Header.Set("X-JA4-Fingerprint", auditJA4)
+			rec := httptest.NewRecorder()
+
+			_ = mw.ServeHTTP(rec, req, next)
+			// In audit mode, attacks are logged but not blocked (200 OK from backend)
+			if rec.Code != http.StatusOK {
+				t.Errorf("audit attack %d expected 200 OK, got %d", i+1, rec.Code)
+			}
+		}
+
+		// Ensure client is NOT banned in BanManager
+		ipParsed := net.ParseIP(auditIP)
+		isBanned, _ := mw.BanManager().IsBanned(ipParsed, auditJA4)
+		if isBanned {
+			t.Errorf("client must NOT be auto-banned in audit mode")
+		}
+	})
+
+	// ------------------------------------------------------------------
+	// Scenario 7: Verified Browser Receives HTTP 429 on Velocity Trip
+	// ------------------------------------------------------------------
+	t.Run("Verified Browser Receives HTTP 429 on Velocity Trip", func(t *testing.T) {
+		verifiedIP := "198.51.100.123"
+		verifiedJA4 := "t13d1516h2_verified_client"
+
+		// Generate valid clearance cookie using same powSecret
+		clearanceMgr := bot.NewClearanceManager(bot.ClearanceConfig{
+			Secret: powSecret,
+			TTL:    15 * time.Minute,
+		}, nil)
+		token := clearanceMgr.GenerateToken(net.ParseIP(verifiedIP), verifiedJA4, time.Now().Add(15*time.Minute))
+		clearanceCookie := &http.Cookie{
+			Name:  bot.ClearanceCookieName,
+			Value: token,
+		}
+
+		// Flood browser route (/dashboard) with 8 requests (capacity is 6)
+		var got429 bool
+		var gotPoW bool
+		for i := 0; i < 8; i++ {
+			req := httptest.NewRequest(http.MethodGet, "https://example.com/dashboard", nil)
+			req.Header.Set("Accept", "text/html,application/xhtml+xml")
+			req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36")
+			req.Header.Set("X-Real-IP", verifiedIP)
+			req.Header.Set("X-JA4-Fingerprint", verifiedJA4)
+			req.AddCookie(clearanceCookie)
+			rec := httptest.NewRecorder()
+
+			_ = mw.ServeHTTP(rec, req, next)
+			if rec.Code == http.StatusTooManyRequests {
+				got429 = true
+				if rec.Header().Get("Retry-After") == "" {
+					t.Errorf("verified browser 429 missing Retry-After header")
+				}
+				break
+			} else if rec.Code == bot.HTTPStatusChallenge {
+				gotPoW = true
+			}
+		}
+
+		if gotPoW {
+			t.Errorf("verified browser should NOT receive another HTTP 468 PoW challenge")
+		}
+		if !got429 {
+			t.Errorf("verified browser flood should have triggered HTTP 429 Too Many Requests")
+		}
+	})
+
+	// ------------------------------------------------------------------
+	// Scenario 8: Virtual Waiting Room Position Preservation via Cookie
+	// ------------------------------------------------------------------
+	t.Run("Virtual Waiting Room Position Preservation via Cookie", func(t *testing.T) {
+		mwWait := &proxy.Middleware{
+			Mode:          "defense",
+			BotDefense:    "defense",
+			PoWSecret:     powSecret,
+			PoWDifficulty: 200,
+			WaitingRoomConfig: &proxy.WaitingRoomSettings{
+				Enabled:               true,
+				MaxConcurrentInFlight: 1,
+				MaxQueueDepth:         10,
+				AdmissionRate:         10,
+				AdmissionTokenTTL:     caddy.Duration(15 * time.Minute),
+			},
+		}
+		cCtx, cancel := caddy.NewContext(caddy.Context{Context: context.Background()})
+		defer cancel()
+		if err := mwWait.Provision(cCtx); err != nil {
+			t.Fatalf("failed to provision middleware: %v", err)
+		}
+		defer func() {
+			_ = mwWait.Cleanup()
+		}()
+
+		wm := mwWait.WaitingRoom()
+		// Hold the single in-flight lease
+		rel := wm.AcquireLease()
+		defer rel()
+
+		cookieIP := "198.51.100.155"
+		cookieJA4 := "t13d1516h2_queue_cookie_test"
+
+		// 1. Initial request to waiting room
+		req1 := httptest.NewRequest(http.MethodGet, "https://example.com/dashboard", nil)
+		req1.Header.Set("Accept", "text/html,application/xhtml+xml")
+		req1.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh)")
+		req1.Header.Set("X-Real-IP", cookieIP)
+		req1.Header.Set("X-JA4-Fingerprint", cookieJA4)
+		rec1 := httptest.NewRecorder()
+
+		_ = mwWait.ServeHTTP(rec1, req1, next)
+		if rec1.Code != http.StatusServiceUnavailable {
+			t.Fatalf("expected status 503, got %d", rec1.Code)
+		}
+
+		// Extract queue cookie
+		var queueCookie *http.Cookie
+		for _, c := range rec1.Result().Cookies() {
+			if c.Name == rate.WaitingRoomQueueCookie {
+				queueCookie = c
+				break
+			}
+		}
+		if queueCookie == nil || queueCookie.Value == "" {
+			t.Fatalf("expected %s cookie in response", rate.WaitingRoomQueueCookie)
+		}
+
+		// 2. Client refreshes with queue cookie
+		req2 := httptest.NewRequest(http.MethodGet, "https://example.com/dashboard", nil)
+		req2.Header.Set("Accept", "text/html,application/xhtml+xml")
+		req2.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh)")
+		req2.Header.Set("X-Real-IP", cookieIP)
+		req2.Header.Set("X-JA4-Fingerprint", cookieJA4)
+		req2.AddCookie(queueCookie)
+		rec2 := httptest.NewRecorder()
+
+		_ = mwWait.ServeHTTP(rec2, req2, next)
+		if rec2.Code != http.StatusServiceUnavailable {
+			t.Fatalf("expected status 503 on refresh, got %d", rec2.Code)
+		}
+
+		// Ensure queue depth is still 1 (not duplicated)
+		if depth := wm.QueueDepth(); depth != 1 {
+			t.Errorf("expected queue depth 1 on refresh with cookie, got %d", depth)
+		}
 	})
 }

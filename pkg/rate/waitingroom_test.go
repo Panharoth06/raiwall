@@ -184,3 +184,81 @@ func TestWaitingRoomManager_SSEStreaming(t *testing.T) {
 	_ = pos
 	_ = wait
 }
+
+func TestWaitingRoomManager_NoQueueJumping(t *testing.T) {
+	wm := NewWaitingRoomManager(WaitingRoomConfig{
+		MaxConcurrentInFlight: 10,
+		MaxQueueDepth:         20,
+		AdmissionRate:         5,
+	})
+	defer wm.Close()
+
+	// Initially in-flight is 0, queue is empty -> false
+	if wm.ShouldEnterWaitingRoom() {
+		t.Errorf("expected ShouldEnterWaitingRoom=false when in-flight is 0 and queue is empty")
+	}
+
+	// Enqueue a client
+	_, _, _, err := wm.Enqueue(net.ParseIP("192.0.2.1"), "ja4-1")
+	if err != nil {
+		t.Fatalf("failed to enqueue: %v", err)
+	}
+
+	// Now queue depth is 1, even though in-flight is 0, new arrivals MUST enter waiting room
+	if !wm.ShouldEnterWaitingRoom() {
+		t.Errorf("queue jumping allowed! ShouldEnterWaitingRoom must be true when clients are waiting in queue")
+	}
+}
+
+func TestWaitingRoomManager_SSE_NotFoundStatus(t *testing.T) {
+	wm := NewWaitingRoomManager(WaitingRoomConfig{
+		MaxConcurrentInFlight: 5,
+		MaxQueueDepth:         10,
+	})
+	defer wm.Close()
+
+	req := httptest.NewRequest(http.MethodGet, "/.raiwall/waiting-room/events?id=non-existent-id", nil)
+	rec := httptest.NewRecorder()
+
+	wm.HandleSSE(rec, req, net.ParseIP("192.0.2.1"), "ja4")
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected HTTP 404 for non-existent queue ID, got status %d", rec.Code)
+	}
+	if rec.Header().Get("Content-Type") == "text/event-stream" {
+		t.Errorf("404 response must not be committed with text/event-stream headers")
+	}
+}
+
+func TestWaitingRoomManager_FindActiveEntry(t *testing.T) {
+	wm := NewWaitingRoomManager(WaitingRoomConfig{
+		MaxConcurrentInFlight: 5,
+		MaxQueueDepth:         10,
+		AdmissionRate:         2,
+	})
+	defer wm.Close()
+
+	entry, _, _, err := wm.Enqueue(net.ParseIP("192.0.2.55"), "ja4-active")
+	if err != nil {
+		t.Fatalf("enqueue error: %v", err)
+	}
+
+	pos, wait, admitted, found := wm.FindActiveEntry(entry.ID)
+	if found == nil || found.ID != entry.ID {
+		t.Fatalf("expected to find active entry")
+	}
+	if pos != 1 {
+		t.Errorf("expected pos=1, got %d", pos)
+	}
+	if wait <= 0 {
+		t.Errorf("expected positive wait time, got %d", wait)
+	}
+	if admitted {
+		t.Errorf("expected admitted=false")
+	}
+
+	// Non-existent ID
+	_, _, _, foundNone := wm.FindActiveEntry("unknown-id")
+	if foundNone != nil {
+		t.Errorf("expected nil for unknown ID")
+	}
+}

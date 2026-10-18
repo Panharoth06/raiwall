@@ -24,14 +24,15 @@ const DefaultTier1Burst int64 = 20
 
 // Tier1Config contains configuration parameters for Tier 1 Access Velocity Limiter.
 type Tier1Config struct {
-	Limiter         RateLimiter
-	Rate            int64
-	Period          time.Duration
-	Burst           int64
-	CookieName      string
-	Storage         RateStorage
-	RouteClassifier *bot.RouteClassifier
-	PoWEngine       *bot.PoWEngine
+	Limiter          RateLimiter
+	Rate             int64
+	Period           time.Duration
+	Burst            int64
+	CookieName       string
+	Storage          RateStorage
+	RouteClassifier  *bot.RouteClassifier
+	PoWEngine        *bot.PoWEngine
+	ClearanceManager *bot.ClearanceManager
 }
 
 // Tier1APIErrorResponse is the structured JSON returned on HTTP 429 for API routes.
@@ -46,6 +47,7 @@ type Tier1VelocityLimiter struct {
 	limiter         RateLimiter
 	routeClassifier *bot.RouteClassifier
 	powEngine       *bot.PoWEngine
+	clearanceMgr    *bot.ClearanceManager
 	cookieName      string
 }
 
@@ -86,6 +88,7 @@ func NewTier1VelocityLimiter(cfg Tier1Config) *Tier1VelocityLimiter {
 		limiter:         limiter,
 		routeClassifier: rc,
 		powEngine:       cfg.PoWEngine,
+		clearanceMgr:    cfg.ClearanceManager,
 		cookieName:      cfg.CookieName,
 	}
 }
@@ -116,13 +119,14 @@ func (t1 *Tier1VelocityLimiter) Enforce(w http.ResponseWriter, r *http.Request, 
 	}
 
 	// Request exceeded velocity threshold
-	return false, t1.HandleRateLimited(w, r, res, route)
+	return false, t1.HandleRateLimited(w, r, ip, ja4, res, route)
 }
 
 // HandleRateLimited writes route-appropriate enforcement response:
 // - API/machine routes receive HTTP 429 Too Many Requests with JSON error and Retry-After.
-// - Browser routes receive an HTTP 468 Altcha PoW challenge page.
-func (t1 *Tier1VelocityLimiter) HandleRateLimited(w http.ResponseWriter, r *http.Request, res *RateResult, route bot.RouteType) error {
+// - Already verified browsers receive HTTP 429 Too Many Requests to prevent infinite challenge loops.
+// - Unverified browser routes receive an HTTP 468 Altcha PoW challenge page.
+func (t1 *Tier1VelocityLimiter) HandleRateLimited(w http.ResponseWriter, r *http.Request, ip net.IP, ja4 string, res *RateResult, route bot.RouteType) error {
 	retryAfterSec := int(math.Ceil(res.RetryAfter.Seconds()))
 	if retryAfterSec <= 0 {
 		retryAfterSec = 1
@@ -150,7 +154,19 @@ func (t1 *Tier1VelocityLimiter) HandleRateLimited(w http.ResponseWriter, r *http
 		return nil
 	}
 
-	// 2. Browser routes: deliver interactive PoW challenge (HTTP 468)
+	// 2. Verified browser sessions: already solved PoW challenge; do not loop on PoW indefinitely!
+	// Deliver standard HTTP 429 Too Many Requests.
+	if t1.clearanceMgr != nil && t1.clearanceMgr.ValidateRequest(r, ip, ja4) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Header().Set("Retry-After", strconv.Itoa(retryAfterSec))
+		w.Header().Set("X-RateLimit-Limit", strconv.FormatInt(res.Limit, 10))
+		w.Header().Set("X-RateLimit-Remaining", "0")
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte(fmt.Sprintf("<!DOCTYPE html><html><head><title>429 Too Many Requests</title></head><body><h1>429 Too Many Requests</h1><p>You are sending requests too quickly. Please retry after %d seconds.</p></body></html>", retryAfterSec)))
+		return nil
+	}
+
+	// 3. Unverified browser routes: deliver interactive PoW challenge (HTTP 468)
 	if t1.powEngine != nil {
 		return t1.powEngine.RenderChallengePage(w, r, r.URL.RequestURI())
 	}
@@ -171,6 +187,11 @@ func (t1 *Tier1VelocityLimiter) Limiter() RateLimiter {
 // SetPoWEngine updates the active PoWEngine.
 func (t1 *Tier1VelocityLimiter) SetPoWEngine(p *bot.PoWEngine) {
 	t1.powEngine = p
+}
+
+// SetClearanceManager updates the active ClearanceManager.
+func (t1 *Tier1VelocityLimiter) SetClearanceManager(c *bot.ClearanceManager) {
+	t1.clearanceMgr = c
 }
 
 // Close releases any allocated limiter resources.

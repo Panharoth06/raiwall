@@ -36,19 +36,38 @@ func RenderWaitingRoomPage(w http.ResponseWriter, queueID string, initialPos int
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate")
 	w.Header().Set("Retry-After", "10")
+
+	// Set queue tracking cookie so reloads preserve queue position
+	http.SetCookie(w, &http.Cookie{
+		Name:     WaitingRoomQueueCookie,
+		Value:    queueID,
+		Path:     "/",
+		SameSite: http.SameSiteLaxMode,
+		HttpOnly: true,
+	})
+
 	w.WriteHeader(http.StatusServiceUnavailable)
 
 	if redirectURL == "" {
 		redirectURL = "/"
 	}
 
+	queueIDJSON, err := json.Marshal(queueID)
+	if err != nil {
+		queueIDJSON = []byte(`""`)
+	}
+	redirectURLJSON, err := json.Marshal(redirectURL)
+	if err != nil {
+		redirectURLJSON = []byte(`"/"`)
+	}
+
 	html := waitingRoomTemplate
-	html = strings.ReplaceAll(html, "{{QUEUE_ID}}", queueID)
+	html = strings.ReplaceAll(html, "{{QUEUE_ID_JSON}}", string(queueIDJSON))
 	html = strings.ReplaceAll(html, "{{INITIAL_POS}}", strconv.Itoa(initialPos))
 	html = strings.ReplaceAll(html, "{{WAIT_SECONDS}}", strconv.Itoa(waitSeconds))
-	html = strings.ReplaceAll(html, "{{REDIRECT_URL}}", redirectURL)
+	html = strings.ReplaceAll(html, "{{REDIRECT_URL_JSON}}", string(redirectURLJSON))
 
-	_, err := fmt.Fprint(w, html)
+	_, err = fmt.Fprint(w, html)
 	return err
 }
 
@@ -205,8 +224,8 @@ const waitingRoomTemplate = `<!DOCTYPE html>
 
   <script>
     (function() {
-      const queueID = "{{QUEUE_ID}}";
-      const redirectURL = "{{REDIRECT_URL}}";
+      const queueID = {{QUEUE_ID_JSON}};
+      const redirectURL = {{REDIRECT_URL_JSON}};
       let initialPos = parseInt("{{INITIAL_POS}}", 10) || 1;
 
       const posEl = document.getElementById('position');

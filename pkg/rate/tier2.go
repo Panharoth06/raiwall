@@ -110,8 +110,11 @@ func (t2 *Tier2AttackLimiter) RecordAttack(ctx context.Context, ip net.IP, ja4 s
 	if !res.Allowed {
 		// Threshold exceeded: trigger composite ClientIP + JA4 auto-ban
 		banReason := fmt.Sprintf("tier2_attack_frequency_exceeded: rule=%s reason=%s", ruleID, reason)
-		entry := t2.banManager.Ban(ip, ja4, t2.banDuration, banReason)
-		if t2.logger != nil {
+		var entry *BanEntry
+		if t2.banManager != nil {
+			entry = t2.banManager.Ban(ip, ja4, t2.banDuration, banReason)
+		}
+		if t2.logger != nil && entry != nil {
 			t2.logger.Warn("Tier 2 attack frequency exceeded, auto-banning client",
 				zap.String("client_ip", entry.ClientIP),
 				zap.String("ja4", entry.JA4),
@@ -129,7 +132,10 @@ func (t2 *Tier2AttackLimiter) RecordAttack(ctx context.Context, ip net.IP, ja4 s
 		ipRes, ipErr := t2.ipLimiter.Allow(ctx, ipKey, 1)
 		if ipErr == nil && !ipRes.Allowed {
 			banReason := fmt.Sprintf("tier2_ip_escalation: multiple attacks from shared IP (%s)", reason)
-			entry := t2.banManager.BanIP(ip, t2.banDuration, banReason)
+			var entry *BanEntry
+			if t2.banManager != nil {
+				entry = t2.banManager.BanIP(ip, t2.banDuration, banReason)
+			}
 			if t2.logger != nil {
 				t2.logger.Warn("Tier 2 pure IP escalation auto-ban triggered",
 					zap.String("client_ip", ip.String()),

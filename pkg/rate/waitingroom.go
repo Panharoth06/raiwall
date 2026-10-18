@@ -27,6 +27,7 @@ const (
 	DefaultAdmissionTokenTTL     time.Duration = 15 * time.Minute
 	WaitingRoomEventsPath                      = "/.raiwall/waiting-room/events"
 	WaitingRoomClearanceCookie                 = "rw_waiting_room_clearance"
+	WaitingRoomQueueCookie                     = "rw_waiting_room_queue_id"
 )
 
 // WaitingRoomConfig configures the Virtual Waiting Room engine.
@@ -218,7 +219,12 @@ func (wm *WaitingRoomManager) QueueDepth() int {
 
 // ShouldEnterWaitingRoom determines whether an unadmitted request must enter the queue.
 func (wm *WaitingRoomManager) ShouldEnterWaitingRoom() bool {
-	return wm.activeInFlight.Load() >= wm.maxConcurrent
+	if wm == nil {
+		return false
+	}
+	wm.mu.Lock()
+	defer wm.mu.Unlock()
+	return len(wm.queue) > 0 || wm.activeInFlight.Load() >= wm.maxConcurrent
 }
 
 // Enqueue adds a client to the waiting queue or sheds load if maxQueueDepth is exceeded.
@@ -254,6 +260,9 @@ func (wm *WaitingRoomManager) Enqueue(ip net.IP, ja4 string) (*QueueEntry, int, 
 
 // GetPosition returns the current position (1-based) of the given queue entry ID.
 func (wm *WaitingRoomManager) GetPosition(id string) (int, int, bool) {
+	if wm == nil || id == "" {
+		return 0, 0, false
+	}
 	wm.mu.Lock()
 	defer wm.mu.Unlock()
 
@@ -276,8 +285,38 @@ func (wm *WaitingRoomManager) GetPosition(id string) (int, int, bool) {
 	return 0, 0, false
 }
 
+// FindActiveEntry checks if an entry is active in the queue and returns its current position and wait time.
+func (wm *WaitingRoomManager) FindActiveEntry(id string) (int, int, bool, *QueueEntry) {
+	if wm == nil || id == "" {
+		return 0, 0, false, nil
+	}
+	wm.mu.Lock()
+	defer wm.mu.Unlock()
+
+	entry, exists := wm.entries[id]
+	if !exists {
+		return 0, 0, false, nil
+	}
+	if entry.Admitted {
+		return 0, 0, true, entry
+	}
+
+	for i, q := range wm.queue {
+		if q.ID == id {
+			pos := i + 1
+			wait := int((int64(pos) + wm.admissionRate - 1) / wm.admissionRate)
+			return pos, wait, false, entry
+		}
+	}
+
+	return 0, 0, false, nil
+}
+
 // AdmitEntry immediately marks an entry as admitted and signals its notification channel.
 func (wm *WaitingRoomManager) AdmitEntry(id string) bool {
+	if wm == nil || id == "" {
+		return false
+	}
 	wm.mu.Lock()
 	defer wm.mu.Unlock()
 
@@ -294,6 +333,9 @@ func (wm *WaitingRoomManager) AdmitEntry(id string) bool {
 
 // RemoveEntry cleans up an entry from the queue (e.g. on client disconnect).
 func (wm *WaitingRoomManager) RemoveEntry(id string) {
+	if wm == nil || id == "" {
+		return
+	}
 	wm.mu.Lock()
 	defer wm.mu.Unlock()
 
@@ -304,6 +346,17 @@ func (wm *WaitingRoomManager) RemoveEntry(id string) {
 			break
 		}
 	}
+}
+
+// Clear removes all active entries and clears the waiting queue (useful for test resets).
+func (wm *WaitingRoomManager) Clear() {
+	if wm == nil {
+		return
+	}
+	wm.mu.Lock()
+	defer wm.mu.Unlock()
+	wm.queue = wm.queue[:0]
+	wm.entries = make(map[string]*QueueEntry)
 }
 
 // HandleSSE serves the Server-Sent Events stream for a waiting client.
@@ -320,18 +373,20 @@ func (wm *WaitingRoomManager) HandleSSE(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 
+	pos, wait, admitted := wm.GetPosition(queueID)
+	if !admitted && pos == 0 {
+		http.Error(w, "Queue entry expired or not found", http.StatusNotFound)
+		return
+	}
+
 	PrepareSSEHeaders(w)
 	flusher.Flush()
 
-	pos, wait, admitted := wm.GetPosition(queueID)
 	if admitted {
 		token := wm.GenerateAdmissionToken(ip, ja4, wm.admissionTokenTTL)
 		_ = WriteSSE(w, "admitted", SSEUpdate{Position: 0, WaitSeconds: 0, Admitted: true, Token: token})
 		flusher.Flush()
-		return
-	}
-	if pos == 0 {
-		http.Error(w, "Queue entry expired or not found", http.StatusNotFound)
+		wm.RemoveEntry(queueID)
 		return
 	}
 
@@ -359,6 +414,7 @@ func (wm *WaitingRoomManager) HandleSSE(w http.ResponseWriter, r *http.Request, 
 			token := wm.GenerateAdmissionToken(ip, ja4, wm.admissionTokenTTL)
 			_ = WriteSSE(w, "admitted", SSEUpdate{Position: 0, WaitSeconds: 0, Admitted: true, Token: token})
 			flusher.Flush()
+			wm.RemoveEntry(queueID)
 			return
 		case <-ticker.C:
 			currentPos, currentWait, isAdmitted := wm.GetPosition(queueID)
@@ -366,6 +422,7 @@ func (wm *WaitingRoomManager) HandleSSE(w http.ResponseWriter, r *http.Request, 
 				token := wm.GenerateAdmissionToken(ip, ja4, wm.admissionTokenTTL)
 				_ = WriteSSE(w, "admitted", SSEUpdate{Position: 0, WaitSeconds: 0, Admitted: true, Token: token})
 				flusher.Flush()
+				wm.RemoveEntry(queueID)
 				return
 			}
 			if currentPos > 0 {
@@ -380,6 +437,8 @@ func (wm *WaitingRoomManager) HandleSSE(w http.ResponseWriter, r *http.Request, 
 func (wm *WaitingRoomManager) admissionLoop() {
 	ticker := time.NewTicker(200 * time.Millisecond)
 	defer ticker.Stop()
+	evictTicker := time.NewTicker(30 * time.Second)
+	defer evictTicker.Stop()
 
 	for {
 		select {
@@ -387,8 +446,33 @@ func (wm *WaitingRoomManager) admissionLoop() {
 			return
 		case <-ticker.C:
 			wm.processAdmissions()
+		case <-evictTicker.C:
+			wm.evictStaleEntries()
 		}
 	}
+}
+
+func (wm *WaitingRoomManager) evictStaleEntries() {
+	wm.mu.Lock()
+	defer wm.mu.Unlock()
+
+	now := time.Now()
+	cutoff := now.Add(-5 * time.Minute)
+
+	for id, entry := range wm.entries {
+		if entry.EnteredAt.Before(cutoff) {
+			delete(wm.entries, id)
+		}
+	}
+
+	n := 0
+	for _, entry := range wm.queue {
+		if !entry.EnteredAt.Before(cutoff) {
+			wm.queue[n] = entry
+			n++
+		}
+	}
+	wm.queue = wm.queue[:n]
 }
 
 func (wm *WaitingRoomManager) processAdmissions() {

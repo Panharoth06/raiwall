@@ -3,6 +3,9 @@ package rate
 import (
 	"context"
 	"errors"
+	"net"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -161,5 +164,148 @@ func TestRedisStorage_ResetAndClose(t *testing.T) {
 
 	if err := storage.Close(); err != nil {
 		t.Fatalf("close failed: %v", err)
+	}
+}
+
+func TestSimpleRESPClient_Pipe(t *testing.T) {
+	var connMu sync.Mutex
+	var activeServerConns []net.Conn
+
+	dialer := func(network, addr string) (net.Conn, error) {
+		clientConn, serverConn := net.Pipe()
+		connMu.Lock()
+		activeServerConns = append(activeServerConns, serverConn)
+		connMu.Unlock()
+
+		go func(c net.Conn) {
+			defer c.Close()
+			buf := make([]byte, 1024)
+			for {
+				n, err := c.Read(buf)
+				if err != nil {
+					return
+				}
+				cmd := string(buf[:n])
+				if strings.Contains(cmd, "PING") {
+					_, _ = c.Write([]byte("+PONG\r\n"))
+				} else if strings.Contains(cmd, "EVAL") {
+					// Return GCRA result: [1, 5, 0, 100]
+					_, _ = c.Write([]byte("*4\r\n:1\r\n:5\r\n:0\r\n:100\r\n"))
+				} else if strings.Contains(cmd, "DEL") {
+					_, _ = c.Write([]byte(":1\r\n"))
+				} else if strings.Contains(cmd, "DROP") {
+					return
+				}
+			}
+		}(serverConn)
+
+		return clientConn, nil
+	}
+
+	client := NewSimpleRESPClient("in-memory:6379", 500*time.Millisecond)
+	client.SetDialer(dialer)
+	defer func() {
+		client.Close()
+		connMu.Lock()
+		for _, sc := range activeServerConns {
+			_ = sc.Close()
+		}
+		connMu.Unlock()
+	}()
+
+	// 1. Test Ping
+	if err := client.Ping(context.Background()); err != nil {
+		t.Fatalf("ping failed: %v", err)
+	}
+
+	// 2. Test Eval
+	res, err := client.Eval(context.Background(), "return {1, 5, 0, 100}", []string{"k1"}, 10)
+	if err != nil {
+		t.Fatalf("eval failed: %v", err)
+	}
+	slice, ok := res.([]any)
+	if !ok || len(slice) != 4 {
+		t.Fatalf("expected 4 elements in eval result, got %v", res)
+	}
+
+	// 3. Test Del
+	if err := client.Del(context.Background(), "k1"); err != nil {
+		t.Fatalf("del failed: %v", err)
+	}
+
+	// 4. Test Reconnection after close
+	_ = client.Close()
+	if err := client.Ping(context.Background()); err != nil {
+		t.Fatalf("reconnect ping failed: %v", err)
+	}
+}
+
+func TestSimpleRESPClient_RealTCPAndReconnect(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Skipf("skipping real TCP test: net.Listen failed: %v", err)
+		return
+	}
+	defer ln.Close()
+
+	// Run mock RESP Redis server in background
+	serverClosed := make(chan struct{})
+	go func() {
+		defer close(serverClosed)
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			go func(c net.Conn) {
+				defer c.Close()
+				buf := make([]byte, 1024)
+				for {
+					n, err := c.Read(buf)
+					if err != nil {
+						return
+					}
+					cmd := string(buf[:n])
+					if strings.Contains(cmd, "PING") {
+						_, _ = c.Write([]byte("+PONG\r\n"))
+					} else if strings.Contains(cmd, "EVAL") {
+						// Return GCRA result: [1, 5, 0, 100]
+						_, _ = c.Write([]byte("*4\r\n:1\r\n:5\r\n:0\r\n:100\r\n"))
+					} else if strings.Contains(cmd, "DEL") {
+						_, _ = c.Write([]byte(":1\r\n"))
+					} else if strings.Contains(cmd, "DROP") {
+						// Drop connection abruptly without response
+						return
+					}
+				}
+			}(conn)
+		}
+	}()
+
+	client := NewSimpleRESPClient(ln.Addr().String(), 500*time.Millisecond)
+	defer client.Close()
+
+	// 1. Test Ping
+	if err := client.Ping(context.Background()); err != nil {
+		if strings.Contains(err.Error(), "operation not permitted") || strings.Contains(err.Error(), "permission denied") {
+			t.Skipf("skipping TCP ping due to environment permissions: %v", err)
+			return
+		}
+		t.Fatalf("ping failed: %v", err)
+	}
+
+	// 2. Test Eval
+	res, err := client.Eval(context.Background(), "return {1, 5, 0, 100}", []string{"k1"}, 10)
+	if err != nil {
+		t.Fatalf("eval failed: %v", err)
+	}
+	slice, ok := res.([]any)
+	if !ok || len(slice) != 4 {
+		t.Fatalf("expected 4 elements in eval result, got %v", res)
+	}
+
+	// 3. Test Del
+	if err := client.Del(context.Background(), "k1"); err != nil {
+		t.Fatalf("del failed: %v", err)
 	}
 }

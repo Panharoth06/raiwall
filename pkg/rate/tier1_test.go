@@ -157,4 +157,42 @@ func TestTier1VelocityLimiter(t *testing.T) {
 			t.Fatalf("Bob should be allowed despite Alice being rate limited on same IP: %v", err)
 		}
 	})
+
+	t.Run("Verified browser receives HTTP 429 rather than infinite PoW challenge", func(t *testing.T) {
+		clearanceMgr := bot.NewClearanceManager(bot.ClearanceConfig{
+			Secret: "test-secret-32-bytes-tier1-clear",
+			TTL:    1 * time.Hour,
+		}, powEngine)
+		limiter.SetClearanceManager(clearanceMgr)
+
+		verifiedIP := net.ParseIP("198.51.100.99")
+		token := clearanceMgr.GenerateToken(verifiedIP, ja4, time.Now().Add(1*time.Hour))
+
+		req := httptest.NewRequest(http.MethodGet, "https://example.com/dashboard", nil)
+		req.Header.Set("Accept", "text/html")
+		req.Header.Set("User-Agent", "Mozilla/5.0")
+		req.AddCookie(&http.Cookie{Name: bot.ClearanceCookieName, Value: token})
+
+		// 1st request -> allowed
+		rec1 := httptest.NewRecorder()
+		allowed1, _ := limiter.Enforce(rec1, req, verifiedIP, ja4)
+		if !allowed1 {
+			t.Fatalf("1st request for verified browser should be allowed")
+		}
+
+		// 2nd request -> exceeds rate limit
+		rec2 := httptest.NewRecorder()
+		allowed2, _ := limiter.Enforce(rec2, req, verifiedIP, ja4)
+		if allowed2 {
+			t.Fatalf("2nd request should be rate limited")
+		}
+
+		// Must receive HTTP 429 Too Many Requests, NOT HTTP 468 challenge
+		if rec2.Code != http.StatusTooManyRequests {
+			t.Errorf("verified browser exceeding velocity expected HTTP 429, got %d", rec2.Code)
+		}
+		if rec2.Header().Get("Retry-After") == "" {
+			t.Errorf("expected Retry-After header on 429")
+		}
+	})
 }

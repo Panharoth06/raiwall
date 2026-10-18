@@ -62,3 +62,35 @@ func TestWriteWaitingRoomOverloadedJSON(t *testing.T) {
 		t.Errorf("expected retry_after 45, got: %d", resp.RetryAfter)
 	}
 }
+
+func TestRenderWaitingRoomPage_XSSSanitization(t *testing.T) {
+	rec := httptest.NewRecorder()
+	xssPayload := `/?q="></script><script>alert('xss')</script>`
+	err := RenderWaitingRoomPage(rec, "q-xss", 5, 2, xssPayload)
+	if err != nil {
+		t.Fatalf("RenderWaitingRoomPage failed: %v", err)
+	}
+
+	body := rec.Body.String()
+	// Verifies that unescaped </script> tag breakout is NOT present
+	if strings.Contains(body, `</script><script>alert('xss')</script>`) {
+		t.Errorf("Reflected XSS vulnerability detected: unescaped </script> found in output")
+	}
+	// Verifies that JSON-escaped HTML characters were used (\u003c/script\u003e)
+	if !strings.Contains(body, `\u003c/script\u003e`) {
+		t.Errorf("Expected JSON-escaped \\u003c/script\\u003e in template body")
+	}
+}
+
+func TestRenderWaitingRoomPage_QueueCookie(t *testing.T) {
+	rec := httptest.NewRecorder()
+	err := RenderWaitingRoomPage(rec, "cookie-test-id", 3, 1, "/checkout")
+	if err != nil {
+		t.Fatalf("RenderWaitingRoomPage failed: %v", err)
+	}
+
+	cookieHeader := rec.Header().Get("Set-Cookie")
+	if !strings.Contains(cookieHeader, WaitingRoomQueueCookie+"=cookie-test-id") {
+		t.Errorf("missing %s cookie in Set-Cookie header: %s", WaitingRoomQueueCookie, cookieHeader)
+	}
+}

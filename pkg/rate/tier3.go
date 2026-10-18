@@ -106,7 +106,7 @@ func (t3 *Tier3ScannerTrap) InspectResponse(ctx context.Context, r *http.Request
 	}
 
 	// 2. Filter out static asset paths to avoid false positives on missing images/css
-	if r != nil && IsStaticAssetPath(r.URL.Path, t3.staticExts) {
+	if r != nil && r.URL != nil && IsStaticAssetPath(r.URL.Path, t3.staticExts) {
 		return false, nil, nil
 	}
 
@@ -124,9 +124,12 @@ func (t3 *Tier3ScannerTrap) InspectResponse(ctx context.Context, r *http.Request
 			path = r.URL.Path
 		}
 		banReason := fmt.Sprintf("tier3_scanner_reconnaissance_exceeded: status=%d path=%s", statusCode, path)
-		entry := t3.banManager.Ban(ip, ja4, t3.banDuration, banReason)
+		var entry *BanEntry
+		if t3.banManager != nil {
+			entry = t3.banManager.Ban(ip, ja4, t3.banDuration, banReason)
+		}
 
-		if t3.logger != nil {
+		if t3.logger != nil && entry != nil {
 			t3.logger.Warn("Tier 3 scanner reconnaissance trap triggered, auto-banned client",
 				zap.String("client_ip", entry.ClientIP),
 				zap.String("ja4", entry.JA4),
