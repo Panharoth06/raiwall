@@ -893,17 +893,17 @@
 **Description:** Implement `pkg/acl/expr.go` using `github.com/expr-lang/expr` to compile boolean rules into bytecode evaluated in $<15\text{ ns}$. Build evaluation environment exposing `ip`, `ja4`, `method`, `path`, `host`, `headers`, `cookies`, `query`, `geo` (`Country`, `ASN`), and helper functions (`in_cidr`, `in_feed`, `has_prefix`, `contains`, `regex_match`). Implement ordered first-match-wins evaluation supporting actions `allow`, `block`, `challenge`, `redirect`, and `audit`.
 
 **Acceptance criteria:**
-- [ ] Define `ACLRule` (Name, Expression, Action, Priority, StatusCode, RedirectURL).
-- [ ] Pre-compile expressions into `expr.Program` bytecode with type checking at configuration time.
-- [ ] Expose request attributes and helper functions (`in_cidr(ip, subnet)`, `in_feed(ip, feedName)`).
-- [ ] Implement `Evaluate(reqCtx *engine.RequestContext, geo GeoData) (*ACLVerdict, error)` with first-match-wins semantics.
-- [ ] Benchmarks verify sub-15ns bytecode evaluation overhead.
-- [ ] Unit tests verify rule compilation, helper functions, execution priority, and action verdicts.
+- [x] Define `ACLRule` (Name, Expression, Action, Priority, StatusCode, RedirectURL).
+- [x] Pre-compile expressions into `expr.Program` bytecode with type checking at configuration time.
+- [x] Expose request attributes and helper functions (`in_cidr(ip, subnet)`, `in_feed(ip, feedName)`).
+- [x] Implement `Evaluate(reqCtx *engine.RequestContext, geo GeoData) (*ACLVerdict, error)` with first-match-wins semantics.
+- [x] Benchmarks verify sub-15ns bytecode evaluation overhead.
+- [x] Unit tests verify rule compilation, helper functions, execution priority, and action verdicts.
 
 **Verification:**
-- [ ] Tests pass: `go test -v -race ./pkg/acl/...`
-- [ ] Benchmarks pass: `go test -bench=BenchmarkACLExpr ./pkg/acl/...`
-- [ ] Build succeeds: `go build ./pkg/acl/...`
+- [x] Tests pass: `go test -v -race ./pkg/acl/...`
+- [x] Benchmarks pass: `go test -bench=BenchmarkACLExpr ./pkg/acl/...`
+- [x] Build succeeds: `go build ./pkg/acl/...`
 
 **Dependencies:** Tasks 39–40
 **Files likely touched:**
@@ -915,9 +915,9 @@
 ---
 
 ## Checkpoint: Bytecode ACL Engine
-- [ ] `expr` rules compile cleanly into bytecode and execute in $<15\text{ ns}$.
-- [ ] Helper functions seamlessly bridge BART threat feeds and GeoIP attributes.
-- [ ] Unit tests pass with `-race`.
+- [x] `expr` rules compile cleanly into bytecode and execute in $<15\text{ ns}$.
+- [x] Helper functions seamlessly bridge BART threat feeds and GeoIP attributes.
+- [x] Unit tests pass with `-race`.
 
 ---
 
