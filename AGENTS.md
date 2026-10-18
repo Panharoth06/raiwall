@@ -313,6 +313,7 @@ These are **hard constraints** that must be respected in every implementation:
 ---
 
 ## Commit Conventions
+Always commit your work before starting a new task. If a task is not completed, you can make multiple commits until the task is completed. Each commit must be self-contained and should not be dependent on other commits. Always make sure that your last commit is a working commit that can be deployed to production.
 
 Use [Conventional Commits](https://www.conventionalcommits.org/) with scope prefixes:
 
