@@ -16,13 +16,14 @@
 - [Testing Strategy](#testing-strategy)
 - [Production Constraints & Risk Mitigations](#production-constraints--risk-mitigations)
 - [Engineering Roadmap](#engineering-roadmap)
+- [Knowledge Graph (graphify)](#knowledge-graph-graphify)
 - [Commit Conventions](#commit-conventions)
 
 ---
 
 ## Project Overview
 
-Raiwall is a self-hosted, SafeLine-class WAF that combines:
+Raiwall is a self-hosted, enterprise-grade WAF that combines:
 
 - **High-throughput reverse proxying** (HTTP/1.1, HTTP/2, HTTP/3/QUIC, WebSockets, gRPC) via Caddy v2.
 - **Semantic threat detection** using a three-stage funnel: recursive normalization → pure-Go `libinjection-go` lexical triage (< 2 µs) → bounded AST context verification (SQL, Shell, XSS).
@@ -309,6 +310,26 @@ These are **hard constraints** that must be respected in every implementation:
 | **1: Core Proxy & Control Plane** | Caddy Proxy + Auto-SSL + Normalization + `libinjection-go` • Minimal Control Plane API (`huma`) + Web UI Log Viewer + Rule Exception Engine | Weeks 1–8 | 🟡 Domain 1 complete, Domains 2–7 in progress |
 | **2: Stateful Defense & AST Verification** | 3-Tier Composite Rate Limiting + Fast CIDR (`bart`) + MaxMind GeoIP + AST Verification (32KB/5ms cap) + ClickHouse batch logging + PII Sanitizer | Weeks 9–16 | ⬜ Not started |
 | **3: Active Defense & Sidecar Mode** | JA4 Fingerprinting + HTTP 468 PoW (`altcha`/`anubis` with API bypass) + Envoy/Nginx `ext_proc` sidecar connector + Web UI charts & alerts | Weeks 17–24 | ⬜ Not started |
+
+---
+
+## Knowledge Graph (graphify)
+
+This project maintains a navigable knowledge graph in `graphify-out/` detailing architectural components, god nodes, cross-package call graphs, and community clusters.
+
+### Mandatory Rules for AI Agents
+
+1. **Orientation First**:
+   - For codebase or architecture questions, when `graphify-out/graph.json` exists, query the graph first instead of scanning files or running wide grep:
+     - `graphify query "<question>"` — extract scoped subgraphs and dependency paths.
+     - `graphify path "<A>" "<B>"` — trace shortest dependency and call paths between two symbols or packages.
+     - `graphify explain "<concept>"` — inspect all incoming/outgoing connections, callers, and rationale for a node.
+2. **Visualizer & Reports**:
+   - `graphify-out/graph.html` — interactive knowledge graph (open in browser, no server needed).
+   - `graphify-out/GRAPH_REPORT.md` — comprehensive audit report (god nodes, community hubs, and cohesion scores).
+3. **Graph Synchronization**:
+   - After modifying or introducing Go source files, run `graphify update .` to keep AST extraction, edges, and communities up to date without incurring LLM token costs.
+   - Git post-commit hooks are installed to automatically trigger incremental AST re-indexing upon commits.
 
 ---
 

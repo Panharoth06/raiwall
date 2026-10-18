@@ -1,3 +1,6 @@
 bin/
 *.log
 .DS_Store
+
+# Knowledge graph output (local only, do not commit to GitHub)
+graphify-out/
