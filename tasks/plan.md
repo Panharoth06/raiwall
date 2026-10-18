@@ -1,46 +1,48 @@
-# Implementation Plan: Raiwall Domain 4 (DDoS, HTTP Flood & Three-Tiered Rate Limiting)
+# Implementation Plan: Raiwall Domain 5 (Access Control & Zero-Trust Identity Gateway)
 
 ## Overview
-Implement **Domain 4: DDoS, HTTP Flood & Three-Tiered Rate Limiting** for **Raiwall**: an enterprise-grade, high-throughput traffic control and anti-abuse architecture combining a three-tiered sliding-window / Generic Cell Rate Algorithm (GCRA) rate limiter, anti-CGNAT composite key tracking, scanner reconnaissance traps, and a bounded Server-Sent Events (SSE) Virtual Waiting Room.
+Implement **Domain 5: Access Control (ACLs) & Zero-Trust Identity Gateway** for **Raiwall**: an enterprise-grade access control, threat feed matching, rule exception, and pre-application authentication architecture. 
 
-The traffic defense pipeline operates across five coordinated layers:
-1. **High-Performance GCRA Engine & Pluggable Storage:** Sub-microsecond ($<1\text{ µs}$) pure-Go GCRA engine supporting single-node in-memory storage (`dgraph-io/ristretto` / atomic structures) as default, plus an optional distributed Redis storage backend for cluster deployments.
-2. **Tier 1 — Access Velocity (Flood Mitigation):** Evaluated at the front of the request pipeline. Exceeding velocity thresholds (e.g. $>100\text{ req}/10\text{s}$) triggers route-aware enforcement: unverified browser sessions receive an HTTP 468 Altcha PoW challenge, while API/machine routes receive standard HTTP 429 Too Many Requests with `Retry-After` and JSON error payloads.
-3. **Tier 2 — Attack Frequency Limiter:** Incremented whenever the Semantic Threat Engine (Domain 2) or Bot Classifier blocks a malicious payload. Exceeding thresholds (e.g. 10 attacks in 60s) triggers an immediate auto-ban stored in a unified, thread-safe `BanManager` with composite `ClientIP + JA4` keys to prevent CGNAT collateral damage.
-4. **Tier 3 — Scanner Trap (Anti-Reconnaissance):** Intercepts reverse proxy backend responses (`ModifyResponse`). Whenever the upstream server returns `404 Not Found` or `403 Forbidden`, the reconnaissance counter increments. Static asset requests (`.ico`, `.css`, `.png`, etc.) are filtered out to avoid false positives. Exceeding thresholds (e.g. $>20\text{ errors}/30\text{s}$) bans directory brute-forcers (`ffuf`, `gobuster`, `dirsearch`).
-5. **Bounded Virtual Waiting Room:** During extreme traffic surges, excess users enter an SSE-powered waiting room with real-time queue position streaming. Queue depth is strictly capped (`max_queue_depth`) to prevent socket and file-descriptor exhaustion (`ulimit -n`), shedding excess requests with HTTP 503 + `Retry-After`.
+Domain 5 delivers four integrated pillars:
+1. **Granular Parameter-Level Exception Engine (Anti-False-Positive):** Suppresses specific detection rules matching `Host`, `Path Regex`, `HTTP Method`, exact `Parameter Location` (Query, Body, Header, Cookie) + `Parameter Name`, and `RuleID` (e.g. bypassing SQLi AST only on `/api/v1/posts` for field `markdown_content` while keeping SQLi protection active on all other parameters). Evaluated per-parameter prior to AST/lexical triage to conserve CPU.
+2. **Sub-Microsecond CIDR & Threat Feed Engine (`gaissmai/bart`):** Balanced Routing Tables matching incoming IPv4/IPv6 client addresses against 500,000+ threat intelligence entries (CrowdSec, Spamhaus, AbuseIPDB) in $\sim 15\text{ ns}$, with atomic pointer swapping for zero-downtime hot reloads.
+3. **GeoIP Lookups & ASN Extractor (`oschwald/maxminddb-golang`):** MaxMind GeoLite2/GeoIP2 reader for country code, continent, ASN, and organization filtering, with graceful zero-allocation fallback when databases are omitted.
+4. **Compiled Bytecode Boolean ACL Engine (`expr-lang/expr`):** Compiles multi-condition rules (combining IP, CIDR, Country, ASN, Path, Method, Headers, Cookies) into bytecode evaluated in $<15\text{ ns}$ with ordered first-match-wins semantics and rich actions (`allow`, `block`, `challenge`, `redirect`, `audit`).
+5. **Zero-Code Pre-Application Authentication Gateway (`pkg/auth`):** Dual-mode authentication (OIDC Single Sign-On via `coreos/go-oidc` + Simple local credential auth) placing a secure session wall in front of legacy or staging services, issuing signed JWT session cookies (`rw_session`), and injecting upstream identity headers (`X-Auth-Email`, `X-Auth-Subject`, `X-Auth-Roles`).
 
 ---
 
 ## Architecture Decisions
 
-- **Pluggable Storage Abstraction (`RateLimiter` & `RateStorage`):** Abstract storage interface allowing seamless switching between high-performance in-memory GCRA (zero CGO, zero GC overhead) and distributed Redis (`go-redis` or raw scripts) for clustered multi-node data planes.
-- **Route-Aware Tier 1 Enforcement:** Preserves mobile apps and B2B API pipelines (`/api/*`, `Authorization: Bearer`, `Accept: application/json`) by issuing HTTP 429 + `Retry-After` rather than interactive browser PoW challenges.
-- **Anti-CGNAT Composite Key Strategy:** Prevents accidental lockouts of university campuses, corporate egress proxies, or mobile carrier NATs by binding scanner traps and rate limits to composite keys: `ClientIP + JA4_Hash + SessionCookie` (with graceful fallback to `ClientIP + JA4` when unauthenticated).
-- **Unified Ban Manager (`pkg/rate/ban.go`):** Harmonizes auto-ban state across Domain 3 (honeypot crawler bans) and Domain 4 (Tier 2 attack frequency & Tier 3 scanner bans) into a single, high-throughput in-memory TTL store evaluated on the sub-microsecond fast-path.
-- **Bounded Virtual Waiting Room with Strict Concurrency Cap:** Prevents socket/file-descriptor exhaustion (`ulimit -n`) under massive DDoS floods by enforcing a strict `max_queue_depth`. Excess connections are shed immediately with HTTP 503 rather than holding open connections indefinitely.
-- **Nested Caddyfile Directives:** Clean, intuitive operator configuration via nested `rate_limit { ... }` and `waiting_room { ... }` blocks.
+- **Pre-Inspection Parameter-Level Exception Gate:** Evaluated per parameter directly inside `SemanticEngine` prior to lexical triage and AST verification. Matching parameters skip inspection for the designated `RuleID` without modifying the request payload or wasting parser CPU cycles on known-safe fields.
+- **Atomic Balanced Routing Table (`bart.Table`):** High-throughput radix/BART routing table (`gaissmai/bart`) for IP/CIDR lookups in $\sim 15\text{ ns}$. Threat feed updates use `atomic.Pointer[bart.Table]` for zero-lock hot-reloads under load.
+- **Graceful GeoIP Fallback:** MaxMind reader operates without panics or errors if `.mmdb` files are missing or unconfigured, returning empty/unknown metadata so rules can degrade gracefully.
+- **High-Performance Bytecode Evaluation (`expr-lang/expr`):** ACL rules are pre-compiled into bytecode during configuration provisioning and executed on a pooled environment struct, achieving sub-15ns decision times with zero allocations on the hot path.
+- **Dual-Mode Zero-Code Pre-App Auth:** Supports both enterprise OIDC SSO (Google, Keycloak, Okta, Microsoft) and local Simple Auth for staging environments. Upon successful authentication, issues a tamper-proof signed JWT cookie and injects standardized `X-Auth-*` identity headers into upstream requests.
+- **Modular Nested Caddyfile Directives:** Clean operator UX with dedicated `exceptions { ... }`, `acl { ... }`, and `auth { ... }` blocks within the `raiwall` directive.
 
 ---
 
 ## Dependency Graph
 
 ```
-RateStorage Interface (Memory / Redis)
+Exception Engine (pkg/acl/exception.go)
    │
-   ├── Generic Cell Rate Algorithm (GCRA Engine)
-   │       │
-   │       ├── Composite Key Builder (IP + JA4 + Cookie)
-   │       │       │
-   │       │       ├── Tier 1 Velocity Limiter (PoW / 429)
-   │       │       ├── Tier 2 Attack Frequency Limiter (BanManager)
-   │       │       └── Tier 3 Scanner Trap (Upstream 403/404 Interceptor)
-   │       │
-   │       └── Bounded Virtual Waiting Room (SSE Streamer + Queue Cap)
+   └── Semantic Engine Integration (pkg/engine/semantic.go)
+
+BART Routing Table (pkg/acl/bart.go) & Feed Loader
    │
-   └── Caddy Middleware Wiring & Caddyfile Parsing
+   ├── GeoIP Reader (pkg/acl/geoip.go)
+   │       │
+   │       └── Compiled Bytecode ACL Engine (pkg/acl/expr.go)
+   │
+Pre-App Auth Core (pkg/auth/oidc.go, simple.go)
+   │
+   └── JWT Session & Identity Injector (pkg/auth/session.go, handler.go)
            │
-           └── End-to-End Tests & DDoS Benchmark Suite
+           └── Caddy Middleware Pipeline & Nested Caddyfile Directives (pkg/proxy)
+                   │
+                   └── End-to-End Integration & Benchmark Suite
 ```
 
 ---
@@ -49,29 +51,29 @@ RateStorage Interface (Memory / Redis)
 
 Tasks are tracked in `tasks/todo.md`:
 
-### Phase 1: High-Performance Rate Limiter Engine & Pluggable Storage
-- [x] **Task 28: Core Rate Limiter Abstraction & Pure-Go GCRA In-Memory Engine** (Size: M)
-- [x] **Task 29: Distributed Redis Storage Backend & Composite Key Builder** (Size: M)
-- [x] *Checkpoint: Core rate limiter engine, in-memory GCRA, Redis backend, and composite key builder verified.*
+### Phase 1: Granular Parameter-Level Exception Engine
+- [ ] **Task 37: Parameter-Level Exception Engine Core & Pattern Matcher** (Size: S)
+- [ ] **Task 38: Exception Gate Integration with Semantic Threat Engine** (Size: S)
+- [ ] *Checkpoint: Parameter Exception Engine successfully suppresses false positives at parameter precision while keeping adjacent parameters protected.*
 
-### Phase 2: Tier 1 (Access Velocity) & Tier 2 (Attack Frequency Limiter)
-- [x] **Task 30: Tier 1 Access Velocity Limiter with Route-Aware Enforcement** (Size: M)
-- [x] **Task 31: Tier 2 Attack Frequency Limiter & Unified Ban Store** (Size: M)
-- [x] *Checkpoint: Tier 1 access velocity and Tier 2 attack frequency limiting with unified ban store verified.*
+### Phase 2: High-Performance CIDR Routing (`bart`) & GeoIP Engine (`maxminddb`)
+- [ ] **Task 39: Balanced Routing Table CIDR & Threat Feed Engine (`gaissmai/bart`)** (Size: M)
+- [ ] **Task 40: MaxMind GeoIP Lookup Reader & ASN Extractor (`oschwald/maxminddb-golang`)** (Size: S)
+- [ ] *Checkpoint: BART CIDR table and MaxMind GeoIP readers provide sub-microsecond IP threat and geographic intelligence.*
 
-### Phase 3: Tier 3 Scanner Trap & Anti-Reconnaissance Engine
-- [x] **Task 32: Tier 3 Scanner Trap with Upstream Response Interception** (Size: M)
-- [x] *Checkpoint: Tier 3 scanner trap neutralizes directory fuzzers without false positives on static assets.*
+### Phase 3: Compiled Bytecode Boolean ACL Engine (`expr-lang/expr`)
+- [ ] **Task 41: Compiled Bytecode ACL Engine & Expression Environment** (Size: M)
+- [ ] *Checkpoint: Compiled bytecode ACL engine executes multi-condition rules in $<15\text{ ns}$ with rich action outcomes.*
 
-### Phase 4: Bounded Virtual Waiting Room (SSE Streaming & Surge Protection)
-- [x] **Task 33: Bounded Virtual Waiting Room Engine & SSE Queue Streamer** (Size: M)
-- [x] **Task 34: Embedded Waiting Room UI & Client-Side Auto-Admit** (Size: S)
-- [x] *Checkpoint: Virtual waiting room streams live SSE queue updates, admits users smoothly, and sheds excess traffic under extreme overload.*
+### Phase 4: Zero-Code Pre-Application Authentication Gateway (`pkg/auth`)
+- [ ] **Task 42: Dual-Mode Auth Core (Simple Local Auth + OIDC Discovery Client)** (Size: M)
+- [ ] **Task 43: JWT Session Management, Upstream Identity Injection & Auth Endpoints** (Size: M)
+- [ ] *Checkpoint: Zero-code pre-app auth wall secures legacy apps with OIDC/Simple auth and injects identity headers upstream.*
 
-### Phase 5: Caddy Middleware Wiring, Caddyfile Parsing & End-to-End Validation
-- [x] **Task 35: Caddy Middleware Integration & Nested Caddyfile Directives** (Size: M)
-- [x] **Task 36: Domain 4 End-to-End Integration Tests & DDoS Flood Benchmark Suite** (Size: M)
-- [x] *Checkpoint: Milestone 4 complete, all tests passing with `-race`, single binary builds cleanly.*
+### Phase 5: Caddy Middleware Integration, Nested Caddyfile Directives & End-to-End Validation
+- [ ] **Task 44: Caddy Middleware Wiring & Nested Caddyfile Directives (`exceptions`, `acl`, `auth`)** (Size: M)
+- [ ] **Task 45: Domain 5 End-to-End Integration Tests & Micro-Benchmark Suite** (Size: M)
+- [ ] *Checkpoint: Milestone 5 complete, all tests passing with `-race`, single binary builds cleanly under 50MB.*
 
 ---
 
@@ -79,14 +81,15 @@ Tasks are tracked in `tasks/todo.md`:
 
 | Risk | Impact | Mitigation Strategy |
 | :--- | :---: | :--- |
-| **CGNAT Collateral Damage from Shared IP Bans** | **High** | Evaluate composite rate limiting keys: `ClientIP + JA4_Hash + SessionCookie`. Allow individual browser sessions behind shared proxies to continue unhindered. |
-| **Mobile / B2B Webhook Breakage on Rate Limit** | **High** | Intelligent Route Classifier steers machine traffic (`/api/*`, `Authorization: Bearer`, `Accept: application/json`) to HTTP 429 with `Retry-After` rather than HTML PoW challenges. |
-| **Socket & FD Exhaustion during Waiting Room Surges** | **High** | Enforce a strict `max_queue_depth` cap on the SSE waiting room. Excess connections are shed immediately with HTTP 503 to preserve system stability (`ulimit -n`). |
-| **Lock Contention on In-Memory Rate Limiter at High QPS** | **Medium** | Use partitioned/sharded locks or lock-free atomic CAS operations with Ristretto for sub-microsecond GCRA evaluations. |
-| **False-Positive Scanner Bans on Missing Static Assets** | **Medium** | Exclude common static file extensions (`.ico`, `.css`, `.png`, `.jpg`, `.svg`, `.js`, etc.) from incrementing the Tier 3 404/403 counter. |
+| **Exception Engine Over-Bypass** | **Critical** | Require explicit matching across `Host`, `Path`, `Method`, `Location`, and `ParamName`. Support exact `RuleID` targeting (e.g. `SEMANTIC_SQLI` only) rather than blanket WAF bypasses. |
+| **Memory Exhaustion on 500K+ Threat Feeds** | **High** | `gaissmai/bart` Balanced Routing Tables use memory-efficient compressed prefix trees ($\sim 2\text{ MB}$ for 500K routes). Threat feeds are parsed streaming line-by-line without duplicate buffering. |
+| **Missing or Corrupted GeoIP Database** | **Medium** | Safe no-op fallback when `.mmdb` is missing, unreadable, or omitted. Private/loopback IPs evaluate to unknown geo attributes without panicking. |
+| **`expr` Expression ReDoS or Slow Evaluation** | **Medium** | Pre-compile and validate all expressions during Caddy provisioning; reject invalid ASTs at startup. Restrict expression environment to purely functional, bounded helpers. |
+| **OIDC IdP Latency / Downtime** | **High** | Cache OIDC discovery documents and JWKS keys. Sessions rely on local stateless signed JWT cookies (`rw_session`), requiring IdP roundtrips only during initial login. |
+| **Header Injection Spoofing by Untrusted Clients** | **High** | Always strip incoming `X-Auth-*` headers from incoming client requests at the gateway boundary before injecting verified auth claims. |
 
 ---
 
 ## Open Questions & Future Work
-- **Cluster Redis Pub/Sub Synchronization (Domain 7):** When operating in Redis cluster mode, ban revocations and waiting room queue positions will sync across data plane nodes via Redis Pub/Sub.
-- **Frontend Dashboard Real-Time Metrics (Domain 6):** Real-time rate limit drops, waiting room queue depths, and scanner trap bans will be streamed via SSE to the Vue 3 control plane dashboard.
+- **1-Click Create Exception from UI (Domain 6):** The Control Plane UI log viewer will provide a "Create Exception" action that pre-fills the exception dialog with the exact Host, Path, Method, Location, and ParamName from the forensic event.
+- **Dynamic Cluster Threat Sync (Domain 7):** Real-time threat feed updates and IP ban distribution over Redis Pub/Sub across multi-node clusters.

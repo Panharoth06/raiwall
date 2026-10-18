@@ -5,10 +5,26 @@ go 1.27.0
 require (
 	github.com/caddyserver/caddy/v2 v2.8.4
 	github.com/corazawaf/libinjection-go v0.3.5
+	github.com/coreos/go-oidc/v3 v3.21.0
+	github.com/expr-lang/expr v1.17.8
+	github.com/gaissmai/bart v0.30.0
+	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
+	github.com/oschwald/maxminddb-golang v1.13.1
 	go.uber.org/zap v1.27.0
 	golang.org/x/net v0.25.0
+	golang.org/x/oauth2 v0.36.0
 )
+
+replace github.com/go-jose/go-jose/v4 => github.com/go-jose/go-jose/v4 v4.1.1
+
+replace golang.org/x/sys => golang.org/x/sys v0.20.0
+
+replace golang.org/x/term => golang.org/x/term v0.20.0
+
+replace golang.org/x/crypto => golang.org/x/crypto v0.23.0
+
+replace golang.org/x/net => golang.org/x/net v0.25.0
 
 require (
 	filippo.io/edwards25519 v1.1.0 // indirect
@@ -41,6 +57,7 @@ require (
 	github.com/fxamacker/cbor/v2 v2.6.0 // indirect
 	github.com/go-chi/chi/v5 v5.0.12 // indirect
 	github.com/go-jose/go-jose/v3 v3.0.3 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/go-kit/kit v0.13.0 // indirect
 	github.com/go-kit/log v0.2.1 // indirect
 	github.com/go-logfmt/logfmt v0.6.0 // indirect
@@ -132,12 +149,12 @@ require (
 	go.uber.org/mock v0.4.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap/exp v0.2.0 // indirect
-	golang.org/x/crypto v0.23.0 // indirect
+	golang.org/x/crypto v0.39.0 // indirect
 	golang.org/x/crypto/x509roots/fallback v0.0.0-20240507223354-67b13616a595 // indirect
 	golang.org/x/exp v0.0.0-20240506185415-9bf2ced13842 // indirect
 	golang.org/x/mod v0.17.0 // indirect
 	golang.org/x/sync v0.7.0 // indirect
-	golang.org/x/sys v0.20.0 // indirect
+	golang.org/x/sys v0.21.0 // indirect
 	golang.org/x/term v0.20.0 // indirect
 	golang.org/x/text v0.15.0 // indirect
 	golang.org/x/time v0.5.0 // indirect

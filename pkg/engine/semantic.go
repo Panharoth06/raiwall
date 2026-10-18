@@ -9,8 +9,20 @@ import (
 	"github.com/Panharoth06/raiwall/pkg/engine/normalizer"
 )
 
+// ExceptionMatcher determines if a parameter matches an active false-positive bypass rule.
+type ExceptionMatcher interface {
+	Matches(host, path, method, location, paramName, ruleID string) bool
+}
+
 // SemanticOption allows customizing SemanticEngine settings.
 type SemanticOption func(*SemanticEngine)
+
+// WithExceptionEngine configures an ExceptionMatcher (e.g. *acl.ExceptionEngine) on the SemanticEngine.
+func WithExceptionEngine(matcher ExceptionMatcher) SemanticOption {
+	return func(s *SemanticEngine) {
+		s.exceptionMatcher = matcher
+	}
+}
 
 // WithASTTimeout sets the timeout for bounded AST verification per parameter.
 func WithASTTimeout(d time.Duration) SemanticOption {
@@ -41,12 +53,23 @@ func WithMaxParamSize(size int) SemanticOption {
 // Stage 2: Pure-Go lexical triage (< 2 µs)
 // Stage 3: Bounded AST context verification (SQL, Shell, XSS) with 32 KB cap and 5 ms timeout.
 type SemanticEngine struct {
-	normalizer   *normalizer.Normalizer
-	sqlChop      *ast.SQLChop
-	cmdChop      *ast.CMDChop
-	xssChop      *ast.XSSChop
-	maxParamSize int
-	astTimeout   time.Duration
+	normalizer       *normalizer.Normalizer
+	sqlChop          *ast.SQLChop
+	cmdChop          *ast.CMDChop
+	xssChop          *ast.XSSChop
+	exceptionMatcher ExceptionMatcher
+	maxParamSize     int
+	astTimeout       time.Duration
+}
+
+// SetExceptionEngine dynamically updates the ExceptionMatcher.
+func (s *SemanticEngine) SetExceptionEngine(matcher ExceptionMatcher) {
+	s.exceptionMatcher = matcher
+}
+
+// ExceptionEngine returns the active ExceptionMatcher.
+func (s *SemanticEngine) ExceptionEngine() ExceptionMatcher {
+	return s.exceptionMatcher
 }
 
 // NewSemanticEngine creates an initialized SemanticEngine with production defaults.
@@ -96,6 +119,11 @@ func (s *SemanticEngine) InspectRequest(ctx *RequestContext) (*Verdict, error) {
 			continue
 		}
 
+		// Exception Gate: check if this parameter is globally exempt from all rules (*)
+		if s.exceptionMatcher != nil && s.exceptionMatcher.Matches(ctx.Host, ctx.Path, ctx.Method, string(param.Location), param.Name, "*") {
+			continue
+		}
+
 		// Stage 1: Multi-pass recursive normalization (stabilize within <= 10 iterations)
 		normalized := s.normalizer.Normalize(param.Value)
 		if len(normalized) == 0 {
@@ -109,9 +137,30 @@ func (s *SemanticEngine) InspectRequest(ctx *RequestContext) (*Verdict, error) {
 			continue
 		}
 
+		// Determine candidate RuleID for this threat
+		var targetRuleID string
+		switch triage {
+		case TriageSuspectSQLi:
+			targetRuleID = "SEMANTIC_SQLI"
+		case TriageSuspectCmdI:
+			targetRuleID = "SEMANTIC_CMDI"
+		case TriageSuspectXSS:
+			targetRuleID = "SEMANTIC_XSS"
+		}
+
+		// Exception Gate: skip if parameter is exempt from this threat category
+		if s.exceptionMatcher != nil && targetRuleID != "" {
+			if s.exceptionMatcher.Matches(ctx.Host, ctx.Path, ctx.Method, string(param.Location), param.Name, targetRuleID) {
+				continue
+			}
+		}
+
 		// Enforce parameter size cap: if > maxParamSize, rely on Stage 2 lexical triage
 		if len(normalized) > s.maxParamSize {
 			ruleID := "LEXICAL_" + triage.String()
+			if s.exceptionMatcher != nil && s.exceptionMatcher.Matches(ctx.Host, ctx.Path, ctx.Method, string(param.Location), param.Name, ruleID) {
+				continue
+			}
 			return &Verdict{
 				Action: ActionBlock,
 				RuleID: ruleID,
@@ -138,6 +187,10 @@ func (s *SemanticEngine) InspectRequest(ctx *RequestContext) (*Verdict, error) {
 
 		if astVerdict != nil {
 			if astVerdict.Action == ast.ActionBlock {
+				// Final check against exact AST rule ID (e.g. SEMANTIC_SQLI, SEMANTIC_CMDI, SEMANTIC_XSS)
+				if s.exceptionMatcher != nil && s.exceptionMatcher.Matches(ctx.Host, ctx.Path, ctx.Method, string(param.Location), param.Name, astVerdict.RuleID) {
+					continue
+				}
 				// Immediate short-circuit on confirmed threat
 				return &Verdict{
 					Action: ActionBlock,
@@ -145,6 +198,9 @@ func (s *SemanticEngine) InspectRequest(ctx *RequestContext) (*Verdict, error) {
 					Reason: fmt.Sprintf("%s (param %q in %s)", astVerdict.Reason, param.Name, param.Location),
 				}, nil
 			} else if astVerdict.Action == ast.ActionAudit {
+				if s.exceptionMatcher != nil && s.exceptionMatcher.Matches(ctx.Host, ctx.Path, ctx.Method, string(param.Location), param.Name, astVerdict.RuleID) {
+					continue
+				}
 				if timeoutVerdict == nil {
 					timeoutVerdict = &Verdict{
 						Action: ActionAudit,

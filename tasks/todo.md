@@ -773,3 +773,274 @@
 - [x] Bounded SSE virtual waiting room protects backend against surge exhaustion.
 - [x] All unit, integration, and benchmark tests pass with `-race`.
 - [x] Production-ready single binary builds cleanly.
+
+
+---
+
+# Tasks: Raiwall Domain 5 (Access Control & Zero-Trust Identity Gateway)
+
+## Phase 1: Granular Parameter-Level Exception Engine
+
+### Task 37: Parameter-Level Exception Engine Core & Pattern Matcher
+**Description:** Implement `pkg/acl/exception.go` providing `ExceptionEngine` and `ExceptionRule`. Support granular false-positive suppression rules matching `Host`, `Path Regex` / `PathPrefix`, `HTTP Method`, `Parameter Location` (`query`, `body`, `header`, `cookie`, `json`, `multipart`), exact `Parameter Name`, and specific `RuleID` (e.g. `SEMANTIC_SQLI`, `SEMANTIC_CMDI`, or `*` for all rules). Implement thread-safe rule registration and fast evaluation.
+
+**Acceptance criteria:**
+- [x] Define `ExceptionRule` struct and `ExceptionEngine` type.
+- [x] Implement `Matches(host, path, method, location, paramName, ruleID) bool`.
+- [x] Support regex path compilation with thread-safe caching and wildcard `*` matching for RuleID and Method.
+- [x] Unit tests cover location types (Query, Body, Header, Cookie), regex paths, method matching, and wildcard rule IDs.
+
+**Verification:**
+- [x] Tests pass: `go test -v -race ./pkg/acl/...`
+- [x] Build succeeds: `go build ./pkg/acl/...`
+
+**Dependencies:** None
+**Files likely touched:**
+- `pkg/acl/exception.go`
+- `pkg/acl/exception_test.go`
+- `pkg/acl/types.go`
+**Estimated scope:** Small (2–3 files)
+
+---
+
+### Task 38: Exception Gate Integration with Semantic Threat Engine
+**Description:** Integrate `ExceptionEngine` into `pkg/engine/semantic.go`. Add `WithExceptionEngine(*acl.ExceptionEngine)` option to `SemanticEngine`. During Stage 1 parameter normalization and before Stage 2/3 triage, check if candidate parameters match an active exception for the target rule. If matched, skip inspection for that parameter while ensuring all other parameters in the same request remain strictly verified.
+
+**Acceptance criteria:**
+- [x] Add `exceptionEngine *acl.ExceptionEngine` field and option to `SemanticEngine`.
+- [x] Skip lexical triage and AST verification for parameters matching an active exception rule.
+- [x] Unmatched parameters in the same request are inspected and blocked if malicious.
+- [x] Unit tests verify parameter-level bypass on target endpoints (e.g. `markdown_content` on `/api/v1/posts`) while blocking attacks on adjacent parameters (e.g. `title` or `author`).
+
+**Verification:**
+- [x] Tests pass: `go test -v -race ./pkg/engine/...`
+- [x] Build succeeds: `go build ./pkg/engine/...`
+
+**Dependencies:** Task 37
+**Files likely touched:**
+- `pkg/engine/semantic.go`
+- `pkg/engine/semantic_test.go`
+**Estimated scope:** Small (2 files)
+
+---
+
+## Checkpoint: Parameter Exception Engine
+- [x] Parameter Exception Engine matches granular (Host, Path, Method, Location, Param, RuleID) tuples.
+- [x] False-positive exceptions skip AST verification on exempted fields without compromising other parameters.
+- [x] Unit tests pass with `-race`.
+
+---
+
+## Phase 2: High-Performance CIDR Routing (`bart`) & GeoIP Engine (`maxminddb`)
+
+### Task 39: Balanced Routing Table CIDR & Threat Feed Engine (`gaissmai/bart`)
+**Description:** Implement `pkg/acl/bart.go` and `pkg/acl/feed_loader.go` using `github.com/gaissmai/bart` to build sub-microsecond ($<15\text{ ns}$) IPv4/IPv6 Balanced Routing Tables. Support named threat feeds (CrowdSec, Spamhaus, AbuseIPDB, Tor exit nodes) loaded from line-delimited files or CIDR slices. Provide thread-safe lookups via `atomic.Pointer[bart.Table]` for zero-downtime hot reloads.
+
+**Acceptance criteria:**
+- [ ] Implement `BARTTable` wrapping `bart.Table` for IPv4 and IPv6 lookups.
+- [ ] Implement streaming threat feed file loader parsing IP/CIDR lists with comment (`#`) and whitespace stripping.
+- [ ] Support named feeds (`crowdsec`, `spamhaus`, `tor`) and custom IP blacklists/whitelists.
+- [ ] Provide atomic swap mechanism (`UpdateTable`) for lock-free hot updates.
+- [ ] Benchmarks verify sub-20ns lookup time across 100K+ IP entries.
+- [ ] Unit tests verify IPv4, IPv6, CIDR subnets, and feed reloading.
+
+**Verification:**
+- [ ] Tests pass: `go test -v -race ./pkg/acl/...`
+- [ ] Benchmarks pass: `go test -bench=BenchmarkBARTLookup ./pkg/acl/...`
+- [ ] Build succeeds: `go build ./pkg/acl/...`
+
+**Dependencies:** None
+**Files likely touched:**
+- `pkg/acl/bart.go`
+- `pkg/acl/bart_test.go`
+- `pkg/acl/feed_loader.go`
+**Estimated scope:** Medium (3 files)
+
+---
+
+### Task 40: MaxMind GeoIP Lookup Reader & ASN Extractor (`oschwald/maxminddb-golang`)
+**Description:** Implement `pkg/acl/geoip.go` using `github.com/oschwald/maxminddb-golang` to read MaxMind GeoLite2/GeoIP2 Country, City, and ASN databases. Extract `GeoData` (`Country` ISO alpha-2, `Continent`, `ASN`, `ASOrg`). Provide safe zero-allocation fallback when MMDB files are not provided, missing, or when querying loopback/private IP addresses.
+
+**Acceptance criteria:**
+- [ ] Implement `GeoIPReader` opening country and ASN `.mmdb` databases.
+- [ ] Implement `Lookup(ip net.IP) GeoData` returning Country, Continent, ASN, and Organization.
+- [ ] Gracefully handle unconfigured/missing database files by returning empty `GeoData` with zero errors or crashes.
+- [ ] Handle private/internal IP ranges (RFC 1918) without errors.
+- [ ] Unit tests cover country lookups, ASN lookups, and graceful degradation on missing files.
+
+**Verification:**
+- [ ] Tests pass: `go test -v -race ./pkg/acl/...`
+- [ ] Build succeeds: `go build ./pkg/acl/...`
+
+**Dependencies:** None
+**Files likely touched:**
+- `pkg/acl/geoip.go`
+- `pkg/acl/geoip_test.go`
+**Estimated scope:** Small (2 files)
+
+---
+
+## Checkpoint: CIDR Routing & GeoIP
+- [ ] BART routing table matches 100K+ IPs in $<20\text{ ns}$ with atomic hot reload.
+- [ ] MaxMind GeoIP reader extracts country and ASN data with graceful zero-panic fallback.
+- [ ] Unit tests and benchmarks pass with `-race`.
+
+---
+
+## Phase 3: Compiled Bytecode Boolean ACL Engine (`expr-lang/expr`)
+
+### Task 41: Compiled Bytecode ACL Engine & Expression Environment
+**Description:** Implement `pkg/acl/expr.go` using `github.com/expr-lang/expr` to compile boolean rules into bytecode evaluated in $<15\text{ ns}$. Build evaluation environment exposing `ip`, `ja4`, `method`, `path`, `host`, `headers`, `cookies`, `query`, `geo` (`Country`, `ASN`), and helper functions (`in_cidr`, `in_feed`, `has_prefix`, `contains`, `regex_match`). Implement ordered first-match-wins evaluation supporting actions `allow`, `block`, `challenge`, `redirect`, and `audit`.
+
+**Acceptance criteria:**
+- [ ] Define `ACLRule` (Name, Expression, Action, Priority, StatusCode, RedirectURL).
+- [ ] Pre-compile expressions into `expr.Program` bytecode with type checking at configuration time.
+- [ ] Expose request attributes and helper functions (`in_cidr(ip, subnet)`, `in_feed(ip, feedName)`).
+- [ ] Implement `Evaluate(reqCtx *engine.RequestContext, geo GeoData) (*ACLVerdict, error)` with first-match-wins semantics.
+- [ ] Benchmarks verify sub-15ns bytecode evaluation overhead.
+- [ ] Unit tests verify rule compilation, helper functions, execution priority, and action verdicts.
+
+**Verification:**
+- [ ] Tests pass: `go test -v -race ./pkg/acl/...`
+- [ ] Benchmarks pass: `go test -bench=BenchmarkACLExpr ./pkg/acl/...`
+- [ ] Build succeeds: `go build ./pkg/acl/...`
+
+**Dependencies:** Tasks 39–40
+**Files likely touched:**
+- `pkg/acl/expr.go`
+- `pkg/acl/expr_env.go`
+- `pkg/acl/expr_test.go`
+**Estimated scope:** Medium (3 files)
+
+---
+
+## Checkpoint: Bytecode ACL Engine
+- [ ] `expr` rules compile cleanly into bytecode and execute in $<15\text{ ns}$.
+- [ ] Helper functions seamlessly bridge BART threat feeds and GeoIP attributes.
+- [ ] Unit tests pass with `-race`.
+
+---
+
+## Phase 4: Zero-Code Pre-Application Authentication Gateway (`pkg/auth`)
+
+### Task 42: Dual-Mode Auth Core (Simple Local Auth + OIDC Discovery Client)
+**Description:** Implement `pkg/auth/simple.go` and `pkg/auth/oidc.go` supporting dual-mode pre-application authentication. Simple Auth provides local username/password verification (bcrypt/argon2 or secure hash). OIDC client integrates `github.com/coreos/go-oidc/v3/oidc` and `golang.org/x/oauth2` to perform IdP discovery, authorization code redirect generation, and code-for-token exchange against identity providers (Google, Keycloak, Okta).
+
+**Acceptance criteria:**
+- [ ] Implement `SimpleAuth` credential validation.
+- [ ] Implement `OIDCClient` with automatic discovery (`/.well-known/openid-configuration`), state generation, and code exchange.
+- [ ] Support configurable OIDC scopes, client credentials, and redirect URIs.
+- [ ] Unit tests cover Simple Auth credential checking, OIDC discovery parsing, state verification, and code exchange mocks.
+
+**Verification:**
+- [ ] Tests pass: `go test -v -race ./pkg/auth/...`
+- [ ] Build succeeds: `go build ./pkg/auth/...`
+
+**Dependencies:** None
+**Files likely touched:**
+- `pkg/auth/types.go`
+- `pkg/auth/simple.go`
+- `pkg/auth/oidc.go`
+- `pkg/auth/auth_test.go`
+**Estimated scope:** Medium (3–4 files)
+
+---
+
+### Task 43: JWT Session Management, Upstream Identity Injection & Auth Endpoints
+**Description:** Implement `pkg/auth/session.go`, `pkg/auth/handler.go`, and `pkg/auth/templates.go`. Manage session state via tamper-proof signed JWT cookies (`rw_session`) using `github.com/golang-jwt/jwt/v5`. Serve embedded login page at `/.raiwall/auth/login`, handle OIDC callback at `/.raiwall/auth/callback`, and logout at `/.raiwall/auth/logout`. Inject verified identity headers (`X-Auth-Subject`, `X-Auth-Email`, `X-Auth-Name`, `X-Auth-Roles`) upstream and support configurable `BypassPaths`.
+
+**Acceptance criteria:**
+- [ ] Generate and validate HMAC-SHA256 signed JWT session cookies with configurable TTL and `HttpOnly`/`Secure` flags.
+- [ ] Implement auth HTTP endpoints (`/.raiwall/auth/login`, `callback`, `logout`).
+- [ ] Render embedded, responsive zero-CDN login UI supporting both local credentials and SSO button.
+- [ ] Strip incoming client `X-Auth-*` headers and inject verified identity claims into upstream requests.
+- [ ] Support bypass paths (`/public/*`, `/healthz`, webhook routes) skipping authentication.
+- [ ] Unit tests cover session issuance, tampered cookie rejection, expiration, callback flow, and header injection.
+
+**Verification:**
+- [ ] Tests pass: `go test -v -race ./pkg/auth/...`
+- [ ] Build succeeds: `go build ./pkg/auth/...`
+
+**Dependencies:** Task 42
+**Files likely touched:**
+- `pkg/auth/session.go`
+- `pkg/auth/handler.go`
+- `pkg/auth/templates.go`
+- `pkg/auth/session_test.go`
+**Estimated scope:** Medium (4 files)
+
+---
+
+## Checkpoint: Pre-Application Auth Gateway
+- [ ] Dual-mode authentication (OIDC SSO + Simple Auth) fully operational.
+- [ ] Signed JWT session cookies maintain tamper-proof state without server-side database.
+- [ ] Upstream services receive verified identity headers (`X-Auth-Email`, etc.).
+- [ ] Unit tests pass with `-race`.
+
+---
+
+## Phase 5: Caddy Middleware Integration, Nested Caddyfile Directives & End-to-End Validation
+
+### Task 44: Caddy Middleware Wiring & Nested Caddyfile Directives (`exceptions`, `acl`, `auth`)
+**Description:** Wire `ExceptionEngine`, `BARTTable`, `GeoIPReader`, `ACLEngine`, and `AuthGateway` into `pkg/proxy/middleware.go` and `pkg/proxy/caddyfile.go`. Implement execution pipeline: Auth Gateway -> ACL Rules -> Exception Gate -> Threat Inspection -> Upstream Header Injection. Parse modular Caddyfile blocks: `exceptions { ... }`, `acl { ... }`, and `auth { ... }`. Update `examples/Caddyfile`.
+
+**Acceptance criteria:**
+- [ ] Wire Pre-App Auth check, ACL rule evaluation, and exception engine into `ServeHTTP`.
+- [ ] Strip client-supplied `X-Auth-*` headers and inject authenticated claims prior to upstream proxying.
+- [ ] Parse nested Caddyfile directives:
+  - `exceptions { rule <id> { host ...; path ...; method ...; location ...; param ...; } }`
+  - `acl { threat_feed <name> <path>; geoip_db <path>; rule <name> { expr <str>; action <act>; } }`
+  - `auth { provider <type>; issuer ...; client_id ...; client_secret ...; bypass_path ...; }`
+- [ ] Update `examples/Caddyfile` showcasing complete Domain 5 configuration.
+- [ ] Unit tests verify Caddyfile unmarshaling and middleware provisioning.
+
+**Verification:**
+- [ ] Tests pass: `go test -v -race ./pkg/proxy/...`
+- [ ] Build succeeds: `go build ./cmd/raiwall`
+
+**Dependencies:** Tasks 37–43
+**Files likely touched:**
+- `pkg/proxy/middleware.go`
+- `pkg/proxy/caddyfile.go`
+- `pkg/proxy/caddyfile_test.go`
+- `examples/Caddyfile`
+**Estimated scope:** Medium (4 files)
+
+---
+
+### Task 45: Domain 5 End-to-End Integration Tests & Micro-Benchmark Suite
+**Description:** Build comprehensive end-to-end integration tests in `tests/e2e/access_control_test.go` and micro-benchmarks in `pkg/acl/benchmark_test.go`. Validate full access control lifecycle: parameter false-positive exceptions, sub-20ns BART threat feed bans, GeoIP country fencing, `expr` multi-condition bytecode evaluation, and zero-code pre-app auth flows with upstream header forwarding under concurrent load with `-race`.
+
+**Acceptance criteria:**
+- [ ] End-to-end integration tests verify:
+  - Whitelisted parameter on target route bypasses SQLi/XSS while other parameters are blocked.
+  - Threat feed IP matches BART table and is blocked immediately.
+  - GeoIP fencer permits allowed country and blocks unauthorized country.
+  - Bytecode `expr` rules evaluate complex logic (IP + Path + Header + Geo).
+  - Unauthenticated request is redirected to `/.raiwall/auth/login`.
+  - Authenticated session receives `rw_session` cookie and upstream receives `X-Auth-*` headers.
+- [ ] Benchmarks verify sub-microsecond evaluation overhead ($<15\text{ ns}$ for BART and expr).
+- [ ] Zero race conditions under concurrent requests (`go test -race`).
+- [ ] Single binary builds cleanly under 50MB (`make build`).
+
+**Verification:**
+- [ ] Integration tests pass: `go test -v -race -tags=integration ./tests/e2e/...`
+- [ ] Benchmarks pass: `go test -bench=. ./pkg/acl/...`
+- [ ] Build succeeds: `make build`
+
+**Dependencies:** Tasks 37–44
+**Files likely touched:**
+- `tests/e2e/access_control_test.go`
+- `pkg/acl/benchmark_test.go`
+**Estimated scope:** Medium (2 files)
+
+---
+
+## Final Checkpoint: Milestone 5 (Domain 5) Completion
+- [ ] All 9 tasks (Tasks 37–45) implemented and verified.
+- [ ] Granular parameter-level exception engine operational.
+- [ ] Sub-microsecond BART CIDR threat feed matching and MaxMind GeoIP integrated.
+- [ ] Bytecode boolean ACL engine (`expr-lang/expr`) executing in $<15\text{ ns}$.
+- [ ] Zero-code pre-application auth gateway (OIDC + Simple Auth) securing legacy endpoints.
+- [ ] All unit, integration, and benchmark tests pass with `-race`.
+- [ ] Single binary builds cleanly.
