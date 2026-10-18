@@ -1,5 +1,7 @@
 package acl
 
+import "strings"
+
 // Location defines parameter origination locations for ACL and exception rules.
 type Location string
 
@@ -33,27 +35,30 @@ type GeoData struct {
 	ASOrg     string `json:"as_org,omitempty"`    // Autonomous System Organization name
 }
 
-// ThreatEntry records threat feed membership and metadata for an IP or CIDR block.
-type ThreatEntry struct {
+// FeedMetadata records threat feed membership and metadata for an IP or CIDR block.
+type FeedMetadata struct {
 	Feeds       []string `json:"feeds"`
 	Description string   `json:"description,omitempty"`
 }
 
-// Clone returns a deep copy of ThreatEntry for bart.Table requirements.
-func (e ThreatEntry) Clone() ThreatEntry {
+// ThreatEntry is an alias for FeedMetadata.
+type ThreatEntry = FeedMetadata
+
+// Clone returns a deep copy of FeedMetadata for bart.Table requirements.
+func (e FeedMetadata) Clone() FeedMetadata {
 	var f []string
 	if e.Feeds != nil {
 		f = make([]string, len(e.Feeds))
 		copy(f, e.Feeds)
 	}
-	return ThreatEntry{
+	return FeedMetadata{
 		Feeds:       f,
 		Description: e.Description,
 	}
 }
 
-// Equal checks equality of two ThreatEntries for bart.Table requirements.
-func (e ThreatEntry) Equal(other ThreatEntry) bool {
+// Equal checks equality of two FeedMetadatas for bart.Table requirements.
+func (e FeedMetadata) Equal(other FeedMetadata) bool {
 	if e.Description != other.Description || len(e.Feeds) != len(other.Feeds) {
 		return false
 	}
@@ -67,7 +72,7 @@ func (e ThreatEntry) Equal(other ThreatEntry) bool {
 
 // HasFeed checks whether the entry belongs to a specific feed name (case-insensitive).
 // Wildcard "*" or empty string matches any feed.
-func (e ThreatEntry) HasFeed(feedName string) bool {
+func (e FeedMetadata) HasFeed(feedName string) bool {
 	if feedName == "" || feedName == "*" {
 		return len(e.Feeds) > 0
 	}

@@ -837,17 +837,17 @@
 **Description:** Implement `pkg/acl/bart.go` and `pkg/acl/feed_loader.go` using `github.com/gaissmai/bart` to build sub-microsecond ($<15\text{ ns}$) IPv4/IPv6 Balanced Routing Tables. Support named threat feeds (CrowdSec, Spamhaus, AbuseIPDB, Tor exit nodes) loaded from line-delimited files or CIDR slices. Provide thread-safe lookups via `atomic.Pointer[bart.Table]` for zero-downtime hot reloads.
 
 **Acceptance criteria:**
-- [ ] Implement `BARTTable` wrapping `bart.Table` for IPv4 and IPv6 lookups.
-- [ ] Implement streaming threat feed file loader parsing IP/CIDR lists with comment (`#`) and whitespace stripping.
-- [ ] Support named feeds (`crowdsec`, `spamhaus`, `tor`) and custom IP blacklists/whitelists.
-- [ ] Provide atomic swap mechanism (`UpdateTable`) for lock-free hot updates.
-- [ ] Benchmarks verify sub-20ns lookup time across 100K+ IP entries.
-- [ ] Unit tests verify IPv4, IPv6, CIDR subnets, and feed reloading.
+- [x] Implement `BARTTable` wrapping `bart.Table` for IPv4 and IPv6 lookups.
+- [x] Implement streaming threat feed file loader parsing IP/CIDR lists with comment (`#`) and whitespace stripping.
+- [x] Support named feeds (`crowdsec`, `spamhaus`, `tor`) and custom IP blacklists/whitelists.
+- [x] Provide atomic swap mechanism (`UpdateTable`) for lock-free hot updates.
+- [x] Benchmarks verify sub-20ns lookup time across 100K+ IP entries.
+- [x] Unit tests verify IPv4, IPv6, CIDR subnets, and feed reloading.
 
 **Verification:**
-- [ ] Tests pass: `go test -v -race ./pkg/acl/...`
-- [ ] Benchmarks pass: `go test -bench=BenchmarkBARTLookup ./pkg/acl/...`
-- [ ] Build succeeds: `go build ./pkg/acl/...`
+- [x] Tests pass: `go test -v -race ./pkg/acl/...`
+- [x] Benchmarks pass: `go test -bench=BenchmarkBARTLookup ./pkg/acl/...`
+- [x] Build succeeds: `go build ./pkg/acl/...`
 
 **Dependencies:** None
 **Files likely touched:**
@@ -862,15 +862,15 @@
 **Description:** Implement `pkg/acl/geoip.go` using `github.com/oschwald/maxminddb-golang` to read MaxMind GeoLite2/GeoIP2 Country, City, and ASN databases. Extract `GeoData` (`Country` ISO alpha-2, `Continent`, `ASN`, `ASOrg`). Provide safe zero-allocation fallback when MMDB files are not provided, missing, or when querying loopback/private IP addresses.
 
 **Acceptance criteria:**
-- [ ] Implement `GeoIPReader` opening country and ASN `.mmdb` databases.
-- [ ] Implement `Lookup(ip net.IP) GeoData` returning Country, Continent, ASN, and Organization.
-- [ ] Gracefully handle unconfigured/missing database files by returning empty `GeoData` with zero errors or crashes.
-- [ ] Handle private/internal IP ranges (RFC 1918) without errors.
-- [ ] Unit tests cover country lookups, ASN lookups, and graceful degradation on missing files.
+- [x] Implement `GeoIPReader` opening country and ASN `.mmdb` databases.
+- [x] Implement `Lookup(ip net.IP) GeoData` returning Country, Continent, ASN, and Organization.
+- [x] Gracefully handle unconfigured/missing database files by returning empty `GeoData` with zero errors or crashes.
+- [x] Handle private/internal IP ranges (RFC 1918) without errors.
+- [x] Unit tests cover country lookups, ASN lookups, and graceful degradation on missing files.
 
 **Verification:**
-- [ ] Tests pass: `go test -v -race ./pkg/acl/...`
-- [ ] Build succeeds: `go build ./pkg/acl/...`
+- [x] Tests pass: `go test -v -race ./pkg/acl/...`
+- [x] Build succeeds: `go build ./pkg/acl/...`
 
 **Dependencies:** None
 **Files likely touched:**
@@ -881,9 +881,9 @@
 ---
 
 ## Checkpoint: CIDR Routing & GeoIP
-- [ ] BART routing table matches 100K+ IPs in $<20\text{ ns}$ with atomic hot reload.
-- [ ] MaxMind GeoIP reader extracts country and ASN data with graceful zero-panic fallback.
-- [ ] Unit tests and benchmarks pass with `-race`.
+- [x] BART routing table matches 100K+ IPs in $<20\text{ ns}$ with atomic hot reload.
+- [x] MaxMind GeoIP reader extracts country and ASN data with graceful zero-panic fallback.
+- [x] Unit tests and benchmarks pass with `-race`.
 
 ---
 
