@@ -88,6 +88,21 @@ func (r *ACLRule) Compile(bartTable *BARTTable) error {
 	return r.CompileWithProvider(func() *BARTTable { return bartTable })
 }
 
+// Eval evaluates the compiled rule directly against an EvalEnv.
+func (r *ACLRule) Eval(env *EvalEnv) (bool, error) {
+	if r.compiled == nil {
+		if err := r.Compile(nil); err != nil {
+			return false, err
+		}
+	}
+	out, err := vm.Run(r.compiled, env)
+	if err != nil {
+		return false, err
+	}
+	matched, _ := out.(bool)
+	return matched, nil
+}
+
 // evalContains is a helper for expr.
 func evalContains(params ...any) (any, error) {
 	if len(params) != 2 {
