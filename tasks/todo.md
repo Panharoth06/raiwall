@@ -1,4 +1,4 @@
-# Tasks: Raiwall Domain 6 (Observability, Forensics & Real-Time Alerting)
+# Tasks: Raiwall Domain 7 (Control Plane, Customization & Ecosystem Integration)
 
 ## Completed Milestones
 - [x] **Milestone 1: Domain 1 (Reverse Proxy & Gateway)** — Tasks 1 through 8 completed and verified.
@@ -6,351 +6,439 @@
 - [x] **Milestone 3: Domain 3 (Bot Mitigation & Active Defense)** — Tasks 18 through 27 completed and verified.
 - [x] **Milestone 4: Domain 4 (DDoS, HTTP Flood & Rate Limiting)** — Tasks 28 through 36 completed and verified.
 - [x] **Milestone 5: Domain 5 (Access Control & Zero-Trust Identity Gateway)** — Tasks 37 through 45 completed and verified.
+- [x] **Milestone 6: Domain 6 (Observability, Forensics & Real-Time Alerting)** — Tasks 46 through 57 completed and verified.
 
 ---
 
-## Phase 1: Telemetry Data Model, PII/PCI-DSS Sanitizer & High-Throughput Ring Buffer
+## Phase 1: Database Schema, `sqlc` Code Generation & In-Memory Config Rollback Engine
 
-### Task 46: Forensic Event Model & Multi-Layer PII/PCI-DSS Sanitizer
-**Description:** Implement `pkg/telemetry/event.go`, `pkg/telemetry/sanitizer.go`, and test suite in `pkg/telemetry/sanitizer_test.go`. Define the canonical `ForensicEvent` structure capturing complete request metadata (`EventID`, `Timestamp`, `Host`, `Path`, `Method`, `ClientIP`, `JA4`, `GeoData`, `RuleID`, `Action`, `Severity`, `Headers`, `TruncatedPayload`, `Latency`, `StatusCode`). Implement an in-stream multi-layer sanitizer that redacts sensitive headers (`Authorization`, `Cookie`, `X-Auth-*`), blacklisted parameter keys (`password`, `token`, `secret`, `cvv`, `card`, `api_key`), applies regex scanning for 16-digit credit card numbers (PCI-DSS 4.0) and bearer tokens, and truncates raw payload snippets to $2\text{ KB}$.
+### Task 58: SQLite Schema & `sqlc` Repository for Control Plane Persistence
+**Description:** Implement `pkg/control/db/schema.sql`, `pkg/control/db/query.sql`, `sqlc.yaml`, and generate Go models and queries via `sqlc`. Define relational schema in pure-Go SQLite WAL mode (`modernc.org/sqlite`) persisting protected sites (`raiwall_apps`), false-positive exceptions (`raiwall_exceptions`), compiled ACL rules (`raiwall_acl_rules`), rate limit policies (`raiwall_rate_policies`), bot defense settings (`raiwall_bot_configs`), versioned snapshots (`raiwall_config_snapshots`), admin users (`raiwall_users`), and API keys (`raiwall_api_keys`). Implement database connection bootstrap with pragmas (`PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;`).
 
 **Acceptance criteria:**
-- [x] Define `ForensicEvent` struct with complete JSON tags and serialization helpers.
-- [x] Implement `Sanitize(event *ForensicEvent)` redacting sensitive headers and replacing sensitive key values with `[REDACTED]`.
-- [x] Scrub PCI-DSS credit card PANs and JWT/Bearer tokens in request bodies and query strings via regex pattern matching.
-- [x] Enforce hard context truncation cap of $2\text{ KB}$ on raw payload snippets to prevent memory bloat.
-- [x] Unit tests cover header redaction, query/body parameter scrubbing, card number patterns, and context truncation.
+- [ ] Define comprehensive SQLite schema with foreign key constraints, indexes, and timestamps.
+- [ ] Write SQL queries for CRUD operations on sites, exceptions, ACLs, rate policies, snapshots, users, and API keys.
+- [ ] Configure `sqlc.yaml` and compile type-safe Go code in `pkg/control/db/`.
+- [ ] Implement `InitDB(dsn string) (*Store, error)` applying automated schema migrations on startup.
+- [ ] Unit tests cover all CRUD queries, transaction rollbacks, and schema integrity.
 
 **Verification:**
-- [x] Tests pass: `go test -v -race ./pkg/telemetry/...`
-- [x] Build succeeds: `go build ./pkg/telemetry/...`
+- [ ] Tests pass: `go test -v -race ./pkg/control/db/...`
+- [ ] Build succeeds: `go build ./pkg/control/db/...`
 
 **Dependencies:** None
 **Files likely touched:**
-- `pkg/telemetry/event.go`
-- `pkg/telemetry/sanitizer.go`
-- `pkg/telemetry/sanitizer_test.go`
+- `pkg/control/db/schema.sql`
+- `pkg/control/db/query.sql`
+- `pkg/control/db/store.go`
+- `pkg/control/db/store_test.go`
+- `sqlc.yaml`
+**Estimated scope:** Medium (4 files)
+
+---
+
+### Task 59: Atomic Config Snapshot Compiler, Pre-Flight Validator & Rollback Engine
+**Description:** Implement `pkg/config/compiler.go`, `pkg/config/validator.go`, and test suite in `pkg/config/compiler_test.go`. Build the configuration compiler transforming relational SQLite records into an immutable `ConfigSnapshot`. Implement strict pre-flight validation: parse and compile `expr-lang/expr` ACL rules, validate BART CIDR IP blocks, test regex patterns, and verify upstream dial address formats. Implement the rollback engine that stores snapshot versions in SQLite history and executes atomic swaps via `atomic.Pointer[ConfigSnapshot]`.
+
+**Acceptance criteria:**
+- [ ] Implement `CompileSnapshot(store *db.Store) (*ConfigSnapshot, error)` assembling all active configuration entities.
+- [ ] Pre-flight validator verifies `expr` syntax, CIDR prefixes, regex validity, and upstream network addresses.
+- [ ] Rejects invalid configurations with structured errors, leaving active runtime data plane unaffected.
+- [ ] Persist compiled snapshot JSON and metadata to `raiwall_config_snapshots` table with auto-incremented version.
+- [ ] Implement atomic swap updating `atomic.Pointer[ConfigSnapshot]` with zero lock contention.
+- [ ] Implement `RollbackToVersion(targetVersion uint64)` reverting data plane to any historical snapshot.
+- [ ] Unit and concurrent race tests verify compilation, validation failures, atomic swapping, and rollback.
+
+**Verification:**
+- [ ] Tests pass: `go test -v -race ./pkg/config/...`
+- [ ] Build succeeds: `go build ./pkg/config/...`
+
+**Dependencies:** Task 58
+**Files likely touched:**
+- `pkg/config/compiler.go`
+- `pkg/config/validator.go`
+- `pkg/config/rollback.go`
+- `pkg/config/compiler_test.go`
+**Estimated scope:** Medium (4 files)
+
+---
+
+## Checkpoint: Database Persistence & Atomic Config Rollback
+- [ ] Relational configuration schema persisted in WAL-mode SQLite with type-safe `sqlc` models.
+- [ ] Pre-flight compiler validates all rules and prevents invalid states from reaching data plane.
+- [ ] Atomic pointer swap and 1-click rollback verified under concurrent traffic.
+
+---
+
+## Phase 2: Huma v2 OpenAPI 3.1 REST API, Auth & MCP Tool Bridge
+
+### Task 60: Huma v2 REST Framework Setup, Admin Auth & 2-Tier RBAC
+**Description:** Implement `pkg/control/api/server.go`, `pkg/control/api/auth.go`, and test suite in `pkg/control/api/auth_test.go`. Integrate `github.com/danielgtaylor/huma/v2` with Chi router to provide an OpenAPI 3.1 compliant REST API. Implement authentication supporting both Bearer API keys (`X-Raiwall-Key` or `Authorization: Bearer <key>`) and session cookies. Enforce 2-tier RBAC (`admin` read-write, `viewer` read-only). Mount interactive Scalar and Swagger UI documentation at `/.raiwall/api/docs`.
+
+**Acceptance criteria:**
+- [ ] Initialize Huma v2 API instance with OpenAPI 3.1 specification metadata.
+- [ ] Implement authentication middleware validating Bearer API tokens against SQLite hashed keys.
+- [ ] Implement session cookie authentication with HMAC signature verification.
+- [ ] Enforce role-based access control (`admin` vs `viewer`) on mutating HTTP methods (`POST`, `PUT`, `DELETE`).
+- [ ] Serve interactive Scalar documentation at `/.raiwall/api/docs` and OpenAPI JSON at `/.raiwall/api/openapi.json`.
+- [ ] Unit tests verify token parsing, role enforcement, unauthorized rejections, and docs endpoints.
+
+**Verification:**
+- [ ] Tests pass: `go test -v -race ./pkg/control/api/...`
+- [ ] Build succeeds: `go build ./pkg/control/api/...`
+
+**Dependencies:** Task 58, Task 59
+**Files likely touched:**
+- `pkg/control/api/server.go`
+- `pkg/control/api/auth.go`
+- `pkg/control/api/middleware.go`
+- `pkg/control/api/auth_test.go`
+**Estimated scope:** Medium (4 files)
+
+---
+
+### Task 61: Configuration CRUD Endpoints & Staged Deployment API
+**Description:** Implement `pkg/control/api/sites.go`, `pkg/control/api/exceptions.go`, `pkg/control/api/acls.go`, `pkg/control/api/snapshots.go`, and tests. Provide Huma v2 endpoints for managing Sites (with upstream pools and health check parameters), Exceptions (with test dry-run), ACLs (with syntax dry-run), Rate Limiting, and Bot policies. Implement staged deployment workflow: `GET /api/v1/config/draft/diff` (visual diff against active snapshot), `POST /api/v1/config/apply` (pre-flight validation, version bump, atomic swap), and `POST /api/v1/config/rollback/{version}`.
+
+**Acceptance criteria:**
+- [ ] Implement CRUD endpoints for Sites, Exceptions, ACLs, and Policies with strict Huma request/response validation.
+- [ ] Implement dry-run evaluation endpoint for testing exception and ACL rules against synthetic request inputs.
+- [ ] Implement diff endpoint comparing staged database draft changes against active snapshot.
+- [ ] Implement apply endpoint executing pre-flight validation, committing snapshot revision, and triggering swap.
+- [ ] Implement rollback endpoint reverting active configuration to any specified past revision.
+- [ ] Unit tests verify all endpoints, validation errors, diff generation, and rollback execution.
+
+**Verification:**
+- [ ] Tests pass: `go test -v -race ./pkg/control/api/...`
+- [ ] Build succeeds: `go build ./pkg/control/api/...`
+
+**Dependencies:** Task 60
+**Files likely touched:**
+- `pkg/control/api/sites.go`
+- `pkg/control/api/exceptions.go`
+- `pkg/control/api/acls.go`
+- `pkg/control/api/snapshots.go`
+- `pkg/control/api/sites_test.go`
+- `pkg/control/api/snapshots_test.go`
+**Estimated scope:** Medium (6 files)
+
+---
+
+### Task 62: Model Context Protocol (MCP) Server Endpoint & CLI Stdio Adapter
+**Description:** Implement `pkg/control/mcp/server.go`, `pkg/control/mcp/tools.go`, `pkg/control/mcp/mcp_test.go`, and `cmd/raiwall/mcp.go`. Expose Raiwall Control Plane as a Model Context Protocol (MCP) server for AI assistants and LLMs. Define tools: `get_waf_status`, `list_threat_events`, `create_exception_rule`, `apply_configuration`, and `rollback_configuration`. Expose MCP over SSE at `/.raiwall/api/mcp` and provide `raiwall mcp` stdio CLI command for desktop agent integration.
+
+**Acceptance criteria:**
+- [ ] Implement MCP protocol handler supporting JSON-RPC 2.0 tool discovery and execution.
+- [ ] Expose core WAF tools with JSON schemas describing arguments and return payloads.
+- [ ] Serve MCP SSE transport at `/.raiwall/api/mcp` authenticated via API keys.
+- [ ] Implement `raiwall mcp` stdio command connecting AI agents (Claude Desktop, Cursor, Antigravity) to local or remote Raiwall instances.
+- [ ] Unit tests verify tool schema generation, tool execution, and error handling.
+
+**Verification:**
+- [ ] Tests pass: `go test -v -race ./pkg/control/mcp/...`
+- [ ] Build succeeds: `go build ./cmd/raiwall`
+
+**Dependencies:** Task 61
+**Files likely touched:**
+- `pkg/control/mcp/server.go`
+- `pkg/control/mcp/tools.go`
+- `pkg/control/mcp/mcp_test.go`
+- `cmd/raiwall/mcp.go`
+**Estimated scope:** Medium (4 files)
+
+---
+
+## Checkpoint: REST Management API & AI/MCP Tooling
+- [ ] Huma v2 OpenAPI 3.1 REST API is live with interactive Scalar documentation.
+- [ ] 2-tier RBAC protects mutating configuration endpoints.
+- [ ] Staged deployment diff and 1-click rollback endpoints operational.
+- [ ] Model Context Protocol (MCP) server enables AI-assisted operations via SSE and stdio CLI.
+
+---
+
+## Phase 3: Redis Pub/Sub Cluster Synchronization
+
+### Task 63: Redis Pub/Sub Cluster Sync Engine & Reconnect Re-synchronization
+**Description:** Implement `pkg/control/cluster/pubsub.go`, `pkg/control/cluster/sync.go`, and `pkg/control/cluster/sync_test.go`. Build the distributed cluster configuration synchronizer. When a configuration is deployed on the master node, broadcast a version notification (`{"version": 42, "hash": "...", "timestamp": ...}`) over Redis Pub/Sub channel `raiwall:cluster:events` and cache the latest compiled snapshot in Redis key `raiwall:config:snapshot:latest`. Implement worker node subscriber that fetches, validates, and swaps snapshots upon notification, with automated poll re-synchronization on reconnect.
+
+**Acceptance criteria:**
+- [ ] Implement master publisher sending version notifications on config deployment.
+- [ ] Store active compiled snapshot in Redis cache key with configurable TTL.
+- [ ] Implement worker subscriber receiving notifications, fetching latest snapshot, and executing atomic swap.
+- [ ] Automatic re-synchronization worker polling latest version upon Redis reconnect or startup.
+- [ ] Graceful fallback: continue serving cached active snapshot if Redis connection is temporarily interrupted.
+- [ ] Unit and mock tests verify publish/subscribe flow, reconnect re-sync, and hash validation.
+
+**Verification:**
+- [ ] Tests pass: `go test -v -race ./pkg/control/cluster/...`
+- [ ] Build succeeds: `go build ./pkg/control/cluster/...`
+
+**Dependencies:** Task 59, Task 61
+**Files likely touched:**
+- `pkg/control/cluster/pubsub.go`
+- `pkg/control/cluster/sync.go`
+- `pkg/control/cluster/sync_test.go`
 **Estimated scope:** Medium (3 files)
 
 ---
 
-### Task 47: Zero-Latency Non-Blocking In-Memory Ring Buffer & Flush Worker
-**Description:** Implement `pkg/telemetry/ring_buffer.go` and `pkg/telemetry/ring_buffer_test.go`. Build a fixed-capacity, non-blocking ring buffer that receives `ForensicEvent` pointers with zero request thread blocking. If the ring buffer fills to capacity under heavy traffic, excess events are safely dropped while atomically incrementing a dropped-event counter. Implement a background worker that flushes batches to a configured sink every $500\text{ ms}$ or whenever a batch size threshold is reached.
-
-**Acceptance criteria:**
-- [x] Implement non-blocking ring buffer with configurable capacity (default 10,000 events).
-- [x] Ingestion overhead $<1\text{ µs}$ per event on the hot path without mutex lock contention.
-- [x] Safe saturation policy: drop excess events and atomically record dropped count for Prometheus metrics.
-- [x] Background worker triggers batch flush at $500\text{ ms}$ intervals or when batch limit (e.g., 500 events) is met.
-- [x] Clean shutdown support draining remaining events before exit.
-- [x] Concurrent tests verify thread safety and race freedom under high QPS (`go test -race`).
-
-**Verification:**
-- [x] Tests pass: `go test -v -race ./pkg/telemetry/...`
-- [x] Benchmarks pass: `go test -bench=BenchmarkRingBuffer ./pkg/telemetry/...`
-- [x] Build succeeds: `go build ./pkg/telemetry/...`
-
-**Dependencies:** Task 46
-**Files likely touched:**
-- `pkg/telemetry/ring_buffer.go`
-- `pkg/telemetry/ring_buffer_test.go`
-**Estimated scope:** Small (2 files)
+## Checkpoint: Cluster Synchronization
+- [ ] Master nodes broadcast config versions via Redis Pub/Sub.
+- [ ] Worker nodes fetch and apply snapshots atomically with zero downtime.
+- [ ] Network partition and reconnect healing verified with tests.
 
 ---
 
-## Checkpoint: Telemetry Ingestion & Sanitization
-- [x] Canonical `ForensicEvent` records all threat attributes without sensitive PII or raw secrets.
-- [x] Ring buffer delivers sub-microsecond non-blocking ingestion and timed batch flushing.
-- [x] Unit and benchmark tests pass cleanly with `-race`.
+## Phase 4: Envoy External Processor (`ext_proc/v3`) gRPC Sidecar Engine
 
----
-
-## Phase 2: Dual-Tier Forensic Storage (SQLite WAL & ClickHouse)
-
-### Task 48: Pluggable ForensicStore Interface & Pure-Go SQLite WAL Implementation
-**Description:** Implement `pkg/telemetry/storage.go`, `pkg/telemetry/sqlite.go`, and `pkg/telemetry/sqlite_test.go`. Define the `ForensicStore` interface (`SaveBatch`, `Query`, `QueryAggregates`, `Prune`, `Close`). Implement the default embedded SQLite driver using pure-Go `modernc.org/sqlite` in WAL mode (`PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;`). Create an optimized schema with composite indexes on `timestamp`, `client_ip`, `action`, and `rule_id`. Implement an automatic background retention pruning worker that deletes records exceeding max age (e.g., 30 days) or database size limit.
+### Task 64: Envoy `ext_proc/v3` gRPC Server Protocol Implementation
+**Description:** Implement `pkg/sidecar/server.go`, `pkg/sidecar/processor.go`, and test suite in `pkg/sidecar/server_test.go`. Implement the Envoy External Processor gRPC protocol (`envoy.service.ext_proc.v3.ExternalProcessorServer`). Process bidirectional gRPC request streams: on `RequestHeaders`, extract client IP, JA4 fingerprint, evaluate ACLs, Bot defense, and Route classification, returning 403 `ImmediateResponse` or header modifications. On `RequestBody`, buffer payloads up to 1 MB and evaluate the semantic WAF engine (normalization, `libinjection`, AST verification), returning 403 or continuation.
 
 **Acceptance criteria:**
-- [x] Define abstract `ForensicStore` interface and `QueryParams` struct.
-- [x] Implement `SQLiteStore` with automatic table creation and composite indexing.
-- [x] Implement batch insert (`SaveBatch`) utilizing single-transaction prepared statements.
-- [x] Implement `Query` supporting filtering by time range, client IP, action, rule ID, and country code with pagination (`limit`, `offset`).
-- [x] Implement `QueryAggregates` returning time-bucketed counts (QPS, block ratio, top attacking countries, top rules).
-- [x] Automatic retention pruning cleans records older than configured TTL (e.g. 30 days).
-- [x] Unit tests verify batch insertion, filtered queries, pagination, aggregations, and pruning.
+- [ ] Implement `ExternalProcessorServer` interface handling bidirectional gRPC streaming.
+- [ ] Handle `RequestHeaders` message: evaluate client IP, JA4, rate limiting, and ACL rules.
+- [ ] Handle `RequestBody` message: buffer chunked body up to 1 MB and evaluate semantic WAF engine.
+- [ ] Return `ImmediateResponse` with configured status code (403/429) and custom block HTML on threat match.
+- [ ] Stream payloads > 1 MB directly without buffering to prevent sidecar OOM.
+- [ ] Record sanitized telemetry to the async ring buffer for all inspected sidecar requests.
+- [ ] Unit tests verify gRPC stream processing, threat blocking, header mutation, and body buffering limits.
 
 **Verification:**
-- [x] Tests pass: `go test -v -race ./pkg/telemetry/...`
-- [x] Build succeeds: `go build ./pkg/telemetry/...`
+- [ ] Tests pass: `go test -v -race ./pkg/sidecar/...`
+- [ ] Build succeeds: `go build ./pkg/sidecar/...`
 
-**Dependencies:** Task 46, Task 47
+**Dependencies:** Task 59
 **Files likely touched:**
-- `pkg/telemetry/storage.go`
-- `pkg/telemetry/sqlite.go`
-- `pkg/telemetry/sqlite_test.go`
+- `pkg/sidecar/server.go`
+- `pkg/sidecar/processor.go`
+- `pkg/sidecar/server_test.go`
 **Estimated scope:** Medium (3 files)
 
 ---
 
-### Task 49: Enterprise Scaled ClickHouse Batch Storage Driver
-**Description:** Implement `pkg/telemetry/clickhouse.go` and `pkg/telemetry/clickhouse_test.go`. Provide the enterprise columnar store driver implementing `ForensicStore` using `github.com/ClickHouse/clickhouse-go/v2`. Implement automated schema migration creating the `MergeTree` forensic events table partitioned by day with ZSTD compression. Implement high-throughput batch insertion, query pagination, and aggregation queries optimized for ClickHouse columnar layout.
+### Task 65: Sidecar CLI Command & Caddyfile Directive Integration
+**Description:** Implement `cmd/raiwall/sidecar.go`, wire the sidecar listener into `pkg/proxy/caddyfile.go`, and update `pkg/proxy/middleware.go`. Implement the standalone CLI command `raiwall sidecar --listen :50051 --config ...` for dedicated Kubernetes sidecar deployments. Add `sidecar { listen :50051; max_body_size 1MB; }` directive to Caddyfile to enable concurrent dual-mode reverse proxy and ext_proc gRPC processing within a single binary process.
 
 **Acceptance criteria:**
-- [x] Implement `ClickHouseStore` adhering to the `ForensicStore` interface.
-- [x] Define ClickHouse table schema (`raiwall_forensic_events`) using `MergeTree()` ordered by `(timestamp, action, rule_id, client_ip)`.
-- [x] Implement high-performance batch insertion utilizing native protocol batching.
-- [x] Implement filtered queries and time-series aggregation queries.
-- [x] Handle connection loss gracefully with reconnect retries and error logging.
-- [x] Unit and mock tests verify query building, batch serialization, and schema definition.
+- [ ] Implement `raiwall sidecar` CLI subcommand with flags for listen address, SQLite path, and Redis address.
+- [ ] Parse `sidecar` directive in Caddyfile: `sidecar { listen <addr>; max_body_size <size>; }`.
+- [ ] Start background gRPC server in Caddy provision phase when sidecar directive is specified.
+- [ ] Ensure clean shutdown of gRPC server on Caddy reload or termination.
+- [ ] Unit tests verify Caddyfile parsing and CLI flag validation.
 
 **Verification:**
-- [x] Tests pass: `go test -v -race ./pkg/telemetry/...`
-- [x] Build succeeds: `go build ./pkg/telemetry/...`
+- [ ] Tests pass: `go test -v -race ./pkg/proxy/...`
+- [ ] Build succeeds: `go build ./cmd/raiwall`
 
-**Dependencies:** Task 48
+**Dependencies:** Task 64
 **Files likely touched:**
-- `pkg/telemetry/clickhouse.go`
-- `pkg/telemetry/clickhouse_test.go`
+- `cmd/raiwall/sidecar.go`
+- `pkg/proxy/caddyfile.go`
+- `pkg/proxy/middleware.go`
+- `pkg/proxy/caddyfile_test.go`
+**Estimated scope:** Medium (4 files)
+
+---
+
+## Checkpoint: Envoy ext_proc Sidecar Mode
+- [ ] Envoy ext_proc gRPC server inspects headers and bodies with sub-millisecond triage.
+- [ ] Standalone CLI command runs in Kubernetes sidecar containers.
+- [ ] Caddyfile directive runs reverse proxy and ext_proc sidecar concurrently in single binary.
+
+---
+
+## Phase 5: Embedded Vue 3 Enterprise Admin Dashboard (Full Control Plane UI)
+
+### Task 66: Dashboard Shell, Navigation, Pinia API Client & Auth Views
+**Description:** Implement `web/src/layouts/DashboardLayout.vue`, `web/src/router/index.ts`, `web/src/stores/auth.ts`, `web/src/stores/config.ts`, `web/src/api/client.ts`, and `web/src/views/LoginView.vue`. Build the enterprise dashboard navigation with sidebar, header, active snapshot status pill, and breadcrumbs. Implement typed API client against Huma OpenAPI 3.1 endpoints with token refresh and error toast notifications. Implement login screen with session cookie authentication and route guards.
+
+**Acceptance criteria:**
+- [ ] Configure Vue Router 4 with nested layout, authentication guards, and dark-mode styling.
+- [ ] Build responsive sidebar navigation linking to all core management views.
+- [ ] Implement Pinia auth store handling login, logout, and active user roles (`admin` vs `viewer`).
+- [ ] Implement typed API client wrapping `fetch` with error interceptors and OpenAPI types.
+- [ ] Build `LoginView.vue` with form validation and error handling.
+- [ ] Vitest unit tests verify router navigation guards and auth store actions.
+
+**Verification:**
+- [ ] Frontend tests pass: `cd web && pnpm test`
+- [ ] Frontend build succeeds: `cd web && pnpm build`
+
+**Dependencies:** Task 60, Task 61
+**Files likely touched:**
+- `web/src/layouts/DashboardLayout.vue`
+- `web/src/router/index.ts`
+- `web/src/stores/auth.ts`
+- `web/src/stores/config.ts`
+- `web/src/api/client.ts`
+- `web/src/views/LoginView.vue`
+**Estimated scope:** Medium (6 files)
+
+---
+
+### Task 67: Sites, Upstream Pools & Run Mode Management View
+**Description:** Implement `web/src/views/SitesView.vue`, `web/src/components/SiteDialog.vue`, `web/src/components/UpstreamPoolEditor.vue`, and component tests. Build full CRUD interface for protected sites: configure hostnames, load-balanced upstreams (dial address, weight, health check probe path, interval, fail timeout), operational modes (`defense`, `audit`, `offline`), and custom block/offline response templates. Changes are saved to staged draft configuration with visual indicators.
+
+**Acceptance criteria:**
+- [ ] Display sites table with status badges (mode, healthy upstreams count, requests volume).
+- [ ] Build dialog for creating and editing sites with hostname chips and mode selector.
+- [ ] Build upstream pool editor supporting dynamic adding/removing of backend targets with weight sliders.
+- [ ] Save changes to draft configuration store and show "Unsaved changes" staging banner.
+- [ ] Vitest tests verify site creation, upstream editing, and draft store mutations.
+
+**Verification:**
+- [ ] Frontend tests pass: `cd web && pnpm test`
+- [ ] Frontend build succeeds: `cd web && pnpm build`
+
+**Dependencies:** Task 66
+**Files likely touched:**
+- `web/src/views/SitesView.vue`
+- `web/src/components/SiteDialog.vue`
+- `web/src/components/UpstreamPoolEditor.vue`
+- `web/src/views/__tests__/SitesView.spec.ts`
+**Estimated scope:** Medium (4 files)
+
+---
+
+### Task 68: False-Positive Exceptions & ACL Rules Builder with Test Simulator
+**Description:** Implement `web/src/views/ExceptionsView.vue`, `web/src/views/ACLsView.vue`, `web/src/components/ACLExprEditor.vue`, and `web/src/components/ExceptionTestModal.vue`. Build exception rules management view linked with the Live Inspector 1-click modal. Build ACL rules view featuring visual condition builder alongside raw `expr-lang/expr` editor with real-time syntax validation. Implement test simulator modal allowing operators to test synthetic HTTP requests against draft rules before deploying.
+
+**Acceptance criteria:**
+- [ ] Exceptions table displays rules with Host, Path, Method, Location, ParamName, and Reason.
+- [ ] 1-Click exception from Live Inspector pre-populates exception modal and saves to draft.
+- [ ] ACL editor validates `expr` syntax in real time against backend API dry-run endpoint.
+- [ ] Test simulator evaluates sample HTTP requests against draft rules and displays match verdicts.
+- [ ] Vitest tests verify rule formulation, syntax validation, and simulator modal.
+
+**Verification:**
+- [ ] Frontend tests pass: `cd web && pnpm test`
+- [ ] Frontend build succeeds: `cd web && pnpm build`
+
+**Dependencies:** Task 66
+**Files likely touched:**
+- `web/src/views/ExceptionsView.vue`
+- `web/src/views/ACLsView.vue`
+- `web/src/components/ACLExprEditor.vue`
+- `web/src/components/ExceptionTestModal.vue`
+**Estimated scope:** Medium (4 files)
+
+---
+
+### Task 69: Rate Limiting, Bot Defense & Cluster Settings Views
+**Description:** Implement `web/src/views/PoliciesView.vue`, `web/src/views/SettingsView.vue`, `web/src/components/ApiKeysManager.vue`, and tests. Build policy views configuring Tier 1 velocity rate limits, Tier 2 attack frequency auto-ban, Tier 3 scanner trap thresholds, and Virtual Waiting Room parameters. Configure bot defense modes, PoW difficulty, and honeypot traps. In settings view, display cluster nodes, Redis sync health, and provide API key generation modal with copyable token.
+
+**Acceptance criteria:**
+- [ ] Form controls for Tier 1-3 rate limits and Virtual Waiting Room concurrency parameters.
+- [ ] Bot defense toggles for PoW challenge mode, difficulty slider, and trap URL paths.
+- [ ] Settings view displays Redis cluster synchronization status and connected nodes.
+- [ ] API keys manager allows generating new Bearer keys with name, role (`admin`/`viewer`), and expiration.
+- [ ] Vitest tests verify form state persistence and API key creation.
+
+**Verification:**
+- [ ] Frontend tests pass: `cd web && pnpm test`
+- [ ] Frontend build succeeds: `cd web && pnpm build`
+
+**Dependencies:** Task 66
+**Files likely touched:**
+- `web/src/views/PoliciesView.vue`
+- `web/src/views/SettingsView.vue`
+- `web/src/components/ApiKeysManager.vue`
+- `web/src/views/__tests__/PoliciesView.spec.ts`
+**Estimated scope:** Medium (4 files)
+
+---
+
+### Task 70: Staged Deployment Diff Review, Snapshot History & 1-Click Rollback View
+**Description:** Implement `web/src/views/DeploymentsView.vue`, `web/src/components/ConfigDiffViewer.vue`, and component tests. Build deployment management view showing color-coded visual diff between staged draft modifications and the active live snapshot. Provide "Deploy Changes" button with commit message prompt and real-time pre-flight validation status. Render historical snapshot timeline showing version numbers, authors, timestamps, and 1-Click Rollback button.
+
+**Acceptance criteria:**
+- [ ] Render side-by-side or unified color-coded diff of staged changes vs active snapshot.
+- [ ] "Deploy Changes" triggers pre-flight validation and atomic swap with loading feedback and error modal.
+- [ ] Snapshot timeline lists all historical versions with description and author.
+- [ ] 1-Click Rollback button triggers confirmation modal and instantly reverts to selected version.
+- [ ] Vitest tests verify diff rendering, deployment submission, and rollback invocation.
+
+**Verification:**
+- [ ] Frontend tests pass: `cd web && pnpm test`
+- [ ] Frontend build succeeds: `cd web && pnpm build`
+
+**Dependencies:** Task 66, Task 67, Task 68, Task 69
+**Files likely touched:**
+- `web/src/views/DeploymentsView.vue`
+- `web/src/components/ConfigDiffViewer.vue`
+- `web/src/views/__tests__/DeploymentsView.spec.ts`
+**Estimated scope:** Medium (3 files)
+
+---
+
+## Checkpoint: Embedded Vue 3 Enterprise Admin Dashboard
+- [ ] Complete Vue 3 Control Plane UI operational with full dark-mode styling.
+- [ ] Sites, Exceptions, ACLs, Policies, and Deployments views connected to Huma v2 API.
+- [ ] Visual diff reviewer and 1-Click Rollback verified in browser tests.
+- [ ] Production frontend bundles cleanly into `web/dist` and embeds into single Go binary.
+
+---
+
+## Phase 6: End-to-End Integration, CLI Tooling & Production Verification
+
+### Task 71: Admin CLI Commands (`raiwall admin init`, `create-user`, `apply`, `rollback`)
+**Description:** Implement `cmd/raiwall/admin.go` and test suite in `cmd/raiwall/admin_test.go`. Provide CLI commands for headless server operations: initialize database (`raiwall admin init`), create admin/viewer users (`raiwall admin create-user`), validate staged configuration (`raiwall admin validate`), apply configuration (`raiwall admin apply`), and disaster recovery rollback (`raiwall admin rollback --version <N>`).
+
+**Acceptance criteria:**
+- [ ] Implement `raiwall admin init` bootstrapping SQLite schema and initial admin credentials.
+- [ ] Implement `raiwall admin create-user --username <name> --role <admin|viewer>` generating secure password hash.
+- [ ] Implement `raiwall admin validate` executing pre-flight compiler checks on draft database.
+- [ ] Implement `raiwall admin apply` committing draft to snapshot and swapping pointer.
+- [ ] Implement `raiwall admin rollback --version <N>` reverting active configuration from terminal.
+- [ ] Unit and CLI tests verify argument parsing, exit codes, and database updates.
+
+**Verification:**
+- [ ] Tests pass: `go test -v -race ./cmd/raiwall/...`
+- [ ] Build succeeds: `go build ./cmd/raiwall`
+
+**Dependencies:** Task 58, Task 59, Task 70
+**Files likely touched:**
+- `cmd/raiwall/admin.go`
+- `cmd/raiwall/admin_test.go`
 **Estimated scope:** Medium (2 files)
 
 ---
 
-## Checkpoint: Pluggable Forensic Storage
-- [x] `ForensicStore` provides consistent CRUD and analytics abstraction.
-- [x] SQLite WAL driver persists events with low write contention and automatic retention pruning.
-- [x] ClickHouse driver is ready for high-throughput enterprise batch archiving.
-- [x] All storage unit tests pass with `-race`.
-
----
-
-## Phase 3: Real-Time Alerting (`containrrr/shoutrrr`) & Prometheus Metrics
-
-### Task 50: Multi-Channel Alert Engine with Sliding-Window Debouncing & Rate Limiting
-**Description:** Implement `pkg/telemetry/alert.go`, `pkg/telemetry/debouncer.go`, and test suite in `pkg/telemetry/alert_test.go`. Integrate `github.com/containrrr/shoutrrr` for push notifications across Slack, Discord, Telegram, Webhook, and Email. Implement a sliding-window debouncer and rate limiter to prevent alert fatigue: only send alerts for designated severities (`block`, `ban`, critical AST breakouts) with a per-rule and per-IP cooldown window (e.g. max 1 alert per target per 5 minutes) and group burst incidents into summary notifications.
+### Task 72: Domain 7 End-to-End Integration Tests, Sidecar Verification & Benchmark Validation
+**Description:** Implement `tests/e2e/control_plane_test.go`, `tests/e2e/sidecar_test.go`, and update `Makefile`. Conduct end-to-end integration tests verifying complete control plane lifecycle: CRUD mutation -> draft diff -> staged apply with pre-flight check -> atomic swap -> Redis pub/sub delta broadcast -> Envoy ext_proc gRPC threat block -> 1-click rollback. Verify single binary builds cleanly under 50 MB with embedded admin UI and all tests pass with `-race`.
 
 **Acceptance criteria:**
-- [x] Integrate `containrrr/shoutrrr` to dispatch rich formatted incident alerts.
-- [x] Implement `AlertDebouncer` with sliding-window cache tracking recent alert keys (`IP + RuleID`).
-- [x] Enforce configurable cooldown period (e.g., 5 minutes) suppressing duplicate alerts for the same source.
-- [x] Format alerts with concise incident context (Timestamp, Client IP, GeoIP, Path, Threat Type, Action taken).
-- [x] Unit tests verify alert filtering, debouncing window suppression, and multi-channel URL parsing.
+- [ ] End-to-end integration tests verify:
+  - Huma REST API creates site and exception rule in SQLite.
+  - Staged draft diff detects modified configuration.
+  - Apply endpoint validates and swaps snapshot atomically with zero dropped requests.
+  - Redis Pub/Sub broadcasts version update to worker nodes.
+  - Envoy ext_proc gRPC server blocks SQLi/XSS requests and passes benign traffic.
+  - 1-Click rollback restores previous snapshot version and updates data plane immediately.
+  - Embedded admin UI serves at `/.raiwall/` and Scalar docs at `/.raiwall/api/docs`.
+- [ ] Zero race conditions under high concurrent requests (`go test -race`).
+- [ ] Single binary builds cleanly under 50 MB (`make build`).
 
 **Verification:**
-- [x] Tests pass: `go test -v -race ./pkg/telemetry/...`
-- [x] Build succeeds: `go build ./pkg/telemetry/...`
+- [ ] Integration tests pass: `go test -v -race -tags=integration ./tests/e2e/...`
+- [ ] Build succeeds: `make build`
+- [ ] Manual check: verify binary size is $<50\text{ MB}$ via `ls -lh bin/raiwall`.
 
-**Dependencies:** Task 46
+**Dependencies:** Tasks 58–71
 **Files likely touched:**
-- `pkg/telemetry/alert.go`
-- `pkg/telemetry/debouncer.go`
-- `pkg/telemetry/alert_test.go`
-**Estimated scope:** Medium (3 files)
-
----
-
-### Task 51: Prometheus Metrics Exporter & Data Plane Instrumentation
-**Description:** Implement `pkg/telemetry/metrics.go` and `pkg/telemetry/metrics_test.go`. Expose standard Prometheus metrics using `github.com/prometheus/client_golang` (`raiwall_requests_total`, `raiwall_blocked_total{reason, rule_id}`, `raiwall_request_duration_seconds`, `raiwall_telemetry_dropped_total`, `raiwall_active_connections`, `raiwall_banned_ips_total`). Provide an HTTP handler mounting `/metrics` on the internal management route.
-
-**Acceptance criteria:**
-- [x] Register Prometheus counters, gauges, and histograms for all core WAF and gateway metrics.
-- [x] Instrument telemetry ring buffer to record dropped event count on saturation.
-- [x] Expose standard `/metrics` endpoint compatible with Prometheus and VictoriaMetrics scrapers.
-- [x] Unit tests verify metric incrementing, label correctness, and HTTP handler response.
-
-**Verification:**
-- [x] Tests pass: `go test -v -race ./pkg/telemetry/...`
-- [x] Build succeeds: `go build ./pkg/telemetry/...`
-
-**Dependencies:** Task 46, Task 47
-**Files likely touched:**
-- `pkg/telemetry/metrics.go`
-- `pkg/telemetry/metrics_test.go`
-**Estimated scope:** Small (2 files)
-
----
-
-## Checkpoint: Real-Time Alerts & Metrics
-- [x] Multi-channel notifications dispatch to Slack, Telegram, Discord, and Webhooks without alert fatigue.
-- [x] Prometheus metrics accurately track traffic volume, blocked threats, and ring buffer health.
-- [x] Tests pass cleanly with `-race`.
-
----
-
-## Phase 4: Real-Time SSE Event Streamer, REST Query APIs & Caddy Middleware Integration
-
-### Task 52: Server-Sent Events (SSE) Live Streamer & Forensic Query REST Endpoints
-**Description:** Implement `pkg/telemetry/streamer.go`, `pkg/telemetry/api.go`, and `pkg/telemetry/api_test.go`. Build an HTTP Server-Sent Events (SSE) broadcaster streaming live `ForensicEvent` instances to connected browser clients (`/.raiwall/api/events/stream`) with real-time query parameter filtering (`?action=block&country=CN&min_severity=high`). Implement REST endpoints for paginated log queries (`GET /.raiwall/api/events`) and time-series / geographical aggregations (`GET /.raiwall/api/events/stats`).
-
-**Acceptance criteria:**
-- [x] Implement SSE broadcaster supporting multiple concurrent browser subscribers with non-blocking fan-out.
-- [x] Support query filters on SSE stream (`action`, `rule_id`, `country`, `min_severity`).
-- [x] Implement REST endpoint `GET /.raiwall/api/events` returning paginated, filtered JSON logs.
-- [x] Implement REST endpoint `GET /.raiwall/api/events/stats` returning aggregated metrics for ECharts and 3D globe.
-- [x] Unit tests verify SSE connection management, broadcast delivery, subscriber disconnects, and REST API serialization.
-
-**Verification:**
-- [x] Tests pass: `go test -v -race ./pkg/telemetry/...`
-- [x] Build succeeds: `go build ./pkg/telemetry/...`
-
-**Dependencies:** Task 46, Task 47, Task 48
-**Files likely touched:**
-- `pkg/telemetry/streamer.go`
-- `pkg/telemetry/api.go`
-- `pkg/telemetry/api_test.go`
-**Estimated scope:** Medium (3 files)
-
----
-
-### Task 53: Caddyfile Directive Parsing (`telemetry`) & Pipeline Telemetry Interception
-**Description:** Wire the telemetry pipeline into `pkg/proxy/middleware.go`, parse nested `telemetry { ... }` blocks in `pkg/proxy/caddyfile.go`, and update `examples/Caddyfile`. Ingest every inspected request into the ring buffer with verdict, matched rule ID, latency, and client metadata. Route internal paths (`/.raiwall/api/...` and `/.raiwall/metrics`) directly to telemetry handlers without upstream proxying.
-
-**Acceptance criteria:**
-- [x] Capture request verdict, rule ID, latency, headers, and metadata in `ServeHTTP` and push to ring buffer.
-- [x] Parse nested `telemetry` Caddyfile block:
-  - `telemetry { storage sqlite <path>; flush_interval 500ms; buffer_size 10000; retention 30d; alert <channel> <url> { events ...; cooldown 5m; } }`
-- [x] Intercept `/.raiwall/api/*` and `/.raiwall/metrics` routes internally.
-- [x] Update `examples/Caddyfile` showcasing complete Domain 6 telemetry and alerting configuration.
-- [x] Unit tests verify Caddyfile unmarshaling and telemetry pipeline lifecycle.
-
-**Verification:**
-- [x] Tests pass: `go test -v -race ./pkg/proxy/...`
-- [x] Build succeeds: `go build ./cmd/raiwall`
-
-**Dependencies:** Tasks 46–52
-**Files likely touched:**
-- `pkg/proxy/middleware.go`
-- `pkg/proxy/caddyfile.go`
-- `pkg/proxy/caddyfile_test.go`
-- `examples/Caddyfile`
-**Estimated scope:** Medium (4 files)
-
----
-
-## Checkpoint: Data Plane Telemetry Interception
-- [x] Every request processed by Caddy WAF pushes sanitized telemetry to the async ring buffer.
-- [x] SSE streamer broadcasts live events to connected browser sessions.
-- [x] Caddyfile cleanly configures storage, flushing intervals, and alerting channels.
-
----
-
-## Phase 5: Frontend Migration (`web/`), Live Inspector & Dashboard Visualizations
-
-### Task 54: Frontend Project Migration (`web-draft` -> `web`) & Embedding Infrastructure
-**Description:** Migrate the Vue 3 + TypeScript codebase from `web-draft/` to `web/` per project conventions. Install required visualization libraries (`echarts`, `vue-echarts`, `globe.gl`, `three`). Configure production Vite build to output to `web/dist/`. Implement `pkg/proxy/ui.go` to embed `web/dist` assets into the Go binary via `go:embed` and serve them under `/.raiwall/` with SPA HTML5 history fallback.
-
-**Acceptance criteria:**
-- [x] Copy and configure Vue 3 project cleanly into `web/` directory.
-- [x] Add `echarts`, `globe.gl`, and `three` to `web/package.json` dependencies.
-- [x] Configure `vite.config.ts` with base path `/.raiwall/` and output directory `dist`.
-- [x] Embed `web/dist` in Go binary using `go:embed` in `pkg/proxy/ui.go`.
-- [x] Serve SPA assets under `/.raiwall/` with fallback to `index.html` for unknown subpaths.
-- [x] Frontend builds cleanly with `pnpm build` or `npm run build`.
-
-**Verification:**
-- [x] Frontend build succeeds: `cd web && pnpm build`
-- [x] Go build succeeds with embedded assets: `go build ./cmd/raiwall`
-
-**Dependencies:** Task 53
-**Files likely touched:**
-- `web/package.json`
-- `web/vite.config.ts`
-- `pkg/proxy/ui.go`
-- `pkg/proxy/middleware.go`
-**Estimated scope:** Medium (4 files)
-
----
-
-### Task 55: Real-Time Live Inspector Table & SSE Composable
-**Description:** Implement `web/src/composables/useEventStream.ts`, `web/src/components/LiveInspector.vue`, and unit test in `web/src/components/__tests__/LiveInspector.spec.ts`. Build the live streaming event inspector connecting to `/.raiwall/api/events/stream` via SSE with pause/resume controls, instant search/filtering (by client IP, rule ID, HTTP method, country), expandable JSON modal showing sanitized request details, and a 1-click "Create Exception" action that pre-fills exception dialogs.
-
-**Acceptance criteria:**
-- [x] Implement `useEventStream` composable handling SSE connection lifecycle, auto-reconnect, and message buffering.
-- [x] Build `LiveInspector.vue` table displaying live events with colored action badges (`allow`, `block`, `challenge`, `ban`).
-- [x] Support pause/resume streaming, clear table, and local search filtering.
-- [x] Modal displays full sanitized forensic context (headers, payload snippet, JA4, rule ID).
-- [x] 1-Click "Create Exception" button emits event with Host, Path, Method, Location, and ParamName.
-- [x] Vitest unit tests verify SSE state handling and table rendering.
-
-**Verification:**
-- [x] Frontend tests pass: `cd web && pnpm test`
-- [x] Manual check: open `/.raiwall/` and verify live events stream smoothly.
-
-**Dependencies:** Task 54, Task 52
-**Files likely touched:**
-- `web/src/composables/useEventStream.ts`
-- `web/src/components/LiveInspector.vue`
-- `web/src/components/__tests__/LiveInspector.spec.ts`
-**Estimated scope:** Medium (3 files)
-
----
-
-### Task 56: Apache ECharts Analytics Dashboards & 3D Threat Globe (`globe.gl`)
-**Description:** Implement `web/src/components/ThreatAnalytics.vue`, `web/src/components/AttackGlobe.vue`, and tests. Build reactive ECharts dashboards displaying real-time QPS, blocked threat distribution by category (SQLi, XSS, CmdI, Rate Limit, ACL), and top attacking IP/ASNs. Integrate `globe.gl` (Three.js) to render a 3D WebGL globe visualizing geolocated threat origin coordinates and animated attack arcs converging on protected gateway locations.
-
-**Acceptance criteria:**
-- [x] Build `ThreatAnalytics.vue` using Apache ECharts with dark-mode theme matching Raiwall UI.
-- [x] Render real-time time-series charts (QPS and Blocked requests) updating from live SSE and REST stats.
-- [x] Build `AttackGlobe.vue` using `globe.gl` rendering interactive 3D globe with country borders and attack arcs.
-- [x] Throttle WebGL animation when container or browser tab is hidden to conserve GPU/CPU.
-- [x] Vitest component tests verify component mounting and props reactivity.
-
-**Verification:**
-- [x] Frontend tests pass: `cd web && pnpm test`
-- [x] Frontend build succeeds: `cd web && pnpm build`
-
-**Dependencies:** Task 54, Task 55
-**Files likely touched:**
-- `web/src/components/ThreatAnalytics.vue`
-- `web/src/components/AttackGlobe.vue`
-- `web/src/components/__tests__/ThreatAnalytics.spec.ts`
-**Estimated scope:** Medium (3 files)
-
----
-
-## Checkpoint: Frontend Visualizations & Single Binary
-- [x] Vue admin dashboard (`web/`) builds cleanly and embeds in the single Go binary.
-- [x] Live Inspector table renders real-time forensic events via SSE.
-- [x] ECharts analytics and 3D Attack Globe render geolocated threats smoothly.
-
----
-
-## Phase 6: End-to-End Integration, Micro-benchmarks & Verification
-
-### Task 57: Domain 6 End-to-End Telemetry Integration Tests & High-QPS Micro-benchmarks
-**Description:** Implement `tests/e2e/telemetry_test.go` and `pkg/telemetry/benchmark_test.go`. Validate complete observability pipeline: HTTP request through Caddy WAF -> non-blocking ring buffer push -> PII sanitization -> SQLite WAL insertion -> SSE stream broadcast -> Shoutrrr alert debouncing. Benchmark ring buffer ingestion and query performance under concurrent load with `-race`, verifying binary size remains $<50\text{ MB}$.
-
-**Acceptance criteria:**
-- [x] End-to-end integration tests verify:
-  - WAF blocked attack produces sanitized record in SQLite WAL database.
-  - Sensitive headers (`Authorization`, `Cookie`) and passwords are scrubbed in database.
-  - SSE client receives live broadcast event within $500\text{ ms}$.
-  - Shoutrrr debouncer suppresses duplicate alerts within cooldown window.
-  - Prometheus `/metrics` increments blocked counters and tracks latency.
-  - Embedded UI is accessible at `/.raiwall/` returning status 200 and index HTML.
-- [x] Benchmarks verify sub-microsecond ring buffer ingestion ($<1\text{ µs}$) with zero data plane blocking.
-- [x] Zero race conditions under high concurrent requests (`go test -race`).
-- [x] Single binary builds cleanly under 50 MB (`make build`).
-
-**Verification:**
-- [x] Integration tests pass: `go test -v -race -tags=integration ./tests/e2e/...`
-- [x] Benchmarks pass: `go test -bench=. ./pkg/telemetry/...`
-- [x] Build succeeds: `make build`
-
-**Dependencies:** Tasks 46–56
-**Files likely touched:**
-- `tests/e2e/telemetry_test.go`
-- `pkg/telemetry/benchmark_test.go`
+- `tests/e2e/control_plane_test.go`
+- `tests/e2e/sidecar_test.go`
 - `Makefile`
 **Estimated scope:** Medium (3 files)
 
 ---
 
-## Final Checkpoint: Milestone 6 (Domain 6) Completion
-- [x] All 12 tasks (Tasks 46–57) implemented and verified.
-- [x] Zero-latency async ring buffer and automated PII/PCI-DSS sanitizer active.
-- [x] Dual-tier storage (SQLite WAL default + ClickHouse driver) fully operational.
-- [x] Shoutrrr multi-channel alerting with sliding-window debouncing active.
-- [x] SSE Live Streamer and Prometheus metrics integrated into Caddy pipeline.
-- [x] Vue 3 dashboard migrated to `web/` with Live Inspector, ECharts, and 3D Attack Globe.
-- [x] Production web assets embedded via `go:embed` into single binary under 50MB.
-- [x] All unit, integration, and benchmark tests pass with `-race`.
+## Final Checkpoint: Milestone 7 (Domain 7) Completion
+- [ ] All 15 tasks (Tasks 58–72) implemented and verified.
+- [ ] SQLite schema & `sqlc` persistence layer active with WAL mode pragmas.
+- [ ] In-memory atomic snapshot compiler, pre-flight validator, and rollback engine operational.
+- [ ] Huma v2 OpenAPI 3.1 REST API, RBAC, and Model Context Protocol (MCP) bridge active.
+- [ ] Redis Pub/Sub cluster synchronization verified with reconnect recovery.
+- [ ] Envoy `ext_proc/v3` gRPC sidecar server operational in CLI and Caddyfile modes.
+- [ ] Full Vue 3 enterprise admin dashboard built, tested, and embedded in single binary under 50 MB.
+- [ ] All unit, integration, and e2e tests pass cleanly with `-race`.

@@ -1,58 +1,59 @@
-# Implementation Plan: Raiwall Domain 6 (Observability, Forensics & Real-Time Alerting)
+# Implementation Plan: Raiwall Domain 7 (Control Plane, Customization & Ecosystem Integration)
 
 ## Overview
-Implement **Domain 6: Observability, Forensics & Real-Time Alerting** for **Raiwall**: an enterprise-grade telemetry, forensics, real-time alerting, and live visual analytics engine.
+Implement **Domain 7: Control Plane, Customization & Ecosystem Integration** for **Raiwall**: an enterprise-grade control plane, dynamic configuration engine, Envoy `ext_proc/v3` sidecar inspection server, and embedded Vue 3 management suite.
 
-Domain 6 delivers six integrated pillars:
-1. **Zero-Latency In-Memory Async Ring Buffer (`pkg/telemetry/ring_buffer.go`):** Non-blocking push pipeline capturing forensic events (client IP, JA4 fingerprint, GeoIP, rule ID, action verdict, latency, headers, truncated payload) with zero allocations on hot paths. Features non-blocking buffer saturation handling with dropped-event telemetry and a background worker flushing batches every $500\text{ ms}$.
-2. **Automated PII & PCI-DSS 4.0 Sanitizer (`pkg/telemetry/sanitizer.go`):** In-stream scrubber sanitizing sensitive headers (`Authorization`, `Cookie`, `X-Auth-*`), blacklisted parameter keys (`password`, `token`, `secret`, `cvv`, `card`, `api_key`), regex pattern scanners for credit card numbers (PCI-DSS) and bearer tokens, plus hard context truncation to $1\text{–}2\text{ KB}$ per event before persistence.
-3. **Pluggable Dual-Tier Forensic Storage (`pkg/telemetry/storage.go`):** 
-   - **Embedded / Homelab Mode (Default):** Zero-dependency pure-Go SQLite in WAL mode (`modernc.org/sqlite`) with optimized multi-column indexes and automated background retention pruning (age and size limits).
-   - **Enterprise Scaled Mode:** Native columnar batch ingestion into ClickHouse (`github.com/ClickHouse/clickhouse-go/v2`) for multi-million record analytics with $10\times$ compression.
-4. **Multi-Channel ChatOps Alerts (`pkg/telemetry/alert.go`):** Notification dispatcher using `containrrr/shoutrrr` supporting Slack, Discord, Telegram, Email, and generic webhooks with sliding-window debouncing and per-target/per-rule cooldowns (preventing alert fatigue during scans).
-5. **Real-Time Live Inspector & Prometheus Metrics (`pkg/telemetry/streamer.go`, `metrics.go`):** High-throughput Server-Sent Events (SSE) broadcaster (`/.raiwall/api/events/stream`) with real-time query filtering, REST log search/aggregation APIs (`/.raiwall/api/events`), and standard Prometheus `/metrics` exporter.
-6. **Embedded Vue 3 Admin Dashboard & Visualizer (`web/`):** Full migration of `web-draft` into `web/`, embedding `dist/` into the single Go binary via `go:embed` served at `/.raiwall/` with SPA history fallback, featuring real-time SSE Live Event Inspector, Apache ECharts QPS/threat analytics, and 3D Attack Globe (`globe.gl`) rendering geolocated threat origin arcs.
+Domain 7 delivers six integrated pillars:
+1. **SQLite Schema & `sqlc` Persistence Layer (`pkg/control/db/`):** Pure-Go WAL-mode SQLite database with type-safe `sqlc` models storing protected Sites/Apps, parameter-level Exceptions, compiled ACL rules, Rate Limiting & Bot policies, versioned `ConfigSnapshot` revisions, and admin users/API keys.
+2. **Atomic Config Compiler & 1-Click Rollback Engine (`pkg/config/`):** Lock-free atomic configuration swap via `atomic.Pointer[ConfigSnapshot]` with comprehensive pre-flight validation (compiling `expr-lang/expr` expressions, checking BART CIDRs, validating regexes, testing upstream dials). Rejects faulty configurations before live application and supports instantaneous 1-click rollback to any historical snapshot.
+3. **Type-Safe Huma v2 OpenAPI 3.1 REST API & MCP Protocol Bridge (`pkg/control/api/`, `pkg/control/mcp/`):** Modern OpenAPI 3.1 management API using `danielgtaylor/huma/v2` with interactive Scalar documentation (`/.raiwall/api/docs`), Bearer API keys + session cookies with 2-tier RBAC (`admin`, `viewer`), and Model Context Protocol (MCP) server support (`/.raiwall/api/mcp` and `raiwall mcp` CLI) for AI-assisted operations.
+4. **Redis Pub/Sub Cluster Synchronization (`pkg/control/cluster/`):** Distributed cluster configuration broadcast across Raiwall instances. Publishes lightweight version notifications to Redis Pub/Sub, caches the latest compiled snapshot in Redis, and automatically reconciles worker node configurations upon startup or network reconnection.
+5. **Envoy `ext_proc/v3` gRPC Sidecar Inspection Engine (`pkg/sidecar/`):** High-performance gRPC server implementing Envoy's External Processor protocol (`envoy.service.ext_proc.v3.ExternalProcessorServer`). Operates in dual mode: as a standalone Kubernetes sidecar daemon (`raiwall sidecar --listen :50051`) or concurrently alongside Caddy reverse proxy via Caddyfile directive (`sidecar { listen :50051 }`).
+6. **Embedded Vue 3 Enterprise Admin Dashboard (`web/`):** Full single-page management application built with Vue 3, TypeScript, Vite, `shadcn-vue`, Pinia, and Vue Router. Features comprehensive views for Sites/Upstreams, Exceptions (with test simulator), ACL Builder (with live `expr` validator), Rate & Bot Defense, Staged Deployment Diff Review, Snapshot Timeline with 1-Click Rollback, and API Key administration.
 
 ---
 
 ## Architecture Decisions
 
-- **Non-Blocking Lock-Free Telemetry Ring Buffer:** Request handling in the Caddy data plane must never block on logging I/O. The ring buffer accepts events synchronously in $<1\text{ µs}$ and delegates disk/network flushing to a decoupled background worker. If buffer saturation occurs under extreme load, excess events are dropped with atomic counter increments exported to Prometheus (`raiwall_telemetry_dropped_total`).
-- **Multi-Layer PII / PCI-DSS Sanitization:** Applied in-stream prior to disk persistence or network streaming. Sensitive headers and parameters are masked (`[REDACTED]`), credit card regexes scrub PANs, and raw payload context is clamped to $2\text{ KB}$ to prevent data leakage and memory bloat.
-- **Pluggable `ForensicStore` Interface:** Abstract interface (`SaveBatch`, `Query`, `QueryAggregates`, `Prune`, `Close`) decoupling business logic from underlying storage engines. SQLite WAL is the zero-config embedded default; ClickHouse batch driver is activated when a ClickHouse DSN is provided.
-- **Severity-Gated Alert Debouncing:** ChatOps alerts are gated by event severity (e.g. `block`, `ban`, high-risk AST threats) and governed by a sliding-window debouncer with per-rule/per-IP cooldowns (e.g., maximum 1 notification per target per 5 minutes) to avoid chat flooding.
-- **SSE Live Streamer with REST Historical Query APIs:** Server-Sent Events (SSE) provide an HTTP/2-friendly, unidirectional live stream to connected browser clients with automatic browser reconnection. Complementary REST endpoints provide paginated historical search and aggregated stats for ECharts and the 3D Globe.
-- **Frontend Migration and Single Binary Embedding:** Migrate the draft Vue 3 codebase from `web-draft/` to `web/`, add ECharts, Globe.gl, and Live Inspector components, build production assets to `web/dist/`, and embed them into the Go binary via `go:embed` mounted at `/.raiwall/`.
-- **Dedicated Internal Route Namespace:** Management routes (`/.raiwall/` UI, `/.raiwall/api/...` APIs, `/.raiwall/metrics`) are handled internally without interfering with upstream reverse proxying.
+- **Hybrid Control Plane Listener:** By default, the Control Plane (Huma REST API, Scalar docs, and Admin UI) is served securely under the internal namespace `/.raiwall/` on the main proxy listener (protected by RBAC and IP ACLs). An optional dedicated management port (e.g. `admin_listen 127.0.0.1:9090`) is supported in Caddyfile and CLI for air-gapped enterprise architectures.
+- **2-Tier RBAC with Dual Auth:** Huma REST API and Admin UI support Bearer tokens (`X-Raiwall-Key` or `Authorization: Bearer <key>`) for automation/CI/CD and secure HMAC-signed session cookies for the UI. Roles are partitioned into `admin` (full read/write, deploy, rollback) and `viewer` (read-only telemetry and rule inspection).
+- **Staged Revisions with Pre-Flight Validation:** Configuration mutations are staged in SQLite draft state, enabling review of visual diffs before applying. On "Deploy Changes", the compiler compiles `expr` bytecode, validates BART CIDR blocks, and verifies upstream endpoints. Upon passing, a new immutable `ConfigSnapshot` is committed to history and swapped atomically via `atomic.Pointer`.
+- **Lightweight Cluster Notification with Snapshot Fetch:** In clustered deployments, the master node publishes a version notification (`{"version": 42, "hash": "..."}`) to Redis Pub/Sub channel `raiwall:cluster:events` and stores the compiled snapshot in Redis key `raiwall:config:snapshot:latest`. Worker nodes fetch, validate, and swap the snapshot, with automatic poll reconciliation on reconnect.
+- **Dual-Mode Envoy `ext_proc/v3` Engine:** The sidecar inspection engine shares the exact same threat detection pipeline, normalizers, `libinjection`, AST checkers, and ACL rules as the Caddy reverse proxy. It can run as a standalone sidecar microservice (`raiwall sidecar`) or as an embedded listener in Caddyfile.
+- **OpenAPI 3.1 & MCP Protocol Bridge:** OpenAPI 3.1 JSON and interactive Scalar docs are exposed at `/.raiwall/api/docs`. An MCP server endpoint at `/.raiwall/api/mcp` and CLI `raiwall mcp` allow AI assistants to inspect telemetry, draft exceptions, and trigger rollbacks safely.
 
 ---
 
 ## Dependency Graph
 
 ```
-Forensic Event Model & PII Sanitizer (pkg/telemetry/event.go, sanitizer.go)
+SQLite Database Schema & sqlc Models (pkg/control/db/)
    │
-   ├── Ring Buffer & Flush Worker (pkg/telemetry/ring_buffer.go)
+   ├── Config Compiler, Pre-Flight Validator & Rollback (pkg/config/compiler.go, rollback.go)
    │       │
-   │       ├── ForensicStore Interface & SQLite WAL Driver (pkg/telemetry/sqlite.go)
+   │       ├── Huma v2 OpenAPI 3.1 REST API & RBAC (pkg/control/api/server.go, auth.go)
    │       │       │
-   │       │       └── ClickHouse Batch Driver (pkg/telemetry/clickhouse.go)
+   │       │       ├── Configuration CRUD & Deployment Diff Endpoints (pkg/control/api/sites.go, snapshots.go)
+   │       │       │       │
+   │       │       │       └── Model Context Protocol (MCP) Bridge (pkg/control/mcp/server.go)
+   │       │       │
+   │       │       └── Redis Pub/Sub Cluster Sync (pkg/control/cluster/pubsub.go)
    │       │
-   │       ├── Shoutrrr Alert Dispatcher & Debouncer (pkg/telemetry/alert.go, debouncer.go)
-   │       │
-   │       └── Prometheus Metrics Exporter (pkg/telemetry/metrics.go)
-   │
-   ├── SSE Streamer & REST Analytics APIs (pkg/telemetry/streamer.go, api.go)
-   │       │
-   │       └── Caddy Middleware Pipeline & 'telemetry' Directive (pkg/proxy/middleware.go, caddyfile.go)
+   │       └── Envoy ext_proc/v3 gRPC Sidecar Engine (pkg/sidecar/server.go, processor.go)
    │               │
-   │               └── Frontend Migration & UI Embedding (web/ -> pkg/proxy/ui.go)
-   │                       │
-   │                       ├── Live Inspector & 1-Click Exception (web/src/components/LiveInspector.vue)
-   │                       │
-   │                       ├── ECharts Analytics & 3D Attack Globe (web/src/components/ThreatAnalytics.vue, AttackGlobe.vue)
-   │                       │
-   │                       └── End-to-End Integration & High-QPS Benchmarks
+   │               └── Caddy Middleware & CLI Integration (cmd/raiwall/sidecar.go, pkg/proxy/caddyfile.go)
+   │
+   └── Vue 3 Enterprise Admin Dashboard (web/src/)
+           │
+           ├── Typed API Client & Pinia Stores (web/src/api/client.ts, stores/config.ts)
+           │
+           ├── Sites & Upstream Pools Manager (web/src/views/SitesView.vue)
+           │
+           ├── Exceptions & ACL Rules Builder (web/src/views/ExceptionsView.vue, ACLsView.vue)
+           │
+           ├── Rate Limiting & Bot Defense Policies (web/src/views/PoliciesView.vue)
+           │
+           └── Staged Diff Review, Snapshot History & 1-Click Rollback (web/src/views/DeploymentsView.vue)
 ```
 
 ---
@@ -61,35 +62,38 @@ Forensic Event Model & PII Sanitizer (pkg/telemetry/event.go, sanitizer.go)
 
 Tasks are tracked in `tasks/todo.md`:
 
-### Phase 1: Telemetry Data Model, PII/PCI-DSS Sanitizer & High-Throughput Ring Buffer
-- [ ] **Task 46: Forensic Event Model & Multi-Layer PII/PCI-DSS Sanitizer** (Size: M)
-- [ ] **Task 47: Zero-Latency Non-Blocking In-Memory Ring Buffer & Flush Worker** (Size: S)
-- [ ] *Checkpoint: Core forensic event model, PII sanitization, and lock-free ring buffer pass all unit and race tests.*
+### Phase 1: Database Schema, `sqlc` Code Generation & In-Memory Config Rollback Engine
+- [ ] **Task 58: SQLite Schema & `sqlc` Repository for Control Plane Persistence** (Size: M)
+- [ ] **Task 59: Atomic Config Snapshot Compiler, Pre-Flight Validator & Rollback Engine** (Size: M)
+- [ ] *Checkpoint: Control Plane DB schema and Atomic Config Compiler/Rollback pass all unit and concurrency tests.*
 
-### Phase 2: Dual-Tier Forensic Storage (SQLite WAL & ClickHouse)
-- [ ] **Task 48: Pluggable ForensicStore Interface & Pure-Go SQLite WAL Implementation** (Size: M)
-- [ ] **Task 49: Enterprise Scaled ClickHouse Batch Storage Driver** (Size: M)
-- [ ] *Checkpoint: Both SQLite WAL and ClickHouse forensic stores ingest batches, query filtered logs, and prune expired records.*
+### Phase 2: Huma v2 OpenAPI 3.1 REST API, Auth & MCP Tool Bridge
+- [ ] **Task 60: Huma v2 REST Framework Setup, Admin Auth & 2-Tier RBAC** (Size: M)
+- [ ] **Task 61: Configuration CRUD Endpoints & Staged Deployment API** (Size: M)
+- [ ] **Task 62: Model Context Protocol (MCP) Server Endpoint & CLI Stdio Adapter** (Size: M)
+- [ ] *Checkpoint: Huma REST API, Scalar docs, RBAC, CRUD endpoints, and MCP tools fully tested and verified.*
 
-### Phase 3: Real-Time Alerting (`containrrr/shoutrrr`) & Prometheus Metrics
-- [ ] **Task 50: Multi-Channel Alert Engine with Sliding-Window Debouncing & Rate Limiting** (Size: M)
-- [ ] **Task 51: Prometheus Metrics Exporter & Data Plane Instrumentation** (Size: S)
-- [ ] *Checkpoint: Alerts dispatch safely without chat spam, and Prometheus exposes accurate WAF telemetry.*
+### Phase 3: Redis Pub/Sub Cluster Synchronization
+- [ ] **Task 63: Redis Pub/Sub Cluster Sync Engine & Reconnect Re-synchronization** (Size: M)
+- [ ] *Checkpoint: Cluster synchronization verified across mock and live Redis instances.*
 
-### Phase 4: Real-Time SSE Event Streamer, REST Query APIs & Caddy Middleware Integration
-- [ ] **Task 52: Server-Sent Events (SSE) Live Streamer & Forensic Query REST Endpoints** (Size: M)
-- [ ] **Task 53: Caddyfile Directive Parsing (`telemetry`) & Pipeline Telemetry Interception** (Size: M)
-- [ ] *Checkpoint: End-to-end telemetry flows from Caddy middleware through ring buffer to SQLite storage, SSE streamer, and alert dispatcher.*
+### Phase 4: Envoy External Processor (`ext_proc/v3`) gRPC Sidecar Engine
+- [ ] **Task 64: Envoy `ext_proc/v3` gRPC Server Protocol Implementation** (Size: M)
+- [ ] **Task 65: Sidecar CLI Command & Caddyfile Directive Integration** (Size: M)
+- [ ] *Checkpoint: Envoy ext_proc gRPC passes integration tests blocking SQLi/XSS and enforcing ACLs.*
 
-### Phase 5: Frontend Migration (`web/`), Live Inspector & Dashboard Visualizations
-- [ ] **Task 54: Frontend Project Migration (`web-draft` -> `web`) & Embedding Infrastructure** (Size: M)
-- [ ] **Task 55: Real-Time Live Inspector Table & SSE Composable** (Size: M)
-- [ ] **Task 56: Apache ECharts Analytics Dashboards & 3D Threat Globe (`globe.gl`)** (Size: M)
-- [ ] *Checkpoint: Complete web dashboard builds cleanly, runs live SSE streaming, and renders ECharts & 3D Globe.*
+### Phase 5: Embedded Vue 3 Enterprise Admin Dashboard (Full Control Plane UI)
+- [ ] **Task 66: Dashboard Shell, Navigation, Pinia API Client & Auth Views** (Size: M)
+- [ ] **Task 67: Sites, Upstream Pools & Run Mode Management View** (Size: M)
+- [ ] **Task 68: False-Positive Exceptions & ACL Rules Builder with Test Simulator** (Size: M)
+- [ ] **Task 69: Rate Limiting, Bot Defense & Cluster Settings Views** (Size: M)
+- [ ] **Task 70: Staged Deployment Diff Review, Snapshot History & 1-Click Rollback View** (Size: M)
+- [ ] *Checkpoint: Complete Vue 3 Admin Dashboard builds cleanly, tests pass with Vitest, and embedded assets render flawlessly.*
 
-### Phase 6: End-to-End Integration, Micro-benchmarks & Verification
-- [ ] **Task 57: Domain 6 End-to-End Telemetry Integration Tests & High-QPS Micro-benchmarks** (Size: M)
-- [ ] *Checkpoint: Milestone 6 complete, all tests passing with `-race`, UI and data plane fully integrated in single binary.*
+### Phase 6: End-to-End Integration, CLI Tooling & Production Verification
+- [ ] **Task 71: Admin CLI Commands (`raiwall admin init`, `create-user`, `apply`, `rollback`)** (Size: M)
+- [ ] **Task 72: Domain 7 End-to-End Integration Tests, Sidecar Verification & Benchmark Validation** (Size: M)
+- [ ] *Checkpoint: Milestone 7 complete, all unit/integration/e2e tests pass with `-race`, binary size verified under 50 MB.*
 
 ---
 
@@ -97,15 +101,8 @@ Tasks are tracked in `tasks/todo.md`:
 
 | Risk | Impact | Mitigation Strategy |
 | :--- | :---: | :--- |
-| **Ring Buffer Saturated Under DDoS** | **High** | Non-blocking ring buffer drops excess events when saturated and atomically records dropped count in Prometheus (`raiwall_telemetry_dropped_total`), ensuring proxy request latency is never impacted. |
-| **PII / PCI-DSS Sensitive Data Leakage** | **Critical** | Multi-layer sanitization applied before event reaches ring buffer or storage. Header redaction, key name matching, credit card regex patterns, and context truncation to $2\text{ KB}$. |
-| **SQLite WAL Lock Contention on Heavy Writes** | **Medium** | Batch transactions ($500\text{ ms}$ buffer flushes) to minimize commit frequency. WAL mode permits concurrent reads while batch writes are in progress. Pragmas tuned (`busy_timeout=5000`, `synchronous=NORMAL`). |
-| **ChatOps Alert Flooding (Alert Fatigue)** | **High** | Sliding-window debouncer with per-rule and per-IP cooldown periods (e.g. 5 minutes). Burst alerts grouped into summary notifications. |
-| **High Memory / CPU on 3D Attack Globe** | **Medium** | Throttle WebGL rendering when tab is hidden. Cap maximum concurrent arc particles rendered on the globe. |
-| **Single Binary Size Inflation (>50 MB)** | **Medium** | Tree-shake frontend assets during Vite build, compress static assets with gzip/brotli, and verify binary size in CI. |
-
----
-
-## Open Questions & Future Enhancements
-- **1-Click Create Exception from UI:** The Live Inspector provides a "Create Exception" button that opens a pre-filled dialog with the exact Host, Path, Method, Location, and ParamName from the forensic record to suppress false positives instantly.
-- **Dynamic Cluster Threat Sync (Domain 7):** Real-time forensic telemetry aggregation across multi-node clusters using Redis Pub/Sub or Kafka.
+| **Faulty Config Reload Breaks Production Traffic** | **Critical** | Pre-flight compilation step validates all `expr` rules, CIDRs, and upstream addresses before atomic swap. If validation fails, deployment is rejected. 1-click rollback instantly restores the last known healthy snapshot. |
+| **Cluster Worker Node Network Partition** | **High** | Worker nodes poll the latest snapshot version from Redis cache upon reconnect or startup, healing missed Pub/Sub events automatically. |
+| **gRPC Ext_Proc Stream Buffer Exhaustion** | **High** | Envoy request body buffering is capped at 1 MB. Streaming payloads exceeding 1 MB are passed through with header inspection only. |
+| **Single Binary Size Inflation (>50 MB)** | **Medium** | Tree-shake unused icons and frontend components in Vite; compile pure-Go SQLite without CGO overhead; verify binary size in CI. |
+| **Admin Route Unauthorized Access** | **Critical** | Default `/.raiwall/api` and UI endpoints enforce Bearer key or session cookie authentication with CSRF protection and optional BART CIDR IP whitelisting. |
