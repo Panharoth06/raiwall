@@ -5,6 +5,8 @@ import (
 	"net"
 	"strings"
 	"time"
+
+	"github.com/Panharoth06/raiwall/pkg/acl"
 )
 
 // RunMode represents the WAF and gateway operational protection mode.
@@ -73,12 +75,43 @@ type AppConfig struct {
 	CustomHeaders       map[string]string `json:"custom_headers,omitempty"`
 }
 
+// RatePolicySnapshot holds compiled rate limiting configuration for a host or global (*).
+type RatePolicySnapshot struct {
+	ID                  string        `json:"id"`
+	Name                string        `json:"name"`
+	Host                string        `json:"host"`
+	Tier1Rate           int64         `json:"tier1_rate"`
+	Tier1Burst          int64         `json:"tier1_burst"`
+	Tier1Period         time.Duration `json:"tier1_period"`
+	Tier2Threshold      int64         `json:"tier2_threshold"`
+	Tier2Period         time.Duration `json:"tier2_period"`
+	Tier2BanDuration    time.Duration `json:"tier2_ban_duration"`
+	Tier3Threshold      int64         `json:"tier3_threshold"`
+	Tier3BanDuration    time.Duration `json:"tier3_ban_duration"`
+	WaitingRoomEnabled  bool          `json:"waiting_room_enabled"`
+	WaitingRoomCapacity int64         `json:"waiting_room_capacity"`
+}
+
+// BotConfigSnapshot holds bot mitigation configuration for a host or global (*).
+type BotConfigSnapshot struct {
+	ID            string   `json:"id"`
+	Host          string   `json:"host"`
+	PowEnabled    bool     `json:"pow_enabled"`
+	PowDifficulty int      `json:"pow_difficulty"`
+	TrapURLs      []string `json:"trap_urls"`
+}
+
 // ConfigSnapshot is an immutable snapshot of gateway configurations.
 type ConfigSnapshot struct {
-	Version     uint64                `json:"version"`
-	CreatedAt   time.Time             `json:"created_at"`
-	DefaultMode RunMode               `json:"default_mode"`
-	Apps        map[string]*AppConfig `json:"apps"`
+	Version      uint64                `json:"version"`
+	CreatedAt    time.Time             `json:"created_at"`
+	DefaultMode  RunMode               `json:"default_mode"`
+	Apps         map[string]*AppConfig `json:"apps"`
+	Exceptions   []*acl.ExceptionRule  `json:"exceptions,omitempty"`
+	ACLRules     []*acl.ACLRule        `json:"acl_rules,omitempty"`
+	RatePolicies []*RatePolicySnapshot `json:"rate_policies,omitempty"`
+	BotConfigs   []*BotConfigSnapshot  `json:"bot_configs,omitempty"`
+
 	// hostToAppID maps normalized hostnames to App IDs for fast O(1) matching.
 	hostToAppID map[string]string
 }
@@ -117,6 +150,29 @@ func NewConfigSnapshot(version uint64, defaultMode RunMode, apps []*AppConfig) *
 	return snap
 }
 
+// RebuildIndex rebuilds internal lookup indexes (e.g. host to app ID).
+func (s *ConfigSnapshot) RebuildIndex() {
+	if s == nil {
+		return
+	}
+	s.hostToAppID = make(map[string]string)
+	for _, app := range s.Apps {
+		if app == nil {
+			continue
+		}
+		for _, host := range app.Hostnames {
+			cleanHost := strings.ToLower(strings.TrimSpace(host))
+			if h, _, err := net.SplitHostPort(cleanHost); err == nil {
+				cleanHost = h
+			}
+			cleanHost = strings.Trim(cleanHost, "[]")
+			if cleanHost != "" {
+				s.hostToAppID[cleanHost] = app.ID
+			}
+		}
+	}
+}
+
 // GetAppForHost resolves an AppConfig by incoming Host header (stripping port if present).
 func (s *ConfigSnapshot) GetAppForHost(host string) (*AppConfig, bool) {
 	if s == nil {
@@ -127,6 +183,10 @@ func (s *ConfigSnapshot) GetAppForHost(host string) (*AppConfig, bool) {
 		cleanHost = h
 	}
 	cleanHost = strings.Trim(cleanHost, "[]")
+
+	if s.hostToAppID == nil {
+		s.RebuildIndex()
+	}
 
 	if appID, ok := s.hostToAppID[cleanHost]; ok {
 		if app, found := s.Apps[appID]; found {
