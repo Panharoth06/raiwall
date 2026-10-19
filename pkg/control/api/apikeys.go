@@ -16,6 +16,7 @@ import (
 type APIKeyDTO struct {
 	ID         string     `json:"id"`
 	Name       string     `json:"name"`
+	Prefix     string     `json:"prefix"`
 	Role       string     `json:"role"`
 	ExpiresAt  *time.Time `json:"expires_at,omitempty"`
 	IsActive   bool       `json:"is_active"`
@@ -24,14 +25,16 @@ type APIKeyDTO struct {
 }
 
 type CreateAPIKeyRequest struct {
-	Name      string     `json:"name"`
-	Role      string     `json:"role"`
-	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+	Name          string     `json:"name"`
+	Role          string     `json:"role"`
+	ExpiresAt     *time.Time `json:"expires_at,omitempty"`
+	ExpiresInDays int        `json:"expires_in_days,omitempty"`
 }
 
 type CreateAPIKeyResponse struct {
 	APIKeyDTO
 	RawKey string `json:"raw_key"`
+	Token  string `json:"token"`
 }
 
 func (s *Server) handleListAPIKeys(w http.ResponseWriter, r *http.Request) {
@@ -50,9 +53,14 @@ func (s *Server) handleListAPIKeys(w http.ResponseWriter, r *http.Request) {
 		if k.LastUsedAt.Valid {
 			last = &k.LastUsedAt.Time
 		}
+		pref := k.ID
+		if len(pref) > 8 {
+			pref = pref[:8]
+		}
 		result = append(result, APIKeyDTO{
 			ID:         k.ID,
 			Name:       k.Name,
+			Prefix:     pref,
 			Role:       k.Role,
 			ExpiresAt:  exp,
 			IsActive:   k.IsActive == 1,
@@ -87,8 +95,14 @@ func (s *Server) handleCreateAPIKey(w http.ResponseWriter, r *http.Request) {
 	now := time.Now().UTC()
 
 	var expNull sql.NullTime
-	if req.ExpiresAt != nil {
+	var expTime *time.Time
+	if req.ExpiresInDays > 0 {
+		exp := now.AddDate(0, 0, req.ExpiresInDays)
+		expNull = sql.NullTime{Time: exp, Valid: true}
+		expTime = &exp
+	} else if req.ExpiresAt != nil {
 		expNull = sql.NullTime{Time: *req.ExpiresAt, Valid: true}
+		expTime = req.ExpiresAt
 	}
 
 	err := s.store.CreateAPIKey(r.Context(), db.CreateAPIKeyParams{
@@ -105,16 +119,23 @@ func (s *Server) handleCreateAPIKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	pref := id
+	if len(pref) > 8 {
+		pref = pref[:8]
+	}
+
 	respondJSON(w, http.StatusCreated, CreateAPIKeyResponse{
 		APIKeyDTO: APIKeyDTO{
 			ID:        id,
 			Name:      req.Name,
+			Prefix:    pref,
 			Role:      req.Role,
-			ExpiresAt: req.ExpiresAt,
+			ExpiresAt: expTime,
 			IsActive:  true,
 			CreatedAt: now,
 		},
 		RawKey: rawKey,
+		Token:  rawKey,
 	})
 }
 

@@ -19,8 +19,11 @@ import (
 	"github.com/Panharoth06/raiwall/pkg/auth"
 	"github.com/Panharoth06/raiwall/pkg/bot"
 	"github.com/Panharoth06/raiwall/pkg/config"
+	"github.com/Panharoth06/raiwall/pkg/control/api"
+	"github.com/Panharoth06/raiwall/pkg/control/db"
 	"github.com/Panharoth06/raiwall/pkg/engine"
 	"github.com/Panharoth06/raiwall/pkg/rate"
+	"github.com/Panharoth06/raiwall/pkg/sidecar"
 	"github.com/Panharoth06/raiwall/pkg/telemetry"
 	"go.uber.org/zap"
 )
@@ -103,6 +106,18 @@ type TelemetrySettings struct {
 	AlertChannels []AlertChannelSettings `json:"alert_channels,omitempty"`
 }
 
+// ControlSettings configures the Control Plane database and management API.
+type ControlSettings struct {
+	DBPath     string `json:"db_path,omitempty"`
+	HMACSecret string `json:"hmac_secret,omitempty"`
+}
+
+// SidecarSettings configures the Envoy ext_proc gRPC sidecar service.
+type SidecarSettings struct {
+	Listen      string `json:"listen,omitempty"`
+	MaxBodySize int64  `json:"max_body_size,omitempty"`
+}
+
 // Middleware is the Caddy HTTP handler implementing Raiwall WAF and Gateway interception.
 type Middleware struct {
 	Mode                string         `json:"mode,omitempty"`
@@ -132,6 +147,10 @@ type Middleware struct {
 
 	// Domain 6: Observability, Forensics & Real-Time Alerting
 	TelemetryConfig *TelemetrySettings `json:"telemetry,omitempty"`
+
+	// Domain 7: Control Plane & Sidecar Mode
+	ControlConfig *ControlSettings `json:"control,omitempty"`
+	SidecarConfig *SidecarSettings `json:"sidecar,omitempty"`
 
 	engine     engine.WAFEngine
 	logger     *zap.Logger
@@ -165,6 +184,9 @@ type Middleware struct {
 	metrics        *telemetry.Metrics
 	telemetryAPI   *telemetry.TelemetryAPI
 	uiHandler      *UIHandler
+	controlStore   *db.Store
+	controlAPI     *api.Server
+	sidecarServer  *sidecar.ExtProcServer
 }
 
 var (
@@ -536,6 +558,52 @@ func (m *Middleware) Provision(ctx caddy.Context) error {
 		m.telemetryAPI = telemetry.NewTelemetryAPI(m.telemetryStore, m.streamer, m.metrics)
 	}
 
+	if m.controlAPI == nil {
+		dbDSN := "file:raiwall_control.db?_pragma=busy_timeout(5000)"
+		var secret []byte
+		if m.ControlConfig != nil {
+			if m.ControlConfig.DBPath != "" {
+				dbDSN = m.ControlConfig.DBPath
+			}
+			if m.ControlConfig.HMACSecret != "" {
+				secret = []byte(m.ControlConfig.HMACSecret)
+			}
+		}
+		store, err := db.InitDB(dbDSN)
+		if err != nil {
+			if m.logger != nil {
+				m.logger.Warn("failed to initialize control plane database", zap.Error(err))
+			}
+		} else {
+			m.controlStore = store
+			m.controlAPI = api.NewServer(store, secret)
+		}
+	}
+
+	if m.SidecarConfig != nil {
+		listenAddr := m.SidecarConfig.Listen
+		if listenAddr == "" {
+			listenAddr = sidecar.DefaultListenAddr
+		}
+		maxBodySize := int(m.SidecarConfig.MaxBodySize)
+		if maxBodySize <= 0 {
+			maxBodySize = sidecar.DefaultMaxBodySize
+		}
+
+		m.sidecarServer = sidecar.NewServer(sidecar.ExtProcConfig{
+			ListenAddr:  listenAddr,
+			MaxBodySize: maxBodySize,
+			WAFEngine:   m.engine,
+			RingBuffer:  m.ringBuffer,
+		})
+		if err := m.sidecarServer.Start(); err != nil {
+			return fmt.Errorf("failed to start Envoy ext_proc sidecar server on %s: %w", listenAddr, err)
+		}
+		if m.logger != nil {
+			m.logger.Info("started Envoy ext_proc sidecar server", zap.String("listen", listenAddr))
+		}
+	}
+
 	return nil
 }
 
@@ -762,6 +830,16 @@ func (m *Middleware) TelemetryAPI() *telemetry.TelemetryAPI {
 	return m.telemetryAPI
 }
 
+// SetControlAPI overrides the Control Plane API server (used for testing or custom setups).
+func (m *Middleware) SetControlAPI(srv *api.Server) {
+	m.controlAPI = srv
+}
+
+// ControlAPI returns the active Control Plane API server.
+func (m *Middleware) ControlAPI() *api.Server {
+	return m.controlAPI
+}
+
 // Validate ensures the middleware configuration is valid.
 func (m *Middleware) Validate() error {
 	if !m.runMode.IsValid() {
@@ -852,11 +930,20 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 	r = r.WithContext(ctx)
 
 	// Internal WAF routes: Metrics & Telemetry API
-	if r.URL.Path == "/.raiwall/metrics" || strings.HasPrefix(r.URL.Path, "/.raiwall/api/") {
+	if r.URL.Path == "/.raiwall/metrics" ||
+		r.URL.Path == "/.raiwall/api/events" ||
+		r.URL.Path == "/.raiwall/api/events/stats" ||
+		r.URL.Path == "/.raiwall/api/events/stream" {
 		if m.telemetryAPI != nil {
 			m.telemetryAPI.ServeHTTP(w, r)
 			return nil
 		}
+	}
+
+	// Internal WAF routes: Control Plane REST API, OpenAPI Docs & MCP
+	if m.controlAPI != nil && strings.HasPrefix(r.URL.Path, "/.raiwall/api/") {
+		m.controlAPI.ServeHTTP(w, r)
+		return nil
 	}
 
 	// Internal WAF routes: Embedded UI Admin Dashboard
@@ -1662,6 +1749,12 @@ func (m *Middleware) Cleanup() error {
 	}
 	if m.rateStorage != nil {
 		_ = m.rateStorage.Close()
+	}
+	if m.sidecarServer != nil {
+		m.sidecarServer.Stop()
+	}
+	if m.controlStore != nil {
+		_ = m.controlStore.Close()
 	}
 	return nil
 }

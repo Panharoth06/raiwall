@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Panharoth06/raiwall/pkg/acl"
 	"github.com/Panharoth06/raiwall/pkg/config"
 	"github.com/Panharoth06/raiwall/pkg/engine"
 	"github.com/Panharoth06/raiwall/pkg/telemetry"
@@ -166,10 +167,57 @@ func (s *ExtProcServer) Process(stream ExternalProcessor_ProcessServer) error {
 				}
 
 				// Evaluate ACL rules
+				headerMap := make(map[string]string)
+				for k, v := range headers {
+					if len(v) > 0 {
+						headerMap[strings.ToLower(k)] = v[0]
+					}
+				}
+				env := &acl.EvalEnv{
+					IP:        clientIP.String(),
+					ClientIP:  clientIP.String(),
+					Method:    method,
+					Path:      path,
+					Host:      host,
+					Headers:   headerMap,
+					Cookies:   make(map[string]string),
+					Query:     make(map[string]string),
+					UserAgent: headers.Get("user-agent"),
+				}
+				if cookieHdr := headers.Get("cookie"); cookieHdr != "" {
+					parts := strings.Split(cookieHdr, ";")
+					for _, p := range parts {
+						p = strings.TrimSpace(p)
+						if k, v, found := strings.Cut(p, "="); found {
+							env.Cookies[k] = v
+						}
+					}
+				}
+				if idx := strings.IndexByte(path, '?'); idx != -1 && idx+1 < len(path) {
+					qStr := path[idx+1:]
+					for _, pair := range strings.Split(qStr, "&") {
+						if k, v, found := strings.Cut(pair, "="); found {
+							env.Query[k] = v
+						}
+					}
+				}
+
 				for _, r := range snap.ACLRules {
-					if r.Action == "block" && strings.Contains(strings.ToLower(path), "/admin") && !isInternalIP(clientIP) {
-						s.recordTelemetry(host, path, method, clientIP, r.Name, "block", 403)
-						return sendImmediateResponse(stream, 403, "Access Denied by Raiwall ACL Policy", "raiwall_acl_block")
+					matched, err := r.Eval(env)
+					if err != nil {
+						continue
+					}
+					if matched {
+						if r.Action == acl.ActionBlock {
+							sc := r.StatusCode
+							if sc == 0 {
+								sc = 403
+							}
+							s.recordTelemetry(host, path, method, clientIP, r.Name, "block", sc)
+							return sendImmediateResponse(stream, sc, "Access Denied by Raiwall ACL Policy", "raiwall_acl_block")
+						} else if r.Action == acl.ActionAllow {
+							break
+						}
 					}
 				}
 			}
@@ -201,6 +249,16 @@ func (s *ExtProcServer) Process(stream ExternalProcessor_ProcessServer) error {
 			if bReq.EndOfStream {
 				// If not too large and has body, inspect with semantic engine
 				if !bodyTooLarge && len(bodyBuf) > 0 {
+					snap := config.GetActiveSnapshot()
+					if semEng, ok := s.cfg.WAFEngine.(*engine.SemanticEngine); ok {
+						if snap != nil && len(snap.Exceptions) > 0 {
+							excEng, _ := acl.NewExceptionEngine(snap.Exceptions...)
+							semEng.SetExceptionEngine(excEng)
+						} else {
+							semEng.SetExceptionEngine(nil)
+						}
+					}
+
 					reqCtx := &engine.RequestContext{
 						ClientIP: clientIP,
 						Method:   method,
@@ -306,13 +364,6 @@ func extractClientIP(headers http.Header) net.IP {
 		}
 	}
 	return net.ParseIP("127.0.0.1")
-}
-
-func isInternalIP(ip net.IP) bool {
-	if ip == nil {
-		return false
-	}
-	return ip.IsLoopback() || ip.IsPrivate()
 }
 
 func (s *ExtProcServer) recordTelemetry(host, path, method string, ip net.IP, ruleID, action string, status int) {

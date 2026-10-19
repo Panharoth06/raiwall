@@ -3,11 +3,14 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"time"
 
 	"github.com/Panharoth06/raiwall/pkg/config"
 	"github.com/Panharoth06/raiwall/pkg/control/db"
+	"github.com/Panharoth06/raiwall/pkg/control/mcp"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -22,15 +25,17 @@ type Server struct {
 	authMgr          *AuthManager
 	router           *chi.Mux
 	clusterPublisher ClusterPublisher
+	mcpServer        *mcp.Server
 }
 
 // NewServer initializes a new Control Plane API server with Chi routing.
 func NewServer(store *db.Store, hmacSecret []byte) *Server {
 	authMgr := NewAuthManager(store, hmacSecret)
 	s := &Server{
-		store:   store,
-		authMgr: authMgr,
-		router:  chi.NewRouter(),
+		store:     store,
+		authMgr:   authMgr,
+		router:    chi.NewRouter(),
+		mcpServer: mcp.NewServer(store),
 	}
 
 	s.routes()
@@ -40,6 +45,16 @@ func NewServer(store *db.Store, hmacSecret []byte) *Server {
 // SetClusterPublisher sets the distributed cluster event publisher.
 func (s *Server) SetClusterPublisher(pub ClusterPublisher) {
 	s.clusterPublisher = pub
+}
+
+// Store returns the underlying SQLite DB store.
+func (s *Server) Store() *db.Store {
+	return s.store
+}
+
+// MCPServer returns the underlying MCP server.
+func (s *Server) MCPServer() *mcp.Server {
+	return s.mcpServer
 }
 
 // Router returns the Chi router instance.
@@ -59,69 +74,93 @@ func (s *Server) routes() {
 	r.Get("/.raiwall/api/openapi.json", ServeOpenAPISpec)
 	r.Get("/.raiwall/api/docs", ServeScalarDocs)
 	r.Get("/.raiwall/api/swagger", ServeSwaggerDocs)
+	r.Get("/api/openapi.json", ServeOpenAPISpec)
+	r.Get("/api/docs", ServeScalarDocs)
+	r.Get("/api/swagger", ServeSwaggerDocs)
 
-	// Auth Endpoints (Public login)
-	r.Post("/api/v1/auth/login", s.handleLogin)
+	// MCP Server Protocol Endpoints (Protected by API Key / Session)
+	registerMCPRoutes := func(mcpRouter chi.Router) {
+		mcpRouter.Use(s.authMgr.AuthMiddleware)
+		mcpRouter.Get("/", s.mcpServer.ServeSSE)
+		mcpRouter.Post("/message", s.handleMCPMessage)
+	}
 
-	// Protected API Routes with Auth and 2-Tier RBAC Middleware
-	r.Group(func(api chi.Router) {
-		api.Use(s.authMgr.AuthMiddleware)
+	r.Route("/.raiwall/api/mcp", registerMCPRoutes)
+	r.Route("/api/mcp", registerMCPRoutes)
+	r.Route("/api/v1/mcp", registerMCPRoutes)
+	r.Route("/.raiwall/api/v1/mcp", registerMCPRoutes)
 
-		// Auth
-		api.Post("/api/v1/auth/logout", s.handleLogout)
-		api.Get("/api/v1/auth/me", s.handleAuthMe)
+	registerAPIRoutes := func(sub chi.Router) {
+		sub.Post("/auth/login", s.handleLogin)
 
-		// Status
-		api.Get("/api/v1/status", s.handleStatus)
+		sub.Group(func(api chi.Router) {
+			api.Use(s.authMgr.AuthMiddleware)
 
-		// Sites (Apps) CRUD
-		api.Get("/api/v1/sites", s.handleListSites)
-		api.Post("/api/v1/sites", s.handleCreateSite)
-		api.Get("/api/v1/sites/{id}", s.handleGetSite)
-		api.Put("/api/v1/sites/{id}", s.handleUpdateSite)
-		api.Delete("/api/v1/sites/{id}", s.handleDeleteSite)
+			// Auth
+			api.Post("/auth/logout", s.handleLogout)
+			api.Get("/auth/me", s.handleAuthMe)
 
-		// Exceptions CRUD & Test Dry-run
-		api.Get("/api/v1/exceptions", s.handleListExceptions)
-		api.Post("/api/v1/exceptions", s.handleCreateException)
-		api.Get("/api/v1/exceptions/{id}", s.handleGetException)
-		api.Put("/api/v1/exceptions/{id}", s.handleUpdateException)
-		api.Delete("/api/v1/exceptions/{id}", s.handleDeleteException)
-		api.Post("/api/v1/exceptions/test", s.handleTestException)
+			// Status & Cluster
+			api.Get("/status", s.handleStatus)
+			api.Get("/cluster/status", s.handleClusterStatus)
 
-		// ACL Rules CRUD & Expr Test Dry-run
-		api.Get("/api/v1/acls", s.handleListACLRules)
-		api.Post("/api/v1/acls", s.handleCreateACLRule)
-		api.Get("/api/v1/acls/{id}", s.handleGetACLRule)
-		api.Put("/api/v1/acls/{id}", s.handleUpdateACLRule)
-		api.Delete("/api/v1/acls/{id}", s.handleDeleteACLRule)
-		api.Post("/api/v1/acls/test", s.handleTestACL)
+			// Sites (Apps) CRUD
+			api.Get("/sites", s.handleListSites)
+			api.Post("/sites", s.handleCreateSite)
+			api.Get("/sites/{id}", s.handleGetSite)
+			api.Put("/sites/{id}", s.handleUpdateSite)
+			api.Delete("/sites/{id}", s.handleDeleteSite)
 
-		// Rate Policies CRUD
-		api.Get("/api/v1/policies/rate", s.handleListRatePolicies)
-		api.Post("/api/v1/policies/rate", s.handleCreateRatePolicy)
-		api.Get("/api/v1/policies/rate/{id}", s.handleGetRatePolicy)
-		api.Put("/api/v1/policies/rate/{id}", s.handleUpdateRatePolicy)
-		api.Delete("/api/v1/policies/rate/{id}", s.handleDeleteRatePolicy)
+			// Exceptions CRUD & Test Dry-run
+			api.Get("/exceptions", s.handleListExceptions)
+			api.Post("/exceptions", s.handleCreateException)
+			api.Get("/exceptions/{id}", s.handleGetException)
+			api.Put("/exceptions/{id}", s.handleUpdateException)
+			api.Delete("/exceptions/{id}", s.handleDeleteException)
+			api.Post("/exceptions/test", s.handleTestException)
+			api.Post("/exceptions/dry-run", s.handleTestException)
 
-		// Bot Configs CRUD
-		api.Get("/api/v1/policies/bot", s.handleListBotConfigs)
-		api.Post("/api/v1/policies/bot", s.handleCreateBotConfig)
-		api.Get("/api/v1/policies/bot/{id}", s.handleGetBotConfig)
-		api.Put("/api/v1/policies/bot/{id}", s.handleUpdateBotConfig)
-		api.Delete("/api/v1/policies/bot/{id}", s.handleDeleteBotConfig)
+			// ACL Rules CRUD & Expr Test Dry-run
+			api.Get("/acls", s.handleListACLRules)
+			api.Post("/acls", s.handleCreateACLRule)
+			api.Get("/acls/{id}", s.handleGetACLRule)
+			api.Put("/acls/{id}", s.handleUpdateACLRule)
+			api.Delete("/acls/{id}", s.handleDeleteACLRule)
+			api.Post("/acls/test", s.handleTestACL)
+			api.Post("/acls/dry-run", s.handleTestACL)
 
-		// Staged Deployment Diff, Apply, Rollback & Snapshot History
-		api.Get("/api/v1/config/draft/diff", s.handleGetConfigDiff)
-		api.Post("/api/v1/config/apply", s.handleApplyConfig)
-		api.Post("/api/v1/config/rollback/{version}", s.handleRollbackConfig)
-		api.Get("/api/v1/config/snapshots", s.handleListSnapshots)
+			// Unified Policies & Sub-Policies CRUD
+			api.Get("/policies", s.handleGetUnifiedPolicies)
+			api.Put("/policies", s.handleUpdateUnifiedPolicies)
+			api.Get("/policies/rate", s.handleListRatePolicies)
+			api.Post("/policies/rate", s.handleCreateRatePolicy)
+			api.Get("/policies/rate/{id}", s.handleGetRatePolicy)
+			api.Put("/policies/rate/{id}", s.handleUpdateRatePolicy)
+			api.Delete("/policies/rate/{id}", s.handleDeleteRatePolicy)
 
-		// API Keys CRUD
-		api.Get("/api/v1/apikeys", s.handleListAPIKeys)
-		api.Post("/api/v1/apikeys", s.handleCreateAPIKey)
-		api.Delete("/api/v1/apikeys/{id}", s.handleDeleteAPIKey)
-	})
+			// Bot Configs CRUD
+			api.Get("/policies/bot", s.handleListBotConfigs)
+			api.Post("/policies/bot", s.handleCreateBotConfig)
+			api.Get("/policies/bot/{id}", s.handleGetBotConfig)
+			api.Put("/policies/bot/{id}", s.handleUpdateBotConfig)
+			api.Delete("/policies/bot/{id}", s.handleDeleteBotConfig)
+
+			// Staged Deployment Diff, Apply, Rollback & Snapshot History
+			api.Get("/config/draft/diff", s.handleGetConfigDiff)
+			api.Post("/config/apply", s.handleApplyConfig)
+			api.Post("/config/rollback/{version}", s.handleRollbackConfig)
+			api.Get("/config/snapshots", s.handleListSnapshots)
+			api.Get("/config/history", s.handleListSnapshots)
+
+			// API Keys CRUD
+			api.Get("/apikeys", s.handleListAPIKeys)
+			api.Post("/apikeys", s.handleCreateAPIKey)
+			api.Delete("/apikeys/{id}", s.handleDeleteAPIKey)
+		})
+	}
+
+	r.Route("/api/v1", registerAPIRoutes)
+	r.Route("/.raiwall/api/v1", registerAPIRoutes)
 }
 
 type LoginRequest struct {
@@ -198,6 +237,71 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		"mode":           mode,
 		"timestamp":      time.Now().UTC(),
 	})
+}
+
+func (s *Server) handleClusterStatus(w http.ResponseWriter, r *http.Request) {
+	snap := config.GetActiveSnapshot()
+	var ver uint64 = 1
+	if snap != nil {
+		ver = snap.Version
+	}
+
+	respondJSON(w, http.StatusOK, map[string]any{
+		"mode":            "standalone",
+		"redis_connected": false,
+		"active_version":  ver,
+		"channel":         "raiwall:cluster",
+	})
+}
+
+func (s *Server) handleMCPMessage(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		respondError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "failed to read request body: "+err.Error())
+		return
+	}
+
+	var req mcp.JSONRPCRequest
+	if err := json.Unmarshal(bodyBytes, &req); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(mcp.JSONRPCResponse{
+			JSONRPC: "2.0",
+			Error:   &mcp.JSONRPCError{Code: -32700, Message: "parse error: " + err.Error()},
+		})
+		return
+	}
+
+	// Role-based authorization for MCP tools
+	if authCtx, ok := AuthFromContext(r.Context()); ok && authCtx.Role == "viewer" {
+		if req.Method == "tools/call" {
+			var callParams struct {
+				Name string `json:"name"`
+			}
+			_ = json.Unmarshal(req.Params, &callParams)
+			// Disallow mutating tools for viewer
+			if callParams.Name == "create_exception_rule" || callParams.Name == "apply_configuration" || callParams.Name == "rollback_configuration" {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				_ = json.NewEncoder(w).Encode(mcp.JSONRPCResponse{
+					JSONRPC: "2.0",
+					ID:      req.ID,
+					Error:   &mcp.JSONRPCError{Code: -32603, Message: fmt.Sprintf("role viewer is not authorized to execute mutating tool %q", callParams.Name)},
+				})
+				return
+			}
+		}
+	}
+
+	resp := s.mcpServer.HandleRequest(r.Context(), &req)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(resp)
 }
 
 func respondJSON(w http.ResponseWriter, status int, data any) {

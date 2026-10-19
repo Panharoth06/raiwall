@@ -644,6 +644,70 @@ func (m *Middleware) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 					}
 				}
 
+			case "control":
+				if m.ControlConfig == nil {
+					m.ControlConfig = new(ControlSettings)
+				}
+				for d.NextBlock(1) {
+					switch d.Val() {
+					case "db", "db_path":
+						if !d.NextArg() {
+							return d.ArgErr()
+						}
+						m.ControlConfig.DBPath = d.Val()
+					case "hmac_secret", "secret":
+						if !d.NextArg() {
+							return d.ArgErr()
+						}
+						m.ControlConfig.HMACSecret = d.Val()
+					default:
+						return d.Errf("unrecognized control subdirective: %s", d.Val())
+					}
+				}
+
+			case "sidecar":
+				if m.SidecarConfig == nil {
+					m.SidecarConfig = new(SidecarSettings)
+				}
+				for d.NextBlock(1) {
+					switch d.Val() {
+					case "listen":
+						if !d.NextArg() {
+							return d.ArgErr()
+						}
+						m.SidecarConfig.Listen = d.Val()
+					case "max_body_size":
+						if !d.NextArg() {
+							return d.ArgErr()
+						}
+						val := d.Val()
+						var sz int64
+						var err error
+						valUpper := strings.ToUpper(val)
+						if strings.HasSuffix(valUpper, "MB") {
+							mb, err := strconv.ParseInt(strings.TrimSuffix(valUpper, "MB"), 10, 64)
+							if err != nil {
+								return d.Errf("invalid max_body_size: %s (%v)", val, err)
+							}
+							sz = mb * 1024 * 1024
+						} else if strings.HasSuffix(valUpper, "KB") {
+							kb, err := strconv.ParseInt(strings.TrimSuffix(valUpper, "KB"), 10, 64)
+							if err != nil {
+								return d.Errf("invalid max_body_size: %s (%v)", val, err)
+							}
+							sz = kb * 1024
+						} else {
+							sz, err = strconv.ParseInt(val, 10, 64)
+							if err != nil {
+								return d.Errf("invalid max_body_size: %s (%v)", val, err)
+							}
+						}
+						m.SidecarConfig.MaxBodySize = sz
+					default:
+						return d.Errf("unrecognized sidecar subdirective: %s", d.Val())
+					}
+				}
+
 			default:
 				return d.Errf("unrecognized raiwall subdirective: %s", d.Val())
 			}

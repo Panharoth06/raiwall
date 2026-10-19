@@ -2,7 +2,9 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/Panharoth06/raiwall/pkg/acl"
@@ -20,6 +22,7 @@ type ACLRuleDTO struct {
 	StatusCode  int       `json:"status_code"`
 	RedirectURL string    `json:"redirect_url"`
 	IsActive    bool      `json:"is_active"`
+	Enabled     bool      `json:"enabled"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
@@ -67,6 +70,7 @@ func (s *Server) handleListACLRules(w http.ResponseWriter, r *http.Request) {
 			StatusCode:  int(rule.StatusCode),
 			RedirectURL: rule.RedirectUrl,
 			IsActive:    rule.IsActive == 1,
+			Enabled:     rule.IsActive == 1,
 			CreatedAt:   rule.CreatedAt,
 			UpdatedAt:   rule.UpdatedAt,
 		})
@@ -91,17 +95,23 @@ func (s *Server) handleGetACLRule(w http.ResponseWriter, r *http.Request) {
 		StatusCode:  int(rule.StatusCode),
 		RedirectURL: rule.RedirectUrl,
 		IsActive:    rule.IsActive == 1,
+		Enabled:     rule.IsActive == 1,
 		CreatedAt:   rule.CreatedAt,
 		UpdatedAt:   rule.UpdatedAt,
 	})
 }
 
 func (s *Server) handleCreateACLRule(w http.ResponseWriter, r *http.Request) {
-	var req ACLRuleDTO
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	var raw struct {
+		ACLRuleDTO
+		Enabled  *bool `json:"enabled"`
+		IsActive *bool `json:"is_active"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
 		respondError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
 		return
 	}
+	req := raw.ACLRuleDTO
 
 	if req.ID == "" {
 		req.ID = "acl-" + uuid.New().String()[:8]
@@ -125,9 +135,13 @@ func (s *Server) handleCreateACLRule(w http.ResponseWriter, r *http.Request) {
 
 	now := time.Now().UTC()
 	isActive := int64(1)
-	if !req.IsActive {
+	if raw.Enabled != nil && !*raw.Enabled {
+		isActive = 0
+	} else if raw.IsActive != nil && !*raw.IsActive {
 		isActive = 0
 	}
+	req.IsActive = isActive == 1
+	req.Enabled = isActive == 1
 
 	err := s.store.CreateACLRule(r.Context(), db.CreateACLRuleParams{
 		ID:          req.ID,
@@ -153,11 +167,16 @@ func (s *Server) handleCreateACLRule(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleUpdateACLRule(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	var req ACLRuleDTO
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	var raw struct {
+		ACLRuleDTO
+		Enabled  *bool `json:"enabled"`
+		IsActive *bool `json:"is_active"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
 		respondError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
 		return
 	}
+	req := raw.ACLRuleDTO
 
 	rule := acl.ACLRule{
 		Name:       req.Name,
@@ -170,9 +189,13 @@ func (s *Server) handleUpdateACLRule(w http.ResponseWriter, r *http.Request) {
 
 	now := time.Now().UTC()
 	isActive := int64(1)
-	if !req.IsActive {
+	if raw.Enabled != nil && !*raw.Enabled {
+		isActive = 0
+	} else if raw.IsActive != nil && !*raw.IsActive {
 		isActive = 0
 	}
+	req.IsActive = isActive == 1
+	req.Enabled = isActive == 1
 
 	err := s.store.UpdateACLRule(r.Context(), db.UpdateACLRuleParams{
 		ID:          id,
@@ -206,10 +229,40 @@ func (s *Server) handleDeleteACLRule(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleTestACL(w http.ResponseWriter, r *http.Request) {
-	var req ACLTestRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	var raw struct {
+		Expression    string              `json:"expression"`
+		SampleRequest ACLSampleRequestDTO `json:"sample_request"`
+		Request       map[string]any      `json:"request"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
 		respondError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
 		return
+	}
+
+	req := ACLTestRequest{
+		Expression:    raw.Expression,
+		SampleRequest: raw.SampleRequest,
+	}
+
+	if raw.Request != nil {
+		for k, v := range raw.Request {
+			valStr := fmt.Sprintf("%v", v)
+			switch strings.ToLower(k) {
+			case "clientip", "client_ip", "ip":
+				req.SampleRequest.ClientIP = valStr
+				req.SampleRequest.IP = valStr
+			case "path":
+				req.SampleRequest.Path = valStr
+			case "method":
+				req.SampleRequest.Method = valStr
+			case "host":
+				req.SampleRequest.Host = valStr
+			case "ja4":
+				req.SampleRequest.JA4 = valStr
+			case "useragent", "user_agent":
+				req.SampleRequest.UserAgent = valStr
+			}
+		}
 	}
 
 	rule := acl.ACLRule{

@@ -33,9 +33,13 @@ func (am *AuthManager) AuthMiddleware(next http.Handler) http.Handler {
 
 		// Public endpoints that bypass authentication
 		if path == "/api/v1/auth/login" ||
+			path == "/.raiwall/api/v1/auth/login" ||
 			path == "/.raiwall/api/openapi.json" ||
 			path == "/.raiwall/api/docs" ||
-			path == "/.raiwall/api/swagger" {
+			path == "/.raiwall/api/swagger" ||
+			path == "/api/openapi.json" ||
+			path == "/api/docs" ||
+			path == "/api/swagger" {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -50,6 +54,16 @@ func (am *AuthManager) AuthMiddleware(next http.Handler) http.Handler {
 			if strings.HasPrefix(authHeader, "Bearer ") {
 				token = strings.TrimPrefix(authHeader, "Bearer ")
 			}
+		}
+		// Query param support for EventSource / SSE clients
+		if token == "" {
+			token = r.URL.Query().Get("token")
+		}
+		if token == "" {
+			token = r.URL.Query().Get("api_key")
+		}
+		if token == "" {
+			token = r.URL.Query().Get("key")
 		}
 
 		if token != "" {
@@ -104,7 +118,15 @@ func (am *AuthManager) AuthMiddleware(next http.Handler) http.Handler {
 			r.Method == http.MethodPatch
 
 		// Allow logout for all authenticated users
-		if path == "/api/v1/auth/logout" {
+		if strings.HasSuffix(path, "/auth/logout") {
+			isMutating = false
+		}
+		// Allow test / dry-run simulation endpoints for viewers
+		if strings.HasSuffix(path, "/test") || strings.HasSuffix(path, "/dry-run") {
+			isMutating = false
+		}
+		// Allow MCP message JSON-RPC handler (tool-level RBAC is checked inside executor)
+		if strings.HasSuffix(path, "/mcp/message") {
 			isMutating = false
 		}
 

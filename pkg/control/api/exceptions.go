@@ -14,7 +14,9 @@ import (
 type ExceptionDTO struct {
 	ID          string    `json:"id"`
 	Description string    `json:"description"`
+	Reason      string    `json:"reason,omitempty"`
 	Host        string    `json:"host"`
+	Path        string    `json:"path,omitempty"`
 	PathRegex   string    `json:"path_regex"`
 	PathPrefix  string    `json:"path_prefix"`
 	Method      string    `json:"method"`
@@ -30,6 +32,15 @@ type ExceptionDTO struct {
 type ExceptionTestRequest struct {
 	Rule          ExceptionDTO           `json:"rule"`
 	SampleRequest ExceptionSampleRequest `json:"sample_request"`
+	Request       *struct {
+		Host      string            `json:"host"`
+		Path      string            `json:"path"`
+		Method    string            `json:"method"`
+		Location  string            `json:"location"`
+		ParamName string            `json:"param_name"`
+		Params    map[string]string `json:"params"`
+		RuleID    string            `json:"rule_id"`
+	} `json:"request,omitempty"`
 }
 
 type ExceptionSampleRequest struct {
@@ -55,10 +66,16 @@ func (s *Server) handleListExceptions(w http.ResponseWriter, r *http.Request) {
 
 	result := make([]ExceptionDTO, 0, len(excs))
 	for _, e := range excs {
+		p := e.PathPrefix
+		if p == "" {
+			p = e.PathRegex
+		}
 		result = append(result, ExceptionDTO{
 			ID:          e.ID,
 			Description: e.Description,
+			Reason:      e.Description,
 			Host:        e.Host,
+			Path:        p,
 			PathRegex:   e.PathRegex,
 			PathPrefix:  e.PathPrefix,
 			Method:      e.Method,
@@ -82,10 +99,16 @@ func (s *Server) handleGetException(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	p := e.PathPrefix
+	if p == "" {
+		p = e.PathRegex
+	}
 	respondJSON(w, http.StatusOK, ExceptionDTO{
 		ID:          e.ID,
 		Description: e.Description,
+		Reason:      e.Description,
 		Host:        e.Host,
+		Path:        p,
 		PathRegex:   e.PathRegex,
 		PathPrefix:  e.PathPrefix,
 		Method:      e.Method,
@@ -100,10 +123,18 @@ func (s *Server) handleGetException(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleCreateException(w http.ResponseWriter, r *http.Request) {
-	var req ExceptionDTO
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	var raw struct {
+		ExceptionDTO
+		Path     string `json:"path"`
+		IsActive *bool  `json:"is_active"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
 		respondError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
 		return
+	}
+	req := raw.ExceptionDTO
+	if req.PathPrefix == "" && req.PathRegex == "" && raw.Path != "" {
+		req.PathPrefix = raw.Path
 	}
 
 	if req.ID == "" {
@@ -135,7 +166,7 @@ func (s *Server) handleCreateException(w http.ResponseWriter, r *http.Request) {
 
 	now := time.Now().UTC()
 	isActive := int64(1)
-	if !req.IsActive {
+	if raw.IsActive != nil && !*raw.IsActive {
 		isActive = 0
 	}
 
@@ -227,6 +258,50 @@ func (s *Server) handleTestException(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
 		return
+	}
+
+	if req.Rule.PathPrefix == "" && req.Rule.PathRegex == "" && req.Rule.Path != "" {
+		req.Rule.PathPrefix = req.Rule.Path
+	}
+	if req.Rule.Description == "" && req.Rule.Reason != "" {
+		req.Rule.Description = req.Rule.Reason
+	}
+	if req.Rule.Method == "ALL" {
+		req.Rule.Method = "*"
+	}
+	if req.Rule.RuleID == "ALL" {
+		req.Rule.RuleID = "*"
+	}
+
+	if req.Request != nil {
+		if req.SampleRequest.Host == "" {
+			req.SampleRequest.Host = req.Request.Host
+		}
+		if req.SampleRequest.Path == "" {
+			req.SampleRequest.Path = req.Request.Path
+		}
+		if req.SampleRequest.Method == "" {
+			req.SampleRequest.Method = req.Request.Method
+		}
+		if req.SampleRequest.Location == "" {
+			req.SampleRequest.Location = req.Request.Location
+			if req.SampleRequest.Location == "" {
+				req.SampleRequest.Location = "query"
+			}
+		}
+		if req.SampleRequest.RuleID == "" {
+			req.SampleRequest.RuleID = req.Request.RuleID
+		}
+		if req.SampleRequest.ParamName == "" {
+			if req.Request.ParamName != "" {
+				req.SampleRequest.ParamName = req.Request.ParamName
+			} else {
+				for k := range req.Request.Params {
+					req.SampleRequest.ParamName = k
+					break
+				}
+			}
+		}
 	}
 
 	rule := acl.ExceptionRule{

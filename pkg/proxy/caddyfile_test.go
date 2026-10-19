@@ -667,4 +667,55 @@ func TestUnmarshalCaddyfile_Telemetry(t *testing.T) {
 	}
 }
 
+func TestUnmarshalCaddyfile_Sidecar(t *testing.T) {
+	input := `raiwall {
+		sidecar {
+			listen :50051
+			max_body_size 2MB
+		}
+	}`
+	d := caddyfile.NewTestDispenser(input)
+	m := new(Middleware)
+	err := m.UnmarshalCaddyfile(d)
+	if err != nil {
+		t.Fatalf("UnmarshalCaddyfile failed: %v", err)
+	}
+
+	if m.SidecarConfig == nil {
+		t.Fatal("expected SidecarConfig to be non-nil")
+	}
+	if m.SidecarConfig.Listen != ":50051" {
+		t.Errorf("expected listen :50051, got %s", m.SidecarConfig.Listen)
+	}
+	if m.SidecarConfig.MaxBodySize != 2*1024*1024 {
+		t.Errorf("expected max_body_size 2MB (%d), got %d", 2*1024*1024, m.SidecarConfig.MaxBodySize)
+	}
+}
+
+func TestUnmarshalCaddyfile_Control(t *testing.T) {
+	input := `raiwall {
+		control {
+			db_path "file:custom_control.db"
+			hmac_secret "custom-secret-key-32-chars-long"
+		}
+	}`
+	d := caddyfile.NewTestDispenser(input)
+	m := new(Middleware)
+	err := m.UnmarshalCaddyfile(d)
+	if err != nil {
+		t.Fatalf("UnmarshalCaddyfile failed: %v", err)
+	}
+
+	if m.ControlConfig == nil {
+		t.Fatal("expected ControlConfig to be non-nil")
+	}
+	if m.ControlConfig.DBPath != "file:custom_control.db" {
+		t.Errorf("expected db_path file:custom_control.db, got %s", m.ControlConfig.DBPath)
+	}
+	if m.ControlConfig.HMACSecret != "custom-secret-key-32-chars-long" {
+		t.Errorf("expected hmac_secret custom-secret-key-32-chars-long, got %s", m.ControlConfig.HMACSecret)
+	}
+}
+
+
 
