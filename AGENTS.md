@@ -307,9 +307,9 @@ These are **hard constraints** that must be respected in every implementation:
 
 | Milestone | Scope & Deliverables | Timeline | Status |
 |-----------|---------------------|----------|--------|
-| **1: Core Proxy & Control Plane** | Caddy Proxy + Auto-SSL + Normalization + `libinjection-go` • Minimal Control Plane API (`huma`) + Web UI Log Viewer + Rule Exception Engine | Weeks 1–8 | 🟡 Domain 1 complete, Domains 2–7 in progress |
-| **2: Stateful Defense & AST Verification** | 3-Tier Composite Rate Limiting + Fast CIDR (`bart`) + MaxMind GeoIP + AST Verification (32KB/5ms cap) + ClickHouse batch logging + PII Sanitizer | Weeks 9–16 | ⬜ Not started |
-| **3: Active Defense & Sidecar Mode** | JA4 Fingerprinting + HTTP 468 PoW (`altcha`/`anubis` with API bypass) + Envoy/Nginx `ext_proc` sidecar connector + Web UI charts & alerts | Weeks 17–24 | ⬜ Not started |
+| **1: Core Proxy & Control Plane** | Caddy Proxy + Auto-SSL + Normalization + `libinjection-go` • Minimal Control Plane API (`huma`) + Web UI Log Viewer + Rule Exception Engine | Weeks 1–8 | 🟢 Completed |
+| **2: Stateful Defense & AST Verification** | 3-Tier Composite Rate Limiting + Fast CIDR (`bart`) + MaxMind GeoIP + AST Verification (32KB/5ms cap) + ClickHouse batch logging + PII Sanitizer | Weeks 9–16 | 🟢 Completed |
+| **3: Active Defense & Sidecar Mode** | JA4 Fingerprinting + HTTP 468 PoW (`altcha`/`anubis` with API bypass) + Envoy/Nginx `ext_proc` sidecar connector + Web UI charts & alerts | Weeks 17–24 | 🟢 Completed |
 
 ---
 
