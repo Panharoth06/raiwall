@@ -1,0 +1,10 @@
+version: "2"
+sql:
+  - schema: "pkg/control/db/schema.sql"
+    queries: "pkg/control/db/query.sql"
+    engine: "sqlite"
+    gen:
+      go:
+        package: "db"
+        out: "pkg/control/db"
+        sql_package: "database/sql"
