@@ -567,8 +567,80 @@ func (m *Middleware) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 							u.Roles = strings.Split(args[2], ",")
 						}
 						m.AuthConfig.Users = append(m.AuthConfig.Users, u)
+					}
+				}
+
+			case "telemetry":
+				if m.TelemetryConfig == nil {
+					m.TelemetryConfig = new(TelemetrySettings)
+				}
+				for d.NextBlock(1) {
+					switch d.Val() {
+					case "storage":
+						if !d.NextArg() {
+							return d.ArgErr()
+						}
+						m.TelemetryConfig.StorageType = d.Val()
+						if d.NextArg() {
+							m.TelemetryConfig.StoragePath = d.Val()
+						}
+					case "flush_interval":
+						if !d.NextArg() {
+							return d.ArgErr()
+						}
+						dur, err := caddy.ParseDuration(d.Val())
+						if err != nil {
+							return d.Errf("invalid flush_interval: %s (%v)", d.Val(), err)
+						}
+						m.TelemetryConfig.FlushInterval = caddy.Duration(dur)
+					case "buffer_size":
+						if !d.NextArg() {
+							return d.ArgErr()
+						}
+						sz, err := strconv.Atoi(d.Val())
+						if err != nil || sz <= 0 {
+							return d.Errf("invalid buffer_size: %s (%v)", d.Val(), err)
+						}
+						m.TelemetryConfig.BufferSize = sz
+					case "retention":
+						if !d.NextArg() {
+							return d.ArgErr()
+						}
+						dur, err := caddy.ParseDuration(d.Val())
+						if err != nil {
+							return d.Errf("invalid retention: %s (%v)", d.Val(), err)
+						}
+						m.TelemetryConfig.Retention = caddy.Duration(dur)
+					case "alert":
+						var ch AlertChannelSettings
+						if !d.NextArg() {
+							return d.ArgErr()
+						}
+						ch.Name = d.Val()
+						if !d.NextArg() {
+							return d.ArgErr()
+						}
+						ch.URL = d.Val()
+						for d.NextBlock(2) {
+							switch d.Val() {
+							case "events", "event":
+								ch.Events = append(ch.Events, d.RemainingArgs()...)
+							case "cooldown":
+								if !d.NextArg() {
+									return d.ArgErr()
+								}
+								dur, err := caddy.ParseDuration(d.Val())
+								if err != nil {
+									return d.Errf("invalid alert cooldown: %s (%v)", d.Val(), err)
+								}
+								ch.Cooldown = caddy.Duration(dur)
+							default:
+								return d.Errf("unrecognized alert subdirective: %s", d.Val())
+							}
+						}
+						m.TelemetryConfig.AlertChannels = append(m.TelemetryConfig.AlertChannels, ch)
 					default:
-						return d.Errf("unrecognized auth subdirective: %s", d.Val())
+						return d.Errf("unrecognized telemetry subdirective: %s", d.Val())
 					}
 				}
 

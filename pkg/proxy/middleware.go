@@ -2,10 +2,12 @@ package proxy
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -19,6 +21,7 @@ import (
 	"github.com/Panharoth06/raiwall/pkg/config"
 	"github.com/Panharoth06/raiwall/pkg/engine"
 	"github.com/Panharoth06/raiwall/pkg/rate"
+	"github.com/Panharoth06/raiwall/pkg/telemetry"
 	"go.uber.org/zap"
 )
 
@@ -82,6 +85,24 @@ type AuthSettings struct {
 	BypassPaths   []string          `json:"bypass_paths,omitempty"`
 }
 
+// AlertChannelSettings configures a notification channel in Caddyfile.
+type AlertChannelSettings struct {
+	Name     string         `json:"name,omitempty"`
+	URL      string         `json:"url,omitempty"`
+	Events   []string       `json:"events,omitempty"`
+	Cooldown caddy.Duration `json:"cooldown,omitempty"`
+}
+
+// TelemetrySettings configures storage, ring buffer, and alerting for telemetry.
+type TelemetrySettings struct {
+	StorageType   string                 `json:"storage_type,omitempty"`
+	StoragePath   string                 `json:"storage_path,omitempty"`
+	FlushInterval caddy.Duration         `json:"flush_interval,omitempty"`
+	BufferSize    int                    `json:"buffer_size,omitempty"`
+	Retention     caddy.Duration         `json:"retention,omitempty"`
+	AlertChannels []AlertChannelSettings `json:"alert_channels,omitempty"`
+}
+
 // Middleware is the Caddy HTTP handler implementing Raiwall WAF and Gateway interception.
 type Middleware struct {
 	Mode                string         `json:"mode,omitempty"`
@@ -109,6 +130,9 @@ type Middleware struct {
 	ACLConfig       *ACLSettings       `json:"acl,omitempty"`
 	AuthConfig      *AuthSettings      `json:"auth,omitempty"`
 
+	// Domain 6: Observability, Forensics & Real-Time Alerting
+	TelemetryConfig *TelemetrySettings `json:"telemetry,omitempty"`
+
 	engine     engine.WAFEngine
 	logger     *zap.Logger
 	bufferPool *sync.Pool
@@ -133,6 +157,14 @@ type Middleware struct {
 	geoIPReader     *acl.GeoIPReader
 	aclEngine       *acl.ACLEngine
 	authGateway     *auth.AuthGateway
+
+	telemetryStore telemetry.ForensicStore
+	ringBuffer     *telemetry.RingBuffer
+	streamer       *telemetry.EventStreamer
+	alertEngine    *telemetry.AlertEngine
+	metrics        *telemetry.Metrics
+	telemetryAPI   *telemetry.TelemetryAPI
+	uiHandler      *UIHandler
 }
 
 var (
@@ -411,6 +443,99 @@ func (m *Middleware) Provision(ctx caddy.Context) error {
 		m.authGateway = auth.NewAuthGateway(gwCfg)
 	}
 
+	// Domain 6: Observability, Forensics & Real-Time Alerting
+	if m.uiHandler == nil {
+		uiHandler, err := NewUIHandler()
+		if err != nil && m.logger != nil {
+			m.logger.Warn("Failed to initialize UI handler", zap.Error(err))
+		} else {
+			m.uiHandler = uiHandler
+		}
+	}
+
+	if m.metrics == nil {
+		m.metrics = telemetry.NewMetrics(nil)
+	}
+	if m.streamer == nil {
+		m.streamer = telemetry.NewEventStreamer()
+	}
+
+	if m.telemetryStore == nil && m.TelemetryConfig != nil {
+		storageType := strings.ToLower(m.TelemetryConfig.StorageType)
+		if storageType == "clickhouse" {
+			chStore, err := telemetry.NewClickHouseStore(telemetry.ClickHouseConfig{
+				URL: m.TelemetryConfig.StoragePath,
+			})
+			if err != nil {
+				return fmt.Errorf("provision clickhouse telemetry store: %w", err)
+			}
+			m.telemetryStore = chStore
+		} else {
+			retention := time.Duration(m.TelemetryConfig.Retention)
+			if retention <= 0 {
+				retention = 30 * 24 * time.Hour
+			}
+			dbPath := m.TelemetryConfig.StoragePath
+			if dbPath == "" {
+				dbPath = "raiwall-telemetry.db"
+			}
+			sqStore, err := telemetry.NewSQLiteStore(telemetry.SQLiteConfig{
+				DSN:       dbPath,
+				Retention: retention,
+			})
+			if err != nil {
+				return fmt.Errorf("provision sqlite telemetry store: %w", err)
+			}
+			m.telemetryStore = sqStore
+		}
+	}
+
+	if m.alertEngine == nil && m.TelemetryConfig != nil && len(m.TelemetryConfig.AlertChannels) > 0 {
+		var channels []telemetry.AlertChannel
+		for _, ch := range m.TelemetryConfig.AlertChannels {
+			cooldown := time.Duration(ch.Cooldown)
+			if cooldown <= 0 {
+				cooldown = 5 * time.Minute
+			}
+			channels = append(channels, telemetry.AlertChannel{
+				Name:     ch.Name,
+				URL:      ch.URL,
+				Events:   ch.Events,
+				Cooldown: cooldown,
+			})
+		}
+		m.alertEngine = telemetry.NewAlertEngine(channels, 5*time.Minute, nil)
+	}
+
+	if m.ringBuffer == nil {
+		bufSize := telemetry.DefaultRingBufferCapacity
+		flushInterval := telemetry.DefaultFlushInterval
+		if m.TelemetryConfig != nil {
+			if m.TelemetryConfig.BufferSize > 0 {
+				bufSize = m.TelemetryConfig.BufferSize
+			}
+			if m.TelemetryConfig.FlushInterval > 0 {
+				flushInterval = time.Duration(m.TelemetryConfig.FlushInterval)
+			}
+		}
+
+		m.ringBuffer = telemetry.NewRingBuffer(telemetry.RingBufferConfig{
+			Capacity:      bufSize,
+			BatchSize:     telemetry.DefaultBatchSize,
+			FlushInterval: flushInterval,
+			Handler: func(events []*telemetry.ForensicEvent) error {
+				if m.telemetryStore != nil {
+					return m.telemetryStore.SaveBatch(context.Background(), events)
+				}
+				return nil
+			},
+		})
+	}
+
+	if m.telemetryAPI == nil {
+		m.telemetryAPI = telemetry.NewTelemetryAPI(m.telemetryStore, m.streamer, m.metrics)
+	}
+
 	return nil
 }
 
@@ -558,6 +683,85 @@ func (m *Middleware) PoWEngine() *bot.PoWEngine {
 	return m.powEngine
 }
 
+// SetTelemetryStore overrides the ForensicStore (used for testing).
+func (m *Middleware) SetTelemetryStore(s telemetry.ForensicStore) {
+	m.telemetryStore = s
+	if m.telemetryAPI != nil {
+		m.telemetryAPI = telemetry.NewTelemetryAPI(s, m.streamer, m.metrics)
+	}
+}
+
+// TelemetryStore returns the active ForensicStore.
+func (m *Middleware) TelemetryStore() telemetry.ForensicStore {
+	return m.telemetryStore
+}
+
+// SetRingBuffer overrides the RingBuffer (used for testing).
+func (m *Middleware) SetRingBuffer(rb *telemetry.RingBuffer) {
+	m.ringBuffer = rb
+}
+
+// RingBuffer returns the active RingBuffer.
+func (m *Middleware) RingBuffer() *telemetry.RingBuffer {
+	return m.ringBuffer
+}
+
+// SetEventStreamer overrides the EventStreamer (used for testing).
+func (m *Middleware) SetEventStreamer(s *telemetry.EventStreamer) {
+	m.streamer = s
+	if m.telemetryAPI != nil {
+		m.telemetryAPI = telemetry.NewTelemetryAPI(m.telemetryStore, s, m.metrics)
+	}
+}
+
+// EventStreamer returns the active EventStreamer.
+func (m *Middleware) EventStreamer() *telemetry.EventStreamer {
+	return m.streamer
+}
+
+// SetAlertEngine overrides the AlertEngine (used for testing).
+func (m *Middleware) SetAlertEngine(ae *telemetry.AlertEngine) {
+	m.alertEngine = ae
+}
+
+// AlertEngine returns the active AlertEngine.
+func (m *Middleware) AlertEngine() *telemetry.AlertEngine {
+	return m.alertEngine
+}
+
+// SetMetrics overrides the Metrics collector (used for testing).
+func (m *Middleware) SetMetrics(met *telemetry.Metrics) {
+	m.metrics = met
+	if m.telemetryAPI != nil {
+		m.telemetryAPI = telemetry.NewTelemetryAPI(m.telemetryStore, m.streamer, met)
+	}
+}
+
+// Metrics returns the active Metrics collector.
+func (m *Middleware) Metrics() *telemetry.Metrics {
+	return m.metrics
+}
+
+// SetUIHandler overrides the UIHandler (used for testing).
+func (m *Middleware) SetUIHandler(ui *UIHandler) {
+	m.uiHandler = ui
+}
+
+// UIHandler returns the active UIHandler.
+func (m *Middleware) UIHandler() *UIHandler {
+	return m.uiHandler
+}
+
+// SetTelemetryAPI overrides the TelemetryAPI (used for testing).
+func (m *Middleware) SetTelemetryAPI(api *telemetry.TelemetryAPI) {
+	m.telemetryAPI = api
+}
+
+// TelemetryAPI returns the active TelemetryAPI.
+func (m *Middleware) TelemetryAPI() *telemetry.TelemetryAPI {
+	return m.telemetryAPI
+}
+
 // Validate ensures the middleware configuration is valid.
 func (m *Middleware) Validate() error {
 	if !m.runMode.IsValid() {
@@ -608,6 +812,14 @@ func (m *Middleware) Validate() error {
 			return fmt.Errorf("invalid admission_rate: %d (must be non-negative)", m.WaitingRoomConfig.AdmissionRate)
 		}
 	}
+	if m.TelemetryConfig != nil {
+		if st := strings.ToLower(m.TelemetryConfig.StorageType); st != "" && st != "sqlite" && st != "clickhouse" {
+			return fmt.Errorf("invalid telemetry storage type: %s (must be sqlite or clickhouse)", m.TelemetryConfig.StorageType)
+		}
+		if m.TelemetryConfig.BufferSize < 0 {
+			return fmt.Errorf("invalid buffer_size: %d (must be non-negative)", m.TelemetryConfig.BufferSize)
+		}
+	}
 	return nil
 }
 
@@ -638,6 +850,26 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 		ctx = bot.WithJA4(ctx, ja4)
 	}
 	r = r.WithContext(ctx)
+
+	// Internal WAF routes: Metrics & Telemetry API
+	if r.URL.Path == "/.raiwall/metrics" || strings.HasPrefix(r.URL.Path, "/.raiwall/api/") {
+		if m.telemetryAPI != nil {
+			m.telemetryAPI.ServeHTTP(w, r)
+			return nil
+		}
+	}
+
+	// Internal WAF routes: Embedded UI Admin Dashboard
+	if (r.URL.Path == "/.raiwall" || strings.HasPrefix(r.URL.Path, "/.raiwall/")) &&
+		r.URL.Path != rate.WaitingRoomEventsPath &&
+		!bot.IsTrapRequest(r.URL.Path) &&
+		r.URL.Path != bot.ChallengeVerifyPath &&
+		!strings.HasPrefix(r.URL.Path, "/.raiwall/auth") {
+		if m.uiHandler != nil {
+			m.uiHandler.ServeHTTP(w, r)
+			return nil
+		}
+	}
 
 	// 2. Resolve operational run mode from in-memory snapshot with fallback
 	currentMode := m.runMode
@@ -701,6 +933,22 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 				if statusCode == 0 {
 					statusCode = http.StatusForbidden
 				}
+				m.recordTelemetry(&telemetry.ForensicEvent{
+					EventID:    eventID,
+					Timestamp:  startTime,
+					Host:       r.Host,
+					Path:       r.URL.RequestURI(),
+					Method:     r.Method,
+					ClientIP:   clientIP.String(),
+					JA4:        ja4,
+					GeoData:    m.lookupGeo(clientIP),
+					RuleID:     "ban_manager",
+					Action:     "ban",
+					Severity:   "high",
+					Headers:    extractHeadersMap(r.Header),
+					Latency:    time.Since(startTime),
+					StatusCode: statusCode,
+				})
 				w.Header().Set("Content-Type", "text/html; charset=utf-8")
 				w.Header().Set("X-Raiwall-Event-ID", eventID)
 				w.WriteHeader(statusCode)
@@ -727,6 +975,22 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 	// 6. Honeypot Trap Interception (/.raiwall/trap/*)
 	if bot.IsTrapRequest(r.URL.Path) {
 		if m.trapCtrl != nil {
+			m.recordTelemetry(&telemetry.ForensicEvent{
+				EventID:    uuid.New().String(),
+				Timestamp:  startTime,
+				Host:       r.Host,
+				Path:       r.URL.RequestURI(),
+				Method:     r.Method,
+				ClientIP:   clientIP.String(),
+				JA4:        ja4,
+				GeoData:    m.lookupGeo(clientIP),
+				RuleID:     "honeypot_trap",
+				Action:     "ban",
+				Severity:   "critical",
+				Headers:    extractHeadersMap(r.Header),
+				Latency:    time.Since(startTime),
+				StatusCode: http.StatusForbidden,
+			})
 			m.trapCtrl.HandleTrap(w, r, clientIP, ja4)
 			return nil
 		}
@@ -829,6 +1093,22 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 					if statusCode == 0 {
 						statusCode = http.StatusForbidden
 					}
+					m.recordTelemetry(&telemetry.ForensicEvent{
+						EventID:    eventID,
+						Timestamp:  startTime,
+						Host:       r.Host,
+						Path:       r.URL.RequestURI(),
+						Method:     r.Method,
+						ClientIP:   clientIP.String(),
+						JA4:        ja4,
+						GeoData:    m.lookupGeo(clientIP),
+						RuleID:     "bot_spoof",
+						Action:     "block",
+						Severity:   "high",
+						Headers:    extractHeadersMap(r.Header),
+						Latency:    time.Since(startTime),
+						StatusCode: statusCode,
+					})
 					w.Header().Set("Content-Type", "text/html; charset=utf-8")
 					w.Header().Set("X-Raiwall-Event-ID", eventID)
 					w.WriteHeader(statusCode)
@@ -865,6 +1145,22 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 							zap.String("path", r.URL.Path),
 						)
 					}
+					m.recordTelemetry(&telemetry.ForensicEvent{
+						EventID:    uuid.New().String(),
+						Timestamp:  startTime,
+						Host:       r.Host,
+						Path:       r.URL.RequestURI(),
+						Method:     r.Method,
+						ClientIP:   clientIP.String(),
+						JA4:        ja4,
+						GeoData:    m.lookupGeo(clientIP),
+						RuleID:     "pow_challenge",
+						Action:     "challenge",
+						Severity:   "medium",
+						Headers:    extractHeadersMap(r.Header),
+						Latency:    time.Since(startTime),
+						StatusCode: 468,
+					})
 					return m.powEngine.RenderChallengePage(w, r, r.URL.RequestURI())
 				}
 			}
@@ -944,6 +1240,22 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 					if body == "" {
 						body = defaultBlockHTML
 					}
+					m.recordTelemetry(&telemetry.ForensicEvent{
+						EventID:    eventID,
+						Timestamp:  startTime,
+						Host:       r.Host,
+						Path:       r.URL.RequestURI(),
+						Method:     r.Method,
+						ClientIP:   clientIP.String(),
+						JA4:        ja4,
+						GeoData:    m.lookupGeo(clientIP),
+						RuleID:     aclVerdict.RuleName,
+						Action:     "block",
+						Severity:   "high",
+						Headers:    extractHeadersMap(r.Header),
+						Latency:    time.Since(startTime),
+						StatusCode: statusCode,
+					})
 					w.Header().Set("Content-Type", "text/html; charset=utf-8")
 					w.Header().Set("X-Raiwall-Event-ID", eventID)
 					w.WriteHeader(statusCode)
@@ -962,6 +1274,22 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 						break
 					}
 					if m.powEngine != nil {
+						m.recordTelemetry(&telemetry.ForensicEvent{
+							EventID:    uuid.New().String(),
+							Timestamp:  startTime,
+							Host:       r.Host,
+							Path:       r.URL.RequestURI(),
+							Method:     r.Method,
+							ClientIP:   clientIP.String(),
+							JA4:        ja4,
+							GeoData:    m.lookupGeo(clientIP),
+							RuleID:     aclVerdict.RuleName,
+							Action:     "challenge",
+							Severity:   "medium",
+							Headers:    extractHeadersMap(r.Header),
+							Latency:    time.Since(startTime),
+							StatusCode: 468,
+						})
 						return m.powEngine.RenderChallengePage(w, r, r.URL.RequestURI())
 					}
 
@@ -1023,6 +1351,22 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 					if body == "" {
 						body = defaultBlockHTML
 					}
+					m.recordTelemetry(&telemetry.ForensicEvent{
+						EventID:    eventID,
+						Timestamp:  startTime,
+						Host:       r.Host,
+						Path:       r.URL.RequestURI(),
+						Method:     r.Method,
+						ClientIP:   clientIP.String(),
+						JA4:        ja4,
+						GeoData:    m.lookupGeo(clientIP),
+						RuleID:     "threat_feed",
+						Action:     "block",
+						Severity:   "high",
+						Headers:    extractHeadersMap(r.Header),
+						Latency:    time.Since(startTime),
+						StatusCode: statusCode,
+					})
 					w.Header().Set("Content-Type", "text/html; charset=utf-8")
 					w.Header().Set("X-Raiwall-Event-ID", eventID)
 					w.WriteHeader(statusCode)
@@ -1138,6 +1482,23 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 			}
 
 			rendered := strings.ReplaceAll(body, "{{EVENT_ID}}", eventID)
+			m.recordTelemetry(&telemetry.ForensicEvent{
+				EventID:          eventID,
+				Timestamp:        startTime,
+				Host:             r.Host,
+				Path:             r.URL.RequestURI(),
+				Method:           r.Method,
+				ClientIP:         clientIP.String(),
+				JA4:              ja4,
+				GeoData:          m.lookupGeo(clientIP),
+				RuleID:           verdict.RuleID,
+				Action:           "block",
+				Severity:         "critical",
+				Headers:          extractHeadersMap(r.Header),
+				TruncatedPayload: string(bodyBytes),
+				Latency:          time.Since(startTime),
+				StatusCode:       statusCode,
+			})
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 			w.Header().Set("X-Raiwall-Event-ID", eventID)
 			w.WriteHeader(statusCode)
@@ -1160,6 +1521,11 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 	}
 
 	// Forward downstream to next handler
+	if m.metrics != nil {
+		m.metrics.ActiveConnections.Inc()
+		defer m.metrics.ActiveConnections.Dec()
+	}
+
 	nextErr := next.ServeHTTP(interceptor, r)
 
 	// Ensure any buffered HTML response is injected and finished
@@ -1187,6 +1553,32 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 			)
 		}
 	}
+
+	action := "allow"
+	severity := "info"
+	ruleID := ""
+	if verdict != nil && verdict.Action == engine.ActionBlock && currentMode == config.ModeAudit {
+		action = "audit"
+		severity = "medium"
+		ruleID = verdict.RuleID
+	}
+	m.recordTelemetry(&telemetry.ForensicEvent{
+		EventID:          uuid.New().String(),
+		Timestamp:        startTime,
+		Host:             r.Host,
+		Path:             r.URL.RequestURI(),
+		Method:           r.Method,
+		ClientIP:         clientIP.String(),
+		JA4:              ja4,
+		GeoData:          m.lookupGeo(clientIP),
+		RuleID:           ruleID,
+		Action:           action,
+		Severity:         severity,
+		Headers:          extractHeadersMap(r.Header),
+		TruncatedPayload: string(bodyBytes),
+		Latency:          time.Since(startTime),
+		StatusCode:       interceptor.StatusCode(),
+	})
 
 	return nextErr
 }
@@ -1251,8 +1643,14 @@ func (a *banStoreAdapter) Close() {
 	}
 }
 
-// Cleanup releases all background resources, closing rate limit storage, ban manager, waiting room loops, and GeoIP reader.
+// Cleanup releases all background resources, closing rate limit storage, ban manager, waiting room loops, GeoIP reader, and telemetry stores.
 func (m *Middleware) Cleanup() error {
+	if m.ringBuffer != nil {
+		_ = m.ringBuffer.Close()
+	}
+	if m.telemetryStore != nil {
+		_ = m.telemetryStore.Close()
+	}
 	if m.geoIPReader != nil {
 		_ = m.geoIPReader.Close()
 	}
@@ -1266,5 +1664,82 @@ func (m *Middleware) Cleanup() error {
 		_ = m.rateStorage.Close()
 	}
 	return nil
+}
+
+func (m *Middleware) recordTelemetry(event *telemetry.ForensicEvent) {
+	if event == nil {
+		return
+	}
+
+	// 1. Sanitize the event (PCI-DSS & PII scrubbing, 2KB cap)
+	telemetry.Sanitize(event)
+
+	// 2. Broadcast immediately to SSE subscribers
+	if m.streamer != nil {
+		m.streamer.Broadcast(event)
+	}
+
+	// 3. Dispatch alert asynchronously if threat level qualifies
+	if m.alertEngine != nil && (event.Action == "block" || event.Action == "ban" || event.Severity == "critical" || event.Severity == "high") {
+		go func(ev *telemetry.ForensicEvent) {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := m.alertEngine.Dispatch(ctx, ev); err != nil {
+				if m.logger != nil {
+					m.logger.Warn("Failed to dispatch alert", zap.Error(err))
+				} else {
+					fmt.Printf("FAILED TO DISPATCH ALERT: %v\n", err)
+				}
+			}
+		}(event)
+	}
+
+	// 4. Update Banned IPs metric if ban manager is present
+	if m.banManager != nil && m.metrics != nil {
+		m.metrics.SetBannedIPs(float64(m.banManager.Count()))
+	}
+
+	// 5. Record Prometheus metrics
+	if m.metrics != nil {
+		statusStr := strconv.Itoa(event.StatusCode)
+		m.metrics.RecordRequest(event.Method, statusStr, event.Action, event.Latency)
+		if event.Action == "block" || event.Action == "ban" {
+			m.metrics.RecordBlock(event.Action, event.RuleID)
+		}
+	}
+
+	// 6. Enqueue in non-blocking ring buffer
+	if m.ringBuffer != nil {
+		pushed := m.ringBuffer.Push(event)
+		if !pushed && m.metrics != nil {
+			m.metrics.RecordTelemetryDropped(1)
+		}
+	}
+}
+
+func (m *Middleware) lookupGeo(ip net.IP) telemetry.GeoData {
+	if m.geoIPReader == nil || ip == nil {
+		return telemetry.GeoData{}
+	}
+	g := m.geoIPReader.Lookup(ip)
+	return telemetry.GeoData{
+		Country:   g.Country,
+		Continent: g.Continent,
+		ASN:       g.ASN,
+		ASOrg:     g.ASOrg,
+	}
+}
+
+func extractHeadersMap(h http.Header) map[string]string {
+	if len(h) == 0 {
+		return nil
+	}
+	res := make(map[string]string, len(h))
+	for k, v := range h {
+		if len(v) > 0 {
+			res[k] = v[0]
+		}
+	}
+	return res
 }
 

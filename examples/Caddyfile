@@ -84,6 +84,21 @@
 			session_cookie "rw_session"
 			bypass_path /public/* /healthz /.well-known/*
 		}
+
+		telemetry {
+			storage sqlite /var/lib/raiwall/telemetry.db
+			flush_interval 500ms
+			buffer_size 10000
+			retention 720h
+			alert ops_slack https://hooks.slack.com/services/T00/B00/X00 {
+				events block ban critical
+				cooldown 5m
+			}
+			alert ops_discord https://discord.com/api/webhooks/123/abc {
+				events critical
+				cooldown 10m
+			}
+		}
 	}
 
 	reverse_proxy 127.0.0.1:9001 127.0.0.1:9002 {

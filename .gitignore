@@ -7,3 +7,8 @@ graphify-out/
 
 # Video and media references
 reference/
+
+.pnpm-store/
+*.db
+*.db-wal
+*.db-shm

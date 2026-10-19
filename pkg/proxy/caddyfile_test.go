@@ -588,3 +588,83 @@ func TestUnmarshalCaddyfile_SessionSecure(t *testing.T) {
 	defer func() { _ = m.Cleanup() }()
 }
 
+func TestUnmarshalCaddyfile_Telemetry(t *testing.T) {
+	dbPath := "/tmp/test-caddy-telemetry-" + t.Name() + ".db"
+	input := `raiwall {
+		telemetry {
+			storage sqlite ` + dbPath + `
+			flush_interval 250ms
+			buffer_size 5000
+			retention 72h
+			alert ops_slack https://hooks.slack.com/services/T00/B00/X00 {
+				events block ban critical
+				cooldown 2m
+			}
+			alert ops_discord https://discord.com/api/webhooks/123/abc {
+				events critical
+				cooldown 10m
+			}
+		}
+	}`
+
+	d := caddyfile.NewTestDispenser(input)
+	m := new(Middleware)
+	if err := m.UnmarshalCaddyfile(d); err != nil {
+		t.Fatalf("UnmarshalCaddyfile failed: %v", err)
+	}
+
+	if m.TelemetryConfig == nil {
+		t.Fatal("expected TelemetryConfig to be populated")
+	}
+	if m.TelemetryConfig.StorageType != "sqlite" {
+		t.Errorf("expected storage type sqlite, got %s", m.TelemetryConfig.StorageType)
+	}
+	if m.TelemetryConfig.StoragePath != dbPath {
+		t.Errorf("expected storage path %s, got %s", dbPath, m.TelemetryConfig.StoragePath)
+	}
+	if m.TelemetryConfig.BufferSize != 5000 {
+		t.Errorf("expected buffer size 5000, got %d", m.TelemetryConfig.BufferSize)
+	}
+	if len(m.TelemetryConfig.AlertChannels) != 2 {
+		t.Fatalf("expected 2 alert channels, got %d", len(m.TelemetryConfig.AlertChannels))
+	}
+	if m.TelemetryConfig.AlertChannels[0].Name != "ops_slack" {
+		t.Errorf("unexpected alert channel 0 name: %s", m.TelemetryConfig.AlertChannels[0].Name)
+	}
+	if len(m.TelemetryConfig.AlertChannels[0].Events) != 3 {
+		t.Errorf("unexpected alert channel 0 events: %v", m.TelemetryConfig.AlertChannels[0].Events)
+	}
+
+	caddyCtx, cancel := caddy.NewContext(caddy.Context{Context: context.Background()})
+	defer cancel()
+	if err := m.Provision(caddyCtx); err != nil {
+		t.Fatalf("Provision failed: %v", err)
+	}
+	defer func() {
+		_ = m.Cleanup()
+	}()
+
+	if m.TelemetryStore() == nil {
+		t.Error("expected TelemetryStore to be provisioned")
+	}
+	if m.RingBuffer() == nil {
+		t.Error("expected RingBuffer to be provisioned")
+	}
+	if m.EventStreamer() == nil {
+		t.Error("expected EventStreamer to be provisioned")
+	}
+	if m.AlertEngine() == nil {
+		t.Error("expected AlertEngine to be provisioned")
+	}
+	if m.Metrics() == nil {
+		t.Error("expected Metrics to be provisioned")
+	}
+	if m.UIHandler() == nil {
+		t.Error("expected UIHandler to be provisioned")
+	}
+	if m.TelemetryAPI() == nil {
+		t.Error("expected TelemetryAPI to be provisioned")
+	}
+}
+
+
