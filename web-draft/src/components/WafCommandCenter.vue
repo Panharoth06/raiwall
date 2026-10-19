@@ -22,7 +22,6 @@ import {
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
-import { Badge } from '@/components/ui/badge'
 import type {
   ViewMode,
   IngressSourceId,
@@ -115,10 +114,9 @@ const apiSubtext = computed(() => {
     : '41.5M Requests (1.2% Blocked)'
 })
 
-// Starburst Radial Ticks generator (48 ticks)
+// Starburst Radial Ticks generator (48 ticks) - strictly static radii (no scale) with color illumination on hover
 const computeHubTicks = (cx: number, cy: number, hubId: WafHubId) => {
   const isHovered = hoveredHubId.value === hubId
-  const activeLengthExtension = isHovered ? 8 : 0
   const ticks = []
 
   for (let i = 0; i < 48; i++) {
@@ -127,19 +125,22 @@ const computeHubTicks = (cx: number, cy: number, hubId: WafHubId) => {
     const r1 = 64
     const isActive = i % 2 === 0
 
-    let r2 = 76
-    let color = '#3A4354'
-    let strokeWidth = 1.4
+    // Strictly static radii - no scale distortion or length change on hover
+    const r2 = isActive ? 90 : 76
+
+    let color = isHovered ? '#4E5A70' : '#3A4354'
+    let strokeWidth = isActive ? 2.2 : 1.4
 
     if (isActive) {
-      r2 = 90 + activeLengthExtension
-      // Left-facing hemisphere 135° to 225° marks terminated threats
       if (angle >= 135 && angle <= 225) {
-        color = '#EF4444'
+        // Threat sector
+        color = isHovered ? '#F87171' : '#EF4444'
       } else {
-        color = '#10B981'
+        // Clean sector: vibrant emerald for waf-core, electric blue for edge-defense
+        color = isHovered
+          ? (hubId === 'waf-core' ? '#34D399' : '#60A5FA')
+          : (hubId === 'waf-core' ? '#10B981' : '#2574F5')
       }
-      strokeWidth = 2.2
     }
 
     const cos = Math.cos(rad)
@@ -201,9 +202,9 @@ const lowerSummary = computed(() => {
 
 // Upper Arc Nodes
 const upperArcNodes = computed<ArcNodeItem[]>(() => {
-  const cx = 1190
+  const cx = 1140
   const cy = 330
-  const radius = 180
+  const radius = 170
 
   if (viewMode.value === 'threats') {
     const threats = [
@@ -278,9 +279,9 @@ const upperArcNodes = computed<ArcNodeItem[]>(() => {
 
 // Lower Arc Nodes
 const lowerArcNodes = computed<ArcNodeItem[]>(() => {
-  const cx = 1190
+  const cx = 1140
   const cy = 600
-  const radius = 180
+  const radius = 170
 
   if (viewMode.value === 'threats') {
     const vectors = [
@@ -339,10 +340,10 @@ const sankeyRibbons = computed<SankeyRibbon[]>(() => {
   const ribbons: SankeyRibbon[] = []
 
   // Stage 1: Left Ingress Sources to Center Hubs
-  // Bots (270, 200) -> Threats
+  // Bots (240, 200) -> Threats
   ribbons.push({
     id: 'ribbon-bots-wafcore',
-    d: computeCubicPath(270, 200, 800, 330),
+    d: computeCubicPath(240, 200, 800, 330),
     sourceId: 'bots',
     targetId: 'waf-core',
     stroke: hoveredRibbonId.value === 'ribbon-bots-wafcore' ? 'rgba(239, 68, 68, 0.60)' : 'rgba(239, 68, 68, 0.28)',
@@ -357,7 +358,7 @@ const sankeyRibbons = computed<SankeyRibbon[]>(() => {
   const botEdgeDimmed = owaspOnly.value && viewMode.value === 'traffic'
   ribbons.push({
     id: 'ribbon-bots-edgedefense',
-    d: computeCubicPath(270, 200, 800, 600),
+    d: computeCubicPath(240, 200, 800, 600),
     sourceId: 'bots',
     targetId: 'edge-defense',
     stroke: hoveredRibbonId.value === 'ribbon-bots-edgedefense' ? 'rgba(239, 68, 68, 0.60)' : 'rgba(239, 68, 68, 0.28)',
@@ -368,11 +369,11 @@ const sankeyRibbons = computed<SankeyRibbon[]>(() => {
     tooltipSubtext: 'Challenged by stateless PoW and TLS JA4 fingerprinting',
   })
 
-  // Humans (270, 460) -> Clean
+  // Humans (240, 460) -> Clean
   const humansDimmed = (owaspOnly.value && viewMode.value === 'traffic') || viewMode.value === 'threats'
   ribbons.push({
     id: 'ribbon-humans-wafcore',
-    d: computeCubicPath(270, 460, 800, 330),
+    d: computeCubicPath(240, 460, 800, 330),
     sourceId: 'humans',
     targetId: 'waf-core',
     stroke: hoveredRibbonId.value === 'ribbon-humans-wafcore' ? 'rgba(220, 232, 245, 0.52)' : 'rgba(175, 188, 204, 0.22)',
@@ -385,7 +386,7 @@ const sankeyRibbons = computed<SankeyRibbon[]>(() => {
 
   ribbons.push({
     id: 'ribbon-humans-edgedefense',
-    d: computeCubicPath(270, 460, 800, 600),
+    d: computeCubicPath(240, 460, 800, 600),
     sourceId: 'humans',
     targetId: 'edge-defense',
     stroke: hoveredRibbonId.value === 'ribbon-humans-edgedefense' ? 'rgba(220, 232, 245, 0.52)' : 'rgba(175, 188, 204, 0.22)',
@@ -396,11 +397,11 @@ const sankeyRibbons = computed<SankeyRibbon[]>(() => {
     tooltipSubtext: 'Tier-1 rate limiting pass-through with valid session tokens',
   })
 
-  // API (270, 730) -> Clean
+  // API (240, 730) -> Clean
   const apiDimmed = (owaspOnly.value && viewMode.value === 'traffic') || viewMode.value === 'threats'
   ribbons.push({
     id: 'ribbon-api-wafcore',
-    d: computeCubicPath(270, 730, 800, 330),
+    d: computeCubicPath(240, 730, 800, 330),
     sourceId: 'api',
     targetId: 'waf-core',
     stroke: hoveredRibbonId.value === 'ribbon-api-wafcore' ? 'rgba(220, 232, 245, 0.52)' : 'rgba(175, 188, 204, 0.22)',
@@ -413,7 +414,7 @@ const sankeyRibbons = computed<SankeyRibbon[]>(() => {
 
   ribbons.push({
     id: 'ribbon-api-edgedefense',
-    d: computeCubicPath(270, 730, 800, 600),
+    d: computeCubicPath(240, 730, 800, 600),
     sourceId: 'api',
     targetId: 'edge-defense',
     stroke: hoveredRibbonId.value === 'ribbon-api-edgedefense' ? 'rgba(220, 232, 245, 0.52)' : 'rgba(175, 188, 204, 0.22)',
@@ -481,6 +482,39 @@ const sankeyRibbons = computed<SankeyRibbon[]>(() => {
 // Toggle Human drill-down
 const toggleHumansExpanded = () => {
   isHumansExpanded.value = !isHumansExpanded.value
+}
+
+// Opacity for the base ribbon paths
+const getBaseRibbonOpacity = (ribbon: SankeyRibbon): number => {
+  if (ribbon.dimmed) {
+    return 0.15
+  }
+  const isHoveredConnection =
+    hoveredRibbonId.value === ribbon.id ||
+    (hoveredArcNodeId.value !== null && ribbon.targetId === hoveredArcNodeId.value) ||
+    (hoveredHubId.value !== null && (ribbon.sourceId === hoveredHubId.value || ribbon.targetId === hoveredHubId.value))
+
+  if (hoveredRibbonId.value !== null || hoveredArcNodeId.value !== null || hoveredHubId.value !== null) {
+    return isHoveredConnection ? 1 : 0.25
+  }
+  return 1
+}
+
+// Opacity for the specular light shine inside the mask
+const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
+  // Dimmed ribbons completely suppress their shine
+  if (ribbon.dimmed) {
+    return 0
+  }
+  const isHoveredConnection =
+    hoveredRibbonId.value === ribbon.id ||
+    (hoveredArcNodeId.value !== null && ribbon.targetId === hoveredArcNodeId.value) ||
+    (hoveredHubId.value !== null && (ribbon.sourceId === hoveredHubId.value || ribbon.targetId === hoveredHubId.value))
+
+  if (hoveredRibbonId.value !== null || hoveredArcNodeId.value !== null || hoveredHubId.value !== null) {
+    return isHoveredConnection ? 1 : 0.08
+  }
+  return 0.95
 }
 </script>
 
@@ -581,9 +615,9 @@ const toggleHumansExpanded = () => {
     </aside>
 
     <!-- Main Command Center Canvas Area -->
-    <main class="flex-1 h-full relative overflow-hidden">
-      <!-- Floating Top Bar Overlay (h-14) -->
-      <header class="h-14 absolute top-0 left-0 right-0 flex items-center justify-between px-6 z-20 pointer-events-auto">
+    <main class="flex-1 h-full relative overflow-hidden flex flex-col">
+      <!-- Floating Top Bar (h-14) -->
+      <header class="h-14 w-full flex items-center justify-between px-6 z-20 shrink-0 border-b border-[#1E232D]/30">
         <!-- Left: Brand / Title -->
         <div class="flex items-center gap-2">
           <span class="text-xs uppercase tracking-widest font-semibold text-[#B0B8C4]">RAIWALL</span>
@@ -621,15 +655,8 @@ const toggleHumansExpanded = () => {
 
         <!-- Top-Right Telemetry & Filter Bar -->
         <div class="flex items-center gap-4">
-          <!-- Live Status -->
-          <div class="flex items-center gap-2">
-            <span class="relative flex h-2 w-2">
-              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#10B981] opacity-75"></span>
-              <span class="relative inline-flex rounded-full h-2 w-2 bg-[#10B981]"></span>
-            </span>
-            <Badge variant="outline" class="border-[#10B981]/30 bg-[#10B981]/10 text-[#10B981] px-1.5 py-0 text-[10px] font-bold tracking-wider">LIVE</Badge>
-            <span class="text-xs text-[#848D9C] hidden md:inline">Last Updated 16:12:56</span>
-          </div>
+          <!-- Last Updated (LIVE badge removed per user request) -->
+          <span class="text-xs text-[#848D9C] hidden md:inline">Last Updated 16:12:56</span>
 
           <!-- Filter Popover -->
           <Popover>
@@ -702,8 +729,8 @@ const toggleHumansExpanded = () => {
         </div>
       </header>
 
-      <!-- Three-Column Reactive SVG Topology (viewBox 0 0 1600 900) -->
-      <div class="w-full h-full flex items-center justify-center">
+      <!-- Three-Column Reactive SVG Topology Stage -->
+      <div class="flex-1 w-full relative flex items-center justify-center overflow-hidden">
         <svg
           class="w-full h-full max-w-full max-h-full block"
           viewBox="0 0 1600 900"
@@ -719,21 +746,59 @@ const toggleHumansExpanded = () => {
               <stop offset="0%" stop-color="#EF4444" stop-opacity="0.35" />
               <stop offset="100%" stop-color="#EF4444" stop-opacity="0" />
             </radialGradient>
-            <!-- Soft glow filters for continuous ribbon light shine -->
-            <filter id="ribbonGlowCyan" x="-20%" y="-20%" width="140%" height="140%">
-              <feGaussianBlur stdDeviation="2.5" result="blur" />
+            <!-- Pure White Glow filter for shiny-text style ribbon shine -->
+            <filter
+              id="ribbonGlowWhite"
+              filterUnits="userSpaceOnUse"
+              x="0"
+              y="0"
+              width="1600"
+              height="900"
+            >
+              <feGaussianBlur stdDeviation="3.2" result="blur" />
               <feMerge>
                 <feMergeNode in="blur" />
                 <feMergeNode in="SourceGraphic" />
               </feMerge>
             </filter>
-            <filter id="ribbonGlowRed" x="-20%" y="-20%" width="140%" height="140%">
-              <feGaussianBlur stdDeviation="2.5" result="blur" />
-              <feMerge>
-                <feMergeNode in="blur" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
-            </filter>
+
+            <!-- Shiny-text specular sheen linear gradient (soft feathered falloff with luminous pure white peak) -->
+            <linearGradient id="specularSheenGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0" />
+              <stop offset="15%" stop-color="#FFFFFF" stop-opacity="0.04" />
+              <stop offset="30%" stop-color="#FFFFFF" stop-opacity="0.22" />
+              <stop offset="44%" stop-color="#FFFFFF" stop-opacity="0.75" />
+              <stop offset="50%" stop-color="#FFFFFF" stop-opacity="1" />
+              <stop offset="56%" stop-color="#FFFFFF" stop-opacity="0.75" />
+              <stop offset="70%" stop-color="#FFFFFF" stop-opacity="0.22" />
+              <stop offset="85%" stop-color="#FFFFFF" stop-opacity="0.04" />
+              <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0" />
+            </linearGradient>
+
+            <!-- Mask containing all active ribbon paths to keep shine strictly scoped to ribbons -->
+            <mask
+              id="ribbonShineMask"
+              maskUnits="userSpaceOnUse"
+              maskContentUnits="userSpaceOnUse"
+              x="0"
+              y="0"
+              width="1600"
+              height="900"
+            >
+              <path
+                v-for="ribbon in sankeyRibbons"
+                :key="`mask-${ribbon.id}`"
+                :d="ribbon.d"
+                fill="none"
+                stroke="#FFFFFF"
+                :stroke-width="Math.max(3.6, ribbon.strokeWidth * 0.72)"
+                stroke-linecap="round"
+                :style="{
+                  opacity: getRibbonShineOpacity(ribbon),
+                  transition: 'opacity 0.25s ease',
+                }"
+              />
+            </mask>
           </defs>
 
           <!-- ==================== SANKEY RIBBONS LAYER ==================== -->
@@ -748,7 +813,7 @@ const toggleHumansExpanded = () => {
               :stroke="ribbon.stroke"
               :stroke-width="ribbon.strokeWidth"
               :style="{
-                opacity: ribbon.dimmed ? 0.15 : 1,
+                opacity: getBaseRibbonOpacity(ribbon),
                 cursor: 'pointer',
                 transition: 'stroke 0.2s ease, opacity 0.3s ease, stroke-width 0.2s ease',
               }"
@@ -762,30 +827,25 @@ const toggleHumansExpanded = () => {
               }"
             />
 
-            <!-- Single Continuous Long Bridge Light Shine (Client -> Middle -> Destination) -->
-            <path
-              v-for="ribbon in sankeyRibbons"
-              :key="`pulse-${ribbon.id}`"
-              :d="ribbon.d"
-              fill="none"
-              :stroke="ribbon.isThreat ? '#F87171' : '#38BDF8'"
-              :stroke-width="Math.max(2.8, ribbon.strokeWidth * 0.55)"
-              stroke-linecap="round"
-              :class="[
-                'pointer-events-none',
-                (ribbon.sourceId === 'waf-core' || ribbon.sourceId === 'edge-defense')
-                  ? 'ribbon-bridge-stage2'
-                  : 'ribbon-bridge-stage1'
-              ]"
-              :style="{
-                opacity: ribbon.dimmed ? 0 : 0.9,
-                strokeDasharray: '200 1200',
-                filter: ribbon.isThreat ? 'url(#ribbonGlowRed)' : 'url(#ribbonGlowCyan)',
-              }"
-            />
+            <!-- Shiny-Text Style Soft Specular Gradient Sheen Wave (Unified Canvas Sweep) -->
+            <g
+              class="pointer-events-none select-none"
+              filter="url(#ribbonGlowWhite)"
+            >
+              <g mask="url(#ribbonShineMask)">
+                <rect
+                  class="ribbon-specular-sheen"
+                  x="0"
+                  y="0"
+                  width="380"
+                  height="900"
+                  fill="url(#specularSheenGradient)"
+                />
+              </g>
+            </g>
           </g>
 
-          <!-- ==================== COLUMN A: INGRESS SOURCES (x = 270) ==================== -->
+          <!-- ==================== COLUMN A: INGRESS SOURCES (x = 240) ==================== -->
           <g class="ingress-sources-column">
             <!-- 1. Top Cluster: Automated Bots (y = 200) -->
             <g
@@ -793,8 +853,8 @@ const toggleHumansExpanded = () => {
               class="cursor-pointer"
             >
               <!-- Concentric Dashed Rings -->
-              <circle cx="270" cy="200" r="78" fill="none" stroke="#2E3644" stroke-dasharray="2 5" />
-              <circle cx="270" cy="200" r="108" fill="none" stroke="#2E3644" stroke-dasharray="2 5" />
+              <circle cx="240" cy="200" r="78" fill="none" stroke="#2E3644" stroke-dasharray="2 5" />
+              <circle cx="240" cy="200" r="108" fill="none" stroke="#2E3644" stroke-dasharray="2 5" />
 
               <!-- Orbiting Perimeter Badges (4 badges along rings) -->
               <g
@@ -802,29 +862,29 @@ const toggleHumansExpanded = () => {
                 @mouseenter="hoveredBadgeCluster = 'bots'"
                 @mouseleave="hoveredBadgeCluster = null"
               >
-                <!-- Badge 1: 45° r=108 -> (346.4, 276.4) -->
-                <circle cx="346" cy="276" r="12" fill="#161A22" stroke="#2E3644" stroke-width="1.5" />
-                <Bot class="w-3.5 h-3.5 text-[#848D9C]" x="339" y="269" width="14" height="14" />
+                <!-- Badge 1: 45° r=108 -> (316, 276) -->
+                <circle cx="316" cy="276" r="12" fill="#161A22" stroke="#2E3644" stroke-width="1.5" />
+                <Bot class="w-3.5 h-3.5 text-[#848D9C]" x="309" y="269" width="14" height="14" />
 
-                <!-- Badge 2: 135° r=108 -> (193.6, 276.4) -->
-                <circle cx="194" cy="276" r="12" fill="#161A22" stroke="#2E3644" stroke-width="1.5" />
-                <Lock class="w-3.5 h-3.5 text-[#848D9C]" x="187" y="269" width="14" height="14" />
+                <!-- Badge 2: 135° r=108 -> (164, 276) -->
+                <circle cx="164" cy="276" r="12" fill="#161A22" stroke="#2E3644" stroke-width="1.5" />
+                <Lock class="w-3.5 h-3.5 text-[#848D9C]" x="157" y="269" width="14" height="14" />
 
-                <!-- Badge 3: 225° r=78 -> (214.8, 144.8) -->
-                <circle cx="215" cy="145" r="12" fill="#161A22" stroke="#2E3644" stroke-width="1.5" />
-                <Globe class="w-3.5 h-3.5 text-[#848D9C]" x="208" y="138" width="14" height="14" />
+                <!-- Badge 3: 225° r=78 -> (185, 145) -->
+                <circle cx="185" cy="145" r="12" fill="#161A22" stroke="#2E3644" stroke-width="1.5" />
+                <Globe class="w-3.5 h-3.5 text-[#848D9C]" x="178" y="138" width="14" height="14" />
 
-                <!-- Badge 4: 315° r=78 -> (325.2, 144.8) -->
-                <circle cx="325" cy="145" r="12" fill="#161A22" stroke="#2E3644" stroke-width="1.5" />
-                <Smartphone class="w-3.5 h-3.5 text-[#848D9C]" x="318" y="138" width="14" height="14" />
+                <!-- Badge 4: 315° r=78 -> (295, 145) -->
+                <circle cx="295" cy="145" r="12" fill="#161A22" stroke="#2E3644" stroke-width="1.5" />
+                <Smartphone class="w-3.5 h-3.5 text-[#848D9C]" x="288" y="138" width="14" height="14" />
               </g>
 
               <!-- Central Node Surface -->
-              <circle cx="270" cy="200" r="52" fill="#11141A" stroke="#EF4444" stroke-width="1.5" />
+              <circle cx="240" cy="200" r="52" fill="#11141A" stroke="#EF4444" stroke-width="1.5" />
               <!-- Text -->
-              <text x="270" y="192" text-anchor="middle" fill="#FFFFFF" font-size="20" font-weight="bold" class="tabular-nums">48.2k</text>
-              <text x="270" y="210" text-anchor="middle" fill="#B0B8C4" font-size="11" font-weight="600" letter-spacing="1">AUTOMATED BOTS</text>
-              <text x="270" y="226" text-anchor="middle" fill="#848D9C" font-size="11">{{ botsSubtext }}</text>
+              <text x="240" y="192" text-anchor="middle" fill="#FFFFFF" font-size="20" font-weight="bold" class="tabular-nums">48.2k</text>
+              <text x="240" y="210" text-anchor="middle" fill="#B0B8C4" font-size="11" font-weight="600" letter-spacing="1">AUTOMATED BOTS</text>
+              <text x="240" y="226" text-anchor="middle" fill="#848D9C" font-size="11">{{ botsSubtext }}</text>
             </g>
 
             <!-- 2. Middle Cluster: Human Clients (y = 460) with Drill-Down -->
@@ -834,8 +894,8 @@ const toggleHumansExpanded = () => {
               @click="toggleHumansExpanded"
             >
               <!-- Outer Dashed Rings -->
-              <circle cx="270" cy="460" r="78" fill="none" stroke="#2E3644" stroke-dasharray="2 5" />
-              <circle cx="270" cy="460" r="108" fill="none" stroke="#2E3644" stroke-dasharray="2 5" />
+              <circle cx="240" cy="460" r="78" fill="none" stroke="#2E3644" stroke-dasharray="2 5" />
+              <circle cx="240" cy="460" r="108" fill="none" stroke="#2E3644" stroke-dasharray="2 5" />
 
               <!-- Orbiting Badges -->
               <g
@@ -843,27 +903,27 @@ const toggleHumansExpanded = () => {
                 @mouseenter="hoveredBadgeCluster = 'humans'"
                 @mouseleave="hoveredBadgeCluster = null"
               >
-                <circle cx="346" cy="536" r="12" fill="#161A22" stroke="#2E3644" stroke-width="1.5" />
-                <Globe class="w-3.5 h-3.5 text-[#848D9C]" x="339" y="529" width="14" height="14" />
+                <circle cx="316" cy="536" r="12" fill="#161A22" stroke="#2E3644" stroke-width="1.5" />
+                <Globe class="w-3.5 h-3.5 text-[#848D9C]" x="309" y="529" width="14" height="14" />
 
-                <circle cx="194" cy="536" r="12" fill="#161A22" stroke="#2E3644" stroke-width="1.5" />
-                <Smartphone class="w-3.5 h-3.5 text-[#848D9C]" x="187" y="529" width="14" height="14" />
+                <circle cx="164" cy="536" r="12" fill="#161A22" stroke="#2E3644" stroke-width="1.5" />
+                <Smartphone class="w-3.5 h-3.5 text-[#848D9C]" x="157" y="529" width="14" height="14" />
 
-                <circle cx="215" cy="405" r="12" fill="#161A22" stroke="#2E3644" stroke-width="1.5" />
-                <Lock class="w-3.5 h-3.5 text-[#848D9C]" x="208" y="398" width="14" height="14" />
+                <circle cx="185" cy="405" r="12" fill="#161A22" stroke="#2E3644" stroke-width="1.5" />
+                <Lock class="w-3.5 h-3.5 text-[#848D9C]" x="178" y="398" width="14" height="14" />
 
-                <circle cx="325" cy="405" r="12" fill="#161A22" stroke="#2E3644" stroke-width="1.5" />
-                <Bot class="w-3.5 h-3.5 text-[#848D9C]" x="318" y="398" width="14" height="14" />
+                <circle cx="295" cy="405" r="12" fill="#161A22" stroke="#2E3644" stroke-width="1.5" />
+                <Bot class="w-3.5 h-3.5 text-[#848D9C]" x="288" y="398" width="14" height="14" />
               </g>
 
               <!-- Central Node Surface -->
-              <circle cx="270" cy="460" r="52" fill="#11141A" stroke="#10B981" stroke-width="1.5" />
-              <text x="270" y="450" text-anchor="middle" fill="#FFFFFF" font-size="20" font-weight="bold" class="tabular-nums">142.8k</text>
-              <text x="270" y="468" text-anchor="middle" fill="#B0B8C4" font-size="11" font-weight="600" letter-spacing="1">HUMAN CLIENTS</text>
-              <text x="270" y="484" text-anchor="middle" fill="#848D9C" font-size="11">{{ humansSubtext }}</text>
+              <circle cx="240" cy="460" r="52" fill="#11141A" stroke="#10B981" stroke-width="1.5" />
+              <text x="240" y="450" text-anchor="middle" fill="#FFFFFF" font-size="20" font-weight="bold" class="tabular-nums">142.8k</text>
+              <text x="240" y="468" text-anchor="middle" fill="#B0B8C4" font-size="11" font-weight="600" letter-spacing="1">HUMAN CLIENTS</text>
+              <text x="240" y="484" text-anchor="middle" fill="#848D9C" font-size="11">{{ humansSubtext }}</text>
 
               <!-- Expand / Collapse Indicator -->
-              <g transform="translate(263, 495)">
+              <g transform="translate(233, 495)">
                 <rect x="0" y="0" width="14" height="14" rx="7" :fill="isHumansExpanded ? '#2574F5' : '#1E232D'" :stroke="isHumansExpanded ? '#2574F5' : '#363D4C'" stroke-width="1" />
                 <Minus v-if="isHumansExpanded" class="text-white" :size="10" :x="2" :y="2" />
                 <ChevronDown v-else class="text-[#848D9C]" :size="10" :x="2" :y="2" />
@@ -873,32 +933,32 @@ const toggleHumansExpanded = () => {
             <!-- Expanded Sub-nodes when isHumansExpanded is true -->
             <g v-if="isHumansExpanded" class="humans-expansion-layer transition-opacity">
               <!-- Outer dotted expansion ring (r = 195) -->
-              <circle cx="270" cy="460" r="195" fill="none" stroke="#2E3644" stroke-dasharray="2 5" />
+              <circle cx="240" cy="460" r="195" fill="none" stroke="#2E3644" stroke-dasharray="2 5" />
 
               <!-- Connector Lines -->
-              <path d="M 322 460 C 370 460, 390 345, 445 345" fill="none" stroke="#2E3644" stroke-dasharray="2 4" />
-              <path d="M 322 460 C 370 460, 390 575, 445 575" fill="none" stroke="#2E3644" stroke-dasharray="2 4" />
+              <path d="M 292 460 C 340 460, 360 345, 415 345" fill="none" stroke="#2E3644" stroke-dasharray="2 4" />
+              <path d="M 292 460 C 340 460, 360 575, 415 575" fill="none" stroke="#2E3644" stroke-dasharray="2 4" />
 
-              <!-- Sub-node 1: Verified Sessions at (445, 345) -->
+              <!-- Sub-node 1: Verified Sessions at (415, 345) -->
               <g data-testid="subnode-verified" class="cursor-pointer">
-                <circle cx="445" cy="345" r="44" fill="#161A22" stroke="#10B981" stroke-width="1.5" />
-                <text x="445" y="338" text-anchor="middle" fill="#FFFFFF" font-size="15" font-weight="bold" class="tabular-nums">128.4k</text>
-                <text x="445" y="352" text-anchor="middle" fill="#B0B8C4" font-size="10" font-weight="600" letter-spacing="0.5">VERIFIED SESSIONS</text>
-                <text x="445" y="366" text-anchor="middle" fill="#848D9C" font-size="9.5">17.8M Reqs (JWT Valid)</text>
+                <circle cx="415" cy="345" r="44" fill="#161A22" stroke="#10B981" stroke-width="1.5" />
+                <text x="415" y="338" text-anchor="middle" fill="#FFFFFF" font-size="15" font-weight="bold" class="tabular-nums">128.4k</text>
+                <text x="415" y="352" text-anchor="middle" fill="#B0B8C4" font-size="10" font-weight="600" letter-spacing="0.5">VERIFIED SESSIONS</text>
+                <text x="415" y="366" text-anchor="middle" fill="#848D9C" font-size="9.5">17.8M Reqs (JWT Valid)</text>
 
                 <!-- Info Badge (i) -->
-                <g transform="translate(474, 318)">
+                <g transform="translate(444, 318)">
                   <circle r="8" fill="#2574F5" />
                   <Info class="w-2.5 h-2.5 text-white" x="-5" y="-5" width="10" height="10" />
                 </g>
               </g>
 
-              <!-- Sub-node 2: Anonymous / Proxy at (445, 575) -->
+              <!-- Sub-node 2: Anonymous / Proxy at (415, 575) -->
               <g data-testid="subnode-anonymous" class="cursor-pointer">
-                <circle cx="445" cy="575" r="44" fill="#161A22" stroke="#F59E0B" stroke-width="1.5" />
-                <text x="445" y="568" text-anchor="middle" fill="#FFFFFF" font-size="15" font-weight="bold" class="tabular-nums">14.4k</text>
-                <text x="445" y="582" text-anchor="middle" fill="#B0B8C4" font-size="10" font-weight="600" letter-spacing="0.5">ANONYMOUS / PROXY</text>
-                <text x="445" y="596" text-anchor="middle" fill="#848D9C" font-size="9.5">1.1M Reqs (Challenged)</text>
+                <circle cx="415" cy="575" r="44" fill="#161A22" stroke="#F59E0B" stroke-width="1.5" />
+                <text x="415" y="568" text-anchor="middle" fill="#FFFFFF" font-size="15" font-weight="bold" class="tabular-nums">14.4k</text>
+                <text x="415" y="582" text-anchor="middle" fill="#B0B8C4" font-size="10" font-weight="600" letter-spacing="0.5">ANONYMOUS / PROXY</text>
+                <text x="415" y="596" text-anchor="middle" fill="#848D9C" font-size="9.5">1.1M Reqs (Challenged)</text>
               </g>
             </g>
 
@@ -908,8 +968,8 @@ const toggleHumansExpanded = () => {
               class="cursor-pointer"
             >
               <!-- Outer Dashed Rings -->
-              <circle cx="270" cy="730" r="78" fill="none" stroke="#2E3644" stroke-dasharray="2 5" />
-              <circle cx="270" cy="730" r="108" fill="none" stroke="#2E3644" stroke-dasharray="2 5" />
+              <circle cx="240" cy="730" r="78" fill="none" stroke="#2E3644" stroke-dasharray="2 5" />
+              <circle cx="240" cy="730" r="108" fill="none" stroke="#2E3644" stroke-dasharray="2 5" />
 
               <!-- Orbiting Badges -->
               <g
@@ -917,24 +977,24 @@ const toggleHumansExpanded = () => {
                 @mouseenter="hoveredBadgeCluster = 'api'"
                 @mouseleave="hoveredBadgeCluster = null"
               >
-                <circle cx="346" cy="806" r="12" fill="#161A22" stroke="#2E3644" stroke-width="1.5" />
-                <Server class="w-3.5 h-3.5 text-[#848D9C]" x="339" y="799" width="14" height="14" />
+                <circle cx="316" cy="806" r="12" fill="#161A22" stroke="#2E3644" stroke-width="1.5" />
+                <Server class="w-3.5 h-3.5 text-[#848D9C]" x="309" y="799" width="14" height="14" />
 
-                <circle cx="194" cy="806" r="12" fill="#161A22" stroke="#2E3644" stroke-width="1.5" />
-                <Lock class="w-3.5 h-3.5 text-[#848D9C]" x="187" y="799" width="14" height="14" />
+                <circle cx="164" cy="806" r="12" fill="#161A22" stroke="#2E3644" stroke-width="1.5" />
+                <Lock class="w-3.5 h-3.5 text-[#848D9C]" x="157" y="799" width="14" height="14" />
 
-                <circle cx="215" cy="675" r="12" fill="#161A22" stroke="#2E3644" stroke-width="1.5" />
-                <Globe class="w-3.5 h-3.5 text-[#848D9C]" x="208" y="668" width="14" height="14" />
+                <circle cx="185" cy="675" r="12" fill="#161A22" stroke="#2E3644" stroke-width="1.5" />
+                <Globe class="w-3.5 h-3.5 text-[#848D9C]" x="178" y="668" width="14" height="14" />
 
-                <circle cx="325" cy="675" r="12" fill="#161A22" stroke="#2E3644" stroke-width="1.5" />
-                <Key class="w-3.5 h-3.5 text-[#848D9C]" x="318" y="668" width="14" height="14" />
+                <circle cx="295" cy="675" r="12" fill="#161A22" stroke="#2E3644" stroke-width="1.5" />
+                <Key class="w-3.5 h-3.5 text-[#848D9C]" x="288" y="668" width="14" height="14" />
               </g>
 
               <!-- Central Node Surface -->
-              <circle cx="270" cy="730" r="52" fill="#11141A" stroke="#2574F5" stroke-width="1.5" />
-              <text x="270" y="722" text-anchor="middle" fill="#FFFFFF" font-size="20" font-weight="bold" class="tabular-nums">12.1k</text>
-              <text x="270" y="740" text-anchor="middle" fill="#B0B8C4" font-size="11" font-weight="600" letter-spacing="1">API CONSUMERS</text>
-              <text x="270" y="756" text-anchor="middle" fill="#848D9C" font-size="11">{{ apiSubtext }}</text>
+              <circle cx="240" cy="730" r="52" fill="#11141A" stroke="#2574F5" stroke-width="1.5" />
+              <text x="240" y="722" text-anchor="middle" fill="#FFFFFF" font-size="20" font-weight="bold" class="tabular-nums">12.1k</text>
+              <text x="240" y="740" text-anchor="middle" fill="#B0B8C4" font-size="11" font-weight="600" letter-spacing="1">API CONSUMERS</text>
+              <text x="240" y="756" text-anchor="middle" fill="#848D9C" font-size="11">{{ apiSubtext }}</text>
             </g>
           </g>
 
@@ -943,77 +1003,179 @@ const toggleHumansExpanded = () => {
             <!-- 1. Upper Hub: WAF Core Engine (y = 330) -->
             <g
               data-testid="hub-waf-core"
-              class="cursor-pointer"
+              class="cursor-pointer group/hub hub-container"
               @mouseenter="hoveredHubId = 'waf-core'"
               @mouseleave="hoveredHubId = null"
             >
-              <!-- 48 Radial Starburst Spikes -->
-              <line
-                v-for="(tick, idx) in wafCoreTicks"
-                :key="idx"
-                :x1="tick.x1"
-                :y1="tick.y1"
-                :x2="tick.x2"
-                :y2="tick.y2"
-                :stroke="tick.color"
-                :stroke-width="tick.strokeWidth"
-                stroke-linecap="round"
+              <!-- Continuous Hitbox Container to eliminate spike hover glitching -->
+              <rect
+                x="670"
+                y="225"
+                width="260"
+                height="245"
+                rx="28"
+                fill="transparent"
+                pointer-events="all"
               />
 
-              <!-- Hub Outer Shell -->
-              <circle cx="800" cy="330" r="56" fill="#161A22" stroke="#363D4C" stroke-width="2" />
-              <circle cx="800" cy="330" r="44" fill="#11141A" stroke="#10B981" stroke-width="1.5" stroke-opacity="0.8" />
-
-              <!-- Hub Center Shield Icon -->
-              <g transform="translate(788, 318)">
-                <ShieldCheck class="w-6 h-6 text-[#10B981]" width="24" height="24" />
+              <!-- 48 Radial Starburst Spikes -->
+              <g class="pointer-events-none">
+                <line
+                  v-for="(tick, idx) in wafCoreTicks"
+                  :key="idx"
+                  :x1="tick.x1"
+                  :y1="tick.y1"
+                  :x2="tick.x2"
+                  :y2="tick.y2"
+                  :stroke="tick.color"
+                  :stroke-width="tick.strokeWidth"
+                  stroke-linecap="round"
+                  class="transition-colors duration-200"
+                />
               </g>
 
-              <!-- Hub Label & Telemetry -->
-              <text x="800" y="440" text-anchor="middle" fill="#FFFFFF" font-size="13" font-weight="bold" letter-spacing="0.5">
-                WAF CORE ENGINE
-              </text>
-              <text x="800" y="456" text-anchor="middle" fill="#848D9C" font-size="11">
-                OWASP CRS v4 + 42 Custom Rules • 0.8ms p95
-              </text>
+              <!-- Hub Outer Shell (Color shifts on hover, strictly no scale) -->
+              <g class="pointer-events-none">
+                <circle
+                  cx="800"
+                  cy="330"
+                  r="56"
+                  :fill="hoveredHubId === 'waf-core' ? '#18202A' : '#161A22'"
+                  :stroke="hoveredHubId === 'waf-core' ? '#10B981' : '#363D4C'"
+                  :stroke-width="hoveredHubId === 'waf-core' ? 2.5 : 2"
+                  class="transition-colors duration-200"
+                />
+                <circle
+                  cx="800"
+                  cy="330"
+                  r="44"
+                  :fill="hoveredHubId === 'waf-core' ? '#13231E' : '#11141A'"
+                  :stroke="hoveredHubId === 'waf-core' ? '#34D399' : '#10B981'"
+                  :stroke-opacity="hoveredHubId === 'waf-core' ? 1 : 0.8"
+                  stroke-width="1.5"
+                  class="transition-colors duration-200"
+                />
+
+                <!-- Hub Center Shield Icon -->
+                <g transform="translate(788, 318)">
+                  <ShieldCheck
+                    :class="[
+                      'w-6 h-6 transition-all duration-300',
+                      hoveredHubId === 'waf-core'
+                        ? 'text-[#34D399] drop-shadow-[0_0_12px_rgba(52,211,153,0.7)]'
+                        : 'text-[#10B981]'
+                    ]"
+                    width="24"
+                    height="24"
+                  />
+                </g>
+
+                <!-- Hub Label & Telemetry -->
+                <text
+                  x="800"
+                  y="440"
+                  text-anchor="middle"
+                  :fill="hoveredHubId === 'waf-core' ? '#34D399' : '#FFFFFF'"
+                  font-size="13"
+                  font-weight="bold"
+                  letter-spacing="0.5"
+                  class="transition-colors duration-200"
+                >
+                  WAF CORE ENGINE
+                </text>
+                <text x="800" y="456" text-anchor="middle" fill="#848D9C" font-size="11">
+                  OWASP CRS v4 + 42 Custom Rules • 0.8ms p95
+                </text>
+              </g>
             </g>
 
             <!-- 2. Lower Hub: Edge & Bot Defense (y = 600) -->
             <g
               data-testid="hub-edge-defense"
-              class="cursor-pointer"
+              class="cursor-pointer group/hub hub-container"
               @mouseenter="hoveredHubId = 'edge-defense'"
               @mouseleave="hoveredHubId = null"
             >
-              <!-- 48 Radial Starburst Spikes -->
-              <line
-                v-for="(tick, idx) in edgeDefenseTicks"
-                :key="idx"
-                :x1="tick.x1"
-                :y1="tick.y1"
-                :x2="tick.x2"
-                :y2="tick.y2"
-                :stroke="tick.color"
-                :stroke-width="tick.strokeWidth"
-                stroke-linecap="round"
+              <!-- Continuous Hitbox Container to eliminate spike hover glitching -->
+              <rect
+                x="670"
+                y="495"
+                width="260"
+                height="245"
+                rx="28"
+                fill="transparent"
+                pointer-events="all"
               />
 
-              <!-- Hub Outer Shell -->
-              <circle cx="800" cy="600" r="56" fill="#161A22" stroke="#363D4C" stroke-width="2" />
-              <circle cx="800" cy="600" r="44" fill="#11141A" stroke="#2574F5" stroke-width="1.5" stroke-opacity="0.8" />
-
-              <!-- Hub Center Icon -->
-              <g transform="translate(788, 588)">
-                <Bot class="w-6 h-6 text-[#2574F5]" width="24" height="24" />
+              <!-- 48 Radial Starburst Spikes -->
+              <g class="pointer-events-none">
+                <line
+                  v-for="(tick, idx) in edgeDefenseTicks"
+                  :key="idx"
+                  :x1="tick.x1"
+                  :y1="tick.y1"
+                  :x2="tick.x2"
+                  :y2="tick.y2"
+                  :stroke="tick.color"
+                  :stroke-width="tick.strokeWidth"
+                  stroke-linecap="round"
+                  class="transition-colors duration-200"
+                />
               </g>
 
-              <!-- Hub Label & Telemetry -->
-              <text x="800" y="710" text-anchor="middle" fill="#FFFFFF" font-size="13" font-weight="bold" letter-spacing="0.5">
-                EDGE & BOT DEFENSE
-              </text>
-              <text x="800" y="726" text-anchor="middle" fill="#848D9C" font-size="11">
-                18 Rate Policies, Geo-IP & JA4 Fingerprinting
-              </text>
+              <!-- Hub Outer Shell (Color shifts on hover, strictly no scale) -->
+              <g class="pointer-events-none">
+                <circle
+                  cx="800"
+                  cy="600"
+                  r="56"
+                  :fill="hoveredHubId === 'edge-defense' ? '#18202A' : '#161A22'"
+                  :stroke="hoveredHubId === 'edge-defense' ? '#2574F5' : '#363D4C'"
+                  :stroke-width="hoveredHubId === 'edge-defense' ? 2.5 : 2"
+                  class="transition-colors duration-200"
+                />
+                <circle
+                  cx="800"
+                  cy="600"
+                  r="44"
+                  :fill="hoveredHubId === 'edge-defense' ? '#121D2C' : '#11141A'"
+                  :stroke="hoveredHubId === 'edge-defense' ? '#60A5FA' : '#2574F5'"
+                  :stroke-opacity="hoveredHubId === 'edge-defense' ? 1 : 0.8"
+                  stroke-width="1.5"
+                  class="transition-colors duration-200"
+                />
+
+                <!-- Hub Center Icon -->
+                <g transform="translate(788, 588)">
+                  <Bot
+                    :class="[
+                      'w-6 h-6 transition-all duration-300',
+                      hoveredHubId === 'edge-defense'
+                        ? 'text-[#60A5FA] drop-shadow-[0_0_12px_rgba(96,165,250,0.7)]'
+                        : 'text-[#2574F5]'
+                    ]"
+                    width="24"
+                    height="24"
+                  />
+                </g>
+
+                <!-- Hub Label & Telemetry -->
+                <text
+                  x="800"
+                  y="710"
+                  text-anchor="middle"
+                  :fill="hoveredHubId === 'edge-defense' ? '#60A5FA' : '#FFFFFF'"
+                  font-size="13"
+                  font-weight="bold"
+                  letter-spacing="0.5"
+                  class="transition-colors duration-200"
+                >
+                  EDGE & BOT DEFENSE
+                </text>
+                <text x="800" y="726" text-anchor="middle" fill="#848D9C" font-size="11">
+                  18 Rate Policies, Geo-IP & JA4 Fingerprinting
+                </text>
+              </g>
             </g>
           </g>
 
@@ -1023,22 +1185,22 @@ const toggleHumansExpanded = () => {
             <g class="upper-arc-group">
               <!-- Dotted Circular Arc -->
               <path
-                d="M 1320 180 A 180 180 0 0 1 1370 330 A 180 180 0 0 1 1320 480"
+                d="M 1250 190 A 170 170 0 0 1 1310 330 A 170 170 0 0 1 1250 470"
                 fill="none"
                 stroke="#363D4C"
                 stroke-dasharray="2 5"
                 stroke-width="1.5"
               />
 
-              <!-- Upper Summary Counter (x = 1190) -->
+              <!-- Upper Summary Counter (x = 1140) -->
               <g data-testid="dest-summary-upper" class="cursor-default">
-                <text x="1190" y="318" fill="#FFFFFF" font-size="28" font-weight="bold" class="tabular-nums">
+                <text x="1140" y="318" fill="#FFFFFF" font-size="28" font-weight="bold" class="tabular-nums">
                   {{ upperSummary.count }}
                 </text>
-                <text x="1190" y="338" fill="#B0B8C4" font-size="11" font-weight="600" letter-spacing="1">
+                <text x="1140" y="338" fill="#B0B8C4" font-size="11" font-weight="600" letter-spacing="1">
                   {{ upperSummary.title }}
                 </text>
-                <text x="1190" y="354" fill="#848D9C" font-size="12">
+                <text x="1140" y="354" fill="#848D9C" font-size="12">
                   {{ upperSummary.subtext }}
                 </text>
               </g>
@@ -1112,22 +1274,22 @@ const toggleHumansExpanded = () => {
             >
               <!-- Dotted Circular Arc -->
               <path
-                d="M 1320 450 A 180 180 0 0 1 1370 600 A 180 180 0 0 1 1320 750"
+                d="M 1250 460 A 170 170 0 0 1 1310 600 A 170 170 0 0 1 1250 740"
                 fill="none"
                 stroke="#363D4C"
                 stroke-dasharray="2 5"
                 stroke-width="1.5"
               />
 
-              <!-- Lower Summary Counter (x = 1190) -->
+              <!-- Lower Summary Counter (x = 1140) -->
               <g data-testid="dest-summary-lower" class="cursor-default">
-                <text x="1190" y="588" fill="#FFFFFF" font-size="28" font-weight="bold" class="tabular-nums">
+                <text x="1140" y="588" fill="#FFFFFF" font-size="28" font-weight="bold" class="tabular-nums">
                   {{ lowerSummary.count }}
                 </text>
-                <text x="1190" y="608" fill="#B0B8C4" font-size="11" font-weight="600" letter-spacing="1">
+                <text x="1140" y="608" fill="#B0B8C4" font-size="11" font-weight="600" letter-spacing="1">
                   {{ lowerSummary.title }}
                 </text>
-                <text x="1190" y="624" fill="#848D9C" font-size="12">
+                <text x="1140" y="624" fill="#848D9C" font-size="12">
                   {{ lowerSummary.subtext }}
                 </text>
               </g>
@@ -1226,57 +1388,30 @@ const toggleHumansExpanded = () => {
   overflow: hidden;
 }
 
-@keyframes flowBridgeStage1 {
+/* Shiny-text specular light sheen sweep (~2.2s active sweep + ~1.8s idle pause = 4.0s cycle) */
+@keyframes shinyTextSweep {
   0% {
-    stroke-dashoffset: 200;
-    opacity: 0;
+    transform: translateX(-380px);
   }
-  4% {
-    opacity: 0.95;
+  55% {
+    transform: translateX(1620px);
   }
-  36% {
-    opacity: 0.95;
-  }
-  42% {
-    stroke-dashoffset: -580;
-    opacity: 0;
-  }
-  43%, 100% {
-    stroke-dashoffset: -580;
-    opacity: 0;
+  100% {
+    transform: translateX(1620px);
   }
 }
 
-@keyframes flowBridgeStage2 {
-  0%, 41% {
-    stroke-dashoffset: 200;
-    opacity: 0;
-  }
-  42% {
-    stroke-dashoffset: 200;
-    opacity: 0;
-  }
-  46% {
-    opacity: 0.95;
-  }
-  78% {
-    opacity: 0.95;
-  }
-  84% {
-    stroke-dashoffset: -580;
-    opacity: 0;
-  }
-  85%, 100% {
-    stroke-dashoffset: -580;
-    opacity: 0;
-  }
+.ribbon-specular-sheen {
+  animation: shinyTextSweep 4.0s linear infinite;
+  transform-box: view-box;
+  transform-origin: 0 0;
+  will-change: transform;
 }
 
-.ribbon-bridge-stage1 {
-  animation: flowBridgeStage1 4.4s cubic-bezier(0.35, 0, 0.25, 1) infinite;
-}
-
-.ribbon-bridge-stage2 {
-  animation: flowBridgeStage2 4.4s cubic-bezier(0.35, 0, 0.25, 1) infinite;
+@media (prefers-reduced-motion: reduce) {
+  .ribbon-specular-sheen {
+    animation: none;
+    display: none;
+  }
 }
 </style>

@@ -240,4 +240,85 @@ describe('WafCommandCenter.vue', () => {
     // left should be flipped to the left of the cursor (1550 - 275 - 16 = 1259)
     expect(style).toContain('left: 1259px')
   })
+
+  // Contract 9: Shiny-text Specular Sheen Mask & Gradient Structure
+  it('renders shiny-text specular sheen structure with mask, linear gradient, and pure white glow filter', () => {
+    wrapper = mount(WafCommandCenter, {
+      attachTo: document.body,
+    })
+
+    // Gradient exists with white color stops
+    const gradient = wrapper.find('#specularSheenGradient')
+    expect(gradient.exists()).toBe(true)
+    const stops = gradient.findAll('stop')
+    expect(stops.length).toBeGreaterThanOrEqual(7)
+    stops.forEach((stop) => {
+      expect(stop.attributes('stop-color')).toBe('#FFFFFF')
+    })
+
+    // Filter exists with pure white feGaussianBlur and feMerge
+    const filter = wrapper.find('#ribbonGlowWhite')
+    expect(filter.exists()).toBe(true)
+    expect(filter.find('feGaussianBlur').exists()).toBe(true)
+    expect(filter.find('feMerge').exists()).toBe(true)
+
+    // Mask contains paths for ribbons
+    const mask = wrapper.find('#ribbonShineMask')
+    expect(mask.exists()).toBe(true)
+    const maskPaths = mask.findAll('path')
+    expect(maskPaths.length).toBeGreaterThan(0)
+
+    // Sheen rect exists inside the glow filter and masked container
+    const sheenRect = wrapper.find('.ribbon-specular-sheen')
+    expect(sheenRect.exists()).toBe(true)
+    expect(sheenRect.attributes('fill')).toBe('url(#specularSheenGradient)')
+  })
+
+  // Contract 10: Context-Aware Shine Suppression & Non-Scaling Middle Hubs Hover Color Shift
+  it('suppresses shine on dimmed ribbons when OWASP filter is active and verifies middle hubs change color without scaling on hover', async () => {
+    wrapper = mount(WafCommandCenter, {
+      attachTo: document.body,
+    })
+
+    // 1. Middle hubs have cursor-pointer and trigger color change without scaling
+    const hubWafCore = wrapper.find('[data-testid="hub-waf-core"]')
+    expect(hubWafCore.exists()).toBe(true)
+    expect(hubWafCore.classes()).toContain('cursor-pointer')
+
+    // Initial state checks
+    const initialTicks = hubWafCore.findAll('line')
+    const initialMaxY = Math.max(...initialTicks.map((l) => Number(l.attributes('y2'))))
+    const initialShell = hubWafCore.findAll('circle')[0]
+    expect(initialShell.attributes('stroke')).toBe('#363D4C')
+
+    // Trigger hover on hub-waf-core
+    await hubWafCore.trigger('mouseenter')
+
+    // Color shifts to emerald on hover
+    const hoveredShell = hubWafCore.findAll('circle')[0]
+    expect(hoveredShell.attributes('stroke')).toBe('#10B981')
+
+    // Strictly NO SCALE: Spike length and radial dimensions remain completely static
+    const hoveredTicks = hubWafCore.findAll('line')
+    const hoveredMaxY = Math.max(...hoveredTicks.map((l) => Number(l.attributes('y2'))))
+    expect(hoveredMaxY).toBe(initialMaxY)
+
+    await hubWafCore.trigger('mouseleave')
+    expect(hubWafCore.findAll('circle')[0].attributes('stroke')).toBe('#363D4C')
+
+    // 2. OWASP filter dims unselected ribbons to shine opacity 0
+    const filterBtn = wrapper.find('[data-testid="filter-trigger-btn"]')
+    await filterBtn.trigger('click')
+    const owaspSwitch = wrapper.find('[data-testid="owasp-filter-switch"]')
+    await owaspSwitch.trigger('click')
+
+    // Check mask paths
+    const mask = wrapper.find('#ribbonShineMask')
+    const maskPaths = mask.findAll('path')
+
+    // Some ribbons (e.g. human clients) are dimmed and must have opacity: 0
+    const opacities = maskPaths.map((p) => p.attributes('style'))
+    const hasZeroOpacity = opacities.some((s) => s?.includes('opacity: 0;'))
+    expect(hasZeroOpacity).toBe(true)
+  })
 })

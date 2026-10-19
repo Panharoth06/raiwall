@@ -1,48 +1,58 @@
-# Implementation Plan: Raiwall Domain 5 (Access Control & Zero-Trust Identity Gateway)
+# Implementation Plan: Raiwall Domain 6 (Observability, Forensics & Real-Time Alerting)
 
 ## Overview
-Implement **Domain 5: Access Control (ACLs) & Zero-Trust Identity Gateway** for **Raiwall**: an enterprise-grade access control, threat feed matching, rule exception, and pre-application authentication architecture. 
+Implement **Domain 6: Observability, Forensics & Real-Time Alerting** for **Raiwall**: an enterprise-grade telemetry, forensics, real-time alerting, and live visual analytics engine.
 
-Domain 5 delivers four integrated pillars:
-1. **Granular Parameter-Level Exception Engine (Anti-False-Positive):** Suppresses specific detection rules matching `Host`, `Path Regex`, `HTTP Method`, exact `Parameter Location` (Query, Body, Header, Cookie) + `Parameter Name`, and `RuleID` (e.g. bypassing SQLi AST only on `/api/v1/posts` for field `markdown_content` while keeping SQLi protection active on all other parameters). Evaluated per-parameter prior to AST/lexical triage to conserve CPU.
-2. **Sub-Microsecond CIDR & Threat Feed Engine (`gaissmai/bart`):** Balanced Routing Tables matching incoming IPv4/IPv6 client addresses against 500,000+ threat intelligence entries (CrowdSec, Spamhaus, AbuseIPDB) in $\sim 15\text{ ns}$, with atomic pointer swapping for zero-downtime hot reloads.
-3. **GeoIP Lookups & ASN Extractor (`oschwald/maxminddb-golang`):** MaxMind GeoLite2/GeoIP2 reader for country code, continent, ASN, and organization filtering, with graceful zero-allocation fallback when databases are omitted.
-4. **Compiled Bytecode Boolean ACL Engine (`expr-lang/expr`):** Compiles multi-condition rules (combining IP, CIDR, Country, ASN, Path, Method, Headers, Cookies) into bytecode evaluated in $<15\text{ ns}$ with ordered first-match-wins semantics and rich actions (`allow`, `block`, `challenge`, `redirect`, `audit`).
-5. **Zero-Code Pre-Application Authentication Gateway (`pkg/auth`):** Dual-mode authentication (OIDC Single Sign-On via `coreos/go-oidc` + Simple local credential auth) placing a secure session wall in front of legacy or staging services, issuing signed JWT session cookies (`rw_session`), and injecting upstream identity headers (`X-Auth-Email`, `X-Auth-Subject`, `X-Auth-Roles`).
+Domain 6 delivers six integrated pillars:
+1. **Zero-Latency In-Memory Async Ring Buffer (`pkg/telemetry/ring_buffer.go`):** Non-blocking push pipeline capturing forensic events (client IP, JA4 fingerprint, GeoIP, rule ID, action verdict, latency, headers, truncated payload) with zero allocations on hot paths. Features non-blocking buffer saturation handling with dropped-event telemetry and a background worker flushing batches every $500\text{ ms}$.
+2. **Automated PII & PCI-DSS 4.0 Sanitizer (`pkg/telemetry/sanitizer.go`):** In-stream scrubber sanitizing sensitive headers (`Authorization`, `Cookie`, `X-Auth-*`), blacklisted parameter keys (`password`, `token`, `secret`, `cvv`, `card`, `api_key`), regex pattern scanners for credit card numbers (PCI-DSS) and bearer tokens, plus hard context truncation to $1\text{–}2\text{ KB}$ per event before persistence.
+3. **Pluggable Dual-Tier Forensic Storage (`pkg/telemetry/storage.go`):** 
+   - **Embedded / Homelab Mode (Default):** Zero-dependency pure-Go SQLite in WAL mode (`modernc.org/sqlite`) with optimized multi-column indexes and automated background retention pruning (age and size limits).
+   - **Enterprise Scaled Mode:** Native columnar batch ingestion into ClickHouse (`github.com/ClickHouse/clickhouse-go/v2`) for multi-million record analytics with $10\times$ compression.
+4. **Multi-Channel ChatOps Alerts (`pkg/telemetry/alert.go`):** Notification dispatcher using `containrrr/shoutrrr` supporting Slack, Discord, Telegram, Email, and generic webhooks with sliding-window debouncing and per-target/per-rule cooldowns (preventing alert fatigue during scans).
+5. **Real-Time Live Inspector & Prometheus Metrics (`pkg/telemetry/streamer.go`, `metrics.go`):** High-throughput Server-Sent Events (SSE) broadcaster (`/.raiwall/api/events/stream`) with real-time query filtering, REST log search/aggregation APIs (`/.raiwall/api/events`), and standard Prometheus `/metrics` exporter.
+6. **Embedded Vue 3 Admin Dashboard & Visualizer (`web/`):** Full migration of `web-draft` into `web/`, embedding `dist/` into the single Go binary via `go:embed` served at `/.raiwall/` with SPA history fallback, featuring real-time SSE Live Event Inspector, Apache ECharts QPS/threat analytics, and 3D Attack Globe (`globe.gl`) rendering geolocated threat origin arcs.
 
 ---
 
 ## Architecture Decisions
 
-- **Pre-Inspection Parameter-Level Exception Gate:** Evaluated per parameter directly inside `SemanticEngine` prior to lexical triage and AST verification. Matching parameters skip inspection for the designated `RuleID` without modifying the request payload or wasting parser CPU cycles on known-safe fields.
-- **Atomic Balanced Routing Table (`bart.Table`):** High-throughput radix/BART routing table (`gaissmai/bart`) for IP/CIDR lookups in $\sim 15\text{ ns}$. Threat feed updates use `atomic.Pointer[bart.Table]` for zero-lock hot-reloads under load.
-- **Graceful GeoIP Fallback:** MaxMind reader operates without panics or errors if `.mmdb` files are missing or unconfigured, returning empty/unknown metadata so rules can degrade gracefully.
-- **High-Performance Bytecode Evaluation (`expr-lang/expr`):** ACL rules are pre-compiled into bytecode during configuration provisioning and executed on a pooled environment struct, achieving sub-15ns decision times with zero allocations on the hot path.
-- **Dual-Mode Zero-Code Pre-App Auth:** Supports both enterprise OIDC SSO (Google, Keycloak, Okta, Microsoft) and local Simple Auth for staging environments. Upon successful authentication, issues a tamper-proof signed JWT cookie and injects standardized `X-Auth-*` identity headers into upstream requests.
-- **Modular Nested Caddyfile Directives:** Clean operator UX with dedicated `exceptions { ... }`, `acl { ... }`, and `auth { ... }` blocks within the `raiwall` directive.
+- **Non-Blocking Lock-Free Telemetry Ring Buffer:** Request handling in the Caddy data plane must never block on logging I/O. The ring buffer accepts events synchronously in $<1\text{ µs}$ and delegates disk/network flushing to a decoupled background worker. If buffer saturation occurs under extreme load, excess events are dropped with atomic counter increments exported to Prometheus (`raiwall_telemetry_dropped_total`).
+- **Multi-Layer PII / PCI-DSS Sanitization:** Applied in-stream prior to disk persistence or network streaming. Sensitive headers and parameters are masked (`[REDACTED]`), credit card regexes scrub PANs, and raw payload context is clamped to $2\text{ KB}$ to prevent data leakage and memory bloat.
+- **Pluggable `ForensicStore` Interface:** Abstract interface (`SaveBatch`, `Query`, `QueryAggregates`, `Prune`, `Close`) decoupling business logic from underlying storage engines. SQLite WAL is the zero-config embedded default; ClickHouse batch driver is activated when a ClickHouse DSN is provided.
+- **Severity-Gated Alert Debouncing:** ChatOps alerts are gated by event severity (e.g. `block`, `ban`, high-risk AST threats) and governed by a sliding-window debouncer with per-rule/per-IP cooldowns (e.g., maximum 1 notification per target per 5 minutes) to avoid chat flooding.
+- **SSE Live Streamer with REST Historical Query APIs:** Server-Sent Events (SSE) provide an HTTP/2-friendly, unidirectional live stream to connected browser clients with automatic browser reconnection. Complementary REST endpoints provide paginated historical search and aggregated stats for ECharts and the 3D Globe.
+- **Frontend Migration and Single Binary Embedding:** Migrate the draft Vue 3 codebase from `web-draft/` to `web/`, add ECharts, Globe.gl, and Live Inspector components, build production assets to `web/dist/`, and embed them into the Go binary via `go:embed` mounted at `/.raiwall/`.
+- **Dedicated Internal Route Namespace:** Management routes (`/.raiwall/` UI, `/.raiwall/api/...` APIs, `/.raiwall/metrics`) are handled internally without interfering with upstream reverse proxying.
 
 ---
 
 ## Dependency Graph
 
 ```
-Exception Engine (pkg/acl/exception.go)
+Forensic Event Model & PII Sanitizer (pkg/telemetry/event.go, sanitizer.go)
    │
-   └── Semantic Engine Integration (pkg/engine/semantic.go)
-
-BART Routing Table (pkg/acl/bart.go) & Feed Loader
-   │
-   ├── GeoIP Reader (pkg/acl/geoip.go)
+   ├── Ring Buffer & Flush Worker (pkg/telemetry/ring_buffer.go)
    │       │
-   │       └── Compiled Bytecode ACL Engine (pkg/acl/expr.go)
+   │       ├── ForensicStore Interface & SQLite WAL Driver (pkg/telemetry/sqlite.go)
+   │       │       │
+   │       │       └── ClickHouse Batch Driver (pkg/telemetry/clickhouse.go)
+   │       │
+   │       ├── Shoutrrr Alert Dispatcher & Debouncer (pkg/telemetry/alert.go, debouncer.go)
+   │       │
+   │       └── Prometheus Metrics Exporter (pkg/telemetry/metrics.go)
    │
-Pre-App Auth Core (pkg/auth/oidc.go, simple.go)
-   │
-   └── JWT Session & Identity Injector (pkg/auth/session.go, handler.go)
-           │
-           └── Caddy Middleware Pipeline & Nested Caddyfile Directives (pkg/proxy)
-                   │
-                   └── End-to-End Integration & Benchmark Suite
+   ├── SSE Streamer & REST Analytics APIs (pkg/telemetry/streamer.go, api.go)
+   │       │
+   │       └── Caddy Middleware Pipeline & 'telemetry' Directive (pkg/proxy/middleware.go, caddyfile.go)
+   │               │
+   │               └── Frontend Migration & UI Embedding (web/ -> pkg/proxy/ui.go)
+   │                       │
+   │                       ├── Live Inspector & 1-Click Exception (web/src/components/LiveInspector.vue)
+   │                       │
+   │                       ├── ECharts Analytics & 3D Attack Globe (web/src/components/ThreatAnalytics.vue, AttackGlobe.vue)
+   │                       │
+   │                       └── End-to-End Integration & High-QPS Benchmarks
 ```
 
 ---
@@ -51,29 +61,35 @@ Pre-App Auth Core (pkg/auth/oidc.go, simple.go)
 
 Tasks are tracked in `tasks/todo.md`:
 
-### Phase 1: Granular Parameter-Level Exception Engine
-- [x] **Task 37: Parameter-Level Exception Engine Core & Pattern Matcher** (Size: S)
-- [x] **Task 38: Exception Gate Integration with Semantic Threat Engine** (Size: S)
-- [x] *Checkpoint: Parameter Exception Engine successfully suppresses false positives at parameter precision while keeping adjacent parameters protected.*
+### Phase 1: Telemetry Data Model, PII/PCI-DSS Sanitizer & High-Throughput Ring Buffer
+- [ ] **Task 46: Forensic Event Model & Multi-Layer PII/PCI-DSS Sanitizer** (Size: M)
+- [ ] **Task 47: Zero-Latency Non-Blocking In-Memory Ring Buffer & Flush Worker** (Size: S)
+- [ ] *Checkpoint: Core forensic event model, PII sanitization, and lock-free ring buffer pass all unit and race tests.*
 
-### Phase 2: High-Performance CIDR Routing (`bart`) & GeoIP Engine (`maxminddb`)
-- [x] **Task 39: Balanced Routing Table CIDR & Threat Feed Engine (`gaissmai/bart`)** (Size: M)
-- [x] **Task 40: MaxMind GeoIP Lookup Reader & ASN Extractor (`oschwald/maxminddb-golang`)** (Size: S)
-- [x] *Checkpoint: BART CIDR table and MaxMind GeoIP readers provide sub-microsecond IP threat and geographic intelligence.*
+### Phase 2: Dual-Tier Forensic Storage (SQLite WAL & ClickHouse)
+- [ ] **Task 48: Pluggable ForensicStore Interface & Pure-Go SQLite WAL Implementation** (Size: M)
+- [ ] **Task 49: Enterprise Scaled ClickHouse Batch Storage Driver** (Size: M)
+- [ ] *Checkpoint: Both SQLite WAL and ClickHouse forensic stores ingest batches, query filtered logs, and prune expired records.*
 
-### Phase 3: Compiled Bytecode Boolean ACL Engine (`expr-lang/expr`)
-- [x] **Task 41: Compiled Bytecode ACL Engine & Expression Environment** (Size: M)
-- [x] *Checkpoint: Compiled bytecode ACL engine executes multi-condition rules in $<15\text{ ns}$ with rich action outcomes.*
+### Phase 3: Real-Time Alerting (`containrrr/shoutrrr`) & Prometheus Metrics
+- [ ] **Task 50: Multi-Channel Alert Engine with Sliding-Window Debouncing & Rate Limiting** (Size: M)
+- [ ] **Task 51: Prometheus Metrics Exporter & Data Plane Instrumentation** (Size: S)
+- [ ] *Checkpoint: Alerts dispatch safely without chat spam, and Prometheus exposes accurate WAF telemetry.*
 
-### Phase 4: Zero-Code Pre-Application Authentication Gateway (`pkg/auth`)
-- [x] **Task 42: Dual-Mode Auth Core (Simple Local Auth + OIDC Discovery Client)** (Size: M)
-- [x] **Task 43: JWT Session Management, Upstream Identity Injection & Auth Endpoints** (Size: M)
-- [x] *Checkpoint: Zero-code pre-app auth wall secures legacy apps with OIDC/Simple auth and injects identity headers upstream.*
+### Phase 4: Real-Time SSE Event Streamer, REST Query APIs & Caddy Middleware Integration
+- [ ] **Task 52: Server-Sent Events (SSE) Live Streamer & Forensic Query REST Endpoints** (Size: M)
+- [ ] **Task 53: Caddyfile Directive Parsing (`telemetry`) & Pipeline Telemetry Interception** (Size: M)
+- [ ] *Checkpoint: End-to-end telemetry flows from Caddy middleware through ring buffer to SQLite storage, SSE streamer, and alert dispatcher.*
 
-### Phase 5: Caddy Middleware Integration, Nested Caddyfile Directives & End-to-End Validation
-- [x] **Task 44: Caddy Middleware Wiring & Nested Caddyfile Directives (`exceptions`, `acl`, `auth`)** (Size: M)
-- [x] **Task 45: Domain 5 End-to-End Integration Tests & Micro-Benchmark Suite** (Size: M)
-- [x] *Checkpoint: Milestone 5 complete, all tests passing with `-race`, single binary builds cleanly under 50MB.*
+### Phase 5: Frontend Migration (`web/`), Live Inspector & Dashboard Visualizations
+- [ ] **Task 54: Frontend Project Migration (`web-draft` -> `web`) & Embedding Infrastructure** (Size: M)
+- [ ] **Task 55: Real-Time Live Inspector Table & SSE Composable** (Size: M)
+- [ ] **Task 56: Apache ECharts Analytics Dashboards & 3D Threat Globe (`globe.gl`)** (Size: M)
+- [ ] *Checkpoint: Complete web dashboard builds cleanly, runs live SSE streaming, and renders ECharts & 3D Globe.*
+
+### Phase 6: End-to-End Integration, Micro-benchmarks & Verification
+- [ ] **Task 57: Domain 6 End-to-End Telemetry Integration Tests & High-QPS Micro-benchmarks** (Size: M)
+- [ ] *Checkpoint: Milestone 6 complete, all tests passing with `-race`, UI and data plane fully integrated in single binary.*
 
 ---
 
@@ -81,15 +97,15 @@ Tasks are tracked in `tasks/todo.md`:
 
 | Risk | Impact | Mitigation Strategy |
 | :--- | :---: | :--- |
-| **Exception Engine Over-Bypass** | **Critical** | Require explicit matching across `Host`, `Path`, `Method`, `Location`, and `ParamName`. Support exact `RuleID` targeting (e.g. `SEMANTIC_SQLI` only) rather than blanket WAF bypasses. |
-| **Memory Exhaustion on 500K+ Threat Feeds** | **High** | `gaissmai/bart` Balanced Routing Tables use memory-efficient compressed prefix trees ($\sim 2\text{ MB}$ for 500K routes). Threat feeds are parsed streaming line-by-line without duplicate buffering. |
-| **Missing or Corrupted GeoIP Database** | **Medium** | Safe no-op fallback when `.mmdb` is missing, unreadable, or omitted. Private/loopback IPs evaluate to unknown geo attributes without panicking. |
-| **`expr` Expression ReDoS or Slow Evaluation** | **Medium** | Pre-compile and validate all expressions during Caddy provisioning; reject invalid ASTs at startup. Restrict expression environment to purely functional, bounded helpers. |
-| **OIDC IdP Latency / Downtime** | **High** | Cache OIDC discovery documents and JWKS keys. Sessions rely on local stateless signed JWT cookies (`rw_session`), requiring IdP roundtrips only during initial login. |
-| **Header Injection Spoofing by Untrusted Clients** | **High** | Always strip incoming `X-Auth-*` headers from incoming client requests at the gateway boundary before injecting verified auth claims. |
+| **Ring Buffer Saturated Under DDoS** | **High** | Non-blocking ring buffer drops excess events when saturated and atomically records dropped count in Prometheus (`raiwall_telemetry_dropped_total`), ensuring proxy request latency is never impacted. |
+| **PII / PCI-DSS Sensitive Data Leakage** | **Critical** | Multi-layer sanitization applied before event reaches ring buffer or storage. Header redaction, key name matching, credit card regex patterns, and context truncation to $2\text{ KB}$. |
+| **SQLite WAL Lock Contention on Heavy Writes** | **Medium** | Batch transactions ($500\text{ ms}$ buffer flushes) to minimize commit frequency. WAL mode permits concurrent reads while batch writes are in progress. Pragmas tuned (`busy_timeout=5000`, `synchronous=NORMAL`). |
+| **ChatOps Alert Flooding (Alert Fatigue)** | **High** | Sliding-window debouncer with per-rule and per-IP cooldown periods (e.g. 5 minutes). Burst alerts grouped into summary notifications. |
+| **High Memory / CPU on 3D Attack Globe** | **Medium** | Throttle WebGL rendering when tab is hidden. Cap maximum concurrent arc particles rendered on the globe. |
+| **Single Binary Size Inflation (>50 MB)** | **Medium** | Tree-shake frontend assets during Vite build, compress static assets with gzip/brotli, and verify binary size in CI. |
 
 ---
 
-## Open Questions & Future Work
-- **1-Click Create Exception from UI (Domain 6):** The Control Plane UI log viewer will provide a "Create Exception" action that pre-fills the exception dialog with the exact Host, Path, Method, Location, and ParamName from the forensic event.
-- **Dynamic Cluster Threat Sync (Domain 7):** Real-time threat feed updates and IP ban distribution over Redis Pub/Sub across multi-node clusters.
+## Open Questions & Future Enhancements
+- **1-Click Create Exception from UI:** The Live Inspector provides a "Create Exception" button that opens a pre-filled dialog with the exact Host, Path, Method, Location, and ParamName from the forensic record to suppress false positives instantly.
+- **Dynamic Cluster Threat Sync (Domain 7):** Real-time forensic telemetry aggregation across multi-node clusters using Redis Pub/Sub or Kafka.
