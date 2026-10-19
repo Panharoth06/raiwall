@@ -161,21 +161,57 @@ This produces the standalone binary at `./bin/raiwall`.
 ./bin/raiwall run --config examples/Caddyfile
 ```
 
+### 4. Admin CLI & Sidecar Operations
+```bash
+# Initialize SQLite database and create root admin
+./bin/raiwall admin init --db file:raiwall_control.db --username admin --password secret
+
+# Create a viewer user
+./bin/raiwall admin create-user --username viewer --role viewer --password secret
+
+# Validate staged configuration changes
+./bin/raiwall admin validate --db file:raiwall_control.db
+
+# Apply staged configuration atomically
+./bin/raiwall admin apply --db file:raiwall_control.db --description "Deploy v1"
+
+# Rollback configuration to version 1
+./bin/raiwall admin rollback --version 1 --db file:raiwall_control.db
+
+# Run standalone Envoy ext_proc gRPC sidecar
+./bin/raiwall sidecar --listen :50051 --db file:raiwall_control.db
+
+# Run Model Context Protocol (MCP) server for AI assistants
+./bin/raiwall mcp --db file:raiwall_control.db
+```
+
 ---
 
 ## Configuration
 
-Raiwall supports both declarative Caddyfile configuration and dynamic runtime API configuration.
+Raiwall supports both declarative Caddyfile configuration and dynamic runtime API configuration via the control plane.
 
 ### Example Caddyfile
 
 ```caddyfile
 :8080 {
-    # Configure Raiwall WAF Middleware
+    # Configure Raiwall WAF Middleware & Control Plane
     raiwall {
         mode defense          # defense | audit | offline
         block_status 403      # HTTP status code for blocked attacks
         offline_status 503    # HTTP status code for offline mode
+
+        # Control Plane persistence and API auth
+        control {
+            db_path file:raiwall_control.db
+            hmac_secret "insecure-change-in-production-secret-key-32b"
+        }
+
+        # Embedded Envoy ext_proc gRPC sidecar listener (optional)
+        sidecar {
+            listen :50051
+            max_body_size 1MB
+        }
     }
 
     # Reverse proxy with Weighted Round-Robin load balancing & active health checks
@@ -191,6 +227,12 @@ Raiwall supports both declarative Caddyfile configuration and dynamic runtime AP
 }
 ```
 
+### Accessing the Control Plane & Documentation
+- **Web Admin Dashboard:** `http://localhost:8080/.raiwall/`
+- **Interactive OpenAPI 3.1 Scalar Docs:** `http://localhost:8080/.raiwall/api/docs`
+- **OpenAPI 3.1 JSON Specification:** `http://localhost:8080/.raiwall/api/openapi.json`
+- **Model Context Protocol (MCP) SSE Stream:** `http://localhost:8080/.raiwall/api/mcp`
+
 ### Run Modes
 - **`defense`**: Full threat detection active. Malicious requests are blocked immediately with an HTTP 403 response.
 - **`audit`**: Passive inspection. Attacks are detected, logged, and audited without blocking client traffic.
@@ -203,12 +245,16 @@ Raiwall supports both declarative Caddyfile configuration and dynamic runtime AP
 ### Makefile Targets
 
 ```bash
-make build              # Compile ./bin/raiwall
-make test               # Run unit tests with race detection
+make build              # Compile single binary ./bin/raiwall (with embedded UI)
+make test               # Run unit tests
+make test-race          # Run unit tests with Go race detector
 make test-integration   # Run end-to-end integration test suite
 make test-all           # Run all unit and integration tests with -race
-make lint               # Run go vet and golangci-lint
+make lint               # Run go vet
 make run                # Run Raiwall with examples/Caddyfile
+make web-dev            # Run Vue 3 admin dashboard in Vite dev mode
+make web-build          # Build production Vue 3 admin dashboard into web/dist
+make web-test           # Run Vue 3 frontend test suite with Vitest
 ```
 
 ### Testing
@@ -216,6 +262,11 @@ make run                # Run Raiwall with examples/Caddyfile
 All packages are tested with the Go race detector enabled:
 ```bash
 go test -v -race -tags=integration ./...
+```
+
+Frontend unit tests with Vitest:
+```bash
+cd web && pnpm test
 ```
 
 ---
@@ -236,7 +287,7 @@ go test -v -race -tags=integration ./...
 ## Tech Stack
 
 - **Data Plane:** Go 1.27+, Caddy v2 (`caddyhttp`), CertMagic, `libinjection-go` (Pure Go), Coraza, TiDB Parser, `mvdan/sh`, `tdewolff/parse`, `exaring/ja4plus`, `gaissmai/bart`, `ristretto`.
-- **Control Plane:** Huma v2 (OpenAPI 3.1 REST API), `sqlc`, SQLite (`modernc.org/sqlite`), Zap logging, Prometheus metrics, Shoutrrr alerting.
+- **Control Plane:** Huma v2 (OpenAPI 3.1 REST API), `sqlc`, SQLite (`modernc.org/sqlite`), Zap logging, Prometheus metrics, Shoutrrr alerting, Model Context Protocol (MCP).
 - **Dashboard UI:** Vue 3 (latest), TypeScript, Vite, `shadcn-vue` (Radix primitives + Tailwind CSS), Pinia, Vue Router 4, Apache ECharts, `globe.gl`.
 
 ---
@@ -244,8 +295,8 @@ go test -v -race -tags=integration ./...
 ## Roadmap
 
 - [x] **Milestone 1 (Data Plane Core):** Caddy v2 reverse proxy middleware, `atomic.Pointer[ConfigSnapshot]` hot swaps, priority client IP extraction, two-phase request/response interception, decoupled `WAFEngine` interface, Smooth Weighted Round-Robin load balancing, and active health checks.
-- [ ] **Milestone 2 (Stateful Defense & Semantic WAF):** Recursive normalization (Coraza), pure-Go `libinjection-go` lexical triage ($<2\text{ µs}$), bounded AST context evaluation (SQL, Shell, XSS), 3-Tier composite rate limiting, BART CIDR threat feeds, and SQLite/ClickHouse logging.
-- [ ] **Milestone 3 (Active Defense & Control Plane):** JA4/JA4H TLS fingerprinting, HTTP 468 stateless PoW challenges, Vue 3 + TypeScript dashboard embedding, 3D attack globe, and Envoy `ext_proc/v3` sidecar mode.
+- [x] **Milestone 2 (Stateful Defense & Semantic WAF):** Recursive normalization (Coraza), pure-Go `libinjection-go` lexical triage ($<2\text{ µs}$), bounded AST context evaluation (SQL, Shell, XSS), 3-Tier composite rate limiting, BART CIDR threat feeds, and SQLite/ClickHouse logging.
+- [x] **Milestone 3 (Active Defense & Control Plane):** JA4/JA4H TLS fingerprinting, HTTP 468 stateless PoW challenges, Vue 3 + TypeScript dashboard embedding, 3D attack globe, Envoy `ext_proc/v3` sidecar mode, Huma OpenAPI 3.1 REST API, and Model Context Protocol (MCP) server.
 
 ---
 
