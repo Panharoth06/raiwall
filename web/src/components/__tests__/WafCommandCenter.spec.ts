@@ -321,4 +321,28 @@ describe('WafCommandCenter.vue', () => {
     const hasZeroOpacity = opacities.some((s) => s?.includes('opacity: 0;'))
     expect(hasZeroOpacity).toBe(true)
   })
+
+  // Contract 11: Dynamic Responsive ViewBox & Zero-Clipping Stage Bounds
+  it('renders SVG with viewBox ensuring full vertical headroom and footroom to prevent clipping', () => {
+    wrapper = mount(WafCommandCenter, {
+      attachTo: document.body,
+    })
+
+    const svg = wrapper.find('[data-testid="topology-svg"]')
+    expect(svg.exists()).toBe(true)
+    const viewBox = svg.attributes('viewBox')
+    expect(viewBox).toBeDefined()
+
+    // Default stageSize 1600x900 produces aspect 16/9, contentHeight 900, minY 20, vbHeight 900
+    const [minX, minY, vbWidth, vbHeight] = viewBox!.split(' ').map(Number)
+    expect(minX).toBeLessThanOrEqual(0)
+    expect(minY).toBeLessThanOrEqual(20)
+    expect(vbWidth).toBeGreaterThanOrEqual(1600)
+    expect(vbHeight).toBeGreaterThanOrEqual(900)
+
+    // The bottom-most cluster (API Consumers at y=730, dashed ring at y=838) is well within minY + vbHeight
+    expect(minY + vbHeight).toBeGreaterThanOrEqual(920)
+    // The top-most cluster (Bots at y=200, dashed ring at y=92) is well below minY
+    expect(minY).toBeLessThanOrEqual(92)
+  })
 })

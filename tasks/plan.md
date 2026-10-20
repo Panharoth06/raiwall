@@ -1,108 +1,151 @@
-# Implementation Plan: Raiwall Domain 7 (Control Plane, Customization & Ecosystem Integration)
+# Implementation Plan: Raiwall Major Update (SafeLine v9.4.2 Parity & Enterprise Architecture)
 
-## Overview
-Implement **Domain 7: Control Plane, Customization & Ecosystem Integration** for **Raiwall**: an enterprise-grade control plane, dynamic configuration engine, Envoy `ext_proc/v3` sidecar inspection server, and embedded Vue 3 management suite.
+## Executive Summary
 
-Domain 7 delivers six integrated pillars:
-1. **SQLite Schema & `sqlc` Persistence Layer (`pkg/control/db/`):** Pure-Go WAL-mode SQLite database with type-safe `sqlc` models storing protected Sites/Apps, parameter-level Exceptions, compiled ACL rules, Rate Limiting & Bot policies, versioned `ConfigSnapshot` revisions, and admin users/API keys.
-2. **Atomic Config Compiler & 1-Click Rollback Engine (`pkg/config/`):** Lock-free atomic configuration swap via `atomic.Pointer[ConfigSnapshot]` with comprehensive pre-flight validation (compiling `expr-lang/expr` expressions, checking BART CIDRs, validating regexes, testing upstream dials). Rejects faulty configurations before live application and supports instantaneous 1-click rollback to any historical snapshot.
-3. **Type-Safe Huma v2 OpenAPI 3.1 REST API & MCP Protocol Bridge (`pkg/control/api/`, `pkg/control/mcp/`):** Modern OpenAPI 3.1 management API using `danielgtaylor/huma/v2` with interactive Scalar documentation (`/.raiwall/api/docs`), Bearer API keys + session cookies with 2-tier RBAC (`admin`, `viewer`), and Model Context Protocol (MCP) server support (`/.raiwall/api/mcp` and `raiwall mcp` CLI) for AI-assisted operations.
-4. **Redis Pub/Sub Cluster Synchronization (`pkg/control/cluster/`):** Distributed cluster configuration broadcast across Raiwall instances. Publishes lightweight version notifications to Redis Pub/Sub, caches the latest compiled snapshot in Redis, and automatically reconciles worker node configurations upon startup or network reconnection.
-5. **Envoy `ext_proc/v3` gRPC Sidecar Inspection Engine (`pkg/sidecar/`):** High-performance gRPC server implementing Envoy's External Processor protocol (`envoy.service.ext_proc.v3.ExternalProcessorServer`). Operates in dual mode: as a standalone Kubernetes sidecar daemon (`raiwall sidecar --listen :50051`) or concurrently alongside Caddy reverse proxy via Caddyfile directive (`sidecar { listen :50051 }`).
-6. **Embedded Vue 3 Enterprise Admin Dashboard (`web/`):** Full single-page management application built with Vue 3, TypeScript, Vite, `shadcn-vue`, Pinia, and Vue Router. Features comprehensive views for Sites/Upstreams, Exceptions (with test simulator), ACL Builder (with live `expr` validator), Rate & Bot Defense, Staged Deployment Diff Review, Snapshot Timeline with 1-Click Rollback, and API Key administration.
+This plan outlines the architecture, component relationships, and delivery strategy for the **Raiwall Major Update**. The primary objective is establishing **100% functional, operational, and UX parity with Chaitin SafeLine WAF v9.4.2 Pro** (as documented in [`docs/`](file:///Users/macbook/Code/raiwall/docs/README.md) and [`docs/comparative-analysis-raiwall.md`](file:///Users/macbook/Code/raiwall/docs/comparative-analysis-raiwall.md)) while preserving Raiwall's core architectural advantages:
+1. **Pure Go single-binary execution** ($< 50\text{ MB}$, zero CGO, zero Docker/Postgres/Redis dependencies required for standalone mode).
+2. **Sub-microsecond threat evaluation** ($< 2\ \mu\text{s}$ lexical triage, sub-15 ns bytecode ACL, sub-15 ns BART CIDR lookups).
+3. **Native HTTP/3 (QUIC) and automated ACME** via Caddy v2.
+4. **Anti-CGNAT composite rate limiting** (`IP + JA4 + Cookie`).
+5. **Integrated Model Context Protocol (MCP)** server for autonomous AI security operations.
 
 ---
 
-## Architecture Decisions
+## Architectural Comparison & Parity Target
 
-- **Hybrid Control Plane Listener:** By default, the Control Plane (Huma REST API, Scalar docs, and Admin UI) is served securely under the internal namespace `/.raiwall/` on the main proxy listener (protected by RBAC and IP ACLs). An optional dedicated management port (e.g. `admin_listen 127.0.0.1:9090`) is supported in Caddyfile and CLI for air-gapped enterprise architectures.
-- **2-Tier RBAC with Dual Auth:** Huma REST API and Admin UI support Bearer tokens (`X-Raiwall-Key` or `Authorization: Bearer <key>`) for automation/CI/CD and secure HMAC-signed session cookies for the UI. Roles are partitioned into `admin` (full read/write, deploy, rollback) and `viewer` (read-only telemetry and rule inspection).
-- **Staged Revisions with Pre-Flight Validation:** Configuration mutations are staged in SQLite draft state, enabling review of visual diffs before applying. On "Deploy Changes", the compiler compiles `expr` bytecode, validates BART CIDR blocks, and verifies upstream endpoints. Upon passing, a new immutable `ConfigSnapshot` is committed to history and swapped atomically via `atomic.Pointer`.
-- **Lightweight Cluster Notification with Snapshot Fetch:** In clustered deployments, the master node publishes a version notification (`{"version": 42, "hash": "..."}`) to Redis Pub/Sub channel `raiwall:cluster:events` and stores the compiled snapshot in Redis key `raiwall:config:snapshot:latest`. Worker nodes fetch, validate, and swap the snapshot, with automatic poll reconciliation on reconnect.
-- **Dual-Mode Envoy `ext_proc/v3` Engine:** The sidecar inspection engine shares the exact same threat detection pipeline, normalizers, `libinjection`, AST checkers, and ACL rules as the Caddy reverse proxy. It can run as a standalone sidecar microservice (`raiwall sidecar`) or as an embedded listener in Caddyfile.
-- **OpenAPI 3.1 & MCP Protocol Bridge:** OpenAPI 3.1 JSON and interactive Scalar docs are exposed at `/.raiwall/api/docs`. An MCP server endpoint at `/.raiwall/api/mcp` and CLI `raiwall mcp` allow AI assistants to inspect telemetry, draft exceptions, and trigger rollbacks safely.
+```
+Current Raiwall Scope (Tasks 1-72 Complete)
+├── Reverse Proxy: Static Caddyfile pipeline, weighted round-robin, hot-reload ConfigSnapshot
+├── Threat Detection: 3 AST categories (SQLi, CmdI, XSS) via TiDB, mvdan/sh, tdewolff
+├── Access Control: expr bytecode ACLs (< 15 ns), BART CIDR (< 15 ns)
+├── Rate Limiting: 3-tier composite rate limiter (IP + JA4 + Cookie), Waiting Room (HTTP 503)
+├── Bot Defense: Altcha/Anubis stateless PoW (HTTP 468), JA4 fingerprinting
+└── Control Plane: Huma v2 OpenAPI 3.1 REST API, SQLite WAL, Vue 3 WafCommandCenter monolith
+
+SafeLine v9.4.2 Target Scope (Major Update: Tasks 73-96)
+├── Navigation Shell: Persistent 8-domain sidebar, RouterView in App.vue, query-param router
+├── Forensic Inspector: Dual tabs (EVENTS vs LOGS), cURL generator, encoding switcher (UTF-8/GBK)
+├── Semantic Matrix: 14 detection modules with 4 modes (Disabled/Audit/Balance/Strict)
+├── Virtual Patching: 193 CVE inner rules with fast path URI prefix indexing
+├── Microservices Gateway: Dynamic UpstreamPool dispatching, sub-path prefix forwarding rules
+├── Proxy Settings: Per-site XFF rewrite, HSTS, SSE streaming, Gzip/Brotli, IPv6
+├── API Auto-Discovery: Transit path sampler cataloging shadow APIs into SQLite
+├── Volumetric Defense: Active banned IP table with "UNBLOCK ALL" emergency release
+├── Waiting Room: Path targeting, live queue telemetry metrics, deterministic HTTP 465
+├── Identity Gateway: 5,000 user directory, 2FA TOTP, LDAP + GitHub IdP, HTTP 467 challenge
+├── IP Groups: Enhanced Malicious Group (5,000 IPs), Search Spiders, BART integration
+└── Custom Templates: Visual code editor for deterministic codes (403, 404, 429, 465, 466, 467, 468, 502, 504)
+```
+
+---
+
+## Strategic Architectural Decisions
+
+### 1. Two-Stage Threat Funnel with Fast-Path CVE Indexing
+Clean traffic ($> 98\%$ of requests) must never incur the overhead of all 14 semantic parsers and 193 CVE signatures.
+- **Stage 1 (Recursive Normalization)**: Decodes URL, HTML entities, and Base64 recursively.
+- **Stage 2 (Lexical Triage)**: Evaluates input in $< 2\ \mu\text{s}$ using `libinjection-go` and token character frequency analysis. Benign requests bypass deep parsers entirely.
+- **Fast-Path CVE Rule Indexing**: The 193 CVE rules are indexed into an in-memory map keyed by HTTP method and URI prefix (e.g. `/.git` rules only execute on paths starting with `/.git`; Log4j checks only run if candidate tokens contain `${`).
+- **Hard Bounds**: Strict 32 KB per-parameter cap and 5 ms timeout per evaluation guarantee ReDoS immunity.
+
+### 2. Dynamic Upstream Dispatching Inside Caddy Middleware
+Currently, `middleware.go` passes requests to `next.ServeHTTP`. To support dynamic upstreams and path-prefix forwarding configured via the REST API without reloading Caddy:
+- When an `AppConfig` specifies custom upstreams or forwarding rules, `middleware.go` evaluates longest prefix match.
+- Matching requests are dispatched directly to the site's `UpstreamPool` using a pooled `httputil.ReverseProxy` with customized director and transport, bypassing static Caddy downstreams.
+
+### 3. Deterministic Custom HTTP Status Codes
+Raiwall adopts deterministic status codes across the entire gateway:
+- `HTTP 403`: Attack Blocked (Semantic AST / CVE Rule)
+- `HTTP 429`: Rate Limit Exceeded (Volumetric throttle)
+- `HTTP 465`: Virtual Waiting Room Queue (Updated from HTTP 503)
+- `HTTP 466`: Upstream Application Offline (All backends unhealthy)
+- `HTTP 467`: Pre-Application Identity Authentication Challenge
+- `HTTP 468`: Anti-Bot Stateless Proof-of-Work Challenge
+
+### 4. Dual-Model SQLite Persistence (Production WAL + In-Memory Driver)
+Every schema alteration in `pkg/control/db/schema.sql` must be accompanied by an update to `pkg/control/db/driver.go` (`control_sqlite`). This guarantees that both production SQLite WAL files and in-memory test drivers execute flawlessly.
+
+### 5. Frontend Architecture Decoupling (Vertical Slicing)
+The navigation shell (`DashboardLayout.vue`) and `SimpleRouter` query-string parser are placed in **Phase 1 (Tasks 73-74)**. This ensures all subsequent views (`SemanticsView`, `SiteDetailView`, `HttpFloodView`, `AuthGatewayView`, `BlockPagesView`) can be mounted, navigated to with query params, and tested immediately upon creation.
 
 ---
 
 ## Dependency Graph
 
 ```
-SQLite Database Schema & sqlc Models (pkg/control/db/)
+Phase 1: Frontend Architecture Foundation & Router Modernization
+   │ (Tasks 73, 74)
+   ├──> Phase 2: Forensic Inspector & Incident Telemetry Upgrades (Tasks 75, 76, 77)
    │
-   ├── Config Compiler, Pre-Flight Validator & Rollback (pkg/config/compiler.go, rollback.go)
-   │       │
-   │       ├── Huma v2 OpenAPI 3.1 REST API & RBAC (pkg/control/api/server.go, auth.go)
-   │       │       │
-   │       │       ├── Configuration CRUD & Deployment Diff Endpoints (pkg/control/api/sites.go, snapshots.go)
-   │       │       │       │
-   │       │       │       └── Model Context Protocol (MCP) Bridge (pkg/control/mcp/server.go)
-   │       │       │
-   │       │       └── Redis Pub/Sub Cluster Sync (pkg/control/cluster/pubsub.go)
-   │       │
-   │       └── Envoy ext_proc/v3 gRPC Sidecar Engine (pkg/sidecar/server.go, processor.go)
-   │               │
-   │               └── Caddy Middleware & CLI Integration (cmd/raiwall/sidecar.go, pkg/proxy/caddyfile.go)
+   ├──> Phase 3: Semantic Detection Matrix & Enhanced Vulnerability Rules (Tasks 78, 79, 80, 81, 82)
    │
-   └── Vue 3 Enterprise Admin Dashboard (web/src/)
-           │
-           ├── Typed API Client & Pinia Stores (web/src/api/client.ts, stores/config.ts)
-           │
-           ├── Sites & Upstream Pools Manager (web/src/views/SitesView.vue)
-           │
-           ├── Exceptions & ACL Rules Builder (web/src/views/ExceptionsView.vue, ACLsView.vue)
-           │
-           ├── Rate Limiting & Bot Defense Policies (web/src/views/PoliciesView.vue)
-           │
-           └── Staged Diff Review, Snapshot History & 1-Click Rollback (web/src/views/DeploymentsView.vue)
+   ├──> Phase 4: Dynamic Proxying, Sub-Path Forwarding & API Auto-Discovery (Tasks 83, 84, 85, 86)
+   │
+   ├──> Phase 5: Volumetric Defense, Active Ban Registry & Virtual Waiting Room (Tasks 87, 88, 89)
+   │
+   ├──> Phase 6: Pre-Application Zero-Trust Identity Gateway (HTTP 467) (Tasks 90, 91, 92, 93)
+   │
+   └──> Phase 7: IP Groups, Deterministic Templates & Production Verification (Tasks 94, 95, 96)
 ```
 
 ---
 
-## Task List Index
+## Phase Breakdown
 
-Tasks are tracked in `tasks/todo.md`:
+### Phase 1: Frontend Architecture Foundation & Router Modernization (Tasks 73-74)
+- **Task 73**: `SimpleRouter` Query-Param & Route Param Engine + `App.vue` RouterView Wiring (Size: M)
+- **Task 74**: `DashboardLayout.vue` Shell Overhaul (SafeLine 8-Domain Navigation) (Size: M)
+- *Checkpoint 1: Router query parameters and persistent sidebar navigation verified.*
 
-### Phase 1: Database Schema, `sqlc` Code Generation & In-Memory Config Rollback Engine
-- [ ] **Task 58: SQLite Schema & `sqlc` Repository for Control Plane Persistence** (Size: M)
-- [ ] **Task 59: Atomic Config Snapshot Compiler, Pre-Flight Validator & Rollback Engine** (Size: M)
-- [ ] *Checkpoint: Control Plane DB schema and Atomic Config Compiler/Rollback pass all unit and concurrency tests.*
+### Phase 2: Forensic Inspector & Incident Telemetry Upgrades (Tasks 75-77)
+- **Task 75**: Backend Incident Aggregation & Rich Parameter Location Telemetry (Size: M)
+- **Task 76**: Reproducible cURL Command Generator API (Size: S)
+- **Task 77**: Frontend Forensic Drawer & Incident-Level UX (Size: M)
+- *Checkpoint 2: Incident aggregation, cURL reproduction, and dual-tab drawer verified.*
 
-### Phase 2: Huma v2 OpenAPI 3.1 REST API, Auth & MCP Tool Bridge
-- [ ] **Task 60: Huma v2 REST Framework Setup, Admin Auth & 2-Tier RBAC** (Size: M)
-- [ ] **Task 61: Configuration CRUD Endpoints & Staged Deployment API** (Size: M)
-- [ ] **Task 62: Model Context Protocol (MCP) Server Endpoint & CLI Stdio Adapter** (Size: M)
-- [ ] *Checkpoint: Huma REST API, Scalar docs, RBAC, CRUD endpoints, and MCP tools fully tested and verified.*
+### Phase 3: Semantic Threat Detection Matrix & Enhanced Vulnerability Rules (Tasks 78-82)
+- **Task 78**: 14-Module Semantic Matrix & Sensitivity Policy Engine (Size: M)
+- **Task 79**: Code Injection & Deserialization Semantic Detectors (Java, PHP, ASP, SSTI) (Size: M)
+- **Task 80**: Web & Network Flaw Semantic Detectors (File Upload, LFI/RFI, SSRF, CSRF, Mal HTTP) (Size: M)
+- **Task 81**: Enhanced Virtual Patching CVE Engine (`inner_rules`, 193 CVEs) (Size: M)
+- **Task 82**: Frontend Semantic Matrix & Inner Rules Management Views (Size: M)
+- *Checkpoint 3: 14 semantic modules and 193 CVE rules verified blocking exploits.*
 
-### Phase 3: Redis Pub/Sub Cluster Synchronization
-- [ ] **Task 63: Redis Pub/Sub Cluster Sync Engine & Reconnect Re-synchronization** (Size: M)
-- [ ] *Checkpoint: Cluster synchronization verified across mock and live Redis instances.*
+### Phase 4: Dynamic Proxying, Sub-Path Forwarding & API Auto-Discovery (Tasks 83-86)
+- **Task 83**: Dynamic Upstream Proxying & Path-Prefix Forwarding in Caddy Middleware (Size: M)
+- **Task 84**: Advanced Proxy Settings Matrix (XFF, HSTS, SSE, compression, IPv6, HTTP redirect) (Size: M)
+- **Task 85**: Passive Runtime API Auto-Discovery & Shadow API Inventory Engine (Size: M)
+- **Task 86**: Frontend Application Detail Overhaul (4-tab Site Detail UX) (Size: L)
+- *Checkpoint 4: Sub-path routing, proxy settings matrix, and API inventory verified.*
 
-### Phase 4: Envoy External Processor (`ext_proc/v3`) gRPC Sidecar Engine
-- [ ] **Task 64: Envoy `ext_proc/v3` gRPC Server Protocol Implementation** (Size: M)
-- [ ] **Task 65: Sidecar CLI Command & Caddyfile Directive Integration** (Size: M)
-- [ ] *Checkpoint: Envoy ext_proc gRPC passes integration tests blocking SQLi/XSS and enforcing ACLs.*
+### Phase 5: Volumetric Defense, Active Ban Registry & Virtual Waiting Room (Tasks 87-89)
+- **Task 87**: Active Banned IP Registry & Emergency "Unblock All" API (Size: M)
+- **Task 88**: Virtual Waiting Room Path Targeting, Telemetry Metrics & HTTP 465 Status Code (Size: M)
+- **Task 89**: Frontend HTTP Flood & Waiting Room Console View (Size: M)
+- *Checkpoint 5: Ban registry, unblock-all, and Waiting Room HTTP 465 verified.*
 
-### Phase 5: Embedded Vue 3 Enterprise Admin Dashboard (Full Control Plane UI)
-- [ ] **Task 66: Dashboard Shell, Navigation, Pinia API Client & Auth Views** (Size: M)
-- [ ] **Task 67: Sites, Upstream Pools & Run Mode Management View** (Size: M)
-- [ ] **Task 68: False-Positive Exceptions & ACL Rules Builder with Test Simulator** (Size: M)
-- [ ] **Task 69: Rate Limiting, Bot Defense & Cluster Settings Views** (Size: M)
-- [ ] **Task 70: Staged Deployment Diff Review, Snapshot History & 1-Click Rollback View** (Size: M)
-- [ ] *Checkpoint: Complete Vue 3 Admin Dashboard builds cleanly, tests pass with Vitest, and embedded assets render flawlessly.*
+### Phase 6: Pre-Application Zero-Trust Identity Gateway (HTTP 467) (Tasks 90-93)
+- **Task 90**: SQLite Identity User Directory (5,000 Accounts, RBAC, 2FA TOTP Cryptography) (Size: M)
+- **Task 91**: External Identity Provider Connectors (LDAP & GitHub OAuth2) (Size: M)
+- **Task 92**: Per-App HTTP 467 Auth Challenge Gate, API Bypass & Unified SSO Session Token (Size: M)
+- **Task 93**: Frontend Auth Gateway Management Console (User Directory, SSO Portal, IdP Settings) (Size: M)
+- *Checkpoint 6: User directory, 2FA TOTP, external IdPs, and HTTP 467 challenge verified.*
 
-### Phase 6: End-to-End Integration, CLI Tooling & Production Verification
-- [ ] **Task 71: Admin CLI Commands (`raiwall admin init`, `create-user`, `apply`, `rollback`)** (Size: M)
-- [ ] **Task 72: Domain 7 End-to-End Integration Tests, Sidecar Verification & Benchmark Validation** (Size: M)
-- [ ] *Checkpoint: Milestone 7 complete, all unit/integration/e2e tests pass with `-race`, binary size verified under 50 MB.*
+### Phase 7: IP Groups, Deterministic Templates & Production Verification (Tasks 94-96)
+- **Task 94**: Named IP Groups Engine with BART Integration (Size: M)
+- **Task 95**: Custom HTML/CSS Response Template Manager & Visual Code Editor (Size: M)
+- **Task 96**: End-to-End Enterprise Integration Suite, Single Binary Build & Performance Benchmark (Size: M)
+- *Final Checkpoint: Complete SafeLine parity verified with single-binary build < 50 MB.*
 
 ---
 
-## Risks and Mitigations
+## Production Constraints & Risk Mitigations
 
-| Risk | Impact | Mitigation Strategy |
-| :--- | :---: | :--- |
-| **Faulty Config Reload Breaks Production Traffic** | **Critical** | Pre-flight compilation step validates all `expr` rules, CIDRs, and upstream addresses before atomic swap. If validation fails, deployment is rejected. 1-click rollback instantly restores the last known healthy snapshot. |
-| **Cluster Worker Node Network Partition** | **High** | Worker nodes poll the latest snapshot version from Redis cache upon reconnect or startup, healing missed Pub/Sub events automatically. |
-| **gRPC Ext_Proc Stream Buffer Exhaustion** | **High** | Envoy request body buffering is capped at 1 MB. Streaming payloads exceeding 1 MB are passed through with header inspection only. |
-| **Single Binary Size Inflation (>50 MB)** | **Medium** | Tree-shake unused icons and frontend components in Vite; compile pure-Go SQLite without CGO overhead; verify binary size in CI. |
-| **Admin Route Unauthorized Access** | **Critical** | Default `/.raiwall/api` and UI endpoints enforce Bearer key or session cookie authentication with CSRF protection and optional BART CIDR IP whitelisting. |
+| Risk | Severity | Constraint | Mitigation |
+| :--- | :--- | :--- | :--- |
+| **AST ReDoS / CPU Exhaustion** | High | Attacker crafts nested payloads causing CPU lockup | Hard 32 KB per-parameter cap + 5 ms parser timeout. Fallback to audit logging on timeout. |
+| **Clean-Traffic Latency Inflation** | High | Evaluating 14 parsers and 193 CVEs on every request | Two-stage funnel: Stage 2 lexical triage (< 2 µs) filters 98%+ of traffic. CVE rules indexed by method + URI prefix. |
+| **Dynamic Routing Memory Leaks** | Medium | Runtime route additions leaking `httputil.ReverseProxy` transports | Pool reverse proxy transports per site ID; clean up transports on site deletion. |
+| **OOM on Waiting Room Flash Crowds** | High | 100,000 concurrent queued connections exhausting memory | Stateless cryptographic queue cookies (`rw_waiting_room_queue_id`) with HTTP 465 polling; SSE pool capped at 5,000 concurrent listeners. |
+| **B2B / Mobile API Challenge Breakage** | Critical | Non-browser clients crashing on interactive HTTP 467/468 | Route classifier bypasses bot challenges for `Authorization: Bearer`, `/api/*`, and `Accept: application/json`. |
+| **Single-Binary Bloat** | Medium | Embedded web assets and CVE rules exceeding 50 MB | Minified and gzip-compressed assets; rules stored in compressed JSON format. |

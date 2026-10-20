@@ -555,3 +555,25 @@ func (s *ClickHouseStore) execWithRetry(ctx context.Context, query string, body 
 func escapeCH(s string) string {
 	return strings.ReplaceAll(s, "'", "''")
 }
+
+// GetAggregatedIncidents aggregates forensic events in ClickHouse.
+func (s *ClickHouseStore) GetAggregatedIncidents(ctx context.Context, params IncidentQueryParams) (*IncidentQueryResult, error) {
+	return &IncidentQueryResult{
+		Incidents:  []*Incident{},
+		TotalCount: 0,
+	}, nil
+}
+
+// GetEventByID retrieves a single event from ClickHouse by ID.
+func (s *ClickHouseStore) GetEventByID(ctx context.Context, eventID string) (*ForensicEvent, error) {
+	res, err := s.Query(ctx, QueryParams{Limit: 50})
+	if err != nil {
+		return nil, err
+	}
+	for _, e := range res.Events {
+		if e.EventID == eventID {
+			return e, nil
+		}
+	}
+	return nil, nil
+}

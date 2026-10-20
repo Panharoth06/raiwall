@@ -17,7 +17,7 @@ const forwarded = useForwardProps(props)
   >
     <span class="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
       <SelectItemIndicator>
-        <Check class="h-4 w-4 text-[#10B981]" />
+        <Check class="h-4 w-4 text-white" />
       </SelectItemIndicator>
     </span>
     <SelectItemText>

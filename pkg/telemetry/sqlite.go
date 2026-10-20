@@ -100,7 +100,12 @@ func (s *SQLiteStore) initSchema() error {
 		headers TEXT,
 		payload TEXT,
 		latency_us INTEGER,
-		status_code INTEGER
+		status_code INTEGER,
+		payload_location TEXT,
+		matched_token TEXT,
+		attack_category TEXT,
+		response_headers TEXT,
+		response_body BLOB
 	);
 
 	CREATE INDEX IF NOT EXISTS idx_events_ts ON forensic_events(timestamp);
@@ -109,9 +114,23 @@ func (s *SQLiteStore) initSchema() error {
 	CREATE INDEX IF NOT EXISTS idx_events_rule ON forensic_events(rule_id);
 	CREATE INDEX IF NOT EXISTS idx_events_country ON forensic_events(country);
 	CREATE INDEX IF NOT EXISTS idx_events_composite ON forensic_events(timestamp, action, rule_id, client_ip);
+	CREATE INDEX IF NOT EXISTS idx_events_ip_host_ts ON forensic_events(client_ip, host, timestamp);
 	`
-	_, err := s.db.Exec(schema)
-	return err
+	if _, err := s.db.Exec(schema); err != nil {
+		return err
+	}
+
+	migrations := []string{
+		"ALTER TABLE forensic_events ADD COLUMN payload_location TEXT;",
+		"ALTER TABLE forensic_events ADD COLUMN matched_token TEXT;",
+		"ALTER TABLE forensic_events ADD COLUMN attack_category TEXT;",
+		"ALTER TABLE forensic_events ADD COLUMN response_headers TEXT;",
+		"ALTER TABLE forensic_events ADD COLUMN response_body BLOB;",
+	}
+	for _, m := range migrations {
+		_, _ = s.db.Exec(m)
+	}
+	return nil
 }
 
 func (s *SQLiteStore) startRetentionWorker(retention, interval time.Duration) {
@@ -150,8 +169,9 @@ func (s *SQLiteStore) SaveBatch(ctx context.Context, events []*ForensicEvent) er
 	INSERT OR REPLACE INTO forensic_events (
 		event_id, timestamp, host, path, method, client_ip, ja4,
 		country, continent, city, asn, as_org, latitude, longitude,
-		rule_id, action, severity, headers, payload, latency_us, status_code
-	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+		rule_id, action, severity, headers, payload, latency_us, status_code,
+		payload_location, matched_token, attack_category, response_headers, response_body
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 	`
 	stmt, err := tx.PrepareContext(ctx, query)
 	if err != nil {
@@ -160,10 +180,15 @@ func (s *SQLiteStore) SaveBatch(ctx context.Context, events []*ForensicEvent) er
 	defer stmt.Close()
 
 	for _, e := range events {
-		var headersJSON string
+		var headersJSON, respHeadersJSON string
 		if len(e.Headers) > 0 {
 			if b, err := json.Marshal(e.Headers); err == nil {
 				headersJSON = string(b)
+			}
+		}
+		if len(e.ResponseHeaders) > 0 {
+			if b, err := json.Marshal(e.ResponseHeaders); err == nil {
+				respHeadersJSON = string(b)
 			}
 		}
 
@@ -189,6 +214,11 @@ func (s *SQLiteStore) SaveBatch(ctx context.Context, events []*ForensicEvent) er
 			e.TruncatedPayload,
 			e.Latency.Microseconds(),
 			e.StatusCode,
+			e.PayloadLocation,
+			e.MatchedToken,
+			e.AttackCategory,
+			respHeadersJSON,
+			e.ResponseBody,
 		)
 		if err != nil {
 			return fmt.Errorf("exec insert event %s: %w", e.EventID, err)
@@ -254,7 +284,12 @@ func (s *SQLiteStore) Query(ctx context.Context, params QueryParams) (*QueryResu
 	fetchQuery := fmt.Sprintf(`
 		SELECT event_id, timestamp, host, path, method, client_ip, ja4,
 		       country, continent, city, asn, as_org, latitude, longitude,
-		       rule_id, action, severity, headers, payload, latency_us, status_code
+		       rule_id, action, severity, headers, payload, latency_us, status_code,
+		       COALESCE(payload_location, '') AS payload_location,
+		       COALESCE(matched_token, '') AS matched_token,
+		       COALESCE(attack_category, '') AS attack_category,
+		       COALESCE(response_headers, '') AS response_headers,
+		       COALESCE(response_body, '') AS response_body
 		FROM forensic_events
 		WHERE %s
 		ORDER BY timestamp DESC
@@ -271,10 +306,11 @@ func (s *SQLiteStore) Query(ctx context.Context, params QueryParams) (*QueryResu
 	var events []*ForensicEvent
 	for rows.Next() {
 		var (
-			e           ForensicEvent
-			tsStr       string
-			headersJSON string
-			latencyUs   int64
+			e               ForensicEvent
+			tsStr           string
+			headersJSON     string
+			respHeadersJSON string
+			latencyUs       int64
 		)
 		err := rows.Scan(
 			&e.EventID,
@@ -298,6 +334,11 @@ func (s *SQLiteStore) Query(ctx context.Context, params QueryParams) (*QueryResu
 			&e.TruncatedPayload,
 			&latencyUs,
 			&e.StatusCode,
+			&e.PayloadLocation,
+			&e.MatchedToken,
+			&e.AttackCategory,
+			&respHeadersJSON,
+			&e.ResponseBody,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("scan event: %w", err)
@@ -308,6 +349,9 @@ func (s *SQLiteStore) Query(ctx context.Context, params QueryParams) (*QueryResu
 		}
 		if headersJSON != "" {
 			_ = json.Unmarshal([]byte(headersJSON), &e.Headers)
+		}
+		if respHeadersJSON != "" {
+			_ = json.Unmarshal([]byte(respHeadersJSON), &e.ResponseHeaders)
 		}
 		e.Latency = time.Duration(latencyUs) * time.Microsecond
 		events = append(events, &e)
@@ -469,4 +513,171 @@ func (s *SQLiteStore) Close() error {
 	}
 	s.wg.Wait()
 	return s.db.Close()
+}
+
+// GetEventByID retrieves a single forensic event by its unique UUID.
+func (s *SQLiteStore) GetEventByID(ctx context.Context, eventID string) (*ForensicEvent, error) {
+	query := `
+		SELECT event_id, timestamp, host, path, method, client_ip, ja4,
+		       country, continent, city, asn, as_org, latitude, longitude,
+		       rule_id, action, severity, headers, payload, latency_us, status_code,
+		       COALESCE(payload_location, ''), COALESCE(matched_token, ''),
+		       COALESCE(attack_category, ''), COALESCE(response_headers, ''),
+		       COALESCE(response_body, X'')
+		FROM forensic_events
+		WHERE event_id = ?
+		LIMIT 1
+	`
+	row := s.db.QueryRowContext(ctx, query, eventID)
+	var (
+		e               ForensicEvent
+		tsStr           string
+		headersJSON     string
+		respHeadersJSON string
+		latencyUs       int64
+	)
+	err := row.Scan(
+		&e.EventID, &tsStr, &e.Host, &e.Path, &e.Method, &e.ClientIP, &e.JA4,
+		&e.GeoData.Country, &e.GeoData.Continent, &e.GeoData.City, &e.GeoData.ASN, &e.GeoData.ASOrg,
+		&e.GeoData.Latitude, &e.GeoData.Longitude,
+		&e.RuleID, &e.Action, &e.Severity, &headersJSON, &e.TruncatedPayload,
+		&latencyUs, &e.StatusCode,
+		&e.PayloadLocation, &e.MatchedToken, &e.AttackCategory,
+		&respHeadersJSON, &e.ResponseBody,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get event by id %s: %w", eventID, err)
+	}
+
+	if t, err := time.Parse(time.RFC3339Nano, tsStr); err == nil {
+		e.Timestamp = t
+	}
+	if headersJSON != "" {
+		_ = json.Unmarshal([]byte(headersJSON), &e.Headers)
+	}
+	if respHeadersJSON != "" {
+		_ = json.Unmarshal([]byte(respHeadersJSON), &e.ResponseHeaders)
+	}
+	e.Latency = time.Duration(latencyUs) * time.Microsecond
+	return &e, nil
+}
+
+// GetAggregatedIncidents groups events occurring within a sliding 5-minute window by client_ip and host.
+func (s *SQLiteStore) GetAggregatedIncidents(ctx context.Context, params IncidentQueryParams) (*IncidentQueryResult, error) {
+	whereClauses := []string{"1=1"}
+	args := []interface{}{}
+
+	if !params.StartTime.IsZero() {
+		whereClauses = append(whereClauses, "timestamp >= ?")
+		args = append(args, params.StartTime.UTC().Format(time.RFC3339Nano))
+	}
+	if !params.EndTime.IsZero() {
+		whereClauses = append(whereClauses, "timestamp <= ?")
+		args = append(args, params.EndTime.UTC().Format(time.RFC3339Nano))
+	}
+	if params.ClientIP != "" {
+		whereClauses = append(whereClauses, "client_ip = ?")
+		args = append(args, params.ClientIP)
+	}
+	if params.Host != "" {
+		whereClauses = append(whereClauses, "host = ?")
+		args = append(args, params.Host)
+	}
+
+	whereSQL := strings.Join(whereClauses, " AND ")
+
+	countQuery := fmt.Sprintf(`
+		SELECT COUNT(*) FROM (
+			SELECT 1 FROM forensic_events
+			WHERE %s
+			GROUP BY client_ip, host, (CAST(strftime('%%%%s', timestamp) AS INTEGER) / 300)
+		)
+	`, whereSQL)
+
+	var total int64
+	if err := s.db.QueryRowContext(ctx, countQuery, args...).Scan(&total); err != nil {
+		return nil, fmt.Errorf("incident count query: %w", err)
+	}
+
+	limit := params.Limit
+	if limit <= 0 {
+		limit = 20
+	}
+	offset := params.Offset
+	if offset < 0 {
+		offset = 0
+	}
+
+	fetchQuery := fmt.Sprintf(`
+		SELECT 
+			client_ip,
+			host,
+			(CAST(strftime('%%%%s', timestamp) AS INTEGER) / 300) as time_window,
+			MIN(timestamp) as min_ts,
+			MAX(timestamp) as max_ts,
+			COUNT(*) as total_events,
+			SUM(CASE WHEN action IN ('block', 'ban') THEN 1 ELSE 0 END) as total_blocked,
+			MAX(severity) as max_severity,
+			MAX(rule_id) as top_rule,
+			COALESCE(MAX(attack_category), '') as category,
+			COALESCE(MAX(country), '') as country
+		FROM forensic_events
+		WHERE %s
+		GROUP BY client_ip, host, time_window
+		ORDER BY min_ts DESC
+		LIMIT ? OFFSET ?
+	`, whereSQL)
+
+	fetchArgs := append(args, limit, offset)
+	rows, err := s.db.QueryContext(ctx, fetchQuery, fetchArgs...)
+	if err != nil {
+		return nil, fmt.Errorf("fetch incidents query: %w", err)
+	}
+	defer rows.Close()
+
+	var incidents []*Incident
+	for rows.Next() {
+		var (
+			inc        Incident
+			timeWindow int64
+			minTsStr   string
+			maxTsStr   string
+		)
+		err := rows.Scan(
+			&inc.ClientIP,
+			&inc.Host,
+			&timeWindow,
+			&minTsStr,
+			&maxTsStr,
+			&inc.TotalEvents,
+			&inc.TotalBlocked,
+			&inc.MaxSeverity,
+			&inc.TopRuleID,
+			&inc.Category,
+			&inc.Country,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("scan incident: %w", err)
+		}
+
+		if t, err := time.Parse(time.RFC3339Nano, minTsStr); err == nil {
+			inc.StartTime = t
+		}
+		if t, err := time.Parse(time.RFC3339Nano, maxTsStr); err == nil {
+			inc.EndTime = t
+		}
+		inc.ID = fmt.Sprintf("inc-%s-%s-%d", inc.ClientIP, inc.Host, timeWindow)
+		if inc.Category == "" {
+			inc.Category = inc.TopRuleID
+		}
+		incidents = append(incidents, &inc)
+	}
+
+	return &IncidentQueryResult{
+		Incidents:  incidents,
+		TotalCount: total,
+	}, nil
 }

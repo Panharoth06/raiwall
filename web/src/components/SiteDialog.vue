@@ -2,7 +2,23 @@
 import { ref, watch } from 'vue';
 import type { Site, Upstream } from '@/api/client';
 import UpstreamPoolEditor from './UpstreamPoolEditor.vue';
-import { X, Globe, Save } from 'lucide-vue-next';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from '@/components/ui/select';
+import { Globe, Save } from 'lucide-vue-next';
 
 const props = defineProps<{
   open: boolean;
@@ -60,46 +76,54 @@ const handleSave = () => {
   });
   emit('close');
 };
+
+const handleOpenChange = (openState: boolean) => {
+  if (!openState) {
+    emit('close');
+  }
+};
 </script>
 
 <template>
-  <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-    <div class="w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-xl shadow-2xl flex flex-col max-h-[90vh]">
+  <Dialog :open="open" @update:open="handleOpenChange">
+    <DialogContent class="max-w-2xl bg-[#1e222a] border-[#2d3440] p-6 max-h-[90vh] flex flex-col font-sans">
       <!-- Header -->
-      <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between flex-shrink-0">
+      <DialogHeader>
         <div class="flex items-center space-x-2.5">
-          <Globe class="w-5 h-5 text-emerald-400" />
-          <h2 class="text-base font-semibold text-white">
+          <Globe class="w-5 h-5 text-slate-400" />
+          <DialogTitle>
             {{ site ? 'Edit Protected Site' : 'Add Protected Site' }}
-          </h2>
+          </DialogTitle>
         </div>
-        <button @click="$emit('close')" class="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800">
-          <X class="w-4 h-4" />
-        </button>
-      </div>
+      </DialogHeader>
 
       <!-- Body -->
-      <div class="p-6 overflow-y-auto space-y-4 flex-1">
+      <div class="py-2 overflow-y-auto space-y-4 flex-1">
         <div class="grid grid-cols-2 gap-4">
           <div>
             <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Site Name</label>
-            <input
+            <Input
               v-model="formName"
-              type="text"
               placeholder="e.g. Payment Gateway"
-              class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-200 text-sm focus:outline-none focus:border-emerald-500"
             />
           </div>
 
           <div>
             <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Operational Mode</label>
-            <select
-              v-model="formMode"
-              class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-200 text-sm focus:outline-none focus:border-emerald-500"
-            >
-              <option value="defense">Defense (Active Threat Blocking)</option>
-              <option value="audit">Audit (Log & Alert Only)</option>
-              <option value="offline">Offline (Maintenance 503)</option>
+            <Select v-model="formMode">
+              <SelectTrigger class="w-full h-9 border-[#363D4C] bg-[#15181F] text-xs text-white">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent class="border-[#363D4C] bg-[#1E222A] text-white">
+                <SelectItem value="defense">Defense (Active Threat Blocking)</SelectItem>
+                <SelectItem value="audit">Audit (Log & Alert Only)</SelectItem>
+                <SelectItem value="offline">Offline (Maintenance 503)</SelectItem>
+              </SelectContent>
+            </Select>
+            <select v-model="formMode" class="sr-only" tabindex="-1" aria-hidden="true">
+              <option value="defense">Defense</option>
+              <option value="audit">Audit</option>
+              <option value="offline">Offline</option>
             </select>
           </div>
         </div>
@@ -108,57 +132,53 @@ const handleSave = () => {
           <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">
             Hostnames (comma separated)
           </label>
-          <input
+          <Input
             v-model="formHostnames"
-            type="text"
             placeholder="api.example.com, pay.example.com"
-            class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-200 text-sm focus:outline-none focus:border-emerald-500"
           />
         </div>
 
         <div class="grid grid-cols-2 gap-4">
           <div>
             <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Block HTTP Status</label>
-            <input
+            <Input
               v-model.number="formBlockCode"
               type="number"
-              class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-200 text-sm focus:outline-none focus:border-emerald-500"
             />
           </div>
 
           <div>
             <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Offline HTTP Status</label>
-            <input
+            <Input
               v-model.number="formOfflineCode"
               type="number"
-              class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-200 text-sm focus:outline-none focus:border-emerald-500"
             />
           </div>
         </div>
 
-        <div class="pt-2 border-t border-slate-800">
+        <div class="pt-2 border-t border-[#2d3440]">
           <UpstreamPoolEditor v-model="formUpstreams" />
         </div>
       </div>
 
       <!-- Footer -->
-      <div class="px-6 py-4 border-t border-slate-800 bg-slate-900/50 flex justify-end space-x-3 flex-shrink-0">
-        <button
+      <DialogFooter class="flex justify-end space-x-2 pt-4 border-t border-[#2d3440]">
+        <Button
           type="button"
+          variant="secondary"
           @click="$emit('close')"
-          class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium transition-colors"
         >
           Cancel
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
           @click="handleSave"
-          class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-medium transition-colors flex items-center space-x-1.5"
+          class="gap-1.5"
         >
           <Save class="w-3.5 h-3.5" />
           <span>Save to Draft</span>
-        </button>
-      </div>
-    </div>
-  </div>
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 </template>

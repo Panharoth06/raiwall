@@ -3,7 +3,32 @@ import { ref } from 'vue';
 import { useConfigStore } from '@/stores/config';
 import type { ExceptionRule } from '@/api/client';
 import ExceptionTestModal from '@/components/ExceptionTestModal.vue';
-import { Plus, Shield, Trash2, Play, Sparkles, X, Save } from 'lucide-vue-next';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow,
+  TableCell,
+} from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from '@/components/ui/select';
+import { Plus, Shield, Trash2, Play, Sparkles, Save } from 'lucide-vue-next';
 
 const configStore = useConfigStore();
 
@@ -62,131 +87,129 @@ const handleDelete = async (id: string) => {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="h-full flex flex-col space-y-4 p-6 bg-[#0d0f14] text-zinc-100 rounded-xl border border-zinc-800 shadow-2xl font-sans overflow-hidden">
     <!-- Header -->
-    <div class="flex items-center justify-between">
+    <div class="flex items-center justify-between shrink-0">
       <div>
-        <h1 class="text-xl font-bold text-white tracking-tight flex items-center space-x-2.5">
-          <Shield class="w-6 h-6 text-emerald-400" />
+        <h1 class="text-sm font-semibold uppercase tracking-wider text-white flex items-center gap-2">
+          <Shield class="w-4 h-4 text-slate-400" />
           <span>False-Positive Exception Rules</span>
         </h1>
-        <p class="text-xs text-slate-400 mt-1">
-          Granular parameter-level bypasses: Host + Path + Method + Location + Param Name to prevent legitimate transaction drops.
+        <p class="text-[11px] text-zinc-400 mt-0.5">
+          Granular parameter-level bypasses: Host + Path + Method + Location + Param Name.
         </p>
       </div>
 
-      <button
+      <Button
         @click="openAddModal"
-        class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-medium transition-colors flex items-center space-x-2"
+        class="gap-1.5"
       >
-        <Plus class="w-4 h-4" />
+        <Plus class="w-3.5 h-3.5" />
         <span>Add Exception Rule</span>
-      </button>
+      </Button>
     </div>
 
-    <!-- Exceptions Table -->
-    <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
+    <!-- Exceptions Table Container -->
+    <div class="flex-1 min-h-0 bg-[#12151c] border border-zinc-800 rounded-lg overflow-y-auto">
       <div v-if="configStore.exceptions.length === 0" class="p-12 text-center">
-        <Sparkles class="w-12 h-12 text-slate-600 mx-auto mb-3" />
-        <h3 class="text-sm font-semibold text-slate-300">No exception rules defined</h3>
-        <p class="text-xs text-slate-500 mt-1 mb-4">
+        <Sparkles class="w-10 h-10 text-slate-400 mx-auto mb-3" />
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-300">No exception rules defined</h3>
+        <p class="text-[11px] text-slate-400 mt-1 mb-4">
           Suppress false-positives without disabling the WAF globally.
         </p>
-        <button
+        <Button
           @click="openAddModal"
-          class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-medium transition-colors"
+          class="gap-1.5"
         >
-          Add First Exception
-        </button>
+          <Plus class="w-3.5 h-3.5" />
+          <span>Add First Exception</span>
+        </Button>
       </div>
 
-      <table v-else class="w-full text-left text-xs text-slate-300">
-        <thead class="bg-slate-950/60 text-slate-400 uppercase tracking-wider font-semibold border-b border-slate-800">
-          <tr>
-            <th class="py-3 px-4">Host / Path</th>
-            <th class="py-3 px-4">Method</th>
-            <th class="py-3 px-4">Location</th>
-            <th class="py-3 px-4">Parameter Name</th>
-            <th class="py-3 px-4">Suppressed Threat</th>
-            <th class="py-3 px-4">Reason</th>
-            <th class="py-3 px-4 text-right">Actions</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-800/60">
-          <tr v-for="rule in configStore.exceptions" :key="rule.id" class="hover:bg-slate-800/40 transition-colors">
-            <td class="py-3.5 px-4">
-              <span class="text-white font-medium block">{{ rule.path }}</span>
-              <span class="text-[11px] text-slate-500 font-mono">{{ rule.host || '*' }}</span>
-            </td>
-            <td class="py-3.5 px-4 font-mono text-[11px]">
-              <span class="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded text-slate-300">
+      <Table v-else>
+        <TableHeader class="sticky top-0 z-10 bg-[#14171d]">
+          <TableRow>
+            <TableHead class="font-mono text-[11px]">Host / Path</TableHead>
+            <TableHead class="font-mono text-[11px]">Method</TableHead>
+            <TableHead class="font-mono text-[11px]">Location</TableHead>
+            <TableHead class="font-mono text-[11px]">Parameter Name</TableHead>
+            <TableHead class="font-mono text-[11px]">Suppressed Threat</TableHead>
+            <TableHead class="font-mono text-[11px]">Reason</TableHead>
+            <TableHead class="font-mono text-[11px] text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          <TableRow v-for="rule in configStore.exceptions" :key="rule.id">
+            <TableCell>
+              <span class="text-white font-medium block font-mono">{{ rule.path }}</span>
+              <span class="text-[10px] text-slate-400 font-mono">{{ rule.host || '*' }}</span>
+            </TableCell>
+            <TableCell class="font-mono text-[11px]">
+              <span class="px-2 py-0.5 bg-[#17223B] border border-[#2574F5]/30 rounded text-[#38BDF8]">
                 {{ rule.method }}
               </span>
-            </td>
-            <td class="py-3.5 px-4">
-              <span class="capitalize text-slate-300 font-medium">{{ rule.location }}</span>
-            </td>
-            <td class="py-3.5 px-4 font-mono text-emerald-400 font-semibold">
+            </TableCell>
+            <TableCell>
+              <span class="capitalize text-slate-300 font-mono text-[11px]">{{ rule.location }}</span>
+            </TableCell>
+            <TableCell class="font-mono text-emerald-400 font-semibold">
               {{ rule.param_name }}
-            </td>
-            <td class="py-3.5 px-4 font-mono text-slate-400 text-[11px]">
+            </TableCell>
+            <TableCell class="font-mono text-slate-400 text-[11px]">
               {{ rule.rule_id || 'ALL' }}
-            </td>
-            <td class="py-3.5 px-4 text-slate-400 truncate max-w-xs">
+            </TableCell>
+            <TableCell class="text-slate-400 truncate max-w-xs text-[11px]">
               {{ rule.reason }}
-            </td>
-            <td class="py-3.5 px-4 text-right space-x-2">
-              <button
+            </TableCell>
+            <TableCell class="text-right space-x-1">
+              <Button
+                variant="ghost"
+                size="icon"
                 @click="openTestSimulator(rule)"
-                class="p-1.5 text-slate-400 hover:text-emerald-400 hover:bg-slate-800 rounded transition-colors"
                 title="Test with simulator"
+                class="h-7 w-7 text-slate-400 hover:text-white"
               >
-                <Play class="w-4 h-4" />
-              </button>
-              <button
+                <Play class="w-3.5 h-3.5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
                 @click="handleDelete(rule.id)"
-                class="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded transition-colors"
                 title="Delete exception"
+                class="h-7 w-7 text-slate-400 hover:text-red-400"
               >
-                <Trash2 class="w-4 h-4" />
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+                <Trash2 class="w-3.5 h-3.5" />
+              </Button>
+            </TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
     </div>
 
     <!-- Add Exception Modal -->
-    <div v-if="showAddModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div class="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-xl shadow-2xl flex flex-col">
-        <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+    <Dialog :open="showAddModal" @update:open="showAddModal = $event">
+      <DialogContent class="max-w-lg bg-[#1e222a] border-[#2d3440] p-6 font-sans">
+        <DialogHeader>
           <div class="flex items-center space-x-2.5">
-            <Shield class="w-5 h-5 text-emerald-400" />
-            <h2 class="text-base font-semibold text-white">New Parameter Exception Rule</h2>
+            <Shield class="w-5 h-5 text-slate-400" />
+            <DialogTitle>New Parameter Exception Rule</DialogTitle>
           </div>
-          <button @click="showAddModal = false" class="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800">
-            <X class="w-4 h-4" />
-          </button>
-        </div>
+        </DialogHeader>
 
-        <div class="p-6 space-y-4">
+        <div class="space-y-4 py-2">
           <div class="grid grid-cols-2 gap-4">
             <div>
               <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Host (Optional)</label>
-              <input
+              <Input
                 v-model="newHost"
-                type="text"
                 placeholder="* or api.example.com"
-                class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-200 text-sm focus:outline-none focus:border-emerald-500"
               />
             </div>
             <div>
               <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Path</label>
-              <input
+              <Input
                 v-model="newPath"
-                type="text"
                 placeholder="/api/v1/search"
-                class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-200 text-sm focus:outline-none focus:border-emerald-500"
               />
             </div>
           </div>
@@ -194,10 +217,19 @@ const handleDelete = async (id: string) => {
           <div class="grid grid-cols-2 gap-4">
             <div>
               <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">HTTP Method</label>
-              <select
-                v-model="newMethod"
-                class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-200 text-sm focus:outline-none focus:border-emerald-500"
-              >
+              <Select v-model="newMethod">
+                <SelectTrigger class="w-full h-9 border-[#363D4C] bg-[#15181F] text-xs text-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent class="border-[#363D4C] bg-[#1E222A] text-white">
+                  <SelectItem value="ALL">ALL</SelectItem>
+                  <SelectItem value="GET">GET</SelectItem>
+                  <SelectItem value="POST">POST</SelectItem>
+                  <SelectItem value="PUT">PUT</SelectItem>
+                  <SelectItem value="DELETE">DELETE</SelectItem>
+                </SelectContent>
+              </Select>
+              <select v-model="newMethod" class="sr-only" tabindex="-1" aria-hidden="true">
                 <option value="ALL">ALL</option>
                 <option value="GET">GET</option>
                 <option value="POST">POST</option>
@@ -207,10 +239,18 @@ const handleDelete = async (id: string) => {
             </div>
             <div>
               <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Parameter Location</label>
-              <select
-                v-model="newLocation"
-                class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-200 text-sm focus:outline-none focus:border-emerald-500"
-              >
+              <Select v-model="newLocation">
+                <SelectTrigger class="w-full h-9 border-[#363D4C] bg-[#15181F] text-xs text-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent class="border-[#363D4C] bg-[#1E222A] text-white">
+                  <SelectItem value="query">Query Parameter</SelectItem>
+                  <SelectItem value="header">Request Header</SelectItem>
+                  <SelectItem value="cookie">Cookie</SelectItem>
+                  <SelectItem value="body">Request Body</SelectItem>
+                </SelectContent>
+              </Select>
+              <select v-model="newLocation" class="sr-only" tabindex="-1" aria-hidden="true">
                 <option value="query">Query Parameter</option>
                 <option value="header">Request Header</option>
                 <option value="cookie">Cookie</option>
@@ -222,54 +262,48 @@ const handleDelete = async (id: string) => {
           <div class="grid grid-cols-2 gap-4">
             <div>
               <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Parameter Name</label>
-              <input
+              <Input
                 v-model="newParamName"
-                type="text"
                 placeholder="e.g. search_term"
-                class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-200 text-sm focus:outline-none focus:border-emerald-500"
               />
             </div>
             <div>
               <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Rule ID (or ALL)</label>
-              <input
+              <Input
                 v-model="newRuleId"
-                type="text"
                 placeholder="ALL or SQLI_*"
-                class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-200 text-sm focus:outline-none focus:border-emerald-500"
               />
             </div>
           </div>
 
           <div>
             <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Reason / Context</label>
-            <input
+            <Input
               v-model="newReason"
-              type="text"
               placeholder="e.g. Valid SQL editor payload in internal tool"
-              class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-200 text-sm focus:outline-none focus:border-emerald-500"
             />
           </div>
         </div>
 
-        <div class="px-6 py-4 border-t border-slate-800 bg-slate-900/50 flex justify-end space-x-3">
-          <button
+        <DialogFooter class="flex justify-end space-x-2 pt-4 border-t border-[#2d3440]">
+          <Button
             type="button"
+            variant="secondary"
             @click="showAddModal = false"
-            class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium transition-colors"
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             @click="handleSaveException"
-            class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-medium transition-colors flex items-center space-x-1.5"
+            class="gap-1.5"
           >
             <Save class="w-3.5 h-3.5" />
             <span>Add to Draft</span>
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
 
     <!-- Test Simulator Modal -->
     <ExceptionTestModal

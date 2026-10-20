@@ -1,4 +1,4 @@
-import { ref, computed, shallowRef, h, defineComponent, inject, type App, type Component, type Plugin } from 'vue';
+import { ref, shallowRef, h, defineComponent, inject, type App, type Component, type Plugin } from 'vue';
 
 export interface RouteRecord {
   path: string;
@@ -13,6 +13,7 @@ export interface RouteRecord {
 
 export interface RouteLocation {
   path: string;
+  fullPath: string;
   name: string;
   params: Record<string, string>;
   query: Record<string, string>;
@@ -32,6 +33,7 @@ export class SimpleRouter {
   private guards: NavigationGuard[] = [];
   public current = ref<RouteLocation>({
     path: '/',
+    fullPath: '/',
     name: 'overview',
     params: {},
     query: {},
@@ -41,15 +43,74 @@ export class SimpleRouter {
   constructor(routes: RouteRecord[]) {
     this.routes = routes;
     if (typeof window !== 'undefined') {
-      const initialPath = window.location.hash ? window.location.hash.slice(1) : '/';
-      this.navigate(initialPath || '/');
+      const initial = window.location.hash ? window.location.hash.slice(1) : '/';
+      this.navigate(initial || '/');
       window.addEventListener('hashchange', () => {
-        const path = window.location.hash.slice(1) || '/';
-        if (this.current.value.path !== path) {
-          this.navigate(path);
+        const hash = window.location.hash ? window.location.hash.slice(1) : '/';
+        const parsed = this.parseTarget(hash);
+        if (this.current.value.fullPath !== parsed.fullPath) {
+          this.navigate(hash);
         }
       });
     }
+  }
+
+  public parseTarget(target: string): { pathname: string; fullPath: string; query: Record<string, string> } {
+    let raw = target.startsWith('#') ? target.slice(1) : target;
+    if (!raw.startsWith('/')) {
+      raw = '/' + raw;
+    }
+    const [pathname, search] = raw.split('?');
+    const query: Record<string, string> = {};
+    if (search) {
+      const searchParams = new URLSearchParams(search);
+      searchParams.forEach((val, key) => {
+        query[key] = val;
+      });
+    }
+    return {
+      pathname: pathname || '/',
+      fullPath: raw,
+      query,
+    };
+  }
+
+  private matchRoute(pathname: string): { route: RouteRecord; params: Record<string, string> } | undefined {
+    // 1. Exact match first
+    const exact = this.routes.find((r) => r.path === pathname);
+    if (exact) {
+      return { route: exact, params: {} };
+    }
+
+    // 2. Dynamic parameterized segments e.g. /sites/:id
+    const pathParts = pathname.split('/').filter(Boolean);
+    for (const r of this.routes) {
+      if (r.path.includes(':')) {
+        const routeParts = r.path.split('/').filter(Boolean);
+        if (routeParts.length === pathParts.length) {
+          let matches = true;
+          const params: Record<string, string> = {};
+          for (let i = 0; i < routeParts.length; i++) {
+            if (routeParts[i].startsWith(':')) {
+              params[routeParts[i].slice(1)] = decodeURIComponent(pathParts[i]);
+            } else if (routeParts[i] !== pathParts[i]) {
+              matches = false;
+              break;
+            }
+          }
+          if (matches) {
+            return { route: r, params };
+          }
+        }
+      }
+    }
+
+    // 3. Fallback to /
+    const fallback = this.routes.find((r) => r.path === '/');
+    if (fallback) {
+      return { route: fallback, params: {} };
+    }
+    return undefined;
   }
 
   public beforeEach(guard: NavigationGuard) {
@@ -57,8 +118,9 @@ export class SimpleRouter {
   }
 
   public async push(path: string) {
+    const parsed = this.parseTarget(path);
     if (typeof window !== 'undefined') {
-      window.location.hash = path;
+      window.location.hash = parsed.fullPath;
     }
     await this.navigate(path);
   }
@@ -67,17 +129,18 @@ export class SimpleRouter {
     await this.push(path);
   }
 
-  private matchRoute(path: string): RouteRecord | undefined {
-    return this.routes.find((r) => r.path === path) || this.routes.find((r) => r.path === '/');
-  }
+  public async navigate(target: string) {
+    const { pathname, fullPath, query } = this.parseTarget(target);
+    const matched = this.matchRoute(pathname);
+    const routeRecord = matched?.route;
+    const params = matched?.params || {};
 
-  public async navigate(path: string) {
-    const matched = this.matchRoute(path);
     const targetRoute: RouteLocation = {
-      path,
-      name: matched?.name || 'unknown',
-      params: {},
-      query: {},
+      path: pathname,
+      fullPath,
+      name: routeRecord?.name || 'unknown',
+      params,
+      query,
     };
 
     const fromRoute = { ...this.current.value };
@@ -85,11 +148,8 @@ export class SimpleRouter {
     // Execute guards sequentially
     for (const guard of this.guards) {
       let redirectedTarget: string | boolean | undefined;
-      let nextCalled = false;
-
-      const next = (target?: string | boolean) => {
-        nextCalled = true;
-        redirectedTarget = target;
+      const next = (dest?: string | boolean) => {
+        redirectedTarget = dest;
       };
 
       await guard(targetRoute, fromRoute, next);
@@ -97,7 +157,7 @@ export class SimpleRouter {
       if (redirectedTarget === false) {
         return;
       }
-      if (typeof redirectedTarget === 'string' && redirectedTarget !== path) {
+      if (typeof redirectedTarget === 'string' && redirectedTarget !== fullPath && redirectedTarget !== pathname) {
         await this.push(redirectedTarget);
         return;
       }
@@ -105,12 +165,12 @@ export class SimpleRouter {
 
     this.current.value = targetRoute;
 
-    if (matched) {
-      if (typeof matched.component === 'function') {
-        const loaded = await (matched.component as () => Promise<{ default: Component }>)();
+    if (routeRecord) {
+      if (typeof routeRecord.component === 'function') {
+        const loaded = await (routeRecord.component as () => Promise<{ default: Component }>)();
         this.activeComponent.value = loaded.default || loaded;
       } else {
-        this.activeComponent.value = matched.component;
+        this.activeComponent.value = routeRecord.component;
       }
     }
   }
@@ -119,13 +179,11 @@ export class SimpleRouter {
     app.provide(ROUTER_KEY, this);
     app.provide(CURRENT_ROUTE_KEY, this.current);
 
+    const router = this;
     app.component('RouterView', defineComponent({
       name: 'RouterView',
       setup() {
-        return () => (this.router.activeComponent.value ? h(this.router.activeComponent.value) : null);
-      },
-      data() {
-        return { router: this.$router };
+        return () => (router.activeComponent.value ? h(router.activeComponent.value) : null);
       },
     }));
 
@@ -134,28 +192,40 @@ export class SimpleRouter {
   }
 }
 
+let defaultRouter: SimpleRouter | null = null;
+
 export function useRouter(): SimpleRouter {
-  const router = inject<SimpleRouter>(ROUTER_KEY);
-  if (!router) {
-    throw new Error('useRouter() called outside of router context');
+  const router = inject<SimpleRouter>(ROUTER_KEY, null as any);
+  if (router) {
+    return router;
   }
-  return router;
+  if (defaultRouter) {
+    return defaultRouter;
+  }
+  return new SimpleRouter([]);
 }
 
 export function useRoute() {
-  const route = inject<typeof SimpleRouter.prototype.current>(CURRENT_ROUTE_KEY);
-  if (!route) {
-    return ref<RouteLocation>({ path: '/', name: 'overview', params: {}, query: {} });
+  const route = inject<typeof SimpleRouter.prototype.current>(CURRENT_ROUTE_KEY, null as any);
+  if (route) {
+    return route;
   }
-  return route;
+  if (defaultRouter) {
+    return defaultRouter.current;
+  }
+  return ref<RouteLocation>({ path: '/', fullPath: '/', name: 'overview', params: {}, query: {} });
 }
 
 export function createSimpleRouter(routes: RouteRecord[]): SimpleRouter & Plugin {
-  return new SimpleRouter(routes);
+  const r = new SimpleRouter(routes);
+  defaultRouter = r;
+  return r;
 }
 
 // Router instance with all routes for Raiwall Control Plane
-import WafCommandCenter from '@/components/WafCommandCenter.vue';
+import CommandCenterView from '@/views/CommandCenterView.vue';
+import StatisticsView from '@/views/StatisticsView.vue';
+import AttacksView from '@/views/AttacksView.vue';
 import LoginView from '@/views/LoginView.vue';
 import SitesView from '@/views/SitesView.vue';
 import ExceptionsView from '@/views/ExceptionsView.vue';
@@ -163,16 +233,28 @@ import ACLsView from '@/views/ACLsView.vue';
 import PoliciesView from '@/views/PoliciesView.vue';
 import SettingsView from '@/views/SettingsView.vue';
 import DeploymentsView from '@/views/DeploymentsView.vue';
+import RulesView from '@/views/RulesView.vue';
 
 export const router = createSimpleRouter([
-  { path: '/', name: 'overview', component: WafCommandCenter },
-  { path: '/login', name: 'login', component: LoginView },
+  { path: '/', name: 'statistics', component: StatisticsView },
+  { path: '/statistics', name: 'statistics-alias', component: StatisticsView },
+  { path: '/topology', name: 'topology', component: CommandCenterView },
+  { path: '/command-center', name: 'command-center', component: CommandCenterView },
   { path: '/sites', name: 'sites', component: SitesView },
-  { path: '/exceptions', name: 'exceptions', component: ExceptionsView },
+  { path: '/sites/:id', name: 'site-detail', component: SitesView },
+  { path: '/attacks', name: 'attacks', component: AttacksView },
+  { path: '/inspector', name: 'inspector', component: AttacksView },
+  { path: '/allow-deny', name: 'allow-deny', component: ACLsView },
   { path: '/acls', name: 'acls', component: ACLsView },
-  { path: '/policies', name: 'policies', component: PoliciesView },
+  { path: '/http-flood', name: 'http-flood', component: PoliciesView },
+  { path: '/anti-bot', name: 'anti-bot', component: PoliciesView },
+  { path: '/auth', name: 'auth', component: SettingsView },
+  { path: '/system', name: 'system', component: SettingsView },
   { path: '/settings', name: 'settings', component: SettingsView },
+  { path: '/rules', name: 'rules', component: RulesView },
+  { path: '/exceptions', name: 'exceptions', component: ExceptionsView },
   { path: '/deployments', name: 'deployments', component: DeploymentsView },
+  { path: '/login', name: 'login', component: LoginView },
 ]);
 
 export default router;

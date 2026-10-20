@@ -1,7 +1,23 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import { api, type ACLRule } from '@/api/client';
-import { X, CheckCircle2, AlertCircle, Save, Code } from 'lucide-vue-next';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from '@/components/ui/select';
+import { CheckCircle2, AlertCircle, Save, Code } from 'lucide-vue-next';
 
 const props = defineProps<{
   open: boolean;
@@ -77,66 +93,34 @@ const handleSave = () => {
   });
   emit('close');
 };
+
+const handleOpenChange = (openState: boolean) => {
+  if (!openState) {
+    emit('close');
+  }
+};
 </script>
 
 <template>
-  <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-    <div class="w-full max-w-xl bg-slate-900 border border-slate-800 rounded-xl shadow-2xl flex flex-col">
+  <Dialog :open="open" @update:open="handleOpenChange">
+    <DialogContent class="max-w-xl bg-[#1e222a] border-[#2d3440] p-6 font-sans">
       <!-- Header -->
-      <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+      <DialogHeader>
         <div class="flex items-center space-x-2.5">
-          <Code class="w-5 h-5 text-emerald-400" />
-          <h2 class="text-base font-semibold text-white">
+          <Code class="w-5 h-5 text-slate-400" />
+          <DialogTitle>
             {{ rule ? 'Edit ACL Rule' : 'New ACL Bytecode Rule' }}
-          </h2>
+          </DialogTitle>
         </div>
-        <button @click="$emit('close')" class="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800">
-          <X class="w-4 h-4" />
-        </button>
-      </div>
+      </DialogHeader>
 
       <!-- Body -->
-      <div class="p-6 space-y-4">
+      <div class="py-2 space-y-4">
         <div>
           <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Rule Name</label>
-          <input
+          <Input
             v-model="formName"
-            type="text"
-            placeholder="e.g. block_internal_admin"
-            class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-200 text-sm focus:outline-none focus:border-emerald-500"
-          />
-        </div>
-
-        <div class="grid grid-cols-2 gap-4">
-          <div>
-            <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Verdict Action</label>
-            <select
-              v-model="formAction"
-              class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-200 text-sm focus:outline-none focus:border-emerald-500"
-            >
-              <option value="block">Block (HTTP 403)</option>
-              <option value="allow">Allow (Bypass remaining checks)</option>
-              <option value="redirect">Redirect (HTTP 302)</option>
-            </select>
-          </div>
-
-          <div>
-            <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Priority</label>
-            <input
-              v-model.number="formPriority"
-              type="number"
-              class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-200 text-sm focus:outline-none focus:border-emerald-500"
-            />
-          </div>
-        </div>
-
-        <div v-if="formAction === 'redirect'">
-          <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Redirect URL</label>
-          <input
-            v-model="formRedirectUrl"
-            type="text"
-            placeholder="https://example.com/login"
-            class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-200 text-sm focus:outline-none focus:border-emerald-500"
+            placeholder="e.g. Block External Admin Access"
           />
         </div>
 
@@ -145,48 +129,95 @@ const handleSave = () => {
             <label class="text-xs font-semibold text-slate-400 uppercase tracking-wider">
               Boolean Expression (expr-lang)
             </label>
-            <button
+            <Button
               type="button"
-              @click="validateSyntax"
+              variant="ghost"
+              size="sm"
               :disabled="validating"
-              class="text-xs text-emerald-400 hover:text-emerald-300 font-medium"
+              @click="validateSyntax"
+              class="h-6 text-[11px] text-slate-300 hover:text-white px-2"
             >
-              {{ validating ? 'Validating...' : 'Check Syntax' }}
-            </button>
+              {{ validating ? 'Compiling...' : 'Verify Syntax' }}
+            </Button>
           </div>
           <textarea
             v-model="formExpr"
             rows="3"
-            placeholder="ClientIP in '192.168.0.0/16' && Method == 'POST'"
-            class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-200 font-mono text-xs focus:outline-none focus:border-emerald-500"
+            class="w-full px-3 py-2 bg-[#181b20] border border-[#2d3440] rounded-md text-slate-200 font-mono text-xs focus:outline-none focus:border-[#2574F5] focus:ring-1 focus:ring-[#2574F5] transition-colors"
+            placeholder='ClientIP in "192.168.0.0/16" && Method == "POST"'
           ></textarea>
+
+          <!-- Syntax verification banner -->
+          <div v-if="validationResult" class="mt-2 text-xs flex items-center space-x-2">
+            <div v-if="validationResult.valid" class="text-emerald-400 flex items-center space-x-1.5">
+              <CheckCircle2 class="w-4 h-4 text-slate-400" />
+              <span>Expression compiled cleanly (sub-15ns bytecode verified)</span>
+            </div>
+            <div v-else class="text-rose-400 flex items-center space-x-1.5 font-mono text-[11px]">
+              <AlertCircle class="w-4 h-4 flex-shrink-0 text-slate-400" />
+              <span>{{ validationResult.error }}</span>
+            </div>
+          </div>
         </div>
 
-        <!-- Syntax Check Feedback -->
-        <div v-if="validationResult" class="p-3 rounded-lg text-xs flex items-center space-x-2" :class="validationResult.valid ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400' : 'bg-rose-500/10 border border-rose-500/30 text-rose-400'">
-          <component :is="validationResult.valid ? CheckCircle2 : AlertCircle" class="w-4 h-4 flex-shrink-0" />
-          <span>{{ validationResult.valid ? 'Syntax valid (compiles in < 15 ns)' : validationResult.error }}</span>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Action</label>
+            <Select v-model="formAction">
+              <SelectTrigger class="w-full h-9 border-[#363D4C] bg-[#15181F] text-xs text-white">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent class="border-[#363D4C] bg-[#1E222A] text-white">
+                <SelectItem value="block">Block (403 Forbidden)</SelectItem>
+                <SelectItem value="allow">Allow (Bypass Deep Inspection)</SelectItem>
+                <SelectItem value="redirect">Redirect (302 Found)</SelectItem>
+              </SelectContent>
+            </Select>
+            <select v-model="formAction" class="sr-only" tabindex="-1" aria-hidden="true">
+              <option value="block">Block</option>
+              <option value="allow">Allow</option>
+              <option value="redirect">Redirect</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Evaluation Priority</label>
+            <Input
+              v-model.number="formPriority"
+              type="number"
+              min="1"
+              max="999"
+            />
+          </div>
+        </div>
+
+        <div v-if="formAction === 'redirect'">
+          <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Redirect Target URL</label>
+          <Input
+            v-model="formRedirectUrl"
+            placeholder="https://auth.example.com/login"
+          />
         </div>
       </div>
 
       <!-- Footer -->
-      <div class="px-6 py-4 border-t border-slate-800 bg-slate-900/50 flex justify-end space-x-3">
-        <button
+      <DialogFooter class="flex justify-end space-x-2 pt-4 border-t border-[#2d3440]">
+        <Button
           type="button"
+          variant="secondary"
           @click="$emit('close')"
-          class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium transition-colors"
         >
           Cancel
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
           @click="handleSave"
-          class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-medium transition-colors flex items-center space-x-1.5"
+          class="gap-1.5"
         >
           <Save class="w-3.5 h-3.5" />
-          <span>Save Rule</span>
-        </button>
-      </div>
-    </div>
-  </div>
+          <span>Save to Draft</span>
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 </template>

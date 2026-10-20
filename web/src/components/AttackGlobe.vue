@@ -229,7 +229,7 @@ onUnmounted(() => {
   >
     <!-- Header overlay -->
     <div class="absolute top-4 left-5 z-10 flex items-center gap-2">
-      <GlobeIcon class="w-4 h-4 text-cyan-400" />
+      <GlobeIcon class="w-4 h-4 text-slate-400" />
       <span class="text-xs font-bold uppercase tracking-wider text-zinc-200">
         3D Attack Globe (Geolocated Threats)
       </span>
@@ -252,8 +252,8 @@ onUnmounted(() => {
 
     <!-- Bottom Gateway Tag -->
     <div class="absolute bottom-4 z-10 flex items-center gap-3 text-[11px] font-mono text-zinc-400 bg-zinc-900/80 px-3 py-1 rounded-full border border-zinc-800 backdrop-blur-md">
-      <div class="flex items-center gap-1.5 text-cyan-400 font-semibold">
-        <Shield class="w-3.5 h-3.5" />
+      <div class="flex items-center gap-1.5 text-slate-300 font-semibold">
+        <Shield class="w-3.5 h-3.5 text-slate-400" />
         Protected Gateway
       </div>
       <span class="text-zinc-600">|</span>

@@ -1,14 +1,30 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import { api, type ExceptionRule } from '@/api/client';
-import { X, Play, ShieldAlert, ShieldCheck } from 'lucide-vue-next';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from '@/components/ui/select';
+import { Play, ShieldAlert, ShieldCheck } from 'lucide-vue-next';
 
 const props = defineProps<{
   open: boolean;
   rule?: ExceptionRule | null;
 }>();
 
-defineEmits<{
+const emit = defineEmits<{
   (e: 'close'): void;
 }>();
 
@@ -65,35 +81,46 @@ const runSimulation = async () => {
     testing.value = false;
   }
 };
+
+const handleOpenChange = (openState: boolean) => {
+  if (!openState) {
+    emit('close');
+  }
+};
 </script>
 
 <template>
-  <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-    <div class="w-full max-w-xl bg-slate-900 border border-slate-800 rounded-xl shadow-2xl flex flex-col">
+  <Dialog :open="open" @update:open="handleOpenChange">
+    <DialogContent class="max-w-xl bg-[#1e222a] border-[#2d3440] p-6 font-sans">
       <!-- Header -->
-      <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+      <DialogHeader>
         <div class="flex items-center space-x-2.5">
-          <Play class="w-5 h-5 text-emerald-400" />
-          <h2 class="text-base font-semibold text-white">Exception Rule Test Simulator</h2>
+          <Play class="w-5 h-5 text-slate-400" />
+          <DialogTitle>Exception Rule Test Simulator</DialogTitle>
         </div>
-        <button @click="$emit('close')" class="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800">
-          <X class="w-4 h-4" />
-        </button>
-      </div>
+      </DialogHeader>
 
       <!-- Body -->
-      <div class="p-6 space-y-4">
+      <div class="py-2 space-y-4">
         <p class="text-xs text-slate-400">
           Test synthetic HTTP parameters against this exception rule to confirm false-positive suppression before deployment.
         </p>
 
         <div class="grid grid-cols-3 gap-3">
           <div>
-            <label class="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Method</label>
-            <select
-              v-model="testMethod"
-              class="w-full px-2.5 py-1.5 bg-slate-800 border border-slate-700 rounded text-slate-200 text-xs focus:outline-none focus:border-emerald-500"
-            >
+            <label class="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Method</label>
+            <Select v-model="testMethod">
+              <SelectTrigger class="w-full h-9 border-[#363D4C] bg-[#15181F] text-xs text-white">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent class="border-[#363D4C] bg-[#1E222A] text-white">
+                <SelectItem value="GET">GET</SelectItem>
+                <SelectItem value="POST">POST</SelectItem>
+                <SelectItem value="PUT">PUT</SelectItem>
+                <SelectItem value="DELETE">DELETE</SelectItem>
+              </SelectContent>
+            </Select>
+            <select v-model="testMethod" class="sr-only" tabindex="-1" aria-hidden="true">
               <option value="GET">GET</option>
               <option value="POST">POST</option>
               <option value="PUT">PUT</option>
@@ -102,73 +129,70 @@ const runSimulation = async () => {
           </div>
 
           <div class="col-span-2">
-            <label class="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Host</label>
-            <input
+            <label class="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Host Header</label>
+            <Input
               v-model="testHost"
-              type="text"
-              class="w-full px-2.5 py-1.5 bg-slate-800 border border-slate-700 rounded text-slate-200 text-xs focus:outline-none focus:border-emerald-500"
+              placeholder="api.example.com"
             />
           </div>
         </div>
 
         <div>
-          <label class="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Path</label>
-          <input
+          <label class="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Request Path</label>
+          <Input
             v-model="testPath"
-            type="text"
-            class="w-full px-2.5 py-1.5 bg-slate-800 border border-slate-700 rounded text-slate-200 text-xs focus:outline-none focus:border-emerald-500"
+            placeholder="/v1/search"
           />
         </div>
 
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Parameter Name</label>
-            <input
+            <label class="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Param Name</label>
+            <Input
               v-model="testParamName"
-              type="text"
-              class="w-full px-2.5 py-1.5 bg-slate-800 border border-slate-700 rounded text-slate-200 text-xs focus:outline-none focus:border-emerald-500"
+              placeholder="query"
             />
           </div>
 
           <div>
-            <label class="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Parameter Value (Synthetic Payload)</label>
-            <input
+            <label class="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Test Payload</label>
+            <Input
               v-model="testParamVal"
-              type="text"
-              class="w-full px-2.5 py-1.5 bg-slate-800 border border-slate-700 rounded text-slate-200 text-xs font-mono focus:outline-none focus:border-emerald-500"
+              placeholder="' OR 1=1 --"
             />
           </div>
         </div>
 
-        <!-- Simulation Result -->
-        <div v-if="result" class="p-4 rounded-lg border text-xs" :class="result.matched ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-rose-500/10 border-rose-500/30 text-rose-400'">
-          <div class="flex items-center space-x-2 font-semibold">
-            <component :is="result.matched ? ShieldCheck : ShieldAlert" class="w-5 h-5 flex-shrink-0" />
-            <span>{{ result.matched ? 'MATCHED — False-positive successfully bypassed' : 'NOT MATCHED — Request will be inspected by WAF' }}</span>
+        <!-- Simulation Output Box -->
+        <div v-if="result" class="p-3.5 rounded-lg border text-xs" :class="result.matched ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-rose-500/10 border-rose-500/30'">
+          <div class="flex items-center space-x-2 font-semibold" :class="result.matched ? 'text-emerald-400' : 'text-rose-400'">
+            <ShieldCheck v-if="result.matched" class="w-4 h-4 text-slate-400" />
+            <ShieldAlert v-else class="w-4 h-4 text-slate-400" />
+            <span>{{ result.matched ? 'Suppression Matched (Traffic Allowed)' : 'No Match (Threat Blocked)' }}</span>
           </div>
-          <p class="text-[11px] text-slate-400 mt-1 pl-7">{{ result.reason }}</p>
+          <p class="mt-1 text-slate-300 text-[11px] font-mono">{{ result.reason }}</p>
         </div>
       </div>
 
       <!-- Footer -->
-      <div class="px-6 py-4 border-t border-slate-800 bg-slate-900/50 flex justify-end space-x-3">
-        <button
+      <DialogFooter class="flex justify-end space-x-2 pt-4 border-t border-[#2d3440]">
+        <Button
           type="button"
+          variant="secondary"
           @click="$emit('close')"
-          class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium transition-colors"
         >
           Close
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
-          @click="runSimulation"
           :disabled="testing"
-          class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-medium transition-colors flex items-center space-x-1.5"
+          @click="runSimulation"
+          class="gap-1.5"
         >
           <Play class="w-3.5 h-3.5" />
-          <span>{{ testing ? 'Simulating...' : 'Run Simulation' }}</span>
-        </button>
-      </div>
-    </div>
-  </div>
+          <span>{{ testing ? 'Evaluating...' : 'Run Dry-Run Test' }}</span>
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 </template>

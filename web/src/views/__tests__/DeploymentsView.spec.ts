@@ -10,7 +10,7 @@ describe('DeploymentsView.vue', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders active version and diffs correctly', async () => {
+  it('renders staged diffs correctly', async () => {
     const store = useConfigStore();
     store.cluster = {
       mode: 'cluster',
@@ -29,7 +29,6 @@ describe('DeploymentsView.vue', () => {
 
     const wrapper = mount(DeploymentsView);
 
-    expect(wrapper.text()).toContain('v42');
     expect(wrapper.text()).toContain('Deploy 1 Changes');
     expect(wrapper.text()).toContain('Search SQLi Bypass');
     expect(wrapper.text()).toContain('path=/search param=q');

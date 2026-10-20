@@ -75,7 +75,7 @@ const maxBucketVolume = computed(() => {
     <div class="flex flex-wrap items-center justify-between gap-4">
       <div>
         <h2 class="text-base font-bold text-zinc-100 tracking-tight flex items-center gap-2">
-          <Activity class="w-4 h-4 text-cyan-400" />
+          <Activity class="w-4 h-4 text-slate-400" />
           Threat Intelligence & Traffic Analytics
         </h2>
         <p class="text-xs text-zinc-400 mt-0.5">
@@ -86,9 +86,9 @@ const maxBucketVolume = computed(() => {
         type="button"
         data-testid="refresh-stats-btn"
         @click="fetchStats(); emit('refresh')"
-        class="px-3 py-1.5 text-xs font-medium text-zinc-300 hover:text-white bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg transition-colors flex items-center gap-1.5"
+        class="px-3 py-1.5 text-xs font-medium text-zinc-300 hover:text-white bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg transition-colors flex items-center gap-1.5 shadow-none"
       >
-        <Zap class="w-3.5 h-3.5 text-cyan-400" />
+        <Zap class="w-3.5 h-3.5 text-slate-400" />
         <span>Refresh Stats</span>
       </button>
     </div>
@@ -154,7 +154,7 @@ const maxBucketVolume = computed(() => {
       <div class="lg:col-span-2 p-5 bg-[#12151c] border border-zinc-800 rounded-xl flex flex-col justify-between">
         <div class="flex items-center justify-between mb-4">
           <div class="text-xs font-bold text-zinc-200 uppercase tracking-wider flex items-center gap-1.5">
-            <TrendingUp class="w-3.5 h-3.5 text-cyan-400" />
+            <TrendingUp class="w-3.5 h-3.5 text-slate-400" />
             Traffic & Attack Volume (Time Buckets)
           </div>
           <div class="flex items-center gap-3 text-[10px] font-mono">
@@ -208,7 +208,7 @@ const maxBucketVolume = computed(() => {
       <!-- Threat Rule Breakdown -->
       <div class="p-5 bg-[#12151c] border border-zinc-800 rounded-xl flex flex-col">
         <div class="text-xs font-bold text-zinc-200 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-          <ShieldAlert class="w-3.5 h-3.5 text-rose-400" />
+          <ShieldAlert class="w-3.5 h-3.5 text-slate-400" />
           Top Threat Rules
         </div>
         <div class="space-y-3 flex-1 overflow-y-auto">
@@ -243,7 +243,7 @@ const maxBucketVolume = computed(() => {
       <!-- Top Attacking Countries -->
       <div class="p-4 bg-[#12151c] border border-zinc-800 rounded-xl">
         <h3 class="text-xs font-bold text-zinc-300 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-          <Globe2 class="w-3.5 h-3.5 text-cyan-400" />
+          <Globe2 class="w-3.5 h-3.5 text-slate-400" />
           Top Attacking Countries
         </h3>
         <div class="space-y-2">
@@ -264,7 +264,7 @@ const maxBucketVolume = computed(() => {
       <!-- Top Client IPs -->
       <div class="p-4 bg-[#12151c] border border-zinc-800 rounded-xl">
         <h3 class="text-xs font-bold text-zinc-300 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-          <Server class="w-3.5 h-3.5 text-amber-400" />
+          <Server class="w-3.5 h-3.5 text-slate-400" />
           Top Suspicious IPs
         </h3>
         <div class="space-y-2">

@@ -23,11 +23,14 @@ const (
 
 // Verdict contains the inspection decision and metadata.
 type Verdict struct {
-	Action     Action  `json:"action"`
-	RuleID     string  `json:"rule_id,omitempty"`
-	Reason     string  `json:"reason,omitempty"`
-	StatusCode int     `json:"status_code,omitempty"`
-	Confidence float64 `json:"confidence,omitempty"`
+	Action          Action  `json:"action"`
+	RuleID          string  `json:"rule_id,omitempty"`
+	Reason          string  `json:"reason,omitempty"`
+	StatusCode      int     `json:"status_code,omitempty"`
+	Confidence      float64 `json:"confidence,omitempty"`
+	PayloadLocation string  `json:"payload_location,omitempty"`
+	MatchedToken    string  `json:"matched_token,omitempty"`
+	AttackCategory  string  `json:"attack_category,omitempty"`
 }
 
 // VerdictAllow is a pre-allocated singleton for clean zero-allocation passthrough.

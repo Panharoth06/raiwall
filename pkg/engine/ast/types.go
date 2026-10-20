@@ -14,9 +14,12 @@ const (
 
 // Verdict contains the AST decision and metadata.
 type Verdict struct {
-	Action Action `json:"action"`
-	RuleID string `json:"rule_id,omitempty"`
-	Reason string `json:"reason,omitempty"`
+	Action          Action `json:"action"`
+	RuleID          string `json:"rule_id,omitempty"`
+	Reason          string `json:"reason,omitempty"`
+	PayloadLocation string `json:"payload_location,omitempty"`
+	MatchedToken    string `json:"matched_token,omitempty"`
+	AttackCategory  string `json:"attack_category,omitempty"`
 }
 
 // VerdictAllow is a pre-allocated singleton for benign passthrough.

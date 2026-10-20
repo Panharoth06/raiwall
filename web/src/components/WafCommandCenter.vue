@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch, onMounted, onUnmounted } from 'vue'
 import {
   Gauge,
   TrendingUp,
@@ -7,6 +7,7 @@ import {
   Bell,
   Server,
   ShieldCheck,
+  Rocket,
   Settings,
   Filter,
   ChevronDown,
@@ -18,13 +19,14 @@ import {
   Key,
   Minus,
   Info,
+  LogOut,
+  User,
 } from 'lucide-vue-next'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
-import LiveInspector from './LiveInspector.vue'
-import ThreatAnalytics from './ThreatAnalytics.vue'
-import AttackGlobe from './AttackGlobe.vue'
+import { useRouter, useRoute } from '@/router'
+import { useAuthStore } from '@/stores/auth'
 import type {
   ViewMode,
   IngressSourceId,
@@ -34,8 +36,119 @@ import type {
   SankeyRibbon,
 } from '@/types/waf-topology'
 
+export type NavSection = 'topology' | 'analytics' | 'inspector' | 'globe' | 'sites' | 'rules' | 'deployments' | 'settings'
+
+const router = useRouter()
+const route = useRoute()
+
 // Navigation and Reactive State
-const activeNav = ref<'topology' | 'analytics' | 'inspector' | 'globe'>('topology')
+const activeNav = ref<NavSection>('topology')
+
+const syncNavFromRoute = (path: string) => {
+  if (!path) return
+  if (path.startsWith('/analytics')) {
+    activeNav.value = 'analytics'
+  } else if (path.startsWith('/inspector')) {
+    activeNav.value = 'inspector'
+  } else if (path.startsWith('/globe')) {
+    activeNav.value = 'globe'
+  } else if (path.startsWith('/sites')) {
+    activeNav.value = 'sites'
+  } else if (path.startsWith('/rules') || path.startsWith('/exceptions') || path.startsWith('/acls') || path.startsWith('/policies')) {
+    activeNav.value = 'rules'
+  } else if (path.startsWith('/deployments')) {
+    activeNav.value = 'deployments'
+  } else if (path.startsWith('/settings')) {
+    activeNav.value = 'settings'
+  } else if (path === '/' || path.startsWith('/topology') || path.startsWith('/command-center')) {
+    activeNav.value = 'topology'
+  }
+}
+
+// Responsive SVG Stage Dimensions & Dynamic ViewBox
+const topologyStageRef = ref<HTMLElement | null>(null)
+const stageSize = reactive({ width: 1600, height: 900 })
+
+let resizeObserver: ResizeObserver | null = null
+
+onMounted(() => {
+  if (route.value?.path) {
+    syncNavFromRoute(route.value.path)
+  }
+  if (topologyStageRef.value && typeof ResizeObserver !== 'undefined') {
+    resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect
+        if (width > 0 && height > 0) {
+          stageSize.width = width
+          stageSize.height = height
+        }
+      }
+    })
+    resizeObserver.observe(topologyStageRef.value)
+  }
+})
+
+onUnmounted(() => {
+  if (resizeObserver) {
+    resizeObserver.disconnect()
+    resizeObserver = null
+  }
+})
+
+const svgViewBox = computed(() => {
+  const aspect = stageSize.width / stageSize.height
+  // Content bounding dimensions with comfortable padding so no nodes or text ever clip
+  const contentWidth = 1600
+  const contentHeight = 900
+  const centerX = 800
+  const centerY = 470
+
+  let vbWidth = contentWidth
+  let vbHeight = contentHeight
+
+  if (aspect > contentWidth / contentHeight) {
+    vbWidth = contentHeight * aspect
+  } else {
+    vbHeight = contentWidth / aspect
+  }
+
+  // Ensure minimum dimensions so all nodes, satellites, and texts have ample padding and never clip
+  vbWidth = Math.max(vbWidth, contentWidth)
+  vbHeight = Math.max(vbHeight, contentHeight)
+
+  const minX = Math.round(centerX - vbWidth / 2)
+  const minY = Math.round(centerY - vbHeight / 2)
+
+  return `${minX} ${minY} ${Math.round(vbWidth)} ${Math.round(vbHeight)}`
+})
+
+watch(
+  () => route.value?.path,
+  (newPath) => {
+    if (newPath) {
+      syncNavFromRoute(newPath)
+    }
+  }
+)
+
+const selectNav = (section: NavSection) => {
+  activeNav.value = section
+  const targetPath = section === 'topology' ? '/' : `/${section}`
+  if (route.value?.path !== targetPath) {
+    router.push(targetPath)
+  }
+}
+
+const handleLogout = () => {
+  try {
+    const authStore = useAuthStore()
+    authStore.logout()
+  } catch {
+    // Isolated tests without Pinia
+  }
+  router.push('/login')
+}
 const viewMode = ref<ViewMode>('traffic')
 const owaspOnly = ref<boolean>(false)
 const selectedTenant = ref<string>('PROD-WAF: API-EDGE')
@@ -525,126 +638,25 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
 <template>
   <div
     data-testid="waf-dashboard-root"
-    class="w-screen h-screen overflow-hidden relative select-none flex bg-[#080A0C] font-sans antialiased"
-    style="background: radial-gradient(circle at 52% 75%, rgba(16, 65, 48, 0.20) 0%, rgba(8, 10, 12, 0) 65%), #080A0C;"
+    class="w-full h-full min-h-0 relative flex flex-col bg-[#0d0f14] text-zinc-100 rounded-xl border border-zinc-800 shadow-2xl overflow-hidden font-sans select-none flex-1"
   >
-    <!-- Left Navigation Rail (56px) -->
-    <aside
-      data-testid="nav-rail"
-      class="w-14 h-full bg-[#11141A] border-r border-[#1E232D] flex flex-col items-center z-30 shrink-0 select-none"
-    >
-      <!-- Top Brand Mark: Raiwall Shield Logo -->
-      <div class="mt-4 mb-6 flex items-center justify-center">
-        <img
-          src="/logo.png"
-          alt="Raiwall Logo"
-          class="w-7 h-7 object-contain drop-shadow-[0_0_8px_rgba(56,189,248,0.35)]"
-        />
-      </div>
-
-      <!-- 7 Vertical Navigation Icon Buttons -->
-      <nav class="flex-1 w-full flex flex-col gap-1 items-center">
-        <!-- 1. Gauge (Topology Command Center) -->
-        <button
-          data-testid="nav-topology-btn"
-          class="w-full h-11 flex items-center justify-center relative cursor-pointer group"
-          :class="activeNav === 'topology' ? 'bg-[#17223B] text-white' : 'text-[#848D9C] hover:text-white hover:bg-[#1E222A]'"
-          title="Command Center"
-          @click="activeNav = 'topology'"
-        >
-          <div v-if="activeNav === 'topology'" class="absolute left-0 top-0 bottom-0 w-[3px] bg-[#2574F5]"></div>
-          <Gauge class="w-5 h-5 text-white" />
-        </button>
-
-        <!-- 2. TrendingUp (Threat Analytics) -->
-        <button
-          data-testid="nav-analytics-btn"
-          class="w-full h-11 flex items-center justify-center relative cursor-pointer group"
-          :class="activeNav === 'analytics' ? 'bg-[#17223B] text-white' : 'text-[#848D9C] hover:text-white hover:bg-[#1E222A]'"
-          title="Threat Analytics"
-          @click="activeNav = 'analytics'"
-        >
-          <div v-if="activeNav === 'analytics'" class="absolute left-0 top-0 bottom-0 w-[3px] bg-[#2574F5]"></div>
-          <div class="flex items-center">
-            <TrendingUp class="w-5 h-5" />
-            <ChevronRight class="w-2.5 h-2.5 -mr-1" />
-          </div>
-        </button>
-
-        <!-- 3. Compass (Live Forensic Inspector) -->
-        <button
-          data-testid="nav-inspector-btn"
-          class="w-full h-11 flex items-center justify-center relative cursor-pointer group"
-          :class="activeNav === 'inspector' ? 'bg-[#17223B] text-white' : 'text-[#848D9C] hover:text-white hover:bg-[#1E222A]'"
-          title="Live Forensic Inspector"
-          @click="activeNav = 'inspector'"
-        >
-          <div v-if="activeNav === 'inspector'" class="absolute left-0 top-0 bottom-0 w-[3px] bg-[#2574F5]"></div>
-          <Compass class="w-5 h-5" />
-        </button>
-
-        <!-- 4. Globe (3D Attack Globe) -->
-        <button
-          data-testid="nav-globe-btn"
-          class="w-full h-11 flex items-center justify-center relative cursor-pointer group"
-          :class="activeNav === 'globe' ? 'bg-[#17223B] text-white' : 'text-[#848D9C] hover:text-white hover:bg-[#1E222A]'"
-          title="3D Attack Globe"
-          @click="activeNav = 'globe'"
-        >
-          <div v-if="activeNav === 'globe'" class="absolute left-0 top-0 bottom-0 w-[3px] bg-[#2574F5]"></div>
-          <Globe class="w-5 h-5" />
-        </button>
-
-        <!-- 5. Bell (Alerts) -->
-        <button
-          class="w-full h-11 flex items-center justify-center relative text-[#848D9C] hover:text-white hover:bg-[#1E222A] cursor-pointer group"
-          title="Alerts"
-        >
-          <div class="flex items-center">
-            <Bell class="w-5 h-5" />
-            <ChevronRight class="w-2.5 h-2.5 -mr-1" />
-          </div>
-        </button>
-
-        <!-- 6. ShieldCheck (Security Rules) -->
-        <button
-          class="w-full h-11 flex items-center justify-center relative text-[#848D9C] hover:text-white hover:bg-[#1E222A] cursor-pointer group"
-          title="Security Rules"
-        >
-          <div class="flex items-center">
-            <ShieldCheck class="w-5 h-5" />
-            <ChevronRight class="w-2.5 h-2.5 -mr-1" />
-          </div>
-        </button>
-
-        <!-- 7. Settings -->
-        <button
-          class="w-full h-11 flex items-center justify-center relative text-[#848D9C] hover:text-white hover:bg-[#1E222A] cursor-pointer group"
-          title="Settings"
-        >
-          <div class="flex items-center">
-            <Settings class="w-5 h-5" />
-            <ChevronRight class="w-2.5 h-2.5 -mr-1" />
-          </div>
-        </button>
-      </nav>
-    </aside>
-
     <!-- Main Command Center Canvas Area -->
-    <main class="flex-1 h-full relative overflow-hidden flex flex-col">
+    <main class="flex-1 min-h-0 relative overflow-hidden flex flex-col">
       <!-- Floating Top Bar (h-14) -->
-      <header class="h-14 w-full flex items-center justify-between px-6 z-20 shrink-0 border-b border-[#1E232D]/30">
+      <header class="h-14 w-full flex items-center justify-between px-6 z-20 shrink-0 border-b border-zinc-800 bg-[#12151c]/90 backdrop-blur-md">
         <!-- Left: Brand / Title -->
         <div class="flex items-center gap-2">
           <span class="text-xs uppercase tracking-widest font-semibold text-[#B0B8C4]">RAIWALL</span>
           <span class="text-xs text-[#363D4C]">/</span>
-          <span class="text-xs font-medium text-white uppercase">
-            {{ activeNav === 'topology' ? 'COMMAND CENTER' : activeNav === 'analytics' ? 'THREAT INTELLIGENCE' : activeNav === 'inspector' ? 'LIVE FORENSIC INSPECTOR' : '3D ATTACK GLOBE' }}
+          <span class="text-xs font-medium text-white uppercase tracking-wider font-mono">
+            COMMAND CENTER
           </span>
         </div>
 
         <!-- Top-Center View Switcher -->
-        <div class="absolute left-1/2 -translate-x-1/2 flex items-center bg-[#15181F] border border-[#2A303C] rounded-full p-1 shadow-lg">
+        <div
+          class="flex items-center bg-[#15181F] border border-[#2A303C] rounded-full p-1 shadow-lg"
+        >
           <button
             data-testid="mode-btn-traffic"
             :class="[
@@ -673,11 +685,10 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
 
         <!-- Top-Right Telemetry & Filter Bar -->
         <div class="flex items-center gap-4">
-          <!-- Last Updated (LIVE badge removed per user request) -->
-          <span class="text-xs text-[#848D9C] hidden md:inline">Last Updated 16:12:56</span>
+          <span class="text-xs text-[#848D9C] font-mono hidden md:inline">NODE: PROD-EDGE-01</span>
 
-          <!-- Filter Popover -->
-          <Popover>
+          <!-- Filter Popover (Topology) -->
+          <Popover v-if="activeNav === 'topology'">
             <PopoverTrigger as-child>
               <button
                 data-testid="filter-trigger-btn"
@@ -748,10 +759,15 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
       </header>
 
       <!-- Three-Column Reactive SVG Topology Stage -->
-      <div v-show="activeNav === 'topology'" class="flex-1 w-full relative flex items-center justify-center overflow-hidden">
+      <div
+        v-show="activeNav === 'topology'"
+        ref="topologyStageRef"
+        class="flex-1 min-h-0 w-full relative flex items-center justify-center overflow-hidden p-2"
+      >
         <svg
-          class="w-full h-full max-w-full max-h-full block"
-          viewBox="0 0 1600 900"
+          data-testid="topology-svg"
+          class="w-full h-full max-w-full max-h-full block select-none"
+          :viewBox="svgViewBox"
           preserveAspectRatio="xMidYMid meet"
         >
           <defs>
@@ -768,10 +784,10 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
             <filter
               id="ribbonGlowWhite"
               filterUnits="userSpaceOnUse"
-              x="0"
-              y="0"
-              width="1600"
-              height="900"
+              x="-1000"
+              y="-600"
+              width="3600"
+              height="2400"
             >
               <feGaussianBlur stdDeviation="3.2" result="blur" />
               <feMerge>
@@ -798,10 +814,10 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
               id="ribbonShineMask"
               maskUnits="userSpaceOnUse"
               maskContentUnits="userSpaceOnUse"
-              x="0"
-              y="0"
-              width="1600"
-              height="900"
+              x="-1000"
+              y="-600"
+              width="3600"
+              height="2400"
             >
               <path
                 v-for="ribbon in sankeyRibbons"
@@ -854,9 +870,9 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
                 <rect
                   class="ribbon-specular-sheen"
                   x="0"
-                  y="0"
+                  y="-600"
                   width="380"
-                  height="900"
+                  height="2400"
                   fill="url(#specularSheenGradient)"
                 />
               </g>
@@ -1377,24 +1393,9 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
         </svg>
       </div>
 
-      <!-- Threat Analytics View -->
-      <div v-if="activeNav === 'analytics'" class="flex-1 w-full p-6 overflow-y-auto">
-        <ThreatAnalytics />
-      </div>
-
-      <!-- Live Inspector View -->
-      <div v-if="activeNav === 'inspector'" class="flex-1 w-full p-6 overflow-y-auto">
-        <LiveInspector />
-      </div>
-
-      <!-- 3D Attack Globe View -->
-      <div v-if="activeNav === 'globe'" class="flex-1 w-full p-6 flex items-center justify-center overflow-hidden">
-        <AttackGlobe :width="800" :height="500" />
-      </div>
-
       <!-- Floating Contextual Tooltip -->
       <div
-        v-if="tooltip.visible && activeNav === 'topology'"
+        v-if="tooltip.visible"
         data-testid="topology-tooltip"
         class="fixed w-[275px] bg-[#222731] border border-[#3E4656] rounded-md p-3.5 shadow-2xl pointer-events-none z-50 transition-all duration-75"
         :style="{

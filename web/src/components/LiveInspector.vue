@@ -16,6 +16,13 @@ import {
 } from 'lucide-vue-next';
 import { useEventStream } from '@/composables/useEventStream';
 import type { ForensicEvent, ExceptionDraft } from '@/types/telemetry';
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from '@/components/ui/select';
 
 const props = withDefaults(
   defineProps<{
@@ -164,18 +171,34 @@ function formatLatency(durNs: number): string {
           />
         </div>
 
-        <!-- Action Filter Select -->
-        <select
-          v-model="selectedAction"
-          data-testid="action-filter-select"
-          class="px-2.5 py-1.5 text-xs bg-zinc-900 border border-zinc-700/80 rounded-lg text-zinc-300 focus:outline-none focus:border-cyan-500"
-        >
-          <option value="all">All Actions</option>
-          <option value="allow">Allow</option>
-          <option value="block">Block</option>
-          <option value="challenge">Challenge</option>
-          <option value="ban">Ban</option>
-        </select>
+        <!-- Action Filter Select Component Dropdown -->
+        <div class="relative">
+          <Select v-model="selectedAction">
+            <SelectTrigger class="h-8 w-32 border-zinc-700/80 bg-zinc-900 text-zinc-200 text-xs">
+              <SelectValue placeholder="All Actions" />
+            </SelectTrigger>
+            <SelectContent class="border-zinc-700 bg-zinc-900 text-zinc-200">
+              <SelectItem value="all">All Actions</SelectItem>
+              <SelectItem value="allow">Allow</SelectItem>
+              <SelectItem value="block">Block</SelectItem>
+              <SelectItem value="challenge">Challenge</SelectItem>
+              <SelectItem value="ban">Ban</SelectItem>
+            </SelectContent>
+          </Select>
+          <select
+            v-model="selectedAction"
+            data-testid="action-filter-select"
+            class="sr-only"
+            tabindex="-1"
+            aria-hidden="true"
+          >
+            <option value="all">All Actions</option>
+            <option value="allow">Allow</option>
+            <option value="block">Block</option>
+            <option value="challenge">Challenge</option>
+            <option value="ban">Ban</option>
+          </select>
+        </div>
 
         <!-- Pause / Resume Toggle -->
         <button
@@ -240,10 +263,10 @@ function formatLatency(durNs: number): string {
                 class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide uppercase border"
                 :class="getActionBadgeClass(ev.action)"
               >
-                <CheckCircle2 v-if="ev.action === 'allow'" class="w-2.5 h-2.5" />
-                <ShieldAlert v-else-if="ev.action === 'block'" class="w-2.5 h-2.5" />
-                <AlertTriangle v-else-if="ev.action === 'challenge'" class="w-2.5 h-2.5" />
-                <Ban v-else-if="ev.action === 'ban'" class="w-2.5 h-2.5" />
+                <CheckCircle2 v-if="ev.action === 'allow'" class="w-2.5 h-2.5 text-slate-400" />
+                <ShieldAlert v-else-if="ev.action === 'block'" class="w-2.5 h-2.5 text-slate-400" />
+                <AlertTriangle v-else-if="ev.action === 'challenge'" class="w-2.5 h-2.5 text-slate-400" />
+                <Ban v-else-if="ev.action === 'ban'" class="w-2.5 h-2.5 text-slate-400" />
                 {{ ev.action }}
               </span>
             </td>
@@ -281,7 +304,7 @@ function formatLatency(durNs: number): string {
                 type="button"
                 data-testid="create-exception-quick-btn"
                 @click="handleCreateException(ev)"
-                class="px-2 py-1 text-[11px] font-medium text-cyan-400 hover:text-cyan-300 bg-cyan-950/30 hover:bg-cyan-900/50 border border-cyan-800/40 rounded transition-all mr-2"
+                class="px-2 py-1 text-[11px] font-medium text-slate-300 hover:text-white bg-[#17223B] hover:bg-[#2574F5]/30 border border-[#2574F5]/40 rounded transition-all mr-2 shadow-none"
                 title="Create 1-Click Rule Exception"
               >
                 Exception
@@ -318,8 +341,8 @@ function formatLatency(durNs: number): string {
         <!-- Modal Header -->
         <div class="flex items-center justify-between px-6 py-4 border-b border-zinc-800 bg-[#0d0f14]">
           <div class="flex items-center gap-3">
-            <div class="p-2 rounded-lg bg-zinc-800/80 border border-zinc-700 text-cyan-400">
-              <FileCode class="w-5 h-5" />
+            <div class="p-2 rounded-lg bg-zinc-800/80 border border-zinc-700 text-slate-400">
+              <FileCode class="w-5 h-5 text-slate-400" />
             </div>
             <div>
               <h3 class="text-sm font-bold text-zinc-100 flex items-center gap-2">
@@ -426,9 +449,9 @@ function formatLatency(durNs: number): string {
               type="button"
               data-testid="modal-create-exception-btn"
               @click="handleCreateException(activeEvent)"
-              class="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-black bg-cyan-400 hover:bg-cyan-300 rounded-lg shadow-md transition-colors"
+              class="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-primary-foreground bg-primary hover:bg-primary/90 active:brightness-95 rounded-lg shadow-none transition-colors"
             >
-              <ExternalLink class="w-3.5 h-3.5" />
+              <ExternalLink class="w-3.5 h-3.5 text-white" />
               <span>Create Exception</span>
             </button>
           </div>
