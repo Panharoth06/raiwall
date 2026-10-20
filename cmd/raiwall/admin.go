@@ -10,8 +10,8 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/Panharoth06/raiwall/pkg/config"
-	"github.com/Panharoth06/raiwall/pkg/control/db"
+	"github.com/Panharoth06/raiwall/internal/adapters/outbound/storage/sqlite"
+	"github.com/Panharoth06/raiwall/internal/core/control"
 )
 
 func init() {
@@ -49,7 +49,7 @@ func cmdAdmin(flags caddycmd.Flags) (int, error) {
 
 	switch subcommand {
 	case "init":
-		store, err := db.InitDB(dbDSN)
+		store, err := sqlite.InitDB(dbDSN)
 		if err != nil {
 			return 1, fmt.Errorf("failed to initialize database: %w", err)
 		}
@@ -72,7 +72,7 @@ func cmdAdmin(flags caddycmd.Flags) (int, error) {
 				return 1, fmt.Errorf("failed to hash password: %w", err)
 			}
 			now := time.Now().UTC()
-			err = store.CreateUser(ctx, db.CreateUserParams{
+			err = store.CreateUser(ctx, sqlite.CreateUserParams{
 				ID:           uuid.NewString(),
 				Username:     username,
 				PasswordHash: string(hash),
@@ -104,7 +104,7 @@ func cmdAdmin(flags caddycmd.Flags) (int, error) {
 			return 1, fmt.Errorf("--role must be 'admin' or 'viewer'")
 		}
 
-		store, err := db.InitDB(dbDSN)
+		store, err := sqlite.InitDB(dbDSN)
 		if err != nil {
 			return 1, fmt.Errorf("failed to connect to database: %w", err)
 		}
@@ -116,7 +116,7 @@ func cmdAdmin(flags caddycmd.Flags) (int, error) {
 		}
 
 		now := time.Now().UTC()
-		err = store.CreateUser(ctx, db.CreateUserParams{
+		err = store.CreateUser(ctx, sqlite.CreateUserParams{
 			ID:           uuid.NewString(),
 			Username:     username,
 			PasswordHash: string(hash),
@@ -133,13 +133,13 @@ func cmdAdmin(flags caddycmd.Flags) (int, error) {
 		return 0, nil
 
 	case "validate":
-		store, err := db.InitDB(dbDSN)
+		store, err := sqlite.InitDB(dbDSN)
 		if err != nil {
 			return 1, fmt.Errorf("failed to connect to database: %w", err)
 		}
 		defer store.Close()
 
-		snap, err := config.CompileSnapshot(ctx, store)
+		snap, err := control.CompileSnapshot(ctx, store)
 		if err != nil {
 			return 1, fmt.Errorf("pre-flight configuration validation failed: %w", err)
 		}
@@ -149,7 +149,7 @@ func cmdAdmin(flags caddycmd.Flags) (int, error) {
 		return 0, nil
 
 	case "apply":
-		store, err := db.InitDB(dbDSN)
+		store, err := sqlite.InitDB(dbDSN)
 		if err != nil {
 			return 1, fmt.Errorf("failed to connect to database: %w", err)
 		}
@@ -164,7 +164,7 @@ func cmdAdmin(flags caddycmd.Flags) (int, error) {
 			desc = "Applied via CLI"
 		}
 
-		snap, err := config.DeploySnapshot(ctx, store, author, desc)
+		snap, err := control.DeploySnapshot(ctx, store, author, desc)
 		if err != nil {
 			return 1, fmt.Errorf("failed to deploy configuration: %w", err)
 		}
@@ -178,13 +178,13 @@ func cmdAdmin(flags caddycmd.Flags) (int, error) {
 			return 1, fmt.Errorf("--version must be a positive integer")
 		}
 
-		store, err := db.InitDB(dbDSN)
+		store, err := sqlite.InitDB(dbDSN)
 		if err != nil {
 			return 1, fmt.Errorf("failed to connect to database: %w", err)
 		}
 		defer store.Close()
 
-		snap, err := config.RollbackToVersion(ctx, store, uint64(targetVer))
+		snap, err := control.RollbackToVersion(ctx, store, uint64(targetVer))
 		if err != nil {
 			return 1, fmt.Errorf("rollback failed: %w", err)
 		}

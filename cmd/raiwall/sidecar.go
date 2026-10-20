@@ -10,12 +10,12 @@ import (
 	"time"
 
 	caddycmd "github.com/caddyserver/caddy/v2/cmd"
-	"github.com/Panharoth06/raiwall/pkg/acl"
-	"github.com/Panharoth06/raiwall/pkg/config"
-	"github.com/Panharoth06/raiwall/pkg/control/db"
-	"github.com/Panharoth06/raiwall/pkg/engine"
-	"github.com/Panharoth06/raiwall/pkg/sidecar"
-	"github.com/Panharoth06/raiwall/pkg/telemetry"
+	"github.com/Panharoth06/raiwall/internal/adapters/inbound/grpc"
+	"github.com/Panharoth06/raiwall/internal/adapters/outbound/storage/sqlite"
+	"github.com/Panharoth06/raiwall/internal/core/acl"
+	"github.com/Panharoth06/raiwall/internal/core/control"
+	"github.com/Panharoth06/raiwall/internal/core/telemetry"
+	"github.com/Panharoth06/raiwall/internal/core/waf"
 )
 
 func init() {
@@ -56,13 +56,13 @@ func cmdSidecar(flags caddycmd.Flags) (int, error) {
 	})
 	defer ringBuffer.Close()
 
-	wafEngine := engine.NewSemanticEngine()
+	wafEngine := waf.NewSemanticEngine()
 
 	// Initialize database and compiler if available
-	store, err := db.InitDB(dbDSN)
+	store, err := sqlite.InitDB(dbDSN)
 	if err == nil {
 		defer store.Close()
-		snap, err := config.CompileSnapshot(context.Background(), store)
+		snap, err := control.CompileSnapshot(context.Background(), store)
 		if err == nil && snap != nil && len(snap.Exceptions) > 0 {
 			if ee, err := acl.NewExceptionEngine(snap.Exceptions...); err == nil {
 				wafEngine.SetExceptionEngine(ee)
@@ -70,7 +70,7 @@ func cmdSidecar(flags caddycmd.Flags) (int, error) {
 		}
 	}
 
-	server := sidecar.NewServer(sidecar.ExtProcConfig{
+	server := grpc.NewServer(grpc.ExtProcConfig{
 		ListenAddr:  listenAddr,
 		MaxBodySize: maxBodySize,
 		WAFEngine:   wafEngine,

@@ -15,16 +15,16 @@ import (
 	"time"
 
 	"github.com/altcha-org/altcha-lib-go"
-	"github.com/caddyserver/caddy/v2"
-	"github.com/Panharoth06/raiwall/pkg/bot"
-	"github.com/Panharoth06/raiwall/pkg/config"
-	"github.com/Panharoth06/raiwall/pkg/proxy"
+	caddyv2 "github.com/caddyserver/caddy/v2"
+	"github.com/Panharoth06/raiwall/internal/adapters/inbound/caddy"
+	"github.com/Panharoth06/raiwall/internal/core/bot"
+	"github.com/Panharoth06/raiwall/internal/core/control"
 )
 
 func TestEndToEndBotDefense(t *testing.T) {
-	config.StoreSnapshot(config.NewConfigSnapshot(100, config.ModeDefense, nil))
+	control.StoreSnapshot(control.NewConfigSnapshot(100, control.ModeDefense, nil))
 	t.Cleanup(func() {
-		config.StoreSnapshot(config.NewConfigSnapshot(0, config.ModeDefense, nil))
+		control.StoreSnapshot(control.NewConfigSnapshot(0, control.ModeDefense, nil))
 	})
 
 	// 1. Mock upstream protected backend
@@ -47,14 +47,14 @@ func TestEndToEndBotDefense(t *testing.T) {
 
 	// 2. Setup Raiwall Middleware with full Bot Defense
 	powSecret := "e2e-pow-verification-secret-32b"
-	mw := &proxy.Middleware{
+	mw := &caddy.Middleware{
 		Mode:          "defense",
 		BotDefense:    "defense",
 		PoWSecret:     powSecret,
 		PoWDifficulty: 500, // Small difficulty for fast test execution
 	}
 
-	caddyCtx, cancel := caddy.NewContext(caddy.Context{Context: context.Background()})
+	caddyCtx, cancel := caddyv2.NewContext(caddyv2.Context{Context: context.Background()})
 	defer cancel()
 
 	if err := mw.Provision(caddyCtx); err != nil {

@@ -9,15 +9,15 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc"
+	grpcgo "google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/test/bufconn"
 
-	"github.com/Panharoth06/raiwall/pkg/acl"
-	"github.com/Panharoth06/raiwall/pkg/config"
-	"github.com/Panharoth06/raiwall/pkg/engine"
-	"github.com/Panharoth06/raiwall/pkg/sidecar"
-	"github.com/Panharoth06/raiwall/pkg/telemetry"
+	"github.com/Panharoth06/raiwall/internal/adapters/inbound/grpc"
+	"github.com/Panharoth06/raiwall/internal/core/acl"
+	"github.com/Panharoth06/raiwall/internal/core/control"
+	"github.com/Panharoth06/raiwall/internal/core/telemetry"
+	"github.com/Panharoth06/raiwall/internal/core/waf"
 )
 
 func TestSidecar_E2E_ThreatBlockAndPassthrough(t *testing.T) {
@@ -31,9 +31,9 @@ func TestSidecar_E2E_ThreatBlockAndPassthrough(t *testing.T) {
 	})
 	defer ringBuffer.Close()
 
-	srv := sidecar.NewServer(sidecar.ExtProcConfig{
+	srv := grpc.NewServer(grpc.ExtProcConfig{
 		MaxBodySize: 1024 * 1024,
-		WAFEngine:   engine.NewSemanticEngine(),
+		WAFEngine:   waf.NewSemanticEngine(),
 		RingBuffer:  ringBuffer,
 	})
 
@@ -46,25 +46,25 @@ func TestSidecar_E2E_ThreatBlockAndPassthrough(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	conn, err := grpc.DialContext(ctx, "bufnet",
-		grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
+	conn, err := grpcgo.DialContext(ctx, "bufnet",
+		grpcgo.WithContextDialer(func(context.Context, string) (net.Conn, error) {
 			return lis.Dial()
 		}),
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpcgo.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	require.NoError(t, err)
 	defer conn.Close()
 
-	client := sidecar.NewExternalProcessorClient(conn)
+	client := grpc.NewExternalProcessorClient(conn)
 	stream, err := client.Process(ctx)
 	require.NoError(t, err)
 
 	// 1. Send Request Headers
-	reqHeaders := &sidecar.ProcessingRequest{
-		Request: &sidecar.ProcessingRequest_RequestHeaders{
-			RequestHeaders: &sidecar.HttpHeaders{
-				Headers: &sidecar.HeaderMap{
-					Headers: []*sidecar.HeaderValue{
+	reqHeaders := &grpc.ProcessingRequest{
+		Request: &grpc.ProcessingRequest_RequestHeaders{
+			RequestHeaders: &grpc.HttpHeaders{
+				Headers: &grpc.HeaderMap{
+					Headers: []*grpc.HeaderValue{
 						{Key: ":method", Value: "POST"},
 						{Key: ":path", Value: "/api/checkout"},
 						{Key: "x-forwarded-for", Value: "198.51.100.42"},
@@ -82,9 +82,9 @@ func TestSidecar_E2E_ThreatBlockAndPassthrough(t *testing.T) {
 	require.NotNil(t, resp.GetRequestHeaders())
 
 	// 2. Send Request Body containing SQL Injection
-	reqBodyThreat := &sidecar.ProcessingRequest{
-		Request: &sidecar.ProcessingRequest_RequestBody{
-			RequestBody: &sidecar.HttpBody{
+	reqBodyThreat := &grpc.ProcessingRequest{
+		Request: &grpc.ProcessingRequest_RequestBody{
+			RequestBody: &grpc.HttpBody{
 				Body:        []byte("query=1 UNION SELECT username, password FROM users--"),
 				EndOfStream: true,
 			},
@@ -98,7 +98,7 @@ func TestSidecar_E2E_ThreatBlockAndPassthrough(t *testing.T) {
 
 	imm := resp.GetImmediateResponse()
 	require.NotNil(t, imm, "expected threat to trigger 403 ImmediateResponse")
-	require.Equal(t, sidecar.StatusCode_Forbidden, imm.Status.Code)
+	require.Equal(t, grpc.StatusCode_Forbidden, imm.Status.Code)
 	require.Contains(t, imm.Body, "Blocked by Raiwall Semantic WAF")
 
 	// 3. New Stream: Benign Body Passthrough
@@ -110,9 +110,9 @@ func TestSidecar_E2E_ThreatBlockAndPassthrough(t *testing.T) {
 	_, err = stream2.Recv()
 	require.NoError(t, err)
 
-	reqBodyBenign := &sidecar.ProcessingRequest{
-		Request: &sidecar.ProcessingRequest_RequestBody{
-			RequestBody: &sidecar.HttpBody{
+	reqBodyBenign := &grpc.ProcessingRequest{
+		Request: &grpc.ProcessingRequest_RequestBody{
+			RequestBody: &grpc.HttpBody{
 				Body:        []byte("search=sneakers&category=footwear"),
 				EndOfStream: true,
 			},
@@ -131,9 +131,9 @@ func TestSidecar_E2E_ACLRulesAndExceptions(t *testing.T) {
 	lis := bufconn.Listen(1024 * 1024)
 	defer lis.Close()
 
-	srv := sidecar.NewServer(sidecar.ExtProcConfig{
+	srv := grpc.NewServer(grpc.ExtProcConfig{
 		MaxBodySize: 1024 * 1024,
-		WAFEngine:   engine.NewSemanticEngine(),
+		WAFEngine:   waf.NewSemanticEngine(),
 	})
 
 	go func() {
@@ -158,35 +158,35 @@ func TestSidecar_E2E_ACLRulesAndExceptions(t *testing.T) {
 		RuleID:    "SEMANTIC_SQLI",
 	}
 
-	snap := config.NewConfigSnapshot(1, config.ModeDefense, nil)
+	snap := control.NewConfigSnapshot(1, control.ModeDefense, nil)
 	snap.ACLRules = []*acl.ACLRule{rule}
 	snap.Exceptions = []*acl.ExceptionRule{exc}
-	config.StoreSnapshot(snap)
-	defer config.StoreSnapshot(config.NewConfigSnapshot(0, config.ModeDefense, nil))
+	control.StoreSnapshot(snap)
+	defer control.StoreSnapshot(control.NewConfigSnapshot(0, control.ModeDefense, nil))
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	conn, err := grpc.DialContext(ctx, "bufnet",
-		grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
+	conn, err := grpcgo.DialContext(ctx, "bufnet",
+		grpcgo.WithContextDialer(func(context.Context, string) (net.Conn, error) {
 			return lis.Dial()
 		}),
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpcgo.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	require.NoError(t, err)
 	defer conn.Close()
 
-	client := sidecar.NewExternalProcessorClient(conn)
+	client := grpc.NewExternalProcessorClient(conn)
 
 	// 1. Test ACL rule blocks request on header match
 	stream, err := client.Process(ctx)
 	require.NoError(t, err)
 
-	reqHeadersBlocked := &sidecar.ProcessingRequest{
-		Request: &sidecar.ProcessingRequest_RequestHeaders{
-			RequestHeaders: &sidecar.HttpHeaders{
-				Headers: &sidecar.HeaderMap{
-					Headers: []*sidecar.HeaderValue{
+	reqHeadersBlocked := &grpc.ProcessingRequest{
+		Request: &grpc.ProcessingRequest_RequestHeaders{
+			RequestHeaders: &grpc.HttpHeaders{
+				Headers: &grpc.HeaderMap{
+					Headers: []*grpc.HeaderValue{
 						{Key: ":method", Value: "GET"},
 						{Key: ":path", Value: "/data"},
 						{Key: "x-blocked", Value: "true"},
@@ -203,17 +203,17 @@ func TestSidecar_E2E_ACLRulesAndExceptions(t *testing.T) {
 	require.NoError(t, err)
 	imm := resp.GetImmediateResponse()
 	require.NotNil(t, imm, "expected ACL rule to trigger 403 ImmediateResponse")
-	require.Equal(t, sidecar.StatusCode_Forbidden, imm.Status.Code)
+	require.Equal(t, grpc.StatusCode_Forbidden, imm.Status.Code)
 
 	// 2. Test Exception bypasses semantic SQLi block on parameter "query"
 	stream2, err := client.Process(ctx)
 	require.NoError(t, err)
 
-	reqHeadersAllow := &sidecar.ProcessingRequest{
-		Request: &sidecar.ProcessingRequest_RequestHeaders{
-			RequestHeaders: &sidecar.HttpHeaders{
-				Headers: &sidecar.HeaderMap{
-					Headers: []*sidecar.HeaderValue{
+	reqHeadersAllow := &grpc.ProcessingRequest{
+		Request: &grpc.ProcessingRequest_RequestHeaders{
+			RequestHeaders: &grpc.HttpHeaders{
+				Headers: &grpc.HeaderMap{
+					Headers: []*grpc.HeaderValue{
 						{Key: ":method", Value: "POST"},
 						{Key: ":path", Value: "/search"},
 					},
@@ -227,9 +227,9 @@ func TestSidecar_E2E_ACLRulesAndExceptions(t *testing.T) {
 	_, err = stream2.Recv()
 	require.NoError(t, err)
 
-	reqBodyException := &sidecar.ProcessingRequest{
-		Request: &sidecar.ProcessingRequest_RequestBody{
-			RequestBody: &sidecar.HttpBody{
+	reqBodyException := &grpc.ProcessingRequest{
+		Request: &grpc.ProcessingRequest_RequestBody{
+			RequestBody: &grpc.HttpBody{
 				Body:        []byte("query=1 UNION SELECT username, password FROM users--"),
 				EndOfStream: true,
 			},

@@ -15,10 +15,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/caddyserver/caddy/v2"
-	"github.com/Panharoth06/raiwall/pkg/config"
-	"github.com/Panharoth06/raiwall/pkg/engine"
-	"github.com/Panharoth06/raiwall/pkg/proxy"
+	caddyv2 "github.com/caddyserver/caddy/v2"
+	"github.com/Panharoth06/raiwall/internal/adapters/inbound/caddy"
+	"github.com/Panharoth06/raiwall/internal/core/control"
+	"github.com/Panharoth06/raiwall/internal/core/waf"
 )
 
 // pipeHijackResponseWriter connects an http.ResponseWriter to a net.Pipe for testing hijacking.
@@ -59,12 +59,12 @@ func TestEndToEndHTTPProxying(t *testing.T) {
 	})
 
 	// 2. Setup Raiwall Middleware
-	mw := &proxy.Middleware{
+	mw := &caddy.Middleware{
 		Mode:         "defense",
 		StripHeaders: []string{"Server", "X-Powered-By"},
 	}
 
-	caddyCtx, cancel := caddy.NewContext(caddy.Context{Context: context.Background()})
+	caddyCtx, cancel := caddyv2.NewContext(caddyv2.Context{Context: context.Background()})
 	defer cancel()
 
 	if err := mw.Provision(caddyCtx); err != nil {
@@ -124,27 +124,27 @@ func TestEndToEndHTTPProxying(t *testing.T) {
 
 func TestEndToEndWebSocketAndDynamicModeSwitch(t *testing.T) {
 	t.Cleanup(func() {
-		config.StoreSnapshot(config.NewConfigSnapshot(0, config.ModeDefense, nil))
+		control.StoreSnapshot(control.NewConfigSnapshot(0, control.ModeDefense, nil))
 	})
 
 	// Setup threat detection engine
-	mockEng := engine.NewMockEngine()
-	mockEng.InspectRequestHandler = func(ctx *engine.RequestContext) (*engine.Verdict, error) {
+	mockEng := waf.NewMockEngine()
+	mockEng.InspectRequestHandler = func(ctx *waf.RequestContext) (*waf.Verdict, error) {
 		if strings.Contains(ctx.Path, "malicious") || strings.Contains(ctx.Query, "sqli") {
-			return &engine.Verdict{
-				Action:     engine.ActionBlock,
+			return &waf.Verdict{
+				Action:     waf.ActionBlock,
 				RuleID:     "INJECTION_DETECTION_01",
 				Reason:     "Attack detected in query/path",
 				StatusCode: http.StatusForbidden,
 			}, nil
 		}
-		return engine.VerdictAllow, nil
+		return waf.VerdictAllow, nil
 	}
 
-	mw := &proxy.Middleware{
+	mw := &caddy.Middleware{
 		Mode: "defense",
 	}
-	caddyCtx, cancel := caddy.NewContext(caddy.Context{Context: context.Background()})
+	caddyCtx, cancel := caddyv2.NewContext(caddyv2.Context{Context: context.Background()})
 	defer cancel()
 
 	if err := mw.Provision(caddyCtx); err != nil {
@@ -240,12 +240,12 @@ func TestEndToEndWebSocketAndDynamicModeSwitch(t *testing.T) {
 	}
 
 	// 3. Dynamic Mode Flip to Offline on live connection
-	offlineApp := &config.AppConfig{
+	offlineApp := &control.AppConfig{
 		ID:        "app-live",
 		Hostnames: []string{"example.com"},
-		Mode:      config.ModeOffline,
+		Mode:      control.ModeOffline,
 	}
-	config.StoreSnapshot(config.NewConfigSnapshot(2, config.ModeDefense, []*config.AppConfig{offlineApp}))
+	control.StoreSnapshot(control.NewConfigSnapshot(2, control.ModeDefense, []*control.AppConfig{offlineApp}))
 
 	// New incoming HTTP request gets 503
 	reqNew := httptest.NewRequest("GET", "http://example.com/api/test", nil)
@@ -274,12 +274,12 @@ func TestEndToEndWebSocketAndDynamicModeSwitch(t *testing.T) {
 	}
 
 	// 4. Dynamic Mode Flip to Audit Mode
-	auditApp := &config.AppConfig{
+	auditApp := &control.AppConfig{
 		ID:        "app-live",
 		Hostnames: []string{"example.com"},
-		Mode:      config.ModeAudit,
+		Mode:      control.ModeAudit,
 	}
-	config.StoreSnapshot(config.NewConfigSnapshot(3, config.ModeDefense, []*config.AppConfig{auditApp}))
+	control.StoreSnapshot(control.NewConfigSnapshot(3, control.ModeDefense, []*control.AppConfig{auditApp}))
 
 	// Upstream handler for test API
 	testAPIMux := http.NewServeMux()

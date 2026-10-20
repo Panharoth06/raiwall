@@ -6,8 +6,8 @@ import (
 	"os"
 
 	caddycmd "github.com/caddyserver/caddy/v2/cmd"
-	"github.com/Panharoth06/raiwall/pkg/control/db"
-	"github.com/Panharoth06/raiwall/pkg/control/mcp"
+	"github.com/Panharoth06/raiwall/internal/adapters/inbound/mcp"
+	"github.com/Panharoth06/raiwall/internal/adapters/outbound/storage/sqlite"
 )
 
 func init() {
@@ -29,7 +29,7 @@ func cmdMCP(flags caddycmd.Flags) (int, error) {
 		dbDSN = "file:raiwall_control.db"
 	}
 
-	store, err := db.InitDB(dbDSN)
+	store, err := sqlite.InitDB(dbDSN)
 	if err != nil {
 		return 1, err
 	}

@@ -9,8 +9,8 @@ import (
 	caddycmd "github.com/caddyserver/caddy/v2/cmd"
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/require"
-	"github.com/Panharoth06/raiwall/pkg/config"
-	"github.com/Panharoth06/raiwall/pkg/control/db"
+	"github.com/Panharoth06/raiwall/internal/adapters/outbound/storage/sqlite"
+	"github.com/Panharoth06/raiwall/internal/core/control"
 )
 
 func TestAdminCLI_FullLifecycle(t *testing.T) {
@@ -32,7 +32,7 @@ func TestAdminCLI_FullLifecycle(t *testing.T) {
 	require.Equal(t, 0, code)
 
 	// Verify database was initialized
-	store, err := db.InitDB(dbDSN)
+	store, err := sqlite.InitDB(dbDSN)
 	require.NoError(t, err)
 	defer store.Close()
 
@@ -90,7 +90,7 @@ func TestAdminCLI_FullLifecycle(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 0, code)
 
-	active := config.GetActiveSnapshot()
+	active := control.GetActiveSnapshot()
 	require.NotNil(t, active)
 	require.Equal(t, uint64(1), active.Version)
 
@@ -99,7 +99,7 @@ func TestAdminCLI_FullLifecycle(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 0, code)
 
-	active = config.GetActiveSnapshot()
+	active = control.GetActiveSnapshot()
 	require.Equal(t, uint64(2), active.Version)
 
 	// 5. Rollback to version 1
@@ -117,7 +117,7 @@ func TestAdminCLI_FullLifecycle(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 0, code)
 
-	active = config.GetActiveSnapshot()
+	active = control.GetActiveSnapshot()
 	require.Equal(t, uint64(1), active.Version)
 }
 

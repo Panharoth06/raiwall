@@ -162,13 +162,24 @@ flowchart TD
 ```
 raiwall/
 ├── cmd/
-│   └── raiwall/              # Go entrypoint (embeds Caddy CLI runtime)
+│   └── raiwall/              # Go entrypoint & CLI commands (embeds Caddy runtime)
 │       ├── main.go
+│       ├── admin.go
+│       ├── sidecar.go
+│       ├── mcp.go
 │       └── version.go
-├── pkg/
-│   ├── config/               # Thread-safe atomic config snapshot & run modes
-│   ├── engine/               # WAF engine interface & implementations
-│   └── proxy/                # Caddy middleware, interceptors, client IP, upstream pool
+├── internal/
+│   ├── core/                 # Hexagonal Domain Cores & Ports (framework-free)
+│   │   ├── waf/              # Threat detection (lexical triage, AST, normalizer, ports)
+│   │   ├── rate/             # Rate limiting (GCRA, tiers 1-3, waiting room queue, ban)
+│   │   ├── bot/              # Active bot defense (JA4, classifier, PoW, clearance, honeypot)
+│   │   ├── acl/              # Access control (BART CIDR, expr bytecode, exceptions)
+│   │   ├── auth/             # Pre-app authentication (sessions, simple auth, OIDC)
+│   │   ├── telemetry/        # Observability (forensic events, ring buffer, debouncer, metrics)
+│   │   └── control/          # Control plane (snapshot, validator, compiler, rollback)
+│   └── adapters/             # Hexagonal Concrete Technology Adapters
+│       ├── inbound/          # Driving adapters (caddy, http, grpc, mcp)
+│       └── outbound/         # Driven adapters (storage, geoip, alerts, feeds)
 ├── web/                      # Vue 3 + TypeScript admin dashboard (Vite)
 │   ├── src/
 │   │   ├── components/       # shadcn-vue UI components
@@ -240,9 +251,10 @@ raiwall/
 2. **Error Handling**: Always handle errors explicitly. Use `fmt.Errorf("context: %w", err)` for wrapping. Never ignore errors silently.
 3. **Interfaces**: Define interfaces at the consumer site, not the provider. Keep interfaces small (1–3 methods).
 4. **Concurrency**: Use `sync.Pool` for hot-path buffer reuse. Use `atomic.Pointer` for lock-free config reads. Use channels for coordination, mutexes for state protection.
-5. **Package Layout**: Follow the existing `pkg/` structure. Each package should have a single clear responsibility.
+5. **Package Layout**: Follow the Hexagonal Architecture layout under `internal/core/{subdomain}` for domain logic/ports and `internal/adapters/{inbound,outbound}` for concrete drivers and transports. Each package should have a single clear responsibility.
 6. **Naming**: Use short, clear names. Exported symbols get doc comments. Package names are singular nouns.
 7. **No Over-Engineering**: Do not add abstractions, patterns, or layers unless they solve a concrete, immediate problem.
+8. **File Size & Separation of Concerns**: Never write massive monolithic files (> 350–400 lines). Decompose packages into focused, single-responsibility files (e.g. `types.go`, `handler.go`, `store.go`, `service.go`). Keep functions concise and single-purpose.
 
 ### Vue Frontend
 
@@ -254,12 +266,15 @@ raiwall/
 6. **Naming**: PascalCase for components, camelCase for composables and utilities, kebab-case for file names.
 7. **UI Color Consistency & Semantic Tokens**: Always use semantic Tailwind design tokens mapped to CSS custom properties (`bg-background`, `bg-card`, `bg-muted`, `border-border`, `text-foreground`, `text-muted-foreground`, `text-primary`, `text-threat`, `text-success`, `text-warning`, `text-info`). Arbitrary hex classes (e.g. `bg-[#181b20]`, `border-[#2d3440]`, `text-[#EF4444]`) are strictly banned. Components must support dual themes (Light & Dark) via semantic tokens. Refer to `.agents/rules/ui-consistency.md` for full token specification and migration cheat-sheet.
 8. **Anti-AI Slop & Enterprise Ergonomics**: Strictly avoid generic, decorative, or bloated 'AI slop' interfaces. Prioritize high information density (compact tables with monospaced tabular figures over decorative card grids), strict color restraint (90%+ neutral grayscale, no rainbow badges, no multi-colored icon chips, no colored card borders), solid surfaces (no purple/cyan neon gradients, no glow shadows, no glassmorphism blur), mandatory 6-state coverage (loading skeletons, actionable empty states, error with retry, string truncation safety, disabled/pending states, keyboard focus), snappy transitions (≤ 150ms), and direct technical copywriting with zero marketing fluff. Refer to `.agents/rules/anti-ui-slop.md` for full directives and the pre-merge finish gate checklist.
+9. **Distinctive Frontend Craft & Subject Grounding**: Never generate generic SaaS dashboard templates. Ground every view in network telemetry and radar instrumentation vernacular. Choose one signature element per view (e.g. 3D Attack Globe, syntax-highlighted forensic drawer, real-time `expr` bytecode validator) and keep all surrounding areas quiet and disciplined. Use dual-typography hierarchy (`font-sans` for interface hierarchy, `font-mono tabular-nums` for IPs, ports, CIDRs, latencies, and JA4 hashes). Use active-voice deterministic verbs on all controls and toasts. Refer to `.agents/rules/frontend-design.md` for full principles and the two-pass review framework.
+10. **Strict Component Modularity & File Size Limits**: Never code many lines into a single file. Keep `.vue` and `.ts` files concise (target ≤ 200–250 lines, hard ceiling of 350 lines). Aggressively extract complex views into separate subcomponents (`*Table.vue`, `*Modal.vue`, `*Drawer.vue`, `*FilterBar.vue`) and extract reactive state/logic into dedicated composables (`use*.ts`).
 
 ### General
 
 - **No dead code**: Remove unused imports, variables, and functions.
 - **No magic numbers**: Extract constants with descriptive names.
 - **Comments**: Explain *why*, not *what*. Code should be self-documenting for the *what*.
+- **File Length & Modular Separation**: Keep all files concise and modular (target ≤ 250 lines, hard ceiling of 350 lines). Never code many lines into a single file—aggressively separate concerns into dedicated subcomponents, modules, and utilities.
 
 ---
 

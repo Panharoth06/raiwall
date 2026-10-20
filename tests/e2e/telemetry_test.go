@@ -13,16 +13,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/caddyserver/caddy/v2"
-	"github.com/Panharoth06/raiwall/pkg/config"
-	"github.com/Panharoth06/raiwall/pkg/proxy"
-	"github.com/Panharoth06/raiwall/pkg/telemetry"
+	caddyv2 "github.com/caddyserver/caddy/v2"
+	"github.com/Panharoth06/raiwall/internal/adapters/inbound/caddy"
+	api "github.com/Panharoth06/raiwall/internal/adapters/inbound/http"
+	"github.com/Panharoth06/raiwall/internal/adapters/outbound/alerts"
+	"github.com/Panharoth06/raiwall/internal/core/control"
+	"github.com/Panharoth06/raiwall/internal/core/telemetry"
 )
 
 func TestEndToEndTelemetry(t *testing.T) {
-	config.StoreSnapshot(config.NewConfigSnapshot(100, config.ModeDefense, nil))
+	control.StoreSnapshot(control.NewConfigSnapshot(100, control.ModeDefense, nil))
 	t.Cleanup(func() {
-		config.StoreSnapshot(config.NewConfigSnapshot(0, config.ModeDefense, nil))
+		control.StoreSnapshot(control.NewConfigSnapshot(0, control.ModeDefense, nil))
 	})
 
 	// 1. Setup in-memory mock alert sender (avoids sandbox socket restriction)
@@ -50,27 +52,27 @@ func TestEndToEndTelemetry(t *testing.T) {
 	next := &e2eNextHandler{handler: backendMux}
 
 	// 4. Configure Raiwall Middleware with full telemetry pipeline
-	mw := &proxy.Middleware{
+	mw := &caddy.Middleware{
 		Mode:            "defense",
 		BlockStatusCode: http.StatusForbidden,
-		TelemetryConfig: &proxy.TelemetrySettings{
+		TelemetryConfig: &caddy.TelemetrySettings{
 			StorageType:   "sqlite",
 			StoragePath:   dbPath,
-			FlushInterval: caddy.Duration(50 * time.Millisecond),
+			FlushInterval: caddyv2.Duration(50 * time.Millisecond),
 			BufferSize:    1000,
-			Retention:     caddy.Duration(24 * time.Hour),
-			AlertChannels: []proxy.AlertChannelSettings{
+			Retention:     caddyv2.Duration(24 * time.Hour),
+			AlertChannels: []caddy.AlertChannelSettings{
 				{
 					Name:     "e2e_alert_webhook",
 					URL:      "https://hooks.slack.com/services/test",
 					Events:   []string{"block", "critical"},
-					Cooldown: caddy.Duration(5 * time.Second),
+					Cooldown: caddyv2.Duration(5 * time.Second),
 				},
 			},
 		},
 	}
 
-	caddyCtx, cancel := caddy.NewContext(caddy.Context{Context: context.Background()})
+	caddyCtx, cancel := caddyv2.NewContext(caddyv2.Context{Context: context.Background()})
 	defer cancel()
 
 	if err := mw.Provision(caddyCtx); err != nil {
@@ -79,7 +81,7 @@ func TestEndToEndTelemetry(t *testing.T) {
 	defer func() { _ = mw.Cleanup() }()
 
 	// Inject the mock alert sender to capture alerts in-memory without loopback socket dials
-	mw.SetAlertEngine(telemetry.NewAlertEngine([]telemetry.AlertChannel{
+	mw.SetAlertEngine(alerts.NewAlertEngine([]alerts.AlertChannel{
 		{
 			Name:     "e2e_alert_webhook",
 			URL:      "https://hooks.slack.com/services/test",
@@ -93,7 +95,7 @@ func TestEndToEndTelemetry(t *testing.T) {
 	if streamer == nil {
 		t.Fatal("expected EventStreamer to be initialized")
 	}
-	sub, unsubscribe := streamer.Subscribe(telemetry.EventFilter{})
+	sub, unsubscribe := streamer.Subscribe(api.EventFilter{})
 	defer unsubscribe()
 
 	// 6. Send benign request -> verify allowed and proxied to backend

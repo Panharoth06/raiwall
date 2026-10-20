@@ -1,6 +1,6 @@
 # Anti-AI Slop UI & Enterprise Ergonomics Specification
 
-> **Mandatory Rule for Coding Agents:** Raiwall is an enterprise-grade cybersecurity gateway and WAF operations center. All user interfaces must be utilitarian, high-density, performant, and grounded in real-world SOC workflows. Generic, decorative "AI slop" interfaces are **strictly prohibited**.
+> **Mandatory Rule for Coding Agents:** Raiwall is an enterprise-grade cybersecurity gateway and WAF operations center. All user interfaces must be utilitarian, high-density, performant, and grounded in real-world SOC workflows. Generic, decorative "AI slop" interfaces are **strictly prohibited**. See also [`.agents/rules/frontend-design.md`](./frontend-design.md) for distinctive craft principles and the two-pass review framework.
 
 ---
 
@@ -18,7 +18,7 @@ AI coding agents have a strong tendency to generate generic, bloated, and uninsp
 
 ---
 
-## 2. The 6 Anti-Slop Directives
+## 2. The 8 Anti-Slop Directives
 
 ### Directive 1: Information Density Over Decorative Cards
 *Security analysts monitor high-frequency telemetry. Every pixel must serve a purpose.*
@@ -105,6 +105,20 @@ AI coding agents have a strong tendency to generate generic, bloated, and uninsp
   - Always center icons optically with text using `flex items-center gap-2`.
   - Icon sizes must match line heights (16px `w-4 h-4` for compact inline text; 20px `w-5 h-5` for primary navigation).
 
+### Directive 8: Strict File Length & Modular Decomposition (No Monolithic Files)
+*Monolithic files are brittle, unmaintainable, and an antipattern for agentic pair programming.*
+
+* ❌ **BANNED:** Never write monolithic files containing hundreds of lines (strictly avoid files > 350–400 lines).
+* ❌ **BANNED:** Inlining modals, tables, drawers, toolbars, and heavy business logic all into one giant parent view.
+* ✅ **MANDATORY:**
+  - **Hard Size Ceilings:** Keep files concise: target $\le 200–250$ lines, hard limit of $350$ lines. If a file approaches 300 lines, immediately decompose it.
+  - **Vue Component Slicing:** Separate views into small, focused subcomponents:
+    - Extract tables and lists into dedicated `*Table.vue` or `*List.vue`.
+    - Extract dialogs, sheets, and drawers into dedicated `*Modal.vue`, `*Dialog.vue`, or `*Drawer.vue`.
+    - Extract toolbars, search bars, and filter sets into `*FilterBar.vue` or `*Toolbar.vue`.
+  - **Logic Separation:** Extract heavy reactive state, calculations, and API orchestration out of `<script setup>` into composables (`composables/use*.ts`).
+  - **Go Package Slicing:** Separate Go packages into single-responsibility files (`types.go`, `handler.go`, `service.go`, `store.go`, `validator.go`).
+
 ---
 
 ## 3. Pre-Merge Finish Gate Checklist
@@ -114,6 +128,7 @@ Before committing or completing any frontend task, verify against this hard gate
 - [ ] **Density Check:** Does this view present data efficiently without unnecessary empty card nesting?
 - [ ] **No Slop Check:** Are all gradients, glows, and sparkles absent?
 - [ ] **Color Restraint:** Is 90%+ of the screen neutral grayscale? Are rainbow badges, colorful icon chips, and colored card borders completely absent?
+- [ ] **Modularity & File Length:** Is the file concise ($\le 250–350$ lines)? Have complex modals, tables, and logic been separated into distinct subcomponents and composables?
 - [ ] **All States Handled:** Does the component handle Loading (skeletons), Empty (with CTA), Error (with retry), and Disabled?
 - [ ] **Payload Overflow:** Did I test with an abnormally long string (URL/Payload/IP) to ensure no layout breakage?
 - [ ] **Instant Response:** Do tabs, filters, and buttons feel responsive with $\le 150\text{ms}$ transitions and clean active feedback (zero `active:scale`)?

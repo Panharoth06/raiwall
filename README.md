@@ -21,6 +21,7 @@
   <a href="#overview">Overview</a> •
   <a href="#key-features">Key Features</a> •
   <a href="#architecture">Architecture</a> •
+  <a href="#project-structure">Project Structure</a> •
   <a href="#quick-start">Quick Start</a> •
   <a href="#configuration">Configuration</a> •
   <a href="#roadmap">Roadmap</a> •
@@ -86,6 +87,55 @@ Built natively as a **Caddy v2** module, Raiwall combines extreme proxy throughp
 
 ## Architecture
 
+Raiwall is architected using **Strict Hexagonal Architecture (Ports and Adapters)**. The application's core domain models, business logic, and security rules are completely decoupled from external frameworks, HTTP transports, and database drivers.
+
+### 1. Hexagonal Ports & Adapters Architecture
+
+```mermaid
+flowchart TD
+    subgraph DrivingAdapters["DRIVING / INBOUND ADAPTERS (internal/adapters/inbound)"]
+        CaddyAdapter["caddy/<br/>Caddy v2 HTTP Middleware<br/>Pipeline Orchestrator"]
+        HttpAPIAdapter["http/<br/>Huma v2 REST API<br/>Telemetry & Auth Handlers"]
+        GrpcSidecarAdapter["grpc/<br/>Envoy ext_proc v3<br/>Sidecar Server"]
+        McpAdapter["mcp/<br/>Model Context Protocol<br/>Tool Server"]
+    end
+
+    subgraph CoreDomainPorts["CORE DOMAIN & PORTS (internal/core)"]
+        direction TB
+        subgraph Ports["Driving & Driven Ports"]
+            InboundPorts["Driving Ports:<br/>WAFEnginePort, RateLimiterPort,<br/>BotDefensePort, AccessControlPort,<br/>TelemetryRecorderPort, ControlServicePort"]
+            OutboundPorts["Driven Ports:<br/>RateStoragePort, ForensicStorePort,<br/>AlertNotifierPort, GeoIPLookupPort,<br/>ThreatFeedPort, ControlStorePort"]
+        end
+
+        subgraph Subdomains["Domain Cores"]
+            WAF["waf/<br/>Lexical Triage, Normalizer,<br/>AST (SQL, Shell, XSS)"]
+            Rate["rate/<br/>GCRA, 3-Tier Limiting,<br/>Waiting Room Queue"]
+            Bot["bot/<br/>JA4, Route Classifier,<br/>PoW & Honeypot"]
+            ACL["acl/<br/>BART CIDR, expr Bytecode,<br/>Exception Gate"]
+            Auth["auth/<br/>Session & OIDC Claims"]
+            Telemetry["telemetry/<br/>Ring Buffer, Metrics,<br/>Debouncer"]
+            Control["control/<br/>Config Snapshots,<br/>Validation & Rollback"]
+        end
+    end
+
+    subgraph DrivenAdapters["DRIVEN / OUTBOUND ADAPTERS (internal/adapters/outbound)"]
+        StorageSQLite["storage/sqlite/<br/>SQLite WAL Driver<br/>Control & Telemetry DB"]
+        StorageClickHouse["storage/clickhouse/<br/>ClickHouse Telemetry Client"]
+        StorageRedis["storage/redis/<br/>Redis Rate Limit Store"]
+        StorageMemory["storage/memory/<br/>In-Memory Rate & Ban Store"]
+        GeoIPMaxMind["geoip/maxmind/<br/>MaxMind GeoIP Reader"]
+        AlertsShoutrrr["alerts/shoutrrr/<br/>Shoutrrr Notification Client"]
+        FeedsDownloader["feeds/<br/>Threat Feed File Loader"]
+    end
+
+    DrivingAdapters -->|"Invokes Driving Ports"| InboundPorts
+    InboundPorts --> Subdomains
+    Subdomains --> OutboundPorts
+    OutboundPorts -->|"Implemented by"| DrivenAdapters
+```
+
+### 2. Data Plane Request Inspection Funnel
+
 ```mermaid
 flowchart TD
     subgraph ControlPlane["CONTROL PLANE (Admin & API)"]
@@ -133,6 +183,50 @@ flowchart TD
 
     EngineConfig -.->|"Hot-Reload (atomic.Pointer)"| DataPlane
     DataPlane -.->|"Forensic Events"| RingBuffer
+```
+
+---
+
+## Project Structure
+
+Raiwall enforces **Strict File Modularity**: every handwritten Go file adheres to a strict target of $\le 250$ lines (hard ceiling of 350 lines). Complex pipelines and storage drivers are decomposed into concise, single-responsibility files.
+
+```
+raiwall/
+├── cmd/
+│   └── raiwall/                          # Composition Root (single binary runtime)
+│       ├── main.go                       # Caddy runtime entrypoint
+│       ├── admin.go                      # Admin CLI bootstrap & user management
+│       ├── sidecar.go                    # Envoy ext_proc gRPC sidecar flags
+│       ├── mcp.go                        # AI Agent MCP server commands
+│       └── version.go                    # Build & version info
+├── internal/
+│   ├── core/                             # Core Domain & Ports (framework-free)
+│   │   ├── waf/                          # Threat detection (lexical triage, AST, normalizer, ports)
+│   │   ├── rate/                         # Rate limiting (GCRA, tiers 1-3, waiting room queue, ban)
+│   │   ├── bot/                          # Active bot defense (JA4, classifier, PoW, clearance, honeypot)
+│   │   ├── acl/                          # Access control (BART CIDR, expr bytecode, exceptions)
+│   │   ├── auth/                         # Pre-app authentication (sessions, simple auth, OIDC)
+│   │   ├── telemetry/                    # Observability (forensic events, ring buffer, debouncer, metrics)
+│   │   └── control/                      # Control plane (snapshot, validator, compiler, rollback)
+│   └── adapters/                         # Concrete Technology Adapters
+│       ├── inbound/                      # Driving Adapters
+│       │   ├── caddy/                    # Caddy v2 HTTP middleware & stage pipeline orchestrator
+│       │   ├── http/                     # Huma v2 OpenAPI 3.1 REST API & UI static handler
+│       │   ├── grpc/                     # Envoy ext_proc v3 sidecar server
+│       │   └── mcp/                      # Model Context Protocol security operations server
+│       └── outbound/                     # Driven Adapters
+│           ├── storage/                  # SQLite WAL, ClickHouse, Redis, Memory drivers
+│           ├── geoip/                    # MaxMind GeoLite2 reader
+│           ├── alerts/                   # Shoutrrr multi-channel push notification dispatcher
+│           └── feeds/                    # Threat intelligence feed loader
+├── web/                                  # Vue 3 + TypeScript admin dashboard (embedded via go:embed)
+├── tests/
+│   └── e2e/                              # End-to-end integration test suites (build tag: integration)
+├── examples/
+│   └── Caddyfile                         # Example Caddyfile configuration
+├── Dockerfile                            # Multi-stage scratch build (<50 MB)
+└── Makefile                              # Build, test, and dev tooling
 ```
 
 ---
