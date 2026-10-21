@@ -156,6 +156,11 @@ func (m *Middleware) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 					return err
 				}
 
+			case "storage":
+				if err := m.parseStorage(d); err != nil {
+					return err
+				}
+
 			case "sidecar":
 				if err := m.parseSidecar(d); err != nil {
 					return err

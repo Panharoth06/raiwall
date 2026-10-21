@@ -1,12 +1,21 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('WAF Command Center Dashboard E2E', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('#/login');
+    if (await page.locator('input[type="password"]').isVisible()) {
+      await page.fill('input[placeholder="Username"]', 'admin');
+      await page.fill('input[type="password"]', 'admin');
+      await page.click('button[type="submit"]');
+      await page.waitForTimeout(500);
+    }
+    await page.goto('#/topology');
+    await page.waitForSelector('[data-testid="waf-dashboard-root"]');
+  });
+
   // Test 1: Viewport Lock (Zero Scrollbars) at 1440x900
   test('enforces strict viewport lock with zero vertical or horizontal scrollbars at 1440x900', async ({ page }) => {
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await page.goto('/');
-    await page.waitForSelector('[data-testid="waf-dashboard-root"]');
-
     const dimensions = await page.evaluate(() => ({
       scrollHeight: document.documentElement.scrollHeight,
       scrollWidth: document.documentElement.scrollWidth,
@@ -21,7 +30,7 @@ test.describe('WAF Command Center Dashboard E2E', () => {
   // Test 2: SVG Cubic Bézier Integrity
   test('verifies all sankey ribbons have valid cubic bezier paths and zero NaN coordinates', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
-    await page.goto('/');
+    await page.goto('#/topology');
     await page.waitForSelector('[data-testid="sankey-ribbon"]');
 
     const ribbons = page.locator('[data-testid="sankey-ribbon"]');
@@ -42,7 +51,7 @@ test.describe('WAF Command Center Dashboard E2E', () => {
   // Test 3: Interactive Filter & Hub Hover Flow
   test('handles interactive filter toggle and scales hub-waf-core on hover', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
-    await page.goto('/');
+    await page.goto('#/topology');
     await page.waitForSelector('[data-testid="filter-trigger-btn"]');
 
     // Initial check: filter button says Filters
@@ -80,7 +89,7 @@ test.describe('WAF Command Center Dashboard E2E', () => {
   // Test 4: Human Clients Orbital Click Expansion
   test('expands human clients subnodes on click and verifies viewport positioning', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
-    await page.goto('/');
+    await page.goto('#/topology');
     await page.waitForSelector('[data-testid="source-node-humans"]');
 
     // Click to expand
@@ -104,7 +113,7 @@ test.describe('WAF Command Center Dashboard E2E', () => {
   // Test 5: Tooltip Visibility and Strict Viewport Bounds
   test('verifies topology tooltip stays strictly within viewport boundaries when hovering right-column nodes', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
-    await page.goto('/');
+    await page.goto('#/topology');
     await page.waitForSelector('[data-testid="arc-node-item"]');
 
     const firstNode = page.locator('[data-testid="arc-node-item"]').first();
@@ -126,7 +135,7 @@ test.describe('WAF Command Center Dashboard E2E', () => {
   // Test 6: Traffic vs Threats Mode Switch E2E
   test('switches view mode to Threats and updates summary metrics', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
-    await page.goto('/');
+    await page.goto('#/topology');
     await page.waitForSelector('[data-testid="dest-summary-upper"]');
 
     const upperSummary = page.locator('[data-testid="dest-summary-upper"]');

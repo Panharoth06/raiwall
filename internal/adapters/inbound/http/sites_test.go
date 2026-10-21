@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Panharoth06/raiwall/internal/adapters/outbound/storage/sqlite"
 	"github.com/Panharoth06/raiwall/internal/core/control"
 	"github.com/stretchr/testify/require"
 )
@@ -136,8 +135,8 @@ func TestAPI_ACLAndExprDryRun(t *testing.T) {
 	require.NotEmpty(t, res.Error)
 }
 
-func dbCreateAdminKey(token string) sqlite.CreateAPIKeyParams {
-	return sqlite.CreateAPIKeyParams{
+func dbCreateAdminKey(token string) control.ApiKeyRecord {
+	return control.ApiKeyRecord{
 		ID:        "admin-key",
 		Name:      "Admin",
 		KeyHash:   HashAPIKey(token),

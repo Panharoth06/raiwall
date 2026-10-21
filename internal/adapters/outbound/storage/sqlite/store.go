@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	_ "embed"
 	"fmt"
+
+	"github.com/Panharoth06/raiwall/internal/core/control"
 )
 
 //go:embed schema.sql
@@ -12,7 +14,8 @@ var schemaSQL string
 
 // Store provides persistence for Raiwall Control Plane entities.
 type Store struct {
-	db *sql.DB
+	db     *sql.DB
+	ownsDB bool
 	*Queries
 }
 
@@ -50,8 +53,18 @@ func InitDB(dsn string) (*Store, error) {
 
 	return &Store{
 		db:      db,
+		ownsDB:  true,
 		Queries: New(db),
 	}, nil
+}
+
+// NewFromDB creates a Store wrapping an existing *sql.DB connection pool.
+func NewFromDB(db *sql.DB) *Store {
+	return &Store{
+		db:      db,
+		ownsDB:  false,
+		Queries: New(db),
+	}
 }
 
 // DB returns the underlying sql.DB instance.
@@ -59,9 +72,31 @@ func (s *Store) DB() *sql.DB {
 	return s.db
 }
 
-// WithTx executes operations within a database transaction.
+// WithTx executes operations within a database transaction using control.ControlStore.
 // If fn returns an error, the transaction is automatically rolled back.
-func (s *Store) WithTx(ctx context.Context, fn func(q *Queries) error) error {
+func (s *Store) WithTx(ctx context.Context, fn func(store control.ControlStore) error) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+
+	txStore := &Store{
+		db:      s.db,
+		Queries: s.Queries.WithTx(tx),
+	}
+	if err := fn(txStore); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+	return nil
+}
+
+// WithQueriesTx executes operations within a transaction with direct access to *Queries.
+func (s *Store) WithQueriesTx(ctx context.Context, fn func(q *Queries) error) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
@@ -81,7 +116,7 @@ func (s *Store) WithTx(ctx context.Context, fn func(q *Queries) error) error {
 
 // Close releases the database resources.
 func (s *Store) Close() error {
-	if s.db != nil {
+	if s.ownsDB && s.db != nil {
 		return s.db.Close()
 	}
 	return nil

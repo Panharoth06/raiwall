@@ -12,3 +12,8 @@ reference/
 *.db
 *.db-wal
 *.db-shm
+
+# Test lab local data and logs
+test-lab/coreruleset/
+test-lab/logs/
+web/screenshots/

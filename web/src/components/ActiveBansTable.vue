@@ -181,9 +181,11 @@ const handleConfirmUnblockAll = async () => {
         v-else-if="filteredBans.length === 0"
         class="p-8 text-center text-muted-foreground text-xs"
       >
-        <ShieldCheck class="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
+        <ShieldCheck class="h-8 w-8 mx-auto mb-2 text-primary/70" />
         <p class="font-medium text-foreground text-sm">No active client bans</p>
-        <p class="text-sm mt-1 text-muted-foreground">All incoming client traffic is currently within rate limits.</p>
+        <p class="text-sm mt-1 text-muted-foreground max-w-md mx-auto">
+          All incoming client traffic is currently within rate limits. Tier 1–3 volumetric filters and scanner traps are actively monitoring incoming requests.
+        </p>
       </div>
 
       <!-- Active Bans Table -->

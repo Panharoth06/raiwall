@@ -5,8 +5,15 @@ func (m *Middleware) Cleanup() error {
 	if m.ringBuffer != nil {
 		_ = m.ringBuffer.Close()
 	}
-	if m.telemetryStore != nil {
-		_ = m.telemetryStore.Close()
+	if m.storageRegistry != nil {
+		_ = m.storageRegistry.Close()
+	} else {
+		if m.telemetryStore != nil {
+			_ = m.telemetryStore.Close()
+		}
+		if m.controlStore != nil {
+			_ = m.controlStore.Close()
+		}
 	}
 	if m.geoIPReader != nil {
 		_ = m.geoIPReader.Close()
@@ -22,9 +29,6 @@ func (m *Middleware) Cleanup() error {
 	}
 	if m.sidecarServer != nil {
 		m.sidecarServer.Stop()
-	}
-	if m.controlStore != nil {
-		_ = m.controlStore.Close()
 	}
 	if m.upstreamRegistry != nil {
 		m.upstreamRegistry.Close()

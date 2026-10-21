@@ -51,9 +51,9 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
     -o /bin/raiwall ./cmd/raiwall
 
 # ------------------------------------------------------------------------------
-# Stage 3: Lightweight Production Runner (<50MB image)
+# Stage 3: Lightweight Production Runner (lightweight image, ~50MB)
 # ------------------------------------------------------------------------------
-FROM alpine:3.20
+FROM alpine:3.21
 
 RUN apk --no-cache add ca-certificates tzdata curl \
     && addgroup -S -g 1000 raiwall \
@@ -63,6 +63,7 @@ RUN apk --no-cache add ca-certificates tzdata curl \
 
 COPY --from=backend-builder /bin/raiwall /usr/local/bin/raiwall
 COPY --chown=raiwall:raiwall examples/Caddyfile /etc/raiwall/Caddyfile
+COPY --chown=raiwall:raiwall examples/feeds /etc/raiwall/examples/feeds
 
 USER raiwall:raiwall
 WORKDIR /etc/raiwall

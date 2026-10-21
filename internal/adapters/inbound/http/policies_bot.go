@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/Panharoth06/raiwall/internal/adapters/outbound/storage/sqlite"
+	"github.com/Panharoth06/raiwall/internal/core/control"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
@@ -80,7 +80,7 @@ func (s *Server) handleCreateBotConfig(w http.ResponseWriter, r *http.Request) {
 		req.ID = "bot-" + uuid.New().String()[:8]
 	}
 	if req.PowDifficulty == 0 {
-		req.PowDifficulty = 4
+		req.PowDifficulty = 20000
 	}
 
 	trapsJSON, _ := json.Marshal(req.TrapURLs)
@@ -93,7 +93,7 @@ func (s *Server) handleCreateBotConfig(w http.ResponseWriter, r *http.Request) {
 		isActive = 1
 	}
 
-	err := s.store.CreateBotConfig(r.Context(), sqlite.CreateBotConfigParams{
+	err := s.store.CreateBotConfig(r.Context(), control.BotConfig{
 		ID:            req.ID,
 		Host:          req.Host,
 		PowEnabled:    powEnabled,
@@ -131,7 +131,7 @@ func (s *Server) handleUpdateBotConfig(w http.ResponseWriter, r *http.Request) {
 		isActive = 1
 	}
 
-	err := s.store.UpdateBotConfig(r.Context(), sqlite.UpdateBotConfigParams{
+	err := s.store.UpdateBotConfig(r.Context(), control.BotConfig{
 		ID:            id,
 		Host:          req.Host,
 		PowEnabled:    powEnabled,

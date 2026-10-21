@@ -236,6 +236,66 @@ func TestSemanticEngine_OversizedParameterFallback(t *testing.T) {
 	}
 }
 
+func TestSemanticEngine_PathTraversalDetection(t *testing.T) {
+	eng := NewSemanticEngine()
+
+	testCases := []struct {
+		name string
+		ctx  *RequestContext
+	}{
+		{
+			name: "Classic dot-dot-slash /etc/passwd in query",
+			ctx: &RequestContext{
+				Method: "GET",
+				Path:   "/public/download",
+				Query:  "file=..%2F..%2F..%2F..%2Fetc%2Fpasswd",
+			},
+		},
+		{
+			name: "URL-encoded traversal (%2e%2e)",
+			ctx: &RequestContext{
+				Method: "GET",
+				Path:   "/public/view",
+				Query:  "doc=%2e%2e%2f%2e%2e%2fetc%2fpasswd",
+			},
+		},
+		{
+			name: "Windows win.ini backslash traversal",
+			ctx: &RequestContext{
+				Method: "GET",
+				Path:   "/public/file",
+				Query:  "name=..\\..\\windows\\win.ini",
+			},
+		},
+		{
+			name: "Sensitive file in JSON body",
+			ctx: &RequestContext{
+				Method: "POST",
+				Path:   "/public/api/config",
+				Headers: http.Header{
+					"Content-Type": []string{"application/json"},
+				},
+				Body: []byte(`{"filepath": "/etc/shadow"}`),
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			verdict, err := eng.InspectRequest(tc.ctx)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if verdict.Action != ActionBlock {
+				t.Errorf("expected ActionBlock, got %v", verdict.Action)
+			}
+			if verdict.RuleID != "SEMANTIC_TRAVERSAL" {
+				t.Errorf("expected RuleID 'SEMANTIC_TRAVERSAL', got %q", verdict.RuleID)
+			}
+		})
+	}
+}
+
 func TestSemanticEngine_OptionsAndName(t *testing.T) {
 	eng := NewSemanticEngine(
 		WithASTTimeout(10*time.Millisecond),

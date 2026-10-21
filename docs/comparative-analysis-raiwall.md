@@ -18,7 +18,7 @@
 | **Access Control (ACL)** | Multi-condition boolean rule builder with IP Groups | **expr** bytecode compiler (`expr-lang/expr`, < 15 ns) + **BART** CIDR routing table (`gaissmai/bart`, ~15 ns for 500K+ IPs) | Raiwall achieves sub-microsecond ACL evaluation in pure Go memory structures. |
 | **Traffic Buffering** | **Waiting Room** queue (HTTP 465) with concurrency caps and position tracking | Reverse proxy buffering with `sync.Pool` buffer pooling | SafeLine's **Waiting Room** pattern is a high-value capability Raiwall can incorporate. |
 | **API Inventory** | Active API discovery & cataloging under `Sites -> Detail -> Routings` | Planned OpenAPI contract compliance inspection | SafeLine's runtime endpoint discovery provides high visibility for microservices teams. |
-| **Packaging & Distribution**| Multi-container Docker Compose deployment (Tengine, Detector, Web, Redis, Postgres) | **Single binary** (`bin/raiwall`) shipping Caddy, WAF engine, API, and embedded Vue UI | Drastically simpler operations, zero-dependency deployment, container image < 50 MB. |
+| **Packaging & Distribution**| Multi-container Docker Compose deployment (Tengine, Detector, Web, Redis, Postgres) | **Single binary** (`bin/raiwall`) shipping Caddy, WAF engine, API, and embedded Vue UI | Drastically simpler operations, zero-dependency deployment, lightweight container image (~50 MB, not strictly bounded < 50 MB). |
 
 ---
 
@@ -111,7 +111,7 @@ Allowing operators to customize HTML templates and corporate branding for HTTP `
 
 | Feature | SafeLine v9.4.2 | Raiwall Goal State |
 | :--- | :--- | :--- |
-| **Deployment Footprint** | Multi-container Docker (Tengine, Detector, Web, Redis, PG) | **Single compiled Go binary (< 50MB image)** |
+| **Deployment Footprint** | Multi-container Docker (Tengine, Detector, Web, Redis, PG) | **Single compiled Go binary (lightweight ~50MB, not strictly <50MB)** |
 | **WAF Evaluation Latency**| ~1–3 ms (IPC to detector process) | **< 2 µs lexical triage + bounded AST (< 5 ms timeout)** |
 | **ACME SSL Lifecycle** | Manual upload + partial ACME | **Automatic Zero-Config ACME via CertMagic** |
 | **Community / Licensing** | Closed-source core with commercial Pro tiers | **100% Open Source (Enterprise-Grade)** |

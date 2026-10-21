@@ -200,7 +200,7 @@ raiwall/
 ├── tasks/
 │   ├── plan.md               # Implementation plan & architecture decisions
 │   └── todo.md               # Task breakdown with acceptance criteria
-├── Dockerfile                # Multi-stage: golang:1.27-alpine → alpine:latest (<50 MB)
+├── Dockerfile                # Multi-stage: golang:1.27-alpine → alpine:latest (lightweight, ~50MB)
 ├── Makefile                  # build, test, test-integration, lint, run targets
 ├── go.mod
 ├── go.sum
@@ -301,6 +301,21 @@ raiwall/
 | E2E | Playwright | `npm run test:e2e` |
 | Lint | ESLint + Prettier | `npm run lint` |
 
+### Full E2E & Docker Testing (Mandatory Post-Implementation Gate)
+
+Every coding task modifying data plane pipelines, control plane APIs, authentication, or frontend UI **must be tested end-to-end after implementation**:
+
+| Scope | Tool / Runner | Command | Verification Target |
+|-------|---------------|---------|---------------------|
+| **Whole-App Container** | Docker / Docker Compose | `docker compose up -d` | Complete single-binary stack running with Caddy, SQLite/PG, and embedded Vue UI on `:8080` |
+| **All Endpoints Correctness** | HTTP Client / Playwright | Full API sweep across all registered routes | Every endpoint works properly as expected (zero unexpected 404s, zero 500s, 100% contract adherence) |
+| **REST API (Basic Auth)** | `curl` / Playwright API | `curl -u admin:admin http://localhost:8080/.raiwall/api/v1/...` | Full CRUD lifecycle, atomic snapshot swap, unblock IP, 401 on bad credentials |
+| **Frontend UI & Responsive** | Playwright / Chrome | `npm run test:e2e` | Multi-viewport testing across Desktop (`1440×900`), Tablet (`768×1024`), and Mobile (`390×844`) |
+| **Live WAF Threat Block** | HTTP Client / curl | Attack vectors (`' OR 1=1--`, `<script>`) | HTTP 403 Forbidden on attacks, HTTP 200 OK on benign traffic, forensic event ingestion |
+
+> [!IMPORTANT]
+> Refer to [`.agents/rules/e2e-testing.md`](.agents/rules/e2e-testing.md) for full execution rules and the pre-completion finish gate checklist.
+
 ---
 
 ## Production Constraints & Risk Mitigations
@@ -347,6 +362,10 @@ This project maintains a navigable knowledge graph in `graphify-out/` detailing 
 3. **Graph Synchronization**:
    - After modifying or introducing Go source files, run `graphify update .` to keep AST extraction, edges, and communities up to date without incurring LLM token costs.
    - Git post-commit hooks are installed to automatically trigger incremental AST re-indexing upon commits.
+4. **Mandatory Post-Implementation E2E Gate**:
+   - Never mark tasks complete or commit changes without verifying end-to-end: run the full application in Docker, test UI responsiveness across Desktop (`1440×900`), Tablet (`768×1024`), and Mobile (`390×844`) with Playwright or Chrome, and verify API operations using HTTP Basic Auth (`admin:admin`). Always test **after** implementation. Refer to [`.agents/rules/e2e-testing.md`](.agents/rules/e2e-testing.md).
+5. **Exhaustive Endpoint Correctness & Integrity**:
+   - Every single endpoint (gateway data plane routes, embedded UI paths, OpenAPI specs, and every control plane REST API route) must be verified to work properly as expected under its documented schema and response contracts. Zero unexpected 404s, zero unhandled 500 errors, zero silent drops, and strict status code adherence (`200`/`201` on success, `400` on validation errors, `401` on unauthenticated, `403` on forbidden/blocked, `404` on missing resources). Refer to [`.agents/rules/e2e-testing.md`](.agents/rules/e2e-testing.md).
 
 ---
 
@@ -396,6 +415,6 @@ Use [Conventional Commits](https://www.conventionalcommits.org/) with scope pref
 feat(gateway): add weighted round-robin upstream load balancing
 fix(waf): handle chunked transfer encoding in body inspection
 feat(web): add real-time attack log viewer with SSE
-chore(docker): optimize multi-stage build to <50MB
+chore(docker): optimize multi-stage build footprint
 test(gateway): add IPv6 client IP extraction edge cases
 ```

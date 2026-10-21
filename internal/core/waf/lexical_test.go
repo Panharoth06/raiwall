@@ -252,6 +252,9 @@ func TestTriageClassification(t *testing.T) {
 		{"$(whoami)", TriageSuspectCmdI},
 		{"`id`", TriageSuspectCmdI},
 		{"| nc 127.0.0.1 1337", TriageSuspectCmdI},
+		{"../../../../etc/passwd", TriageSuspectTraversal},
+		{"..\\..\\windows\\win.ini", TriageSuspectTraversal},
+		{"php://filter/resource=index.php", TriageSuspectTraversal},
 	}
 
 	for _, tt := range tests {
@@ -259,6 +262,78 @@ func TestTriageClassification(t *testing.T) {
 			res := Triage(tt.input)
 			if res != tt.expected {
 				t.Errorf("Triage(%q) = %v, expected %v", tt.input, res, tt.expected)
+			}
+		})
+	}
+}
+
+func TestLexicalEngineTraversalDetection(t *testing.T) {
+	eng := NewLexicalEngine()
+
+	tests := []struct {
+		name        string
+		ctx         *RequestContext
+		expectBlock bool
+		expectRule  string
+	}{
+		{
+			name: "Benign file download",
+			ctx: &RequestContext{
+				Path:   "/download",
+				Query:  "file=report_2026.pdf",
+				Method: "GET",
+			},
+			expectBlock: false,
+		},
+		{
+			name: "Directory traversal /etc/passwd in query parameter",
+			ctx: &RequestContext{
+				Path:   "/public/download",
+				Query:  "file=../../../../etc/passwd",
+				Method: "GET",
+			},
+			expectBlock: true,
+			expectRule:  "TRAVERSAL_QUERY",
+		},
+		{
+			name: "Directory traversal Windows win.ini",
+			ctx: &RequestContext{
+				Path:   "/public/file",
+				Query:  "name=..\\..\\windows\\win.ini",
+				Method: "GET",
+			},
+			expectBlock: true,
+			expectRule:  "TRAVERSAL_QUERY",
+		},
+		{
+			name: "LFI with php wrapper",
+			ctx: &RequestContext{
+				Path:   "/view",
+				Query:  "page=php://filter/resource=index.php",
+				Method: "GET",
+			},
+			expectBlock: true,
+			expectRule:  "TRAVERSAL_QUERY",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			verdict, err := eng.InspectRequest(tt.ctx)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if tt.expectBlock {
+				if verdict.Action != ActionBlock {
+					t.Fatalf("expected ActionBlock, got %v", verdict.Action)
+				}
+				if verdict.RuleID != tt.expectRule {
+					t.Errorf("expected RuleID %q, got %q", tt.expectRule, verdict.RuleID)
+				}
+			} else {
+				if verdict.Action != ActionAllow {
+					t.Fatalf("expected ActionAllow, got %v", verdict.Action)
+				}
 			}
 		})
 	}

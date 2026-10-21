@@ -148,3 +148,19 @@ func TestAdminCLI_Errors(t *testing.T) {
 	require.Error(t, err)
 	require.Equal(t, 1, code)
 }
+
+func TestAdminCLI_DSNAndDriverFlags(t *testing.T) {
+	dsn := fmt.Sprintf("file:test_dsn_flag_%d.db", time.Now().UnixNano())
+
+	fs := pflag.NewFlagSet("admin", pflag.ContinueOnError)
+	fs.String("dsn", dsn, "")
+	fs.String("driver", "sqlite", "")
+	fs.String("username", "dsn_admin", "")
+	fs.String("password", "dsn_secret_123", "")
+	_ = fs.Parse([]string{"init"})
+
+	code, err := cmdAdmin(caddycmd.Flags{FlagSet: fs})
+	require.NoError(t, err)
+	require.Equal(t, 0, code)
+}
+

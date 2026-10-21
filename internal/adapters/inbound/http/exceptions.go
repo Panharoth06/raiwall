@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/Panharoth06/raiwall/internal/adapters/outbound/storage/sqlite"
 	"github.com/Panharoth06/raiwall/internal/core/acl"
+	"github.com/Panharoth06/raiwall/internal/core/control"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
@@ -109,6 +109,12 @@ func (s *Server) handleCreateException(w http.ResponseWriter, r *http.Request) {
 	if req.PathPrefix == "" && req.PathRegex == "" && raw.Path != "" {
 		req.PathPrefix = raw.Path
 	}
+	if req.Path == "" {
+		req.Path = req.PathPrefix
+		if req.Path == "" {
+			req.Path = req.PathRegex
+		}
+	}
 
 	if req.ID == "" {
 		req.ID = "exc-" + uuid.New().String()[:8]
@@ -142,7 +148,7 @@ func (s *Server) handleCreateException(w http.ResponseWriter, r *http.Request) {
 		isActive = 0
 	}
 
-	err := s.store.CreateException(r.Context(), sqlite.CreateExceptionParams{
+	err := s.store.CreateException(r.Context(), control.ExceptionRule{
 		ID:          req.ID,
 		Description: req.Description,
 		Host:        req.Host,
@@ -169,10 +175,24 @@ func (s *Server) handleCreateException(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleUpdateException(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	var req ExceptionDTO
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	var raw struct {
+		ExceptionDTO
+		Path     string `json:"path"`
+		IsActive *bool  `json:"is_active"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
 		respondError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
 		return
+	}
+	req := raw.ExceptionDTO
+	if req.PathPrefix == "" && req.PathRegex == "" && raw.Path != "" {
+		req.PathPrefix = raw.Path
+	}
+	if req.Path == "" {
+		req.Path = req.PathPrefix
+		if req.Path == "" {
+			req.Path = req.PathRegex
+		}
 	}
 
 	rule := acl.ExceptionRule{
@@ -187,11 +207,13 @@ func (s *Server) handleUpdateException(w http.ResponseWriter, r *http.Request) {
 
 	now := time.Now().UTC()
 	isActive := int64(1)
-	if !req.IsActive {
+	if raw.IsActive != nil && !*raw.IsActive {
+		isActive = 0
+	} else if !req.IsActive && raw.IsActive == nil {
 		isActive = 0
 	}
 
-	err := s.store.UpdateException(r.Context(), sqlite.UpdateExceptionParams{
+	err := s.store.UpdateException(r.Context(), control.ExceptionRule{
 		ID:          id,
 		Description: req.Description,
 		Host:        req.Host,

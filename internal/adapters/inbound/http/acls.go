@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/Panharoth06/raiwall/internal/adapters/outbound/storage/sqlite"
 	"github.com/Panharoth06/raiwall/internal/core/acl"
+	"github.com/Panharoth06/raiwall/internal/core/control"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
@@ -116,7 +116,7 @@ func (s *Server) handleCreateACLRule(w http.ResponseWriter, r *http.Request) {
 	req.IsActive = isActive == 1
 	req.Enabled = isActive == 1
 
-	err := s.store.CreateACLRule(r.Context(), sqlite.CreateACLRuleParams{
+	err := s.store.CreateACLRule(r.Context(), control.AclRule{
 		ID:          req.ID,
 		Name:        req.Name,
 		Expression:  req.Expression,
@@ -170,7 +170,7 @@ func (s *Server) handleUpdateACLRule(w http.ResponseWriter, r *http.Request) {
 	req.IsActive = isActive == 1
 	req.Enabled = isActive == 1
 
-	err := s.store.UpdateACLRule(r.Context(), sqlite.UpdateACLRuleParams{
+	err := s.store.UpdateACLRule(r.Context(), control.AclRule{
 		ID:          id,
 		Name:        req.Name,
 		Expression:  req.Expression,

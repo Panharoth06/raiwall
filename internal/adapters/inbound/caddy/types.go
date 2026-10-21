@@ -6,7 +6,7 @@ import (
 	"github.com/Panharoth06/raiwall/internal/adapters/inbound/grpc"
 	"github.com/Panharoth06/raiwall/internal/adapters/inbound/http"
 	"github.com/Panharoth06/raiwall/internal/adapters/outbound/alerts"
-	"github.com/Panharoth06/raiwall/internal/adapters/outbound/storage/sqlite"
+	"github.com/Panharoth06/raiwall/internal/adapters/outbound/storage"
 	"github.com/Panharoth06/raiwall/internal/core/acl"
 	"github.com/Panharoth06/raiwall/internal/core/auth"
 	"github.com/Panharoth06/raiwall/internal/core/bot"
@@ -94,6 +94,23 @@ type TelemetrySettings struct {
 	AlertChannels []AlertChannelSettings `json:"alert_channels,omitempty"`
 }
 
+// StorageStoreSettings defines a single named store definition.
+type StorageStoreSettings struct {
+	Driver        string         `json:"driver,omitempty"`
+	DSN           string         `json:"dsn,omitempty"`
+	MaxOpen       int            `json:"max_open,omitempty"`
+	MaxIdle       int            `json:"max_idle,omitempty"`
+	Retention     caddy.Duration `json:"retention,omitempty"`
+	PruneInterval caddy.Duration `json:"prune_interval,omitempty"`
+}
+
+// StorageSettings configures named stores and role bindings.
+type StorageSettings struct {
+	Stores    map[string]StorageStoreSettings `json:"stores,omitempty"`
+	Control   string                          `json:"control,omitempty"`
+	Telemetry string                          `json:"telemetry,omitempty"`
+}
+
 // ControlSettings configures the Control Plane database and management API.
 type ControlSettings struct {
 	DBPath     string `json:"db_path,omitempty"`
@@ -137,6 +154,7 @@ type Middleware struct {
 	TelemetryConfig *TelemetrySettings `json:"telemetry,omitempty"`
 
 	// Domain 7: Control Plane & Sidecar Mode
+	StorageConfig *StorageSettings `json:"storage,omitempty"`
 	ControlConfig *ControlSettings `json:"control,omitempty"`
 	SidecarConfig *SidecarSettings `json:"sidecar,omitempty"`
 
@@ -165,6 +183,7 @@ type Middleware struct {
 	aclEngine       *acl.ACLEngine
 	authGateway     *auth.AuthGateway
 
+	storageRegistry    *storage.Registry
 	telemetryStore     telemetry.ForensicStore
 	ringBuffer         *telemetry.RingBuffer
 	streamer           *api.EventStreamer
@@ -172,7 +191,7 @@ type Middleware struct {
 	metrics            *telemetry.Metrics
 	telemetryAPI       *api.TelemetryAPI
 	uiHandler          *UIHandler
-	controlStore       *sqlite.Store
+	controlStore       control.ControlStore
 	controlAPI         *api.Server
 	sidecarServer      *grpc.ExtProcServer
 	upstreamRegistry   *UpstreamRegistry

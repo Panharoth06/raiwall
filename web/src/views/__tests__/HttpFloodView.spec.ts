@@ -3,6 +3,7 @@ import { mount } from '@vue/test-utils';
 import { setActivePinia, createPinia } from 'pinia';
 import { nextTick } from 'vue';
 import HttpFloodView from '../HttpFloodView.vue';
+import { router } from '@/router';
 import { useConfigStore } from '@/stores/config';
 import { api, type BanEntry, type WaitingRoomMetrics } from '@/api/client';
 
@@ -43,9 +44,10 @@ const mockMetrics: WaitingRoomMetrics = {
   total_abandoned: 8,
 };
 
-beforeEach(() => {
+beforeEach(async () => {
   setActivePinia(createPinia());
   vi.restoreAllMocks();
+  await router.navigate('/http-flood');
   global.ResizeObserver = MockResizeObserver as unknown as typeof ResizeObserver;
 
   vi.spyOn(api, 'listBans').mockResolvedValue([...mockBans]);

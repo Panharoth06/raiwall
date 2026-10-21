@@ -223,5 +223,12 @@ func (s *controlStmt) execMore(st *databaseState, q string, args []driver.Value)
 		return driver.RowsAffected(0), true
 	}
 
+	if strings.Contains(q, "INSERT INTO raiwall_schema_migrations") || strings.Contains(q, "INSERT OR REPLACE INTO raiwall_schema_migrations") {
+		ver := int(toInt64Val(args[0]))
+		appliedAt := toStringVal(args[1])
+		st.migrations[ver] = appliedAt
+		return driver.RowsAffected(1), true
+	}
+
 	return nil, false
 }

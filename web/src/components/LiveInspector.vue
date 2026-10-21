@@ -133,6 +133,48 @@ function formatLatency(durNs: number): string {
   const ms = durNs / 1000000;
   return ms < 1 ? `${(ms * 1000).toFixed(0)}µs` : `${ms.toFixed(1)}ms`;
 }
+
+function isPrivateIP(ip: string): boolean {
+  if (!ip) return false;
+  return (
+    ip === '127.0.0.1' ||
+    ip === '::1' ||
+    ip === 'localhost' ||
+    ip.startsWith('192.168.') ||
+    ip.startsWith('10.') ||
+    ip.startsWith('172.16.') ||
+    ip.startsWith('172.17.') ||
+    ip.startsWith('172.18.') ||
+    ip.startsWith('172.19.') ||
+    ip.startsWith('172.20.') ||
+    ip.startsWith('172.21.') ||
+    ip.startsWith('172.22.') ||
+    ip.startsWith('172.23.') ||
+    ip.startsWith('172.24.') ||
+    ip.startsWith('172.25.') ||
+    ip.startsWith('172.26.') ||
+    ip.startsWith('172.27.') ||
+    ip.startsWith('172.28.') ||
+    ip.startsWith('172.29.') ||
+    ip.startsWith('172.30.') ||
+    ip.startsWith('172.31.')
+  );
+}
+
+function getPayloadOrQuery(ev: ForensicEvent): string {
+  if (ev.truncated_payload && ev.truncated_payload.trim() !== '') {
+    return ev.truncated_payload;
+  }
+  if (ev.path && ev.path.includes('?')) {
+    const qs = ev.path.slice(ev.path.indexOf('?') + 1);
+    try {
+      return decodeURIComponent(qs);
+    } catch {
+      return qs;
+    }
+  }
+  return '(No payload or query parameters)';
+}
 </script>
 
 <template>
@@ -301,10 +343,11 @@ function formatLatency(durNs: number): string {
             <!-- Action Buttons -->
             <td class="py-2.5 px-4 text-right whitespace-nowrap" @click.stop>
               <button
+                v-if="ev.action !== 'allow'"
                 type="button"
                 data-testid="create-exception-quick-btn"
                 @click="handleCreateException(ev)"
-                class="px-2 py-1 text-[11px] font-medium text-slate-300 hover:text-white bg-[#17223B] hover:bg-[#2574F5]/30 border border-[#2574F5]/40 rounded transition-all mr-2 shadow-none"
+                class="px-2 py-1 text-[11px] font-medium text-primary hover:text-primary-foreground bg-primary/10 hover:bg-primary border border-primary/30 rounded transition-all mr-2 shadow-none"
                 title="Create 1-Click Rule Exception"
               >
                 Exception
@@ -312,7 +355,7 @@ function formatLatency(durNs: number): string {
               <button
                 type="button"
                 @click="openModal(ev)"
-                class="px-2 py-1 text-[11px] font-medium text-zinc-400 hover:text-zinc-200 bg-zinc-800/80 hover:bg-zinc-700 border border-zinc-700 rounded transition-all"
+                class="px-2 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground bg-muted hover:bg-muted/80 border border-border rounded transition-all"
               >
                 Inspect
               </button>
@@ -339,14 +382,14 @@ function formatLatency(durNs: number): string {
     >
       <div class="w-full max-w-3xl max-h-[85vh] flex flex-col bg-[#12151c] border border-zinc-700 rounded-xl shadow-2xl overflow-hidden font-sans">
         <!-- Modal Header -->
-        <div class="flex items-center justify-between px-6 py-4 border-b border-zinc-800 bg-[#0d0f14]">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-border bg-card">
           <div class="flex items-center gap-3">
-            <div class="p-2 rounded-lg bg-zinc-800/80 border border-zinc-700 text-slate-400">
-              <FileCode class="w-5 h-5 text-slate-400" />
+            <div class="p-2 rounded-lg bg-muted border border-border text-foreground">
+              <FileCode class="w-5 h-5 text-muted-foreground" />
             </div>
             <div>
-              <h3 class="text-sm font-bold text-zinc-100 flex items-center gap-2">
-                Forensic Incident Context
+              <h3 class="text-sm font-bold text-foreground flex items-center gap-2">
+                <span>{{ activeEvent.action === 'allow' ? 'Traffic Telemetry Context' : 'Forensic Incident Context' }}</span>
                 <span
                   class="px-2 py-0.5 rounded text-[10px] font-semibold uppercase border"
                   :class="getActionBadgeClass(activeEvent.action)"
@@ -354,7 +397,7 @@ function formatLatency(durNs: number): string {
                   {{ activeEvent.action }}
                 </span>
               </h3>
-              <p class="text-xs text-zinc-400 font-mono mt-0.5">
+              <p class="text-xs text-muted-foreground font-mono mt-0.5">
                 ID: {{ activeEvent.event_id }} • {{ new Date(activeEvent.timestamp).toISOString() }}
               </p>
             </div>
@@ -363,7 +406,7 @@ function formatLatency(durNs: number): string {
             type="button"
             data-testid="modal-close-btn"
             @click="closeModal"
-            class="p-1.5 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded-lg transition-colors"
+            class="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
           >
             <X class="w-5 h-5" />
           </button>
@@ -373,36 +416,36 @@ function formatLatency(durNs: number): string {
         <div class="flex-1 overflow-y-auto p-6 space-y-5 text-xs font-mono">
           <!-- Request & Client Summary Grid -->
           <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 font-sans">
-            <div class="p-3 bg-zinc-900/80 border border-zinc-800 rounded-lg">
-              <span class="text-[10px] text-zinc-500 uppercase tracking-wider block mb-1">Target Host</span>
-              <span class="font-mono text-zinc-200 truncate block">{{ activeEvent.host }}</span>
+            <div class="p-3 bg-muted/40 border border-border rounded-lg">
+              <span class="text-[10px] text-muted-foreground uppercase tracking-wider block mb-1">Target Host</span>
+              <span class="font-mono text-foreground truncate block">{{ activeEvent.host }}</span>
             </div>
-            <div class="p-3 bg-zinc-900/80 border border-zinc-800 rounded-lg">
-              <span class="text-[10px] text-zinc-500 uppercase tracking-wider block mb-1">Client IP</span>
-              <span class="font-mono text-zinc-200 block">{{ activeEvent.client_ip }}</span>
+            <div class="p-3 bg-muted/40 border border-border rounded-lg">
+              <span class="text-[10px] text-muted-foreground uppercase tracking-wider block mb-1">Client IP</span>
+              <span class="font-mono text-foreground block">{{ activeEvent.client_ip }}</span>
             </div>
-            <div class="p-3 bg-zinc-900/80 border border-zinc-800 rounded-lg">
-              <span class="text-[10px] text-zinc-500 uppercase tracking-wider block mb-1">Rule ID</span>
+            <div class="p-3 bg-muted/40 border border-border rounded-lg">
+              <span class="text-[10px] text-muted-foreground uppercase tracking-wider block mb-1">Rule ID</span>
               <span class="font-mono text-amber-400 font-semibold block truncate">
                 {{ activeEvent.rule_id || 'NONE' }}
               </span>
             </div>
-            <div class="p-3 bg-zinc-900/80 border border-zinc-800 rounded-lg">
-              <span class="text-[10px] text-zinc-500 uppercase tracking-wider block mb-1">Latency</span>
-              <span class="font-mono text-zinc-200 block">{{ formatLatency(activeEvent.latency) }}</span>
+            <div class="p-3 bg-muted/40 border border-border rounded-lg">
+              <span class="text-[10px] text-muted-foreground uppercase tracking-wider block mb-1">Latency</span>
+              <span class="font-mono text-foreground block">{{ formatLatency(activeEvent.latency) }}</span>
             </div>
           </div>
 
           <!-- JA4 Fingerprint & GeoData -->
-          <div class="p-3.5 bg-zinc-900/60 border border-zinc-800 rounded-lg space-y-1.5">
+          <div class="p-3.5 bg-muted/30 border border-border rounded-lg space-y-1.5">
             <div v-if="activeEvent.ja4" class="flex items-center gap-2">
-              <span class="text-zinc-500">JA4 Fingerprint:</span>
-              <span class="text-zinc-300 font-semibold">{{ activeEvent.ja4 }}</span>
+              <span class="text-muted-foreground">JA4 Fingerprint:</span>
+              <span class="text-foreground font-semibold">{{ activeEvent.ja4 }}</span>
             </div>
             <div v-if="activeEvent.geo_data" class="flex items-center gap-2">
-              <span class="text-zinc-500">Geo Intelligence:</span>
-              <span class="text-zinc-300">
-                {{ activeEvent.geo_data.country || 'Unknown' }}
+              <span class="text-muted-foreground">Geo Intelligence:</span>
+              <span class="text-foreground">
+                {{ activeEvent.geo_data.country || (isPrivateIP(activeEvent.client_ip) ? 'Internal / Private Network (RFC 1918)' : 'Unknown / Unresolved') }}
                 {{ activeEvent.geo_data.city ? ', ' + activeEvent.geo_data.city : '' }}
                 {{ activeEvent.geo_data.asn ? ' (AS' + activeEvent.geo_data.asn + ')' : '' }}
               </span>
@@ -411,47 +454,54 @@ function formatLatency(durNs: number): string {
 
           <!-- Sanitized Headers -->
           <div>
-            <h4 class="text-xs font-semibold text-zinc-300 uppercase tracking-wider font-sans mb-2 flex items-center justify-between">
+            <h4 class="text-xs font-semibold text-foreground uppercase tracking-wider font-sans mb-2 flex items-center justify-between">
               <span>Sanitized Request Headers</span>
-              <span class="text-[10px] text-zinc-500 font-normal">PII/PCI-DSS masked</span>
+              <span class="text-[10px] text-muted-foreground font-normal">PII/PCI-DSS masked</span>
             </h4>
-            <div class="p-3.5 bg-zinc-950 border border-zinc-800 rounded-lg overflow-x-auto max-h-48 text-zinc-300">
+            <div class="p-3.5 bg-muted/50 border border-border rounded-lg overflow-x-auto max-h-48 text-foreground">
               <pre>{{ JSON.stringify(activeEvent.headers || {}, null, 2) }}</pre>
             </div>
           </div>
 
-          <!-- Sanitized Raw Payload Snippet -->
+          <!-- Sanitized Raw Payload / Query Snippet -->
           <div>
-            <h4 class="text-xs font-semibold text-zinc-300 uppercase tracking-wider font-sans mb-2 flex items-center justify-between">
-              <span>Payload Snippet</span>
-              <span class="text-[10px] text-zinc-500 font-normal">Clamped to 2 KB cap</span>
+            <h4 class="text-xs font-semibold text-foreground uppercase tracking-wider font-sans mb-2 flex items-center justify-between">
+              <span>{{ activeEvent.method === 'GET' ? 'Inspected Query & URI Parameters' : 'Payload Snippet' }}</span>
+              <span class="text-[10px] text-muted-foreground font-normal">Clamped to 2 KB cap</span>
             </h4>
-            <div class="p-3.5 bg-zinc-950 border border-zinc-800 rounded-lg overflow-x-auto max-h-48 text-zinc-300">
-              <pre>{{ activeEvent.truncated_payload || '(Empty payload)' }}</pre>
+            <div class="p-3.5 bg-muted/50 border border-border rounded-lg overflow-x-auto max-h-48 text-foreground">
+              <pre>{{ getPayloadOrQuery(activeEvent) }}</pre>
             </div>
           </div>
         </div>
 
         <!-- Modal Footer Actions -->
-        <div class="flex items-center justify-between px-6 py-3.5 border-t border-zinc-800 bg-[#0d0f14] font-sans">
-          <div class="text-xs text-zinc-500">
-            Clicking Create Exception pre-populates bypass criteria in Access Control
+        <div class="flex items-center justify-between px-6 py-3.5 border-t border-border bg-card font-sans">
+          <div class="text-xs text-muted-foreground">
+            <span v-if="activeEvent.action === 'allow'" class="text-emerald-400 flex items-center gap-1.5 font-medium">
+              <CheckCircle2 class="w-3.5 h-3.5" />
+              <span>Request verified benign and allowed. No false-positive rule exception required.</span>
+            </span>
+            <span v-else>
+              Clicking Create Exception pre-populates bypass criteria in Access Control
+            </span>
           </div>
           <div class="flex items-center gap-2">
             <button
               type="button"
               @click="closeModal"
-              class="px-4 py-2 text-xs font-medium text-zinc-300 hover:text-white bg-zinc-800 hover:bg-zinc-700 rounded-lg border border-zinc-700 transition-colors"
+              class="px-4 py-2 text-xs font-medium text-foreground hover:bg-muted rounded-lg border border-border transition-colors"
             >
               Close
             </button>
             <button
+              v-if="activeEvent.action !== 'allow'"
               type="button"
               data-testid="modal-create-exception-btn"
               @click="handleCreateException(activeEvent)"
               class="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-primary-foreground bg-primary hover:bg-primary/90 active:brightness-95 rounded-lg shadow-none transition-colors"
             >
-              <ExternalLink class="w-3.5 h-3.5 text-white" />
+              <ExternalLink class="w-3.5 h-3.5" />
               <span>Create Exception</span>
             </button>
           </div>

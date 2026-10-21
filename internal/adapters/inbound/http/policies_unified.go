@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/Panharoth06/raiwall/internal/adapters/outbound/storage/sqlite"
+	"github.com/Panharoth06/raiwall/internal/core/control"
 	"github.com/Panharoth06/raiwall/internal/core/rate"
 )
 
@@ -106,7 +106,7 @@ func (s *Server) handleUpdateUnifiedPolicies(w http.ResponseWriter, r *http.Requ
 	}
 
 	if len(ratePolicies) > 0 {
-		_ = s.store.UpdateRatePolicy(ctx, sqlite.UpdateRatePolicyParams{
+		_ = s.store.UpdateRatePolicy(ctx, control.RatePolicy{
 			ID:                  ratePolicies[0].ID,
 			Name:                ratePolicies[0].Name,
 			Host:                ratePolicies[0].Host,
@@ -125,7 +125,7 @@ func (s *Server) handleUpdateUnifiedPolicies(w http.ResponseWriter, r *http.Requ
 			UpdatedAt:           now,
 		})
 	} else {
-		_ = s.store.CreateRatePolicy(ctx, sqlite.CreateRatePolicyParams{
+		_ = s.store.CreateRatePolicy(ctx, control.RatePolicy{
 			ID:                  "policy-default",
 			Name:                "Default Rate Policy",
 			Host:                "*",
@@ -157,7 +157,7 @@ func (s *Server) handleUpdateUnifiedPolicies(w http.ResponseWriter, r *http.Requ
 	trapsJSON, _ := json.Marshal(traps)
 
 	if len(botConfigs) > 0 {
-		_ = s.store.UpdateBotConfig(ctx, sqlite.UpdateBotConfigParams{
+		_ = s.store.UpdateBotConfig(ctx, control.BotConfig{
 			ID:            botConfigs[0].ID,
 			Host:          botConfigs[0].Host,
 			PowEnabled:    powEnabled,
@@ -167,7 +167,7 @@ func (s *Server) handleUpdateUnifiedPolicies(w http.ResponseWriter, r *http.Requ
 			UpdatedAt:     now,
 		})
 	} else {
-		_ = s.store.CreateBotConfig(ctx, sqlite.CreateBotConfigParams{
+		_ = s.store.CreateBotConfig(ctx, control.BotConfig{
 			ID:            "bot-default",
 			Host:          "*",
 			PowEnabled:    powEnabled,

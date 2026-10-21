@@ -13,9 +13,16 @@ import (
 func (m *Middleware) serveInternalRoutes(w http.ResponseWriter, r *http.Request) bool {
 	// Internal WAF routes: Metrics & Telemetry API
 	if r.URL.Path == "/.raiwall/metrics" ||
+		r.URL.Path == "/metrics" ||
 		r.URL.Path == "/.raiwall/api/events" ||
 		r.URL.Path == "/.raiwall/api/events/stats" ||
-		r.URL.Path == "/.raiwall/api/events/stream" {
+		r.URL.Path == "/.raiwall/api/events/stream" ||
+		r.URL.Path == "/api/v1/telemetry/events" ||
+		r.URL.Path == "/api/v1/telemetry/events/stats" ||
+		r.URL.Path == "/api/v1/telemetry/events/stream" ||
+		r.URL.Path == "/.raiwall/api/v1/telemetry/events" ||
+		r.URL.Path == "/.raiwall/api/v1/telemetry/events/stats" ||
+		r.URL.Path == "/.raiwall/api/v1/telemetry/events/stream" {
 		if m.telemetryAPI != nil {
 			m.telemetryAPI.ServeHTTP(w, r)
 			return true

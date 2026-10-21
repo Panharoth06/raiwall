@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/Panharoth06/raiwall/internal/adapters/outbound/storage/sqlite"
 	"github.com/Panharoth06/raiwall/internal/core/control"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -160,7 +159,7 @@ func (s *Server) handleCreateSite(w http.ResponseWriter, r *http.Request) {
 	proxySettingsJSON, _ := json.Marshal(req.ProxySettings)
 	now := time.Now().UTC()
 
-	err := s.store.CreateApp(r.Context(), sqlite.CreateAppParams{
+	err := s.store.CreateApp(r.Context(), control.SiteApp{
 		ID:                  req.ID,
 		Name:                req.Name,
 		Hostnames:           string(hostnamesJSON),
@@ -199,7 +198,7 @@ func (s *Server) handleUpdateSite(w http.ResponseWriter, r *http.Request) {
 	proxySettingsJSON, _ := json.Marshal(req.ProxySettings)
 	now := time.Now().UTC()
 
-	err := s.store.UpdateApp(r.Context(), sqlite.UpdateAppParams{
+	err := s.store.UpdateApp(r.Context(), control.SiteApp{
 		ID:                  id,
 		Name:                req.Name,
 		Hostnames:           string(hostnamesJSON),

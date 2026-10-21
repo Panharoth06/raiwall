@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Panharoth06/raiwall/internal/adapters/outbound/storage/sqlite"
+	"github.com/Panharoth06/raiwall/internal/core/control"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -34,12 +34,12 @@ type AuthContext struct {
 
 // AuthManager handles authentication, session cookies, and password hashing.
 type AuthManager struct {
-	store      *sqlite.Store
+	store      control.ControlStore
 	hmacSecret []byte
 }
 
 // NewAuthManager creates an AuthManager with a specified HMAC secret or generates one randomly.
-func NewAuthManager(store *sqlite.Store, secret []byte) *AuthManager {
+func NewAuthManager(store control.ControlStore, secret []byte) *AuthManager {
 	if len(secret) == 0 {
 		secret = make([]byte, 32)
 		_, _ = rand.Read(secret)
@@ -72,7 +72,7 @@ func HashAPIKey(token string) string {
 }
 
 // GenerateSessionCookie creates an HMAC-signed session cookie for a user.
-func (am *AuthManager) GenerateSessionCookie(user *sqlite.RaiwallUser, duration time.Duration) (*http.Cookie, error) {
+func (am *AuthManager) GenerateSessionCookie(user *control.UserRecord, duration time.Duration) (*http.Cookie, error) {
 	if user == nil {
 		return nil, errors.New("cannot create cookie for nil user")
 	}

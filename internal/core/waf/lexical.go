@@ -15,6 +15,7 @@ const (
 	TriageSuspectSQLi
 	TriageSuspectXSS
 	TriageSuspectCmdI
+	TriageSuspectTraversal
 )
 
 func (r TriageResult) String() string {
@@ -27,6 +28,8 @@ func (r TriageResult) String() string {
 		return "SuspectXSS"
 	case TriageSuspectCmdI:
 		return "SuspectCmdI"
+	case TriageSuspectTraversal:
+		return "SuspectTraversal"
 	default:
 		return "Unknown"
 	}
@@ -125,6 +128,77 @@ func isCmdBoundary(b byte) bool {
 		b == '\\' || b == '"' || b == '\''
 }
 
+// Directory traversal sequence indicators
+var traversalSequences = [...]string{
+	"../", "..\\",
+	"/..", "\\..",
+	"..%2f", "..%2F", "..%5c", "..%5C",
+	"%2e%2e/", "%2e%2e\\", "%2e%2e%2f", "%2e%2e%5c",
+	".../", "..../", "...\\", "....\\",
+}
+
+// Sensitive system files and directories across Unix and Windows
+var sensitivePaths = [...]string{
+	"/etc/passwd", "/etc/shadow", "/etc/hosts", "/etc/group",
+	"/etc/resolv.conf", "/etc/master.passwd", "/etc/sudoers", "/etc/crontab",
+	"/proc/self/", "/proc/version", "/proc/cpuinfo", "/proc/meminfo",
+	"win.ini", "system.ini", "boot.ini",
+	"windows/system32", "windows\\system32",
+	"/var/log/",
+	"/.env", "\\.env",
+	"/.ssh/", "\\.ssh\\",
+	"id_rsa", "id_ed25519", "authorized_keys",
+}
+
+// Dangerous URI schemes used for local/remote inclusion attacks
+var dangerousFileSchemes = [...]string{
+	"php://", "file://", "phar://", "zip://", "data://",
+}
+
+// ScanPathTraversal checks for directory traversal sequences (../, ..\) and sensitive file references in < 1 µs.
+func ScanPathTraversal(s string) (bool, string) {
+	if len(s) < 2 {
+		return false, ""
+	}
+
+	// Fast-path: must contain dot, slash, backslash, or percent
+	if !strings.ContainsAny(s, "./\\%") {
+		return false, ""
+	}
+
+	lower := strings.ToLower(s)
+
+	// 1. Directory traversal sequences
+	for _, seq := range traversalSequences {
+		if strings.Contains(lower, seq) {
+			return true, "directory traversal sequence: " + seq
+		}
+	}
+
+	// 2. Sensitive system files and credential leaks
+	for _, p := range sensitivePaths {
+		if strings.Contains(lower, p) {
+			return true, "sensitive file reference: " + p
+		}
+	}
+
+	// 3. Dangerous URI schemes for LFI/RFI
+	for _, scheme := range dangerousFileSchemes {
+		if strings.Contains(lower, scheme) {
+			return true, "dangerous inclusion scheme: " + scheme
+		}
+	}
+
+	// 4. Null byte injection in file paths
+	if strings.Contains(s, "\x00") || strings.Contains(lower, "%00") {
+		if strings.ContainsAny(s, "/\\") {
+			return true, "null byte poisoning in path"
+		}
+	}
+
+	return false, ""
+}
+
 // Triage classifies a normalized string into Benign, SuspectSQLi, SuspectXSS, or SuspectCmdI in < 2 µs.
 func Triage(value string) TriageResult {
 	res, _ := TriageWithDetails(value)
@@ -158,6 +232,11 @@ func TriageWithDetails(value string) (TriageResult, string) {
 
 	if libinjection.IsXSS(value) {
 		return TriageSuspectXSS, "libinjection_xss"
+	}
+
+	// 4. Fast Path Traversal & LFI Scan (<1 µs)
+	if isTraversal, reason := ScanPathTraversal(value); isTraversal {
+		return TriageSuspectTraversal, reason
 	}
 
 	return TriageBenign, ""
@@ -249,6 +328,13 @@ func (l *LexicalEngine) verdictForTriage(triage TriageResult, location string, v
 			Action: ActionBlock,
 			RuleID: ruleID,
 			Reason: "Cross-site scripting detected in " + location,
+		}
+	case TriageSuspectTraversal:
+		ruleID := "TRAVERSAL_" + sanitizeRuleLocation(location)
+		return &Verdict{
+			Action: ActionBlock,
+			RuleID: ruleID,
+			Reason: "Path traversal / LFI attack detected in " + location + ": " + details,
 		}
 	default:
 		return VerdictAllow

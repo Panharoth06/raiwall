@@ -44,6 +44,8 @@ services:
     volumes:
       - raiwall_data:/var/lib/raiwall
       - ./examples/Caddyfile:/etc/raiwall/Caddyfile:ro
+      - ./examples/feeds:/etc/raiwall/examples/feeds:ro
+      - ./examples/feeds:/examples/feeds:ro
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/.raiwall/api/openapi.json"]
       interval: 10s

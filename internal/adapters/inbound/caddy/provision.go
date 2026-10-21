@@ -51,6 +51,9 @@ func (m *Middleware) Provision(ctx caddy.Context) error {
 	if err := m.provisionAuth(ctx); err != nil {
 		return err
 	}
+	if err := m.provisionStorage(ctx); err != nil {
+		return err
+	}
 	if err := m.provisionTelemetry(ctx); err != nil {
 		return err
 	}

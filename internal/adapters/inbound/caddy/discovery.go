@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Panharoth06/raiwall/internal/adapters/outbound/storage/sqlite"
+	"github.com/Panharoth06/raiwall/internal/core/control"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
@@ -66,7 +66,7 @@ type DiscoveredEndpoint struct {
 
 // APIDiscoveryCataloger performs non-blocking, aggregated cataloging of clean API endpoints.
 type APIDiscoveryCataloger struct {
-	store       *sqlite.Store
+	store       control.ControlStore
 	logger      *zap.Logger
 	inCh        chan DiscoveredEndpoint
 	flushCh     chan chan struct{}
@@ -79,7 +79,7 @@ type APIDiscoveryCataloger struct {
 }
 
 // NewAPIDiscoveryCataloger starts a background worker that flushes endpoint metrics periodically.
-func NewAPIDiscoveryCataloger(store *sqlite.Store, logger *zap.Logger, flushInterval time.Duration) *APIDiscoveryCataloger {
+func NewAPIDiscoveryCataloger(store control.ControlStore, logger *zap.Logger, flushInterval time.Duration) *APIDiscoveryCataloger {
 	if flushInterval <= 0 {
 		flushInterval = 5 * time.Second
 	}
@@ -196,7 +196,7 @@ func (c *APIDiscoveryCataloger) persistSnapshot(ctx context.Context) {
 	c.mu.Unlock()
 
 	for _, ep := range snapshot {
-		err := c.store.UpsertAPIResource(ctx, sqlite.UpsertAPIResourceParams{
+		err := c.store.UpsertAPIResource(ctx, control.ApiResourceRecord{
 			ID:          "res-" + uuid.New().String()[:8],
 			AppID:       ep.AppID,
 			Method:      ep.Method,

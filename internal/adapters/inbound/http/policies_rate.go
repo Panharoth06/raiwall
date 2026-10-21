@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/Panharoth06/raiwall/internal/adapters/outbound/storage/sqlite"
+	"github.com/Panharoth06/raiwall/internal/core/control"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
@@ -134,7 +134,7 @@ func (s *Server) handleCreateRatePolicy(w http.ResponseWriter, r *http.Request) 
 		isActive = 1
 	}
 
-	err := s.store.CreateRatePolicy(r.Context(), sqlite.CreateRatePolicyParams{
+	err := s.store.CreateRatePolicy(r.Context(), control.RatePolicy{
 		ID:                  req.ID,
 		Name:                req.Name,
 		Host:                req.Host,
@@ -181,7 +181,7 @@ func (s *Server) handleUpdateRatePolicy(w http.ResponseWriter, r *http.Request) 
 		isActive = 1
 	}
 
-	err := s.store.UpdateRatePolicy(r.Context(), sqlite.UpdateRatePolicyParams{
+	err := s.store.UpdateRatePolicy(r.Context(), control.RatePolicy{
 		ID:                  id,
 		Name:                req.Name,
 		Host:                req.Host,

@@ -140,6 +140,8 @@ func (s *SemanticEngine) InspectRequest(ctx *RequestContext) (*Verdict, error) {
 			targetRuleID = "SEMANTIC_CMDI"
 		case TriageSuspectXSS:
 			targetRuleID = "SEMANTIC_XSS"
+		case TriageSuspectTraversal:
+			targetRuleID = "SEMANTIC_TRAVERSAL"
 		}
 
 		// Exception Gate: skip if parameter is exempt from this threat category
@@ -159,6 +161,16 @@ func (s *SemanticEngine) InspectRequest(ctx *RequestContext) (*Verdict, error) {
 				Action: ActionBlock,
 				RuleID: ruleID,
 				Reason: fmt.Sprintf("Threat detected in oversized parameter %s (%s): %s", param.Name, param.Location, details),
+			}, nil
+		}
+
+		// Stage 3: Bounded Verification
+		// Path Traversal / LFI is structural & deterministic
+		if triage == TriageSuspectTraversal {
+			return &Verdict{
+				Action: ActionBlock,
+				RuleID: targetRuleID,
+				Reason: fmt.Sprintf("Path traversal / LFI attack detected (%s) in param %q (%s)", details, param.Name, param.Location),
 			}, nil
 		}
 

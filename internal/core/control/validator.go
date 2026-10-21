@@ -261,12 +261,12 @@ func ValidateSnapshot(snap *ConfigSnapshot) error {
 		if bc == nil {
 			continue
 		}
-		if bc.PowEnabled && (bc.PowDifficulty < 1 || bc.PowDifficulty > 32) {
+		if bc.PowEnabled && (bc.PowDifficulty < 1000 || bc.PowDifficulty > 200000) {
 			errs = append(errs, ValidationError{
 				Entity: "BotConfig",
 				ID:     bc.ID,
 				Field:  "pow_difficulty",
-				Reason: fmt.Sprintf("pow_difficulty %d out of bounds (must be 1-32)", bc.PowDifficulty),
+				Reason: fmt.Sprintf("pow_difficulty %d out of bounds (must be 1,000-200,000)", bc.PowDifficulty),
 			})
 		}
 		for _, trap := range bc.TrapURLs {

@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Panharoth06/raiwall/internal/adapters/outbound/storage/sqlite"
 	"github.com/Panharoth06/raiwall/internal/core/control"
 	"github.com/stretchr/testify/require"
 )
@@ -27,7 +26,7 @@ func TestAPI_DraftDiffApplyAndRollback(t *testing.T) {
 
 	// 1. Create site in SQLite draft
 	now := time.Now().UTC()
-	err := store.CreateApp(ctx, sqlite.CreateAppParams{
+	err := store.CreateApp(ctx, control.SiteApp{
 		ID:                  "site-shop",
 		Name:                "E-Commerce Shop",
 		Hostnames:           `["shop.example.com"]`,
@@ -80,7 +79,7 @@ func TestAPI_DraftDiffApplyAndRollback(t *testing.T) {
 	require.True(t, found)
 
 	// 4. Add second site in draft
-	err = store.CreateApp(ctx, sqlite.CreateAppParams{
+	err = store.CreateApp(ctx, control.SiteApp{
 		ID:                  "site-admin-portal",
 		Name:                "Admin Portal",
 		Hostnames:           `["portal.example.com"]`,

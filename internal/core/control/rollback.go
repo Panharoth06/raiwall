@@ -5,13 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
-
-	"github.com/Panharoth06/raiwall/internal/adapters/outbound/storage/sqlite"
 )
 
-// DeploySnapshot compiles draft SQLite records, validates them, commits a versioned snapshot,
+// DeploySnapshot compiles draft records, validates them, commits a versioned snapshot,
 // and atomically updates the active data plane snapshot pointer.
-func DeploySnapshot(ctx context.Context, store *sqlite.Store, author, description string) (*ConfigSnapshot, error) {
+func DeploySnapshot(ctx context.Context, store ControlStore, author, description string) (*ConfigSnapshot, error) {
 	if store == nil {
 		return nil, fmt.Errorf("database store cannot be nil")
 	}
@@ -30,7 +28,7 @@ func DeploySnapshot(ctx context.Context, store *sqlite.Store, author, descriptio
 		author = "system"
 	}
 
-	saved, err := store.CreateSnapshot(ctx, sqlite.CreateSnapshotParams{
+	saved, err := store.CreateSnapshot(ctx, ConfigSnapshotRecord{
 		SnapshotData: string(data),
 		Author:       author,
 		Description:  description,
@@ -46,9 +44,9 @@ func DeploySnapshot(ctx context.Context, store *sqlite.Store, author, descriptio
 	return snap, nil
 }
 
-// RollbackToVersion retrieves a historical snapshot by version from SQLite,
+// RollbackToVersion retrieves a historical snapshot by version from storage,
 // deserializes, validates, and atomically swaps it as the active configuration.
-func RollbackToVersion(ctx context.Context, store *sqlite.Store, targetVersion uint64) (*ConfigSnapshot, error) {
+func RollbackToVersion(ctx context.Context, store ControlStore, targetVersion uint64) (*ConfigSnapshot, error) {
 	if store == nil {
 		return nil, fmt.Errorf("database store cannot be nil")
 	}
@@ -75,8 +73,8 @@ func RollbackToVersion(ctx context.Context, store *sqlite.Store, targetVersion u
 	return &snap, nil
 }
 
-// ListSnapshotHistory returns historical snapshots recorded in SQLite.
-func ListSnapshotHistory(ctx context.Context, store *sqlite.Store) ([]sqlite.RaiwallConfigSnapshot, error) {
+// ListSnapshotHistory returns historical snapshots recorded in storage.
+func ListSnapshotHistory(ctx context.Context, store ControlStore) ([]ConfigSnapshotRecord, error) {
 	if store == nil {
 		return nil, fmt.Errorf("database store cannot be nil")
 	}

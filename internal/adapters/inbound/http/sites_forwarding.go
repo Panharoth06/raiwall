@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/Panharoth06/raiwall/internal/adapters/outbound/storage/sqlite"
 	"github.com/Panharoth06/raiwall/internal/core/control"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -93,7 +92,7 @@ func (s *Server) handleCreateForwardingRule(w http.ResponseWriter, r *http.Reque
 	}
 	now := time.Now().UTC()
 
-	err := s.store.CreateForwardingRule(r.Context(), sqlite.CreateForwardingRuleParams{
+	err := s.store.CreateForwardingRule(r.Context(), control.ForwardingRuleRecord{
 		ID:                 req.ID,
 		AppID:              siteID,
 		Prefix:             req.Prefix,
@@ -133,7 +132,7 @@ func (s *Server) handleUpdateForwardingRule(w http.ResponseWriter, r *http.Reque
 	}
 	now := time.Now().UTC()
 
-	err := s.store.UpdateForwardingRule(r.Context(), sqlite.UpdateForwardingRuleParams{
+	err := s.store.UpdateForwardingRule(r.Context(), control.ForwardingRuleRecord{
 		ID:                 ruleID,
 		Prefix:             req.Prefix,
 		Upstreams:          string(upstreamsJSON),

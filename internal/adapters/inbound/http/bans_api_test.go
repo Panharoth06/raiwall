@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Panharoth06/raiwall/internal/adapters/outbound/storage/sqlite"
+	"github.com/Panharoth06/raiwall/internal/core/control"
 	"github.com/Panharoth06/raiwall/internal/core/rate"
 	"github.com/stretchr/testify/require"
 )
@@ -49,7 +49,7 @@ func TestBansAndWaitingRoomAPI(t *testing.T) {
 	hash, err := HashPassword("AdminPass123!")
 	require.NoError(t, err)
 
-	err = store.CreateUser(ctx, sqlite.CreateUserParams{
+	err = store.CreateUser(ctx, control.UserRecord{
 		ID:           "u-admin-bans",
 		Username:     "admin-bans",
 		PasswordHash: hash,

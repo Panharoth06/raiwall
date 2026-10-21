@@ -1,4 +1,5 @@
 import { ref, onUnmounted } from 'vue';
+import { api } from '@/api/client';
 import type { ForensicEvent } from '@/types/telemetry';
 
 export interface StreamFilter {
@@ -8,17 +9,46 @@ export interface StreamFilter {
   min_severity?: string;
 }
 
-export function useEventStream(initialFilter?: StreamFilter, maxBuffer = 200) {
-  const events = ref<ForensicEvent[]>([]);
-  const isConnected = ref(false);
-  const isPaused = ref(false);
-  const error = ref<string | null>(null);
+// Module-level shared reactive state so events persist across route navigations
+const sharedEvents = ref<ForensicEvent[]>([]);
+const isConnected = ref(false);
+const isPaused = ref(false);
+const error = ref<string | null>(null);
 
-  let eventSource: EventSource | null = null;
-  let reconnectTimer: any = null;
-  let reconnectDelay = 1000;
-  let currentFilter = initialFilter;
-  let pausedQueue: ForensicEvent[] = [];
+let eventSource: EventSource | null = null;
+let reconnectTimer: any = null;
+let reconnectDelay = 1000;
+let currentFilter: StreamFilter | undefined;
+let pausedQueue: ForensicEvent[] = [];
+let subscriberCount = 0;
+
+async function loadHistoricalEvents(maxBuffer: number, filter?: StreamFilter) {
+  try {
+    const res = await api.listEvents({
+      limit: maxBuffer,
+      action: filter?.action,
+      rule_id: filter?.rule_id,
+      country: filter?.country,
+      min_severity: filter?.min_severity,
+    });
+    if (res && Array.isArray(res.events)) {
+      const existingIds = new Set(sharedEvents.value.map((e) => e.event_id));
+      const newItems = res.events.filter((e) => e.event_id && !existingIds.has(e.event_id));
+      if (newItems.length > 0 || sharedEvents.value.length === 0) {
+        const combined = [...sharedEvents.value, ...newItems];
+        combined.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        sharedEvents.value = combined.slice(0, maxBuffer);
+      }
+    }
+  } catch {
+    // Keep existing in-memory events if offline or mock environment
+  }
+}
+
+export function useEventStream(initialFilter?: StreamFilter, maxBuffer = 200) {
+  if (initialFilter && !currentFilter) {
+    currentFilter = initialFilter;
+  }
 
   function buildUrl(filter?: StreamFilter): string {
     const params = new URLSearchParams();
@@ -31,10 +61,29 @@ export function useEventStream(initialFilter?: StreamFilter, maxBuffer = 200) {
     return `/.raiwall/api/events/stream${qs ? '?' + qs : ''}`;
   }
 
+  function addEvent(event: ForensicEvent) {
+    if (event.event_id) {
+      const exists = sharedEvents.value.some((e) => e.event_id === event.event_id);
+      if (exists) return;
+    }
+    sharedEvents.value.unshift(event);
+    if (sharedEvents.value.length > maxBuffer) {
+      sharedEvents.value.pop();
+    }
+  }
+
   function connect(filter?: StreamFilter) {
-    disconnect();
+    subscriberCount++;
     if (filter) {
       currentFilter = filter;
+    }
+
+    // Hydrate existing attack and forensic history
+    loadHistoricalEvents(maxBuffer, currentFilter);
+
+    if (eventSource && eventSource.readyState !== EventSource.CLOSED) {
+      isConnected.value = true;
+      return;
     }
 
     const url = buildUrl(currentFilter);
@@ -74,30 +123,28 @@ export function useEventStream(initialFilter?: StreamFilter, maxBuffer = 200) {
         }
 
         clearTimeout(reconnectTimer);
-        reconnectTimer = setTimeout(() => {
-          reconnectDelay = Math.min(reconnectDelay * 1.5, 15000);
-          connect(currentFilter);
-        }, reconnectDelay);
+        if (subscriberCount > 0) {
+          reconnectTimer = setTimeout(() => {
+            reconnectDelay = Math.min(reconnectDelay * 1.5, 15000);
+            connect(currentFilter);
+          }, reconnectDelay);
+        }
       };
     } catch (err: any) {
       error.value = err?.message || 'Failed to initialize EventSource';
     }
   }
 
-  function addEvent(event: ForensicEvent) {
-    events.value.unshift(event);
-    if (events.value.length > maxBuffer) {
-      events.value.pop();
-    }
-  }
-
   function disconnect() {
-    clearTimeout(reconnectTimer);
-    if (eventSource) {
-      eventSource.close();
-      eventSource = null;
+    subscriberCount = Math.max(0, subscriberCount - 1);
+    if (subscriberCount === 0) {
+      clearTimeout(reconnectTimer);
+      if (eventSource) {
+        eventSource.close();
+        eventSource = null;
+      }
+      isConnected.value = false;
     }
-    isConnected.value = false;
   }
 
   function pause() {
@@ -115,7 +162,7 @@ export function useEventStream(initialFilter?: StreamFilter, maxBuffer = 200) {
   }
 
   function clear() {
-    events.value = [];
+    sharedEvents.value = [];
     pausedQueue = [];
   }
 
@@ -124,7 +171,7 @@ export function useEventStream(initialFilter?: StreamFilter, maxBuffer = 200) {
   });
 
   return {
-    events,
+    events: sharedEvents,
     isConnected,
     isPaused,
     error,

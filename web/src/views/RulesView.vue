@@ -13,6 +13,10 @@ const route = useRoute();
 const router = useRouter();
 
 const getInitialTab = (): RuleSubTab => {
+  const tab = route.value?.query?.tab;
+  if (tab === 'acls' || tab === 'policies' || tab === 'exceptions') {
+    return tab;
+  }
   const path = route.value?.path || '';
   if (path.includes('acls')) return 'acls';
   if (path.includes('policies')) return 'policies';
@@ -22,8 +26,12 @@ const getInitialTab = (): RuleSubTab => {
 const activeTab = ref<RuleSubTab>(getInitialTab());
 
 watch(
-  () => route.value?.path,
-  (newPath) => {
+  () => [route.value?.path, route.value?.query?.tab],
+  ([newPath, newTab]) => {
+    if (newTab === 'acls' || newTab === 'policies' || newTab === 'exceptions') {
+      activeTab.value = newTab as RuleSubTab;
+      return;
+    }
     if (!newPath) return;
     if (newPath.includes('acls') && activeTab.value !== 'acls') {
       activeTab.value = 'acls';
@@ -43,10 +51,7 @@ const tabs: (Tab & { id: RuleSubTab })[] = [
 
 const handleTabChange = (tabId: string) => {
   activeTab.value = tabId as RuleSubTab;
-  const currentPath = route.value?.path || '';
-  if (!currentPath.includes(tabId)) {
-    router.push(`/${tabId}`);
-  }
+  router.push(`/rules?tab=${tabId}`);
 };
 </script>
 

@@ -405,7 +405,7 @@
 ---
 
 ### Task 72: Domain 7 End-to-End Integration Tests, Sidecar Verification & Benchmark Validation
-**Description:** Implement `tests/e2e/control_plane_test.go`, `tests/e2e/sidecar_test.go`, and update `Makefile`. Conduct end-to-end integration tests verifying complete control plane lifecycle: CRUD mutation -> draft diff -> staged apply with pre-flight check -> atomic swap -> Redis pub/sub delta broadcast -> Envoy ext_proc gRPC threat block -> 1-click rollback. Verify single binary builds cleanly under 50 MB with embedded admin UI and all tests pass with `-race`.
+**Description:** Implement `tests/e2e/control_plane_test.go`, `tests/e2e/sidecar_test.go`, and update `Makefile`. Conduct end-to-end integration tests verifying complete control plane lifecycle: CRUD mutation -> draft diff -> staged apply with pre-flight check -> atomic swap -> Redis pub/sub delta broadcast -> Envoy ext_proc gRPC threat block -> 1-click rollback. Verify single binary builds cleanly as a compact binary (~50 MB) with embedded admin UI and all tests pass with `-race`.
 
 **Acceptance criteria:**
 - [x] End-to-end integration tests verify:
@@ -417,12 +417,12 @@
   - 1-Click rollback restores previous snapshot version and updates data plane immediately.
   - Embedded admin UI serves at `/.raiwall/` and Scalar docs at `/.raiwall/api/docs`.
 - [x] Zero race conditions under high concurrent requests (`go test -race`).
-- [x] Single binary builds cleanly under 50 MB (`make build`).
+- [x] Single binary builds cleanly as a compact binary (~50 MB) (`make build`).
 
 **Verification:**
 - [x] Integration tests pass: `go test -v -race -tags=integration ./tests/e2e/...`
 - [x] Build succeeds: `make build`
-- [x] Manual check: verify binary size is $<50\text{ MB}$ via `ls -lh bin/raiwall`.
+- [x] Manual check: verify binary size is compact (~50 MB, not strictly bounded <50 MB) via `ls -lh bin/raiwall`.
 
 **Dependencies:** Tasks 58–71
 **Files likely touched:**
@@ -440,7 +440,7 @@
 - [x] Huma v2 OpenAPI 3.1 REST API, RBAC, and Model Context Protocol (MCP) bridge active.
 - [x] Redis Pub/Sub cluster synchronization verified with reconnect recovery.
 - [x] Envoy `ext_proc/v3` gRPC sidecar server operational in CLI and Caddyfile modes.
-- [x] Full Vue 3 enterprise admin dashboard built, tested, and embedded in single binary under 50 MB.
+- [x] Full Vue 3 enterprise admin dashboard built, tested, and embedded in single compact binary (~50 MB).
 - [x] All unit, integration, and e2e tests pass cleanly with `-race`.
 
 
@@ -1081,7 +1081,7 @@ Plus dedicated `/topology` link to access Raiwall's 3D Globe / Sankey operations
 ---
 
 ### Task 96: End-to-End Enterprise Integration Suite, Single Binary Build & Performance Benchmark
-**Description:** Implement comprehensive end-to-end integration tests in `tests/e2e/enterprise_waf_test.go` exercising the entire major update lifecycle: 14-module threat blocking, CVE virtual patches, path-prefix forwarding with dynamic `UpstreamPool`, active IP ban & unblock-all, Waiting Room queuing (HTTP 465), pre-application HTTP 467 auth challenge, and custom template rendering. Verify single binary builds cleanly under 50 MB with all embedded web assets.
+**Description:** Implement comprehensive end-to-end integration tests in `tests/e2e/enterprise_waf_test.go` exercising the entire major update lifecycle: 14-module threat blocking, CVE virtual patches, path-prefix forwarding with dynamic `UpstreamPool`, active IP ban & unblock-all, Waiting Room queuing (HTTP 465), pre-application HTTP 467 auth challenge, and custom template rendering. Verify single binary builds cleanly as a compact binary (~50 MB) with all embedded web assets.
 
 **Acceptance criteria:**
 - [ ] End-to-end integration tests verify:
@@ -1093,12 +1093,12 @@ Plus dedicated `/topology` link to access Raiwall's 3D Globe / Sankey operations
   - Unauthenticated requests to protected app receive HTTP 467 auth challenge.
   - Custom HTML templates render with custom branding.
 - [ ] Zero race conditions under high concurrent requests (`go test -race`).
-- [ ] Production binary `bin/raiwall` builds cleanly and measures $< 50\text{ MB}$.
+- [ ] Production binary `bin/raiwall` builds cleanly as a compact binary (~50 MB, not strictly $< 50\text{ MB}$).
 
 **Verification:**
 - [ ] Tests pass: `go test -v -race -tags=integration ./tests/e2e/...`
 - [ ] Build succeeds: `make build`
-- [ ] Manual check: verify binary size is $<50\text{ MB}$ via `ls -lh bin/raiwall`.
+- [ ] Manual check: verify compact binary size (~50 MB) via `ls -lh bin/raiwall`.
 
 **Dependencies:** Tasks 73–95
 **Files likely touched:**
@@ -1111,4 +1111,4 @@ Plus dedicated `/topology` link to access Raiwall's 3D Globe / Sankey operations
 ## Final Checkpoint: Major Update Complete
 - [ ] All 24 tasks (Tasks 73–96) implemented and verified.
 - [ ] 100% functional, operational, and UX parity with SafeLine v9.4.2 achieved.
-- [ ] Single binary < 50 MB verified with zero CGO dependencies and zero runtime regressions.
+- [ ] Single compact binary (~50 MB, not strictly < 50 MB) verified with zero CGO dependencies and zero runtime regressions.

@@ -34,20 +34,20 @@ func (api *TelemetryAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	cleanPath := strings.TrimSuffix(r.URL.Path, "/")
 
 	switch cleanPath {
-	case "/.raiwall/api/events/stream":
+	case "/.raiwall/api/events/stream", "/api/v1/telemetry/events/stream", "/.raiwall/api/v1/telemetry/events/stream":
 		if api.streamer != nil {
 			api.streamer.ServeHTTP(w, r)
 			return
 		}
 		http.Error(w, "Streamer disabled", http.StatusServiceUnavailable)
 
-	case "/.raiwall/api/events":
+	case "/.raiwall/api/events", "/api/v1/telemetry/events", "/.raiwall/api/v1/telemetry/events":
 		api.handleEventsQuery(w, r)
 
-	case "/.raiwall/api/events/stats":
+	case "/.raiwall/api/events/stats", "/api/v1/telemetry/events/stats", "/.raiwall/api/v1/telemetry/events/stats":
 		api.handleStatsQuery(w, r)
 
-	case "/.raiwall/metrics":
+	case "/.raiwall/metrics", "/metrics":
 		if api.metrics != nil {
 			api.metrics.Handler().ServeHTTP(w, r)
 			return

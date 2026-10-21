@@ -19,7 +19,6 @@ import (
 	caddyv2 "github.com/caddyserver/caddy/v2"
 	"github.com/Panharoth06/raiwall/internal/adapters/inbound/caddy"
 	"github.com/Panharoth06/raiwall/internal/adapters/inbound/mcp"
-	"github.com/Panharoth06/raiwall/internal/adapters/outbound/storage/sqlite"
 	"github.com/Panharoth06/raiwall/internal/core/control"
 )
 
@@ -54,7 +53,7 @@ func TestControlPlane_E2E_ProxyMiddlewareAndMCP(t *testing.T) {
 	require.NoError(t, err)
 
 	now := time.Now().UTC()
-	err = store.CreateUser(ctx, sqlite.CreateUserParams{
+	err = store.CreateUser(ctx, control.UserRecord{
 		ID:           uuid.NewString(),
 		Username:     "mw_admin",
 		PasswordHash: string(adminHash),
@@ -65,7 +64,7 @@ func TestControlPlane_E2E_ProxyMiddlewareAndMCP(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	err = store.CreateUser(ctx, sqlite.CreateUserParams{
+	err = store.CreateUser(ctx, control.UserRecord{
 		ID:           uuid.NewString(),
 		Username:     "mw_viewer",
 		PasswordHash: string(viewerHash),

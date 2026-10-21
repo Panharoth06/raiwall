@@ -14,7 +14,7 @@
   <a href="https://vuejs.org"><img src="https://img.shields.io/badge/Vue-3.x-4FC08D?style=flat&logo=vuedotjs" alt="Vue Version" /></a>
   <a href="https://www.typescriptlang.org"><img src="https://img.shields.io/badge/TypeScript-5.x-3178C6?style=flat&logo=typescript" alt="TypeScript" /></a>
   <a href="#testing"><img src="https://img.shields.io/badge/Tests-Passing-brightgreen?style=flat" alt="Tests" /></a>
-  <a href="#production-safeguards"><img src="https://img.shields.io/badge/Image_Size-<50MB-blue" alt="Container Size" /></a>
+  <a href="#production-safeguards"><img src="https://img.shields.io/badge/Footprint-Lightweight_(~50MB)-blue" alt="Footprint" /></a>
 </p>
 
 <p align="center">
@@ -80,7 +80,7 @@ Built natively as a **Caddy v2** module, Raiwall combines extreme proxy throughp
 - **Multi-Channel ChatOps:** Instant push alerts to Telegram, Discord, Slack, and generic webhooks via Shoutrrr.
 
 ### 🎛️ 7. Control Plane & Single-Binary Packaging
-- **Unified Binary:** REST API (`huma` OpenAPI 3.1), Embedded Vue 3 Dashboard, and Caddy Data Plane ship in one `<50 MB` binary.
+- **Unified Binary:** REST API (`huma` OpenAPI 3.1), Embedded Vue 3 Dashboard, and Caddy Data Plane ship in a single compact binary (~50 MB, not strictly bounded under 50 MB).
 - **Sidecar Mode:** Envoy External Processor (`ext_proc/v3`) gRPC interface for Kubernetes ingress sidecar deployment.
 
 ---
@@ -225,7 +225,7 @@ raiwall/
 │   └── e2e/                              # End-to-end integration test suites (build tag: integration)
 ├── examples/
 │   └── Caddyfile                         # Example Caddyfile configuration
-├── Dockerfile                            # Multi-stage scratch build (<50 MB)
+├── Dockerfile                            # Multi-stage alpine build (lightweight container, ~50MB)
 └── Makefile                              # Build, test, and dev tooling
 ```
 

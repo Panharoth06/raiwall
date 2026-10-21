@@ -43,7 +43,7 @@ func TestAPIDiscoveryCataloger_AggregateAndFlush(t *testing.T) {
 	defer store.Close()
 
 	ctx := context.Background()
-	_ = store.CreateApp(ctx, sqlite.CreateAppParams{
+	_ = store.CreateApp(ctx, control.SiteApp{
 		ID:        "app-test-disc",
 		Name:      "Discovery App",
 		Hostnames: "[\"api.example.com\"]",
@@ -65,7 +65,7 @@ func TestAPIDiscoveryCataloger_AggregateAndFlush(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, resources, 2)
 
-	endpointMap := make(map[string]sqlite.RaiwallApiResource)
+	endpointMap := make(map[string]control.ApiResourceRecord)
 	for _, res := range resources {
 		key := res.Method + " " + res.PathPattern
 		endpointMap[key] = res
@@ -87,7 +87,7 @@ func TestMiddleware_DiscoveryIntegration(t *testing.T) {
 	defer store.Close()
 
 	ctx := context.Background()
-	_ = store.CreateApp(ctx, sqlite.CreateAppParams{
+	_ = store.CreateApp(ctx, control.SiteApp{
 		ID:        "app-live-disc",
 		Name:      "Live Disc",
 		Hostnames: "[\"live.example.com\"]",

@@ -10,13 +10,15 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/Panharoth06/raiwall/internal/adapters/outbound/storage/sqlite"
+	"github.com/Panharoth06/raiwall/internal/adapters/outbound/storage"
 	"github.com/Panharoth06/raiwall/internal/core/control"
 )
 
 func init() {
 	fs := flag.NewFlagSet("admin", flag.ExitOnError)
 	fs.String("db", "file:raiwall_control.db", "Path or DSN to SQLite database")
+	fs.String("dsn", "", "Database connection DSN (overrides --db)")
+	fs.String("driver", "", "Database driver (sqlite, postgres; auto-detected if empty)")
 	fs.String("username", "", "Username for user creation or init")
 	fs.String("password", "", "Password for user creation or init")
 	fs.String("role", "admin", "User role: admin or viewer")
@@ -33,6 +35,23 @@ func init() {
 	})
 }
 
+func getFlagString(flags caddycmd.Flags, name string, def string) string {
+	if flags.FlagSet != nil && flags.FlagSet.Lookup(name) != nil {
+		v := flags.String(name)
+		if v != "" {
+			return v
+		}
+	}
+	return def
+}
+
+func getFlagInt(flags caddycmd.Flags, name string, def int) int {
+	if flags.FlagSet != nil && flags.FlagSet.Lookup(name) != nil {
+		return flags.Int(name)
+	}
+	return def
+}
+
 func cmdAdmin(flags caddycmd.Flags) (int, error) {
 	args := flags.Args()
 	if len(args) == 0 {
@@ -40,29 +59,24 @@ func cmdAdmin(flags caddycmd.Flags) (int, error) {
 	}
 
 	subcommand := args[0]
-	dbDSN := flags.String("db")
+	dbDSN := getFlagString(flags, "dsn", "")
 	if dbDSN == "" {
-		dbDSN = "file:raiwall_control.db"
+		dbDSN = getFlagString(flags, "db", "file:raiwall_control.db")
 	}
+	driver := getFlagString(flags, "driver", "")
 
 	ctx := context.Background()
 
 	switch subcommand {
 	case "init":
-		store, err := sqlite.InitDB(dbDSN)
+		store, err := storage.OpenControlStore(ctx, driver, dbDSN)
 		if err != nil {
 			return 1, fmt.Errorf("failed to initialize database: %w", err)
 		}
 		defer store.Close()
 
-		username := flags.String("username")
-		if username == "" {
-			username = "admin"
-		}
-		password := flags.String("password")
-		if password == "" {
-			password = "admin"
-		}
+		username := getFlagString(flags, "username", "admin")
+		password := getFlagString(flags, "password", "admin")
 
 		// Check if user already exists
 		existing, _ := store.GetUserByUsername(ctx, username)
@@ -72,7 +86,7 @@ func cmdAdmin(flags caddycmd.Flags) (int, error) {
 				return 1, fmt.Errorf("failed to hash password: %w", err)
 			}
 			now := time.Now().UTC()
-			err = store.CreateUser(ctx, sqlite.CreateUserParams{
+			err = store.CreateUser(ctx, control.UserRecord{
 				ID:           uuid.NewString(),
 				Username:     username,
 				PasswordHash: string(hash),
@@ -91,20 +105,20 @@ func cmdAdmin(flags caddycmd.Flags) (int, error) {
 		return 0, nil
 
 	case "create-user":
-		username := flags.String("username")
+		username := getFlagString(flags, "username", "")
 		if username == "" {
 			return 1, fmt.Errorf("--username is required")
 		}
-		password := flags.String("password")
+		password := getFlagString(flags, "password", "")
 		if password == "" {
 			return 1, fmt.Errorf("--password is required")
 		}
-		role := flags.String("role")
+		role := getFlagString(flags, "role", "admin")
 		if role != "admin" && role != "viewer" {
 			return 1, fmt.Errorf("--role must be 'admin' or 'viewer'")
 		}
 
-		store, err := sqlite.InitDB(dbDSN)
+		store, err := storage.OpenControlStore(ctx, driver, dbDSN)
 		if err != nil {
 			return 1, fmt.Errorf("failed to connect to database: %w", err)
 		}
@@ -116,7 +130,7 @@ func cmdAdmin(flags caddycmd.Flags) (int, error) {
 		}
 
 		now := time.Now().UTC()
-		err = store.CreateUser(ctx, sqlite.CreateUserParams{
+		err = store.CreateUser(ctx, control.UserRecord{
 			ID:           uuid.NewString(),
 			Username:     username,
 			PasswordHash: string(hash),
@@ -133,7 +147,7 @@ func cmdAdmin(flags caddycmd.Flags) (int, error) {
 		return 0, nil
 
 	case "validate":
-		store, err := sqlite.InitDB(dbDSN)
+		store, err := storage.OpenControlStore(ctx, driver, dbDSN)
 		if err != nil {
 			return 1, fmt.Errorf("failed to connect to database: %w", err)
 		}
@@ -149,20 +163,14 @@ func cmdAdmin(flags caddycmd.Flags) (int, error) {
 		return 0, nil
 
 	case "apply":
-		store, err := sqlite.InitDB(dbDSN)
+		store, err := storage.OpenControlStore(ctx, driver, dbDSN)
 		if err != nil {
 			return 1, fmt.Errorf("failed to connect to database: %w", err)
 		}
 		defer store.Close()
 
-		author := flags.String("author")
-		if author == "" {
-			author = "cli-admin"
-		}
-		desc := flags.String("description")
-		if desc == "" {
-			desc = "Applied via CLI"
-		}
+		author := getFlagString(flags, "author", "cli-admin")
+		desc := getFlagString(flags, "description", "Applied via CLI")
 
 		snap, err := control.DeploySnapshot(ctx, store, author, desc)
 		if err != nil {
@@ -173,12 +181,12 @@ func cmdAdmin(flags caddycmd.Flags) (int, error) {
 		return 0, nil
 
 	case "rollback":
-		targetVer := flags.Int("version")
+		targetVer := getFlagInt(flags, "version", 0)
 		if targetVer <= 0 {
 			return 1, fmt.Errorf("--version must be a positive integer")
 		}
 
-		store, err := sqlite.InitDB(dbDSN)
+		store, err := storage.OpenControlStore(ctx, driver, dbDSN)
 		if err != nil {
 			return 1, fmt.Errorf("failed to connect to database: %w", err)
 		}

@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/Panharoth06/raiwall/internal/adapters/outbound/storage/sqlite"
+	"github.com/Panharoth06/raiwall/internal/core/control"
 )
 
 // JSONRPCRequest represents a standard JSON-RPC 2.0 request.
@@ -37,12 +37,12 @@ type JSONRPCError struct {
 
 // Server handles MCP protocol requests over SSE and Stdio.
 type Server struct {
-	store    *sqlite.Store
+	store    control.ControlStore
 	registry *Registry
 }
 
 // NewServer creates a new MCP protocol server instance.
-func NewServer(store *sqlite.Store) *Server {
+func NewServer(store control.ControlStore) *Server {
 	return &Server{
 		store:    store,
 		registry: NewRegistry(store),

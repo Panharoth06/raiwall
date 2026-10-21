@@ -1,0 +1,46 @@
+services:
+  # ============================================================================
+  # OWASP Core Rule Set (CRS) - Reference WAF Proxy (Nginx + ModSecurity v3)
+  # ============================================================================
+  crs-waf:
+    image: owasp/modsecurity-crs:nginx
+    container_name: crs-waf-test
+    restart: unless-stopped
+    ports:
+      - "8090:8080" # Exposed on port 8090 to avoid collision with Raiwall (8080)
+    environment:
+      SERVERNAME: crs-test-proxy
+      PORT: "8080"
+      BACKEND: "http://crs-backend:80"
+      MODSEC_RULE_ENGINE: "On"
+      PARANOIA: "1"
+      ANOMALY_INBOUND: "5"
+      ANOMALY_OUTBOUND: "4"
+      MODSEC_AUDIT_LOG_FORMAT: Native
+      MODSEC_AUDIT_LOG_TYPE: Serial
+      MODSEC_AUDIT_LOG: "/var/log/nginx/modsec_audit.log"
+      ERRORLOG: "/var/log/nginx/error.log"
+      ACCESSLOG: "/var/log/nginx/access.log"
+    volumes:
+      - ./logs:/var/log/nginx
+    depends_on:
+      - crs-backend
+    networks:
+      - waf-test-net
+
+  # ============================================================================
+  # Albedo: Official OWASP CRS Test Backend (Echo / Reflection Server)
+  # ============================================================================
+  crs-backend:
+    image: ghcr.io/coreruleset/albedo:0.3.0
+    container_name: crs-backend-test
+    restart: unless-stopped
+    command: ["--port", "80"]
+    ports:
+      - "8091:80" # Direct access for un-inspected baseline requests
+    networks:
+      - waf-test-net
+
+networks:
+  waf-test-net:
+    driver: bridge

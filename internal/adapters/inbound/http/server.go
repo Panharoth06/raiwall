@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/Panharoth06/raiwall/internal/adapters/inbound/mcp"
-	"github.com/Panharoth06/raiwall/internal/adapters/outbound/storage/sqlite"
+	"github.com/Panharoth06/raiwall/internal/core/control"
 	"github.com/Panharoth06/raiwall/internal/core/rate"
 	"github.com/go-chi/chi/v5"
 )
@@ -21,7 +21,7 @@ type ClusterPublisher interface {
 
 // Server provides the HTTP handler for the Raiwall Control Plane REST API.
 type Server struct {
-	store            *sqlite.Store
+	store            control.ControlStore
 	authMgr          *AuthManager
 	router           *chi.Mux
 	clusterPublisher ClusterPublisher
@@ -31,7 +31,7 @@ type Server struct {
 }
 
 // NewServer initializes a new Control Plane API server with Chi routing.
-func NewServer(store *sqlite.Store, hmacSecret []byte) *Server {
+func NewServer(store control.ControlStore, hmacSecret []byte) *Server {
 	authMgr := NewAuthManager(store, hmacSecret)
 	s := &Server{
 		store:     store,
@@ -74,8 +74,8 @@ func (s *Server) WaitingRoom() *rate.WaitingRoomManager {
 	return s.waitingRoom
 }
 
-// Store returns the underlying SQLite DB store.
-func (s *Server) Store() *sqlite.Store {
+// Store returns the underlying ControlStore.
+func (s *Server) Store() control.ControlStore {
 	return s.store
 }
 

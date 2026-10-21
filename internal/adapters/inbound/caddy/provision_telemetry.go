@@ -32,33 +32,41 @@ func (m *Middleware) provisionTelemetry(_ caddy.Context) error {
 		m.streamer = api.NewEventStreamer()
 	}
 
-	if m.telemetryStore == nil && m.TelemetryConfig != nil {
-		storageType := strings.ToLower(m.TelemetryConfig.StorageType)
-		if storageType == "clickhouse" {
-			chStore, err := clickhouse.NewClickHouseStore(clickhouse.ClickHouseConfig{
-				URL: m.TelemetryConfig.StoragePath,
-			})
+	if m.telemetryStore == nil {
+		if m.storageRegistry != nil && (m.StorageConfig.Telemetry != "" || m.StorageConfig.Control != "") {
+			tStore, err := m.storageRegistry.TelemetryStore(context.Background())
 			if err != nil {
-				return fmt.Errorf("provision clickhouse telemetry store: %w", err)
+				return fmt.Errorf("provision telemetry store from registry: %w", err)
 			}
-			m.telemetryStore = chStore
-		} else {
-			retention := time.Duration(m.TelemetryConfig.Retention)
-			if retention <= 0 {
-				retention = 30 * 24 * time.Hour
+			m.telemetryStore = tStore
+		} else if m.TelemetryConfig != nil {
+			storageType := strings.ToLower(m.TelemetryConfig.StorageType)
+			if storageType == "clickhouse" {
+				chStore, err := clickhouse.NewClickHouseStore(clickhouse.ClickHouseConfig{
+					URL: m.TelemetryConfig.StoragePath,
+				})
+				if err != nil {
+					return fmt.Errorf("provision clickhouse telemetry store: %w", err)
+				}
+				m.telemetryStore = chStore
+			} else {
+				retention := time.Duration(m.TelemetryConfig.Retention)
+				if retention <= 0 {
+					retention = 30 * 24 * time.Hour
+				}
+				dbPath := m.TelemetryConfig.StoragePath
+				if dbPath == "" {
+					dbPath = "raiwall-telemetry.db"
+				}
+				sqStore, err := sqlite.NewSQLiteStore(sqlite.TelemetryConfig{
+					DSN:       dbPath,
+					Retention: retention,
+				})
+				if err != nil {
+					return fmt.Errorf("provision sqlite telemetry store: %w", err)
+				}
+				m.telemetryStore = sqStore
 			}
-			dbPath := m.TelemetryConfig.StoragePath
-			if dbPath == "" {
-				dbPath = "raiwall-telemetry.db"
-			}
-			sqStore, err := sqlite.NewSQLiteStore(sqlite.TelemetryConfig{
-				DSN:       dbPath,
-				Retention: retention,
-			})
-			if err != nil {
-				return fmt.Errorf("provision sqlite telemetry store: %w", err)
-			}
-			m.telemetryStore = sqStore
 		}
 	}
 

@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:5193/.raiwall/';
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
@@ -8,13 +10,13 @@ export default defineConfig({
   workers: 1,
   reporter: 'list',
   use: {
-    baseURL: 'http://127.0.0.1:5193',
+    baseURL,
     viewport: { width: 1440, height: 900 },
     trace: 'on-first-retry',
   },
-  webServer: {
+  webServer: process.env.PLAYWRIGHT_BASE_URL ? undefined : {
     command: 'npm run dev -- --host 127.0.0.1 --port 5193 --strictPort',
-    url: 'http://127.0.0.1:5193',
+    url: 'http://127.0.0.1:5193/.raiwall/',
     reuseExistingServer: !process.env.CI,
     timeout: 30000,
     stdout: 'pipe',

@@ -207,5 +207,21 @@ func (s *controlStmt) queryExtra(st *databaseState, q string, args []driver.Valu
 		}, true
 	}
 
+	if strings.Contains(q, "FROM raiwall_schema_migrations") {
+		vers := make([]int, 0, len(st.migrations))
+		for v := range st.migrations {
+			vers = append(vers, v)
+		}
+		sort.Ints(vers)
+		rows := make([][]driver.Value, len(vers))
+		for i, v := range vers {
+			rows[i] = []driver.Value{int64(v)}
+		}
+		return &driverMemoryRows{
+			columns: []string{"version"},
+			data:    rows,
+		}, true
+	}
+
 	return nil, false
 }

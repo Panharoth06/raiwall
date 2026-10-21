@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted, watch } from 'vue';
+import { useRoute } from '@/router';
 import { useConfigStore } from '@/stores/config';
 import type { ExceptionRule } from '@/api/client';
 import ExceptionTestModal from '@/components/ExceptionTestModal.vue';
@@ -54,6 +55,29 @@ const openAddModal = () => {
   newRuleId.value = 'ALL';
   showAddModal.value = true;
 };
+
+const route = useRoute();
+
+const checkQueryAndOpen = () => {
+  if (route.value?.query?.create === 'true') {
+    newHost.value = route.value.query.host || '';
+    newPath.value = route.value.query.path || '';
+    newMethod.value = route.value.query.method || 'ALL';
+    newLocation.value = route.value.query.location || 'query';
+    newParamName.value = route.value.query.param || '*';
+    newReason.value = 'Created from live attack inspector';
+    newRuleId.value = route.value.query.rule_id || 'ALL';
+    showAddModal.value = true;
+  }
+};
+
+onMounted(() => {
+  checkQueryAndOpen();
+});
+
+watch(() => route.value?.query, () => {
+  checkQueryAndOpen();
+});
 
 const handleSaveException = async () => {
   if (!newPath.value || !newParamName.value) {

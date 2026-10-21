@@ -21,6 +21,7 @@ type databaseState struct {
 	apiKeys         map[string]*RaiwallApiKey
 	forwardingRules map[string]*RaiwallForwardingRule
 	apiResources    map[string]*RaiwallApiResource
+	migrations      map[int]string
 	nextVersion     int64
 }
 
@@ -37,6 +38,7 @@ func newDatabaseState(name string) *databaseState {
 		apiKeys:         make(map[string]*RaiwallApiKey),
 		forwardingRules: make(map[string]*RaiwallForwardingRule),
 		apiResources:    make(map[string]*RaiwallApiResource),
+		migrations:      make(map[int]string),
 		nextVersion:     1,
 	}
 }
@@ -88,6 +90,9 @@ func (s *databaseState) clone() *databaseState {
 		val := *v
 		cp.apiResources[k] = &val
 	}
+	for k, v := range s.migrations {
+		cp.migrations[k] = v
+	}
 	return cp
 }
 
@@ -109,6 +114,7 @@ func (s *databaseState) applyFrom(src *databaseState) {
 	s.apiKeys = src.apiKeys
 	s.forwardingRules = src.forwardingRules
 	s.apiResources = src.apiResources
+	s.migrations = src.migrations
 }
 
 type driverMemoryRows struct {

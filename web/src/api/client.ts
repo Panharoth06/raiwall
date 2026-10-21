@@ -1,3 +1,5 @@
+import type { ForensicEvent, AggregateStats } from '@/types/telemetry';
+
 export interface Site {
   id: string;
   name: string;
@@ -107,6 +109,25 @@ export interface ConfigHistoryItem {
 export interface UserSession {
   username: string;
   role: 'admin' | 'viewer';
+}
+
+export interface EventQueryParams {
+  limit?: number;
+  offset?: number;
+  client_ip?: string;
+  action?: string;
+  rule_id?: string;
+  country?: string;
+  min_severity?: string;
+  start_time?: string;
+  end_time?: string;
+}
+
+export interface EventsQueryResult {
+  events: ForensicEvent[];
+  total: number;
+  limit: number;
+  offset: number;
 }
 
 const API_BASE = '/.raiwall/api/v1';
@@ -279,4 +300,27 @@ export const api = {
   getConfigHistory: () => request<ConfigHistoryItem[]>('/config/history'),
   getClusterStatus: () =>
     request<{ mode: string; redis_connected: boolean; active_version: number; channel: string }>('/cluster/status'),
+
+  // Telemetry
+  listEvents: (params?: EventQueryParams) => {
+    const q = new URLSearchParams();
+    if (params?.limit != null) q.set('limit', params.limit.toString());
+    if (params?.offset != null) q.set('offset', params.offset.toString());
+    if (params?.client_ip) q.set('client_ip', params.client_ip);
+    if (params?.action) q.set('action', params.action);
+    if (params?.rule_id) q.set('rule_id', params.rule_id);
+    if (params?.country) q.set('country', params.country);
+    if (params?.min_severity) q.set('min_severity', params.min_severity);
+    if (params?.start_time) q.set('start_time', params.start_time);
+    if (params?.end_time) q.set('end_time', params.end_time);
+    const qs = q.toString();
+    return request<EventsQueryResult>(`/telemetry/events${qs ? '?' + qs : ''}`);
+  },
+  getStats: (startTime?: string, endTime?: string) => {
+    const q = new URLSearchParams();
+    if (startTime) q.set('start_time', startTime);
+    if (endTime) q.set('end_time', endTime);
+    const qs = q.toString();
+    return request<AggregateStats>(`/telemetry/events/stats${qs ? '?' + qs : ''}`);
+  },
 };

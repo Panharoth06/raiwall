@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Panharoth06/raiwall/internal/core/control"
 	"github.com/stretchr/testify/require"
 )
 
@@ -31,7 +32,7 @@ func TestStore_AppsCRUD(t *testing.T) {
 	now := time.Now().UTC()
 
 	// 1. Create
-	err = store.CreateApp(ctx, CreateAppParams{
+	err = store.CreateApp(ctx, control.SiteApp{
 		ID:                  "app-1",
 		Name:                "Payment Service",
 		Hostnames:           `["pay.example.com"]`,
@@ -59,7 +60,7 @@ func TestStore_AppsCRUD(t *testing.T) {
 	require.Len(t, apps, 1)
 
 	// 4. Update
-	err = store.UpdateApp(ctx, UpdateAppParams{
+	err = store.UpdateApp(ctx, control.SiteApp{
 		ID:                  "app-1",
 		Name:                "Payment Gateway",
 		Hostnames:           `["pay.example.com","checkout.example.com"]`,
@@ -96,7 +97,7 @@ func TestStore_ExceptionsCRUD(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now().UTC()
 
-	err = store.CreateException(ctx, CreateExceptionParams{
+	err = store.CreateException(ctx, control.ExceptionRule{
 		ID:          "exc-1",
 		Description: "Bypass false-positive in search query",
 		Host:        "api.example.com",
@@ -134,7 +135,7 @@ func TestStore_ACLRulesCRUD(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now().UTC()
 
-	err = store.CreateACLRule(ctx, CreateACLRuleParams{
+	err = store.CreateACLRule(ctx, control.AclRule{
 		ID:          "acl-1",
 		Name:        "Block Tor Exit Nodes",
 		Expression:  `in_feed(client_ip, "tor_exit")`,
@@ -170,7 +171,7 @@ func TestStore_SnapshotsAndRollback(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now().UTC()
 
-	snap1, err := store.CreateSnapshot(ctx, CreateSnapshotParams{
+	snap1, err := store.CreateSnapshot(ctx, control.ConfigSnapshotRecord{
 		SnapshotData: `{"version":1,"apps":{}}`,
 		Author:       "admin",
 		Description:  "Initial deployment",
@@ -179,7 +180,7 @@ func TestStore_SnapshotsAndRollback(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, int64(1), snap1.Version)
 
-	snap2, err := store.CreateSnapshot(ctx, CreateSnapshotParams{
+	snap2, err := store.CreateSnapshot(ctx, control.ConfigSnapshotRecord{
 		SnapshotData: `{"version":2,"apps":{"app-1":{}}}`,
 		Author:       "admin",
 		Description:  "Added app-1",
@@ -208,7 +209,7 @@ func TestStore_UsersAndAPIKeys(t *testing.T) {
 	now := time.Now().UTC()
 
 	// Users
-	err = store.CreateUser(ctx, CreateUserParams{
+	err = store.CreateUser(ctx, control.UserRecord{
 		ID:           "u-1",
 		Username:     "alice",
 		PasswordHash: "$2a$12$hashedpassword",
@@ -224,7 +225,7 @@ func TestStore_UsersAndAPIKeys(t *testing.T) {
 	require.Equal(t, "admin", u.Role)
 
 	// API Keys
-	err = store.CreateAPIKey(ctx, CreateAPIKeyParams{
+	err = store.CreateAPIKey(ctx, control.ApiKeyRecord{
 		ID:        "k-1",
 		Name:      "CI/CD Deployer",
 		KeyHash:   "sha256_mock_key_hash",
@@ -250,8 +251,8 @@ func TestStore_TransactionRollback(t *testing.T) {
 	now := time.Now().UTC()
 
 	// Transaction that fails and rolls back
-	err = store.WithTx(ctx, func(q *Queries) error {
-		createErr := q.CreateApp(ctx, CreateAppParams{
+	err = store.WithTx(ctx, func(txStore control.ControlStore) error {
+		createErr := txStore.CreateApp(ctx, control.SiteApp{
 			ID:                  "app-rollback",
 			Name:                "Rollback Me",
 			Hostnames:           `["rb.example.com"]`,

@@ -1,4 +1,4 @@
-package control
+package control_test
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Panharoth06/raiwall/internal/adapters/outbound/storage/sqlite"
+	"github.com/Panharoth06/raiwall/internal/core/control"
 	"github.com/stretchr/testify/require"
 )
 
@@ -20,7 +21,7 @@ func TestCompiler_CompileAndValidate(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now().UTC()
 
-	err = store.CreateApp(ctx, sqlite.CreateAppParams{
+	err = store.CreateApp(ctx, control.SiteApp{
 		ID:                  "app-1",
 		Name:                "API Gateway",
 		Hostnames:           `["api.example.com"]`,
@@ -36,7 +37,7 @@ func TestCompiler_CompileAndValidate(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	err = store.CreateException(ctx, sqlite.CreateExceptionParams{
+	err = store.CreateException(ctx, control.ExceptionRule{
 		ID:          "exc-1",
 		Description: "Bypass search",
 		Host:        "api.example.com",
@@ -53,7 +54,7 @@ func TestCompiler_CompileAndValidate(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	err = store.CreateACLRule(ctx, sqlite.CreateACLRuleParams{
+	err = store.CreateACLRule(ctx, control.AclRule{
 		ID:          "acl-1",
 		Name:        "Block Tor",
 		Expression:  `in_cidr(client_ip, "192.168.1.0/24")`,
@@ -67,7 +68,7 @@ func TestCompiler_CompileAndValidate(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	snap, err := CompileSnapshot(ctx, store)
+	snap, err := control.CompileSnapshot(ctx, store)
 	require.NoError(t, err)
 	require.NotNil(t, snap)
 	require.Len(t, snap.Apps, 1)
@@ -88,20 +89,21 @@ func TestCompiler_PreFlightValidationFailure(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now().UTC()
 
-	initialSnap := NewConfigSnapshot(1, ModeDefense, []*AppConfig{
+	initialSnap := control.NewConfigSnapshot(1, control.ModeDefense, []*control.AppConfig{
 		{
 			ID:        "app-valid",
 			Name:      "Valid App",
 			Hostnames: []string{"valid.example.com"},
-			Mode:      ModeDefense,
-			Upstreams: []UpstreamTarget{{Dial: "127.0.0.1:8080"}},
+			Mode:      control.ModeDefense,
+			Upstreams: []control.UpstreamTarget{{Dial: "127.0.0.1:8080"}},
 		},
 	})
-	StoreSnapshot(initialSnap)
-	activeBefore := LoadSnapshot()
+	control.StoreSnapshot(initialSnap)
+
+	activeBefore := control.LoadSnapshot()
 	require.Equal(t, "app-valid", activeBefore.Apps["app-valid"].ID)
 
-	err = store.CreateApp(ctx, sqlite.CreateAppParams{
+	err = store.CreateApp(ctx, control.SiteApp{
 		ID:                  "app-bad",
 		Name:                "Bad App",
 		Hostnames:           `["bad.example.com"]`,
@@ -117,7 +119,7 @@ func TestCompiler_PreFlightValidationFailure(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	err = store.CreateACLRule(ctx, sqlite.CreateACLRuleParams{
+	err = store.CreateACLRule(ctx, control.AclRule{
 		ID:          "acl-bad",
 		Name:        "Syntax Error Rule",
 		Expression:  `this is syntax error +++ `,
@@ -131,7 +133,7 @@ func TestCompiler_PreFlightValidationFailure(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	err = store.CreateException(ctx, sqlite.CreateExceptionParams{
+	err = store.CreateException(ctx, control.ExceptionRule{
 		ID:          "exc-bad",
 		Description: "Bad regex",
 		Host:        "*",
@@ -146,15 +148,15 @@ func TestCompiler_PreFlightValidationFailure(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	snap, err := CompileSnapshot(ctx, store)
+	snap, err := control.CompileSnapshot(ctx, store)
 	require.Error(t, err)
 	require.Nil(t, snap)
 
-	deployed, err := DeploySnapshot(ctx, store, "admin", "Attempt invalid deploy")
+	deployed, err := control.DeploySnapshot(ctx, store, "admin", "Attempt invalid deploy")
 	require.Error(t, err)
 	require.Nil(t, deployed)
 
-	activeAfter := LoadSnapshot()
+	activeAfter := control.LoadSnapshot()
 	require.Equal(t, activeBefore.Version, activeAfter.Version)
 	require.Equal(t, "app-valid", activeAfter.Apps["app-valid"].ID)
 	_, found := activeAfter.Apps["app-bad"]
@@ -170,7 +172,7 @@ func TestCompiler_DeployAndRollback(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now().UTC()
 
-	err = store.CreateApp(ctx, sqlite.CreateAppParams{
+	err = store.CreateApp(ctx, control.SiteApp{
 		ID:                  "app-v1",
 		Name:                "App V1",
 		Hostnames:           `["v1.example.com"]`,
@@ -186,12 +188,12 @@ func TestCompiler_DeployAndRollback(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	snap1, err := DeploySnapshot(ctx, store, "alice", "Release v1")
+	snap1, err := control.DeploySnapshot(ctx, store, "alice", "Release v1")
 	require.NoError(t, err)
 	require.Equal(t, uint64(1), snap1.Version)
-	require.Equal(t, snap1, LoadSnapshot())
+	require.Equal(t, snap1, control.LoadSnapshot())
 
-	err = store.CreateApp(ctx, sqlite.CreateAppParams{
+	err = store.CreateApp(ctx, control.SiteApp{
 		ID:                  "app-v2",
 		Name:                "App V2",
 		Hostnames:           `["v2.example.com"]`,
@@ -207,17 +209,17 @@ func TestCompiler_DeployAndRollback(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	snap2, err := DeploySnapshot(ctx, store, "bob", "Release v2 with app-v2")
+	snap2, err := control.DeploySnapshot(ctx, store, "bob", "Release v2 with app-v2")
 	require.NoError(t, err)
 	require.Equal(t, uint64(2), snap2.Version)
-	require.Equal(t, snap2, LoadSnapshot())
-	require.Len(t, LoadSnapshot().Apps, 2)
+	require.Equal(t, snap2, control.LoadSnapshot())
+	require.Len(t, control.LoadSnapshot().Apps, 2)
 
-	restored, err := RollbackToVersion(ctx, store, 1)
+	restored, err := control.RollbackToVersion(ctx, store, 1)
 	require.NoError(t, err)
 	require.Equal(t, uint64(1), restored.Version)
 
-	active := LoadSnapshot()
+	active := control.LoadSnapshot()
 	require.Equal(t, uint64(1), active.Version)
 	require.Len(t, active.Apps, 1)
 	_, found := active.GetAppForHost("v1.example.com")
@@ -225,7 +227,7 @@ func TestCompiler_DeployAndRollback(t *testing.T) {
 	_, found = active.GetAppForHost("v2.example.com")
 	require.False(t, found)
 
-	history, err := ListSnapshotHistory(ctx, store)
+	history, err := control.ListSnapshotHistory(ctx, store)
 	require.NoError(t, err)
 	require.Len(t, history, 2)
 }
@@ -239,7 +241,7 @@ func TestCompiler_ConcurrentReadsAndAtomicRollback(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now().UTC()
 
-	err = store.CreateApp(ctx, sqlite.CreateAppParams{
+	err = store.CreateApp(ctx, control.SiteApp{
 		ID:                  "app-concurrent",
 		Name:                "Concurrent App",
 		Hostnames:           `["conc.example.com"]`,
@@ -255,7 +257,7 @@ func TestCompiler_ConcurrentReadsAndAtomicRollback(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	_, err = DeploySnapshot(ctx, store, "admin", "Base snapshot")
+	_, err = control.DeploySnapshot(ctx, store, "admin", "Base snapshot")
 	require.NoError(t, err)
 
 	var wg sync.WaitGroup
@@ -270,7 +272,7 @@ func TestCompiler_ConcurrentReadsAndAtomicRollback(t *testing.T) {
 				case <-stopCh:
 					return
 				default:
-					s := LoadSnapshot()
+					s := control.LoadSnapshot()
 					if s != nil {
 						_, _ = s.GetAppForHost("conc.example.com")
 					}
@@ -281,11 +283,11 @@ func TestCompiler_ConcurrentReadsAndAtomicRollback(t *testing.T) {
 	}
 
 	for i := 0; i < 5; i++ {
-		_, err = DeploySnapshot(ctx, store, "admin", fmt.Sprintf("Deploy %d", i))
+		_, err = control.DeploySnapshot(ctx, store, "admin", fmt.Sprintf("Deploy %d", i))
 		require.NoError(t, err)
 		time.Sleep(2 * time.Millisecond)
 
-		_, err = RollbackToVersion(ctx, store, 1)
+		_, err = control.RollbackToVersion(ctx, store, 1)
 		require.NoError(t, err)
 		time.Sleep(2 * time.Millisecond)
 	}

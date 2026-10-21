@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Panharoth06/raiwall/internal/adapters/outbound/storage/sqlite"
 	"github.com/Panharoth06/raiwall/internal/core/control"
 	"github.com/google/uuid"
 )
@@ -32,12 +31,12 @@ type ToolContent struct {
 
 // Registry manages MCP tool registration and execution.
 type Registry struct {
-	store *sqlite.Store
+	store control.ControlStore
 	tools map[string]ToolDefinition
 }
 
 // NewRegistry constructs a Registry initialized with Raiwall WAF operational tools.
-func NewRegistry(store *sqlite.Store) *Registry {
+func NewRegistry(store control.ControlStore) *Registry {
 	r := &Registry{
 		store: store,
 		tools: make(map[string]ToolDefinition),
@@ -212,7 +211,7 @@ func (r *Registry) Execute(ctx context.Context, name string, args map[string]any
 		excID := "exc-" + uuid.New().String()[:8]
 		now := time.Now().UTC()
 
-		err := r.store.CreateException(ctx, sqlite.CreateExceptionParams{
+		err := r.store.CreateException(ctx, control.ExceptionRule{
 			ID:          excID,
 			Description: desc,
 			Host:        host,

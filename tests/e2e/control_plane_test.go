@@ -76,7 +76,7 @@ func TestControlPlane_E2E_FullLifecycle(t *testing.T) {
 	require.NoError(t, err)
 
 	now := time.Now().UTC()
-	err = store.CreateUser(ctx, sqlite.CreateUserParams{
+	err = store.CreateUser(ctx, control.UserRecord{
 		ID:           uuid.NewString(),
 		Username:     "admin_e2e",
 		PasswordHash: string(hash),

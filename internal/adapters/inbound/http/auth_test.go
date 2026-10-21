@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Panharoth06/raiwall/internal/adapters/outbound/storage/sqlite"
+	"github.com/Panharoth06/raiwall/internal/core/control"
 	"github.com/stretchr/testify/require"
 )
 
@@ -53,7 +54,7 @@ func TestAuth_LoginAndSessionCookie(t *testing.T) {
 	hash, err := HashPassword("SecretPass123!")
 	require.NoError(t, err)
 
-	err = store.CreateUser(ctx, sqlite.CreateUserParams{
+	err = store.CreateUser(ctx, control.UserRecord{
 		ID:           "u-admin",
 		Username:     "admin",
 		PasswordHash: hash,
@@ -110,7 +111,7 @@ func TestAuth_APIKeyAndRBAC(t *testing.T) {
 	adminToken := "rw_admin_test_token_12345678"
 	viewerToken := "rw_viewer_test_token_87654321"
 
-	err := store.CreateAPIKey(ctx, sqlite.CreateAPIKeyParams{
+	err := store.CreateAPIKey(ctx, control.ApiKeyRecord{
 		ID:        "key-admin",
 		Name:      "Admin Key",
 		KeyHash:   HashAPIKey(adminToken),
@@ -120,7 +121,7 @@ func TestAuth_APIKeyAndRBAC(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	err = store.CreateAPIKey(ctx, sqlite.CreateAPIKeyParams{
+	err = store.CreateAPIKey(ctx, control.ApiKeyRecord{
 		ID:        "key-viewer",
 		Name:      "Viewer Key",
 		KeyHash:   HashAPIKey(viewerToken),

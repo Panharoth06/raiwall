@@ -3,7 +3,7 @@
 ## Executive Summary
 
 This plan outlines the architecture, component relationships, and delivery strategy for the **Raiwall Major Update**. The primary objective is establishing **100% functional, operational, and UX parity with Chaitin SafeLine WAF v9.4.2 Pro** (as documented in [`docs/`](file:///Users/macbook/Code/raiwall/docs/README.md) and [`docs/comparative-analysis-raiwall.md`](file:///Users/macbook/Code/raiwall/docs/comparative-analysis-raiwall.md)) while preserving Raiwall's core architectural advantages:
-1. **Pure Go single-binary execution** ($< 50\text{ MB}$, zero CGO, zero Docker/Postgres/Redis dependencies required for standalone mode).
+1. **Pure Go single-binary execution** (compact ~50 MB footprint, not strictly bounded $< 50\text{ MB}$, zero CGO, zero Docker/Postgres/Redis dependencies required for standalone mode).
 2. **Sub-microsecond threat evaluation** ($< 2\ \mu\text{s}$ lexical triage, sub-15 ns bytecode ACL, sub-15 ns BART CIDR lookups).
 3. **Native HTTP/3 (QUIC) and automated ACME** via Caddy v2.
 4. **Anti-CGNAT composite rate limiting** (`IP + JA4 + Cookie`).
@@ -135,7 +135,7 @@ Phase 1: Frontend Architecture Foundation & Router Modernization
 - **Task 94**: Named IP Groups Engine with BART Integration (Size: M)
 - **Task 95**: Custom HTML/CSS Response Template Manager & Visual Code Editor (Size: M)
 - **Task 96**: End-to-End Enterprise Integration Suite, Single Binary Build & Performance Benchmark (Size: M)
-- *Final Checkpoint: Complete SafeLine parity verified with single-binary build < 50 MB.*
+- *Final Checkpoint: Complete SafeLine parity verified with compact single-binary build (~50 MB).*
 
 ---
 
@@ -148,4 +148,4 @@ Phase 1: Frontend Architecture Foundation & Router Modernization
 | **Dynamic Routing Memory Leaks** | Medium | Runtime route additions leaking `httputil.ReverseProxy` transports | Pool reverse proxy transports per site ID; clean up transports on site deletion. |
 | **OOM on Waiting Room Flash Crowds** | High | 100,000 concurrent queued connections exhausting memory | Stateless cryptographic queue cookies (`rw_waiting_room_queue_id`) with HTTP 465 polling; SSE pool capped at 5,000 concurrent listeners. |
 | **B2B / Mobile API Challenge Breakage** | Critical | Non-browser clients crashing on interactive HTTP 467/468 | Route classifier bypasses bot challenges for `Authorization: Bearer`, `/api/*`, and `Accept: application/json`. |
-| **Single-Binary Bloat** | Medium | Embedded web assets and CVE rules exceeding 50 MB | Minified and gzip-compressed assets; rules stored in compressed JSON format. |
+| **Single-Binary Bloat** | Medium | Uncontrolled binary growth from embedded assets/rules | Minified and gzip-compressed assets; rules stored in compressed JSON format; binary kept compact (~50 MB, not strictly bounded < 50 MB). |

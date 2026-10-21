@@ -1,6 +1,7 @@
 package control
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"strings"
@@ -50,6 +51,100 @@ type UpstreamTarget struct {
 	FailTimeout         time.Duration `json:"fail_timeout,omitempty"`
 	HealthCheckPath     string        `json:"health_check_path,omitempty"`
 	HealthCheckInterval time.Duration `json:"health_check_interval,omitempty"`
+}
+
+// UnmarshalJSON custom unmarshaler for UpstreamTarget supporting string durations and numeric nanoseconds.
+func (u *UpstreamTarget) UnmarshalJSON(data []byte) error {
+	type rawTarget struct {
+		Dial                string `json:"dial"`
+		Weight              int    `json:"weight,omitempty"`
+		MaxFails            int    `json:"max_fails,omitempty"`
+		FailTimeout         any    `json:"fail_timeout,omitempty"`
+		HealthCheckPath     string `json:"health_check_path,omitempty"`
+		HealthCheckInterval any    `json:"health_check_interval,omitempty"`
+		Interval            any    `json:"interval,omitempty"`
+	}
+
+	var raw rawTarget
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	u.Dial = raw.Dial
+	u.Weight = raw.Weight
+	u.MaxFails = raw.MaxFails
+	u.HealthCheckPath = raw.HealthCheckPath
+
+	parseDur := func(v any) (time.Duration, error) {
+		if v == nil {
+			return 0, nil
+		}
+		switch val := v.(type) {
+		case string:
+			if val == "" {
+				return 0, nil
+			}
+			return time.ParseDuration(val)
+		case float64:
+			return time.Duration(val), nil
+		case int64:
+			return time.Duration(val), nil
+		case int:
+			return time.Duration(val), nil
+		default:
+			return 0, fmt.Errorf("unexpected duration type: %T", v)
+		}
+	}
+
+	if raw.FailTimeout != nil {
+		d, err := parseDur(raw.FailTimeout)
+		if err != nil {
+			return fmt.Errorf("invalid fail_timeout: %w", err)
+		}
+		u.FailTimeout = d
+	}
+
+	hcInt := raw.HealthCheckInterval
+	if hcInt == nil {
+		hcInt = raw.Interval
+	}
+	if hcInt != nil {
+		d, err := parseDur(hcInt)
+		if err != nil {
+			return fmt.Errorf("invalid health_check_interval: %w", err)
+		}
+		u.HealthCheckInterval = d
+	}
+
+	return nil
+}
+
+// MarshalJSON serializes UpstreamTarget with string durations.
+func (u UpstreamTarget) MarshalJSON() ([]byte, error) {
+	type targetAlias struct {
+		Dial                string `json:"dial"`
+		Weight              int    `json:"weight,omitempty"`
+		MaxFails            int    `json:"max_fails,omitempty"`
+		FailTimeout         string `json:"fail_timeout,omitempty"`
+		HealthCheckPath     string `json:"health_check_path,omitempty"`
+		HealthCheckInterval string `json:"health_check_interval,omitempty"`
+		Interval            string `json:"interval,omitempty"`
+	}
+
+	t := targetAlias{
+		Dial:            u.Dial,
+		Weight:          u.Weight,
+		MaxFails:        u.MaxFails,
+		HealthCheckPath: u.HealthCheckPath,
+	}
+	if u.FailTimeout > 0 {
+		t.FailTimeout = u.FailTimeout.String()
+	}
+	if u.HealthCheckInterval > 0 {
+		t.HealthCheckInterval = u.HealthCheckInterval.String()
+		t.Interval = u.HealthCheckInterval.String()
+	}
+	return json.Marshal(t)
 }
 
 // ForwardingRule defines a path-prefix routing rule to custom upstream backends.

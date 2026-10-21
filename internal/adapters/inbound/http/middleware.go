@@ -2,13 +2,10 @@ package api
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"net/http"
 	"strings"
 	"time"
-
-	"github.com/Panharoth06/raiwall/internal/adapters/outbound/storage/sqlite"
 )
 
 type contextKey string
@@ -80,10 +77,7 @@ func (am *AuthManager) AuthMiddleware(next http.Handler) http.Handler {
 					}
 					// Asynchronously record last used
 					go func(kID string) {
-						_ = am.store.UpdateAPIKeyLastUsed(context.Background(), sqlite.UpdateAPIKeyLastUsedParams{
-							ID:         kID,
-							LastUsedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
-						})
+						_ = am.store.UpdateAPIKeyLastUsed(context.Background(), kID, time.Now().UTC())
 					}(keyRecord.ID)
 				}
 			}
@@ -94,6 +88,20 @@ func (am *AuthManager) AuthMiddleware(next http.Handler) http.Handler {
 			cookie, err := r.Cookie(SessionCookieName)
 			if err == nil {
 				authCtx, authErr = am.VerifySessionCookie(cookie)
+			}
+		}
+
+		// 3. Try HTTP Basic Auth
+		if authCtx == nil {
+			if user, pass, ok := r.BasicAuth(); ok {
+				u, err := am.store.GetUserByUsername(r.Context(), user)
+				if err == nil && u.IsActive == 1 && CheckPassword(pass, u.PasswordHash) {
+					authCtx = &AuthContext{
+						UserID:   u.ID,
+						Username: u.Username,
+						Role:     u.Role,
+					}
+				}
 			}
 		}
 

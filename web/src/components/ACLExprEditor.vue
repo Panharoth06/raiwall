@@ -49,7 +49,7 @@ watch(
       formPriority.value = val.priority;
     } else {
       formName.value = '';
-      formExpr.value = 'ClientIP in "10.0.0.0/8" && Path == "/admin"';
+      formExpr.value = 'in_cidr(client_ip, "10.0.0.0/8") && path == "/admin"';
       formAction.value = 'block';
       formRedirectUrl.value = '';
       formPriority.value = 100;
@@ -144,7 +144,7 @@ const handleOpenChange = (openState: boolean) => {
             v-model="formExpr"
             rows="3"
             class="w-full px-3 py-2 bg-card border border-input rounded-md text-foreground placeholder:text-muted-foreground font-mono text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-ring transition-colors"
-            placeholder='ClientIP in "192.168.0.0/16" && Method == "POST"'
+            placeholder='in_cidr(client_ip, "192.168.0.0/16") && method == "POST"'
           ></textarea>
 
           <!-- Syntax verification banner -->

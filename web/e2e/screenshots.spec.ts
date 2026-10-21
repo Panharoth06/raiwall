@@ -1,11 +1,22 @@
 import { test } from '@playwright/test';
 
 test.describe('WAF Command Center Visual Verification Screenshots', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('#/login');
+    if (await page.locator('input[type="password"]').isVisible()) {
+      await page.fill('input[placeholder="Username"]', 'admin');
+      await page.fill('input[type="password"]', 'admin');
+      await page.click('button[type="submit"]');
+      await page.waitForTimeout(500);
+    }
+  });
+
   test('capture all key states at 1440x900', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
 
     // 1. Default Traffic View
-    await page.goto('/');
+    await page.goto('#/topology');
     await page.waitForSelector('[data-testid="waf-dashboard-root"]');
     await page.waitForTimeout(500);
     await page.screenshot({ path: 'screenshots/01-traffic-default-1440x900.png' });
@@ -48,7 +59,7 @@ test.describe('WAF Command Center Visual Verification Screenshots', () => {
 
   test('capture default view at 1920x1080', async ({ page }) => {
     await page.setViewportSize({ width: 1920, height: 1080 });
-    await page.goto('/');
+    await page.goto('#/topology');
     await page.waitForSelector('[data-testid="waf-dashboard-root"]');
     await page.waitForTimeout(500);
     await page.screenshot({ path: 'screenshots/07-traffic-default-1920x1080.png' });

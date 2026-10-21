@@ -14,6 +14,7 @@ import (
 // TelemetryStore implements telemetry.ForensicStore backed by SQLite WAL mode.
 type TelemetryStore struct {
 	db        *sql.DB
+	ownsDB    bool
 	stopCh    chan struct{}
 	wg        sync.WaitGroup
 	retention time.Duration
@@ -59,6 +60,7 @@ func NewTelemetryStore(cfg TelemetryConfig) (*TelemetryStore, error) {
 
 	store := &TelemetryStore{
 		db:        db,
+		ownsDB:    true,
 		stopCh:    make(chan struct{}),
 		retention: cfg.Retention,
 	}
@@ -82,6 +84,29 @@ func NewTelemetryStore(cfg TelemetryConfig) (*TelemetryStore, error) {
 // NewSQLiteStore provides a backwards-compatible constructor for TelemetryStore.
 func NewSQLiteStore(cfg TelemetryConfig) (*TelemetryStore, error) {
 	return NewTelemetryStore(cfg)
+}
+
+// NewTelemetryStoreFromDB wraps an existing database connection pool for telemetry.
+func NewTelemetryStoreFromDB(db *sql.DB, retention, pruneInterval time.Duration) (*TelemetryStore, error) {
+	store := &TelemetryStore{
+		db:        db,
+		ownsDB:    false,
+		stopCh:    make(chan struct{}),
+		retention: retention,
+	}
+
+	if err := store.initSchema(); err != nil {
+		return nil, fmt.Errorf("init sqlite schema: %w", err)
+	}
+
+	if retention > 0 {
+		if pruneInterval <= 0 {
+			pruneInterval = time.Hour
+		}
+		store.startRetentionWorker(retention, pruneInterval)
+	}
+
+	return store, nil
 }
 
 func (s *TelemetryStore) initSchema() error {
@@ -245,7 +270,7 @@ func (s *TelemetryStore) Prune(ctx context.Context, maxAge time.Duration) (int64
 	return res.RowsAffected()
 }
 
-// Close terminates background retention loops and closes the SQLite database connection.
+// Close terminates background retention loops and closes the SQLite database connection if owned.
 func (s *TelemetryStore) Close() error {
 	select {
 	case <-s.stopCh:
@@ -253,5 +278,8 @@ func (s *TelemetryStore) Close() error {
 		close(s.stopCh)
 	}
 	s.wg.Wait()
-	return s.db.Close()
+	if s.ownsDB && s.db != nil {
+		return s.db.Close()
+	}
+	return nil
 }

@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/Panharoth06/raiwall/internal/adapters/outbound/storage/sqlite"
+	"github.com/Panharoth06/raiwall/internal/core/control"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
@@ -108,7 +108,7 @@ func (s *Server) handleCreateAPIKey(w http.ResponseWriter, r *http.Request) {
 		expTime = req.ExpiresAt
 	}
 
-	err := s.store.CreateAPIKey(r.Context(), sqlite.CreateAPIKeyParams{
+	err := s.store.CreateAPIKey(r.Context(), control.ApiKeyRecord{
 		ID:        id,
 		Name:      req.Name,
 		KeyHash:   keyHash,

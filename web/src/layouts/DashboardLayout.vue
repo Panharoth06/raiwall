@@ -32,18 +32,29 @@ const configStore = useConfigStore();
 
 const selectedTenant = ref('default');
 
-onMounted(() => {
+onMounted(async () => {
+  await authStore.fetchCurrentUser();
+  if (!authStore.isAuthenticated) {
+    router.push('/login');
+    return;
+  }
   configStore.loadAll();
-  authStore.fetchCurrentUser();
 });
 
 const currentPath = computed(() => route.value.path || '/');
+
+export interface NavChildItem {
+  name: string;
+  path: string;
+  testId: string;
+}
 
 export interface NavItem {
   name: string;
   path: string;
   icon: any;
   testId: string;
+  children?: NavChildItem[];
 }
 
 const navItems: NavItem[] = [
@@ -51,7 +62,16 @@ const navItems: NavItem[] = [
   { name: 'Applications', path: '/sites', icon: Globe, testId: 'nav-applications' },
   { name: 'Attacks', path: '/attacks', icon: ShieldAlert, testId: 'nav-attacks' },
   { name: 'Allow & Deny', path: '/allow-deny', icon: ShieldCheck, testId: 'nav-allow-deny' },
-  { name: 'HTTP Flood', path: '/http-flood', icon: Activity, testId: 'nav-http-flood' },
+  {
+    name: 'HTTP Flood',
+    path: '/http-flood',
+    icon: Activity,
+    testId: 'nav-http-flood',
+    children: [
+      { name: 'Rate Limiting', path: '/http-flood/limits', testId: 'nav-http-flood-limits' },
+      { name: 'Waiting Room', path: '/http-flood/waiting-room', testId: 'nav-http-flood-waiting-room' },
+    ],
+  },
   { name: 'Anti-Bot', path: '/anti-bot', icon: Bot, testId: 'nav-anti-bot' },
   { name: 'Auth', path: '/auth', icon: Lock, testId: 'nav-auth' },
   { name: 'Settings', path: '/system', icon: Settings, testId: 'nav-settings' },
@@ -68,6 +88,16 @@ const isItemActive = (path: string): boolean => {
     return currentPath.value.startsWith('/system') || currentPath.value.startsWith('/settings');
   }
   return currentPath.value.startsWith(path);
+};
+
+const isChildActive = (childPath: string): boolean => {
+  if (childPath === '/http-flood/limits') {
+    return (
+      currentPath.value === '/http-flood' ||
+      currentPath.value.startsWith('/http-flood/limits')
+    );
+  }
+  return currentPath.value.startsWith(childPath);
 };
 
 const isTopologyActive = computed(() => currentPath.value.startsWith('/topology') || currentPath.value.startsWith('/command-center'));
@@ -122,29 +152,54 @@ const handleLogout = async () => {
 
       <!-- SafeLine 8-Domain Navigation Links with Vertical Auto-Scroll -->
       <nav class="flex-1 min-h-0 px-3 py-2 space-y-1 overflow-y-auto">
-        <button
-          v-for="item in navItems"
-          :key="item.path"
-          :data-testid="item.testId"
-          @click="navigateTo(item.path)"
-          :class="[
-            'relative w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-[15px] font-medium transition-colors text-left cursor-pointer overflow-hidden',
-            isItemActive(item.path)
-              ? 'bg-primary/10 text-primary border-l-[3px] border-primary rounded-l-none font-semibold'
-              : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-          ]"
-        >
+        <div v-for="item in navItems" :key="item.path" class="space-y-0.5">
+          <button
+            :data-testid="item.testId"
+            @click="navigateTo(item.path)"
+            :class="[
+              'relative w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-[15px] font-medium transition-colors text-left cursor-pointer overflow-hidden',
+              isItemActive(item.path)
+                ? 'bg-primary/10 text-primary border-l-[3px] border-primary rounded-l-none font-semibold'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+            ]"
+          >
+            <div
+              v-if="isItemActive(item.path)"
+              class="absolute left-0 top-0 bottom-0 w-[3px] bg-primary"
+            />
+            <component
+              :is="item.icon"
+              class="w-[18px] h-[18px] flex-shrink-0"
+              :class="isItemActive(item.path) ? 'text-primary' : 'text-muted-foreground'"
+            />
+            <span class="truncate" :class="isItemActive(item.path) ? 'text-foreground' : 'text-muted-foreground'">{{ item.name }}</span>
+          </button>
+
+          <!-- SafeLine Expandable Sub-Menu for HTTP Flood -->
           <div
-            v-if="isItemActive(item.path)"
-            class="absolute left-0 top-0 bottom-0 w-[3px] bg-primary"
-          />
-          <component
-            :is="item.icon"
-            class="w-[18px] h-[18px] flex-shrink-0"
-            :class="isItemActive(item.path) ? 'text-primary' : 'text-muted-foreground'"
-          />
-          <span class="truncate" :class="isItemActive(item.path) ? 'text-foreground' : 'text-muted-foreground'">{{ item.name }}</span>
-        </button>
+            v-if="item.children && isItemActive(item.path)"
+            class="ml-6 pl-2.5 border-l border-border/80 space-y-0.5 py-1"
+          >
+            <button
+              v-for="child in item.children"
+              :key="child.path"
+              :data-testid="child.testId"
+              @click="navigateTo(child.path)"
+              :class="[
+                'w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors text-left cursor-pointer',
+                isChildActive(child.path)
+                  ? 'text-primary font-semibold bg-primary/10'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'
+              ]"
+            >
+              <span
+                class="w-1.5 h-1.5 rounded-full shrink-0"
+                :class="isChildActive(child.path) ? 'bg-primary' : 'bg-muted-foreground/40'"
+              />
+              <span class="truncate">{{ child.name }}</span>
+            </button>
+          </div>
+        </div>
       </nav>
 
       <!-- Bottom User Profile & Session Controls with Pinned mt-auto -->

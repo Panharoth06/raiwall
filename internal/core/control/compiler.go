@@ -6,13 +6,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Panharoth06/raiwall/internal/adapters/outbound/storage/sqlite"
 	"github.com/Panharoth06/raiwall/internal/core/acl"
 )
 
-// CompileSnapshot queries relational SQLite configuration entities and compiles
+// CompileSnapshot queries relational configuration entities and compiles
 // an immutable, validated ConfigSnapshot.
-func CompileSnapshot(ctx context.Context, store *sqlite.Store) (*ConfigSnapshot, error) {
+func CompileSnapshot(ctx context.Context, store ControlStore) (*ConfigSnapshot, error) {
 	if store == nil {
 		return nil, fmt.Errorf("database store cannot be nil")
 	}
