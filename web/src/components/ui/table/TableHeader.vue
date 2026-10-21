@@ -8,7 +8,7 @@ const props = defineProps<{
 </script>
 
 <template>
-  <thead :class="cn('bg-[#14171d] text-slate-400 uppercase tracking-wider font-semibold border-b border-[#2d3440]', props.class)">
+  <thead :class="cn('bg-muted text-muted-foreground uppercase tracking-wider font-semibold border-b border-border', props.class)">
     <slot />
   </thead>
 </template>

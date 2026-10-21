@@ -44,6 +44,7 @@ type WaitingRoomSettings struct {
 	MaxQueueDepth         int64          `json:"max_queue_depth,omitempty"`
 	AdmissionRate         int64          `json:"admission_rate,omitempty"`
 	AdmissionTokenTTL     caddy.Duration `json:"admission_token_ttl,omitempty"`
+	TargetPaths           []string       `json:"target_paths,omitempty"`
 }
 
 // ExceptionSettings holds parameter-level exception rules for false-positive suppression.

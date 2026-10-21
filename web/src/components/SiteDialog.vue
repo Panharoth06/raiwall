@@ -86,11 +86,11 @@ const handleOpenChange = (openState: boolean) => {
 
 <template>
   <Dialog :open="open" @update:open="handleOpenChange">
-    <DialogContent class="max-w-2xl bg-[#1e222a] border-[#2d3440] p-6 max-h-[90vh] flex flex-col font-sans">
+    <DialogContent class="max-w-2xl max-h-[90vh] flex flex-col font-sans">
       <!-- Header -->
       <DialogHeader>
         <div class="flex items-center space-x-2.5">
-          <Globe class="w-5 h-5 text-slate-400" />
+          <Globe class="w-5 h-5 text-muted-foreground" />
           <DialogTitle>
             {{ site ? 'Edit Protected Site' : 'Add Protected Site' }}
           </DialogTitle>
@@ -101,7 +101,7 @@ const handleOpenChange = (openState: boolean) => {
       <div class="py-2 overflow-y-auto space-y-4 flex-1">
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Site Name</label>
+            <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Site Name</label>
             <Input
               v-model="formName"
               placeholder="e.g. Payment Gateway"
@@ -109,12 +109,12 @@ const handleOpenChange = (openState: boolean) => {
           </div>
 
           <div>
-            <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Operational Mode</label>
+            <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Operational Mode</label>
             <Select v-model="formMode">
-              <SelectTrigger class="w-full h-9 border-[#363D4C] bg-[#15181F] text-xs text-white">
+              <SelectTrigger class="w-full h-9">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent class="border-[#363D4C] bg-[#1E222A] text-white">
+              <SelectContent>
                 <SelectItem value="defense">Defense (Active Threat Blocking)</SelectItem>
                 <SelectItem value="audit">Audit (Log & Alert Only)</SelectItem>
                 <SelectItem value="offline">Offline (Maintenance 503)</SelectItem>
@@ -129,7 +129,7 @@ const handleOpenChange = (openState: boolean) => {
         </div>
 
         <div>
-          <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">
+          <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
             Hostnames (comma separated)
           </label>
           <Input
@@ -140,7 +140,7 @@ const handleOpenChange = (openState: boolean) => {
 
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Block HTTP Status</label>
+            <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Block HTTP Status</label>
             <Input
               v-model.number="formBlockCode"
               type="number"
@@ -148,7 +148,7 @@ const handleOpenChange = (openState: boolean) => {
           </div>
 
           <div>
-            <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Offline HTTP Status</label>
+            <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Offline HTTP Status</label>
             <Input
               v-model.number="formOfflineCode"
               type="number"
@@ -156,13 +156,13 @@ const handleOpenChange = (openState: boolean) => {
           </div>
         </div>
 
-        <div class="pt-2 border-t border-[#2d3440]">
+        <div class="pt-2 border-t border-border">
           <UpstreamPoolEditor v-model="formUpstreams" />
         </div>
       </div>
 
       <!-- Footer -->
-      <DialogFooter class="flex justify-end space-x-2 pt-4 border-t border-[#2d3440]">
+      <DialogFooter>
         <Button
           type="button"
           variant="secondary"

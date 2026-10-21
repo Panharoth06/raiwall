@@ -116,6 +116,26 @@ func (wm *WaitingRoomManager) InFlightCount() int64 {
 	return wm.activeInFlight.Load()
 }
 
+// MaxConcurrent returns the configured max concurrent in-flight capacity.
+func (wm *WaitingRoomManager) MaxConcurrent() int64 {
+	if wm == nil {
+		return 0
+	}
+	wm.mu.Lock()
+	defer wm.mu.Unlock()
+	return wm.maxConcurrent
+}
+
+// SetMaxConcurrent updates the max concurrent in-flight capacity in real time.
+func (wm *WaitingRoomManager) SetMaxConcurrent(limit int64) {
+	if wm == nil || limit <= 0 {
+		return
+	}
+	wm.mu.Lock()
+	defer wm.mu.Unlock()
+	wm.maxConcurrent = limit
+}
+
 // ShouldEnterWaitingRoom determines whether an unadmitted request must enter the queue.
 func (wm *WaitingRoomManager) ShouldEnterWaitingRoom() bool {
 	if wm == nil {

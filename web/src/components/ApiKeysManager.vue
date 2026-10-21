@@ -110,13 +110,13 @@ const handleDeleteKey = async (id: string) => {
     </div>
 
     <!-- Keys Table Container -->
-    <div class="bg-[#181b20] border border-[#2d3440] rounded-lg overflow-hidden">
-      <div v-if="keys.length === 0" class="p-8 text-center text-xs text-slate-400">
+    <div class="bg-card border border-border rounded-lg overflow-hidden">
+      <div v-if="keys.length === 0" class="p-8 text-center text-sm text-muted-foreground">
         No active API keys found. Generate a key to access the Huma REST API or MCP server.
       </div>
 
       <Table v-else>
-        <TableHeader class="bg-[#14171d]">
+        <TableHeader class="bg-muted">
           <TableRow>
             <TableHead class="font-mono text-[11px]">Key Name</TableHead>
             <TableHead class="font-mono text-[11px]">Prefix</TableHead>
@@ -127,23 +127,23 @@ const handleDeleteKey = async (id: string) => {
         </TableHeader>
         <TableBody>
           <TableRow v-for="key in keys" :key="key.id">
-            <TableCell class="font-medium text-white">{{ key.name }}</TableCell>
-            <TableCell class="font-mono text-[#38BDF8]">{{ key.prefix }}...</TableCell>
+            <TableCell class="font-medium text-foreground">{{ key.name }}</TableCell>
+            <TableCell class="font-mono text-primary">{{ key.prefix }}...</TableCell>
             <TableCell>
               <Badge
-                :variant="key.role === 'admin' ? 'amber' : 'secondary'"
+                :variant="key.role === 'admin' ? 'warning' : 'secondary'"
                 class="font-mono uppercase tracking-wider"
               >
                 {{ key.role }}
               </Badge>
             </TableCell>
-            <TableCell class="text-slate-400">{{ new Date(key.created_at).toLocaleDateString() }}</TableCell>
+            <TableCell class="text-muted-foreground">{{ new Date(key.created_at).toLocaleDateString() }}</TableCell>
             <TableCell class="text-right">
               <Button
                 variant="ghost"
                 size="icon"
                 @click="handleDeleteKey(key.id)"
-                class="h-7 w-7 text-slate-400 hover:text-red-400"
+                class="h-7 w-7 text-muted-foreground hover:text-threat"
                 title="Revoke key"
               >
                 <Trash2 class="w-3.5 h-3.5" />
@@ -156,10 +156,10 @@ const handleDeleteKey = async (id: string) => {
 
     <!-- Generate Key Modal -->
     <Dialog :open="modalOpen" @update:open="modalOpen = $event">
-      <DialogContent class="max-w-md bg-[#1e222a] border-[#2d3440] p-6 font-sans">
+      <DialogContent class="max-w-md">
         <DialogHeader>
           <div class="flex items-center space-x-2">
-            <Key class="w-5 h-5 text-slate-400" />
+            <Key class="w-5 h-5 text-muted-foreground" />
             <DialogTitle>Generate API Bearer Token</DialogTitle>
           </div>
         </DialogHeader>
@@ -168,7 +168,7 @@ const handleDeleteKey = async (id: string) => {
           <div v-if="!generatedToken">
             <div class="space-y-3">
               <div>
-                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Key Name</label>
+                <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Key Name</label>
                 <Input
                   v-model="newKeyName"
                   placeholder="e.g. CI/CD Deployer or Claude Desktop"
@@ -176,12 +176,12 @@ const handleDeleteKey = async (id: string) => {
               </div>
 
               <div>
-                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">RBAC Role</label>
+                <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">RBAC Role</label>
                 <Select v-model="newKeyRole">
-                  <SelectTrigger class="w-full h-9 border-[#363D4C] bg-[#15181F] text-xs text-white">
+                  <SelectTrigger class="w-full h-9">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent class="border-[#363D4C] bg-[#1E222A] text-white">
+                  <SelectContent>
                     <SelectItem value="viewer">Viewer (Read-only status & metrics)</SelectItem>
                     <SelectItem value="admin">Admin (Read/Write mutating operations)</SelectItem>
                   </SelectContent>
@@ -193,7 +193,7 @@ const handleDeleteKey = async (id: string) => {
               </div>
 
               <div>
-                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Expiration (Days)</label>
+                <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Expiration (Days)</label>
                 <Input
                   v-model.number="newKeyExpires"
                   type="number"
@@ -203,7 +203,7 @@ const handleDeleteKey = async (id: string) => {
               </div>
             </div>
 
-            <DialogFooter class="flex justify-end space-x-2 pt-4 border-t border-[#2d3440]">
+            <DialogFooter>
               <Button
                 type="button"
                 variant="secondary"
@@ -221,7 +221,7 @@ const handleDeleteKey = async (id: string) => {
           </div>
 
           <div v-else class="space-y-4">
-            <div class="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs text-amber-300">
+            <div class="p-3 bg-warning/10 border border-warning/30 rounded-lg text-xs text-warning">
               <strong>Make sure to copy your API key now.</strong> You won't be able to see it again!
             </div>
 
@@ -229,20 +229,20 @@ const handleDeleteKey = async (id: string) => {
               <Input
                 readonly
                 :model-value="generatedToken"
-                class="text-[#38BDF8] font-mono text-xs pr-10"
+                class="text-primary font-mono text-xs pr-10"
               />
               <Button
                 variant="ghost"
                 size="icon"
                 @click="copyToken"
-                class="absolute right-1 top-1 h-7 w-7 text-slate-400 hover:text-white"
+                class="absolute right-1 top-1 h-7 w-7 text-muted-foreground hover:text-foreground"
                 title="Copy to clipboard"
               >
                 <component :is="copied ? Check : Copy" class="w-4 h-4" />
               </Button>
             </div>
 
-            <DialogFooter class="flex justify-end pt-2 border-t border-[#2d3440]">
+            <DialogFooter class="flex justify-end pt-2 border-t border-border">
               <Button
                 type="button"
                 @click="modalOpen = false"

@@ -23,7 +23,7 @@ const forwarded = useForwardPropsEmits(props, emits)
     <SelectContent
       v-bind="{ ...forwarded, ...$attrs }"
       :class="[
-        'relative z-50 max-h-96 min-w-[8rem] overflow-hidden rounded-md border border-[#363D4C] bg-[#1E222A] text-white shadow-xl',
+        'relative z-50 max-h-96 min-w-[8rem] overflow-hidden rounded-md border border-border bg-popover text-popover-foreground shadow-xl',
         props.class
       ]"
     >

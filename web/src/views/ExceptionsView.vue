@@ -87,15 +87,15 @@ const handleDelete = async (id: string) => {
 </script>
 
 <template>
-  <div class="h-full flex flex-col space-y-4 p-6 bg-[#0d0f14] text-zinc-100 rounded-xl border border-zinc-800 shadow-2xl font-sans overflow-hidden">
+  <div class="h-full flex flex-col space-y-4 p-6 bg-card text-card-foreground rounded-xl border border-border shadow-2xl font-sans overflow-hidden">
     <!-- Header -->
     <div class="flex items-center justify-between shrink-0">
       <div>
-        <h1 class="text-sm font-semibold uppercase tracking-wider text-white flex items-center gap-2">
-          <Shield class="w-4 h-4 text-slate-400" />
+        <h1 class="text-sm font-semibold uppercase tracking-wider text-foreground flex items-center gap-2">
+          <Shield class="w-4 h-4 text-muted-foreground" />
           <span>False-Positive Exception Rules</span>
         </h1>
-        <p class="text-[11px] text-zinc-400 mt-0.5">
+        <p class="text-sm text-muted-foreground mt-1 leading-relaxed">
           Granular parameter-level bypasses: Host + Path + Method + Location + Param Name.
         </p>
       </div>
@@ -110,11 +110,11 @@ const handleDelete = async (id: string) => {
     </div>
 
     <!-- Exceptions Table Container -->
-    <div class="flex-1 min-h-0 bg-[#12151c] border border-zinc-800 rounded-lg overflow-y-auto">
+    <div class="flex-1 min-h-0 bg-card border border-border rounded-lg overflow-y-auto">
       <div v-if="configStore.exceptions.length === 0" class="p-12 text-center">
-        <Sparkles class="w-10 h-10 text-slate-400 mx-auto mb-3" />
-        <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-300">No exception rules defined</h3>
-        <p class="text-[11px] text-slate-400 mt-1 mb-4">
+        <Sparkles class="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-foreground">No exception rules defined</h3>
+        <p class="text-sm text-muted-foreground mt-1 mb-4 leading-relaxed">
           Suppress false-positives without disabling the WAF globally.
         </p>
         <Button
@@ -127,7 +127,7 @@ const handleDelete = async (id: string) => {
       </div>
 
       <Table v-else>
-        <TableHeader class="sticky top-0 z-10 bg-[#14171d]">
+        <TableHeader class="sticky top-0 z-10 bg-muted">
           <TableRow>
             <TableHead class="font-mono text-[11px]">Host / Path</TableHead>
             <TableHead class="font-mono text-[11px]">Method</TableHead>
@@ -141,24 +141,24 @@ const handleDelete = async (id: string) => {
         <TableBody>
           <TableRow v-for="rule in configStore.exceptions" :key="rule.id">
             <TableCell>
-              <span class="text-white font-medium block font-mono">{{ rule.path }}</span>
-              <span class="text-[10px] text-slate-400 font-mono">{{ rule.host || '*' }}</span>
+              <span class="text-foreground font-medium block font-mono">{{ rule.path }}</span>
+              <span class="text-[10px] text-muted-foreground font-mono">{{ rule.host || '*' }}</span>
             </TableCell>
             <TableCell class="font-mono text-[11px]">
-              <span class="px-2 py-0.5 bg-[#17223B] border border-[#2574F5]/30 rounded text-[#38BDF8]">
+              <span class="px-2 py-0.5 bg-primary/10 border border-primary/30 rounded text-primary">
                 {{ rule.method }}
               </span>
             </TableCell>
             <TableCell>
-              <span class="capitalize text-slate-300 font-mono text-[11px]">{{ rule.location }}</span>
+              <span class="capitalize text-foreground font-mono text-[11px]">{{ rule.location }}</span>
             </TableCell>
-            <TableCell class="font-mono text-emerald-400 font-semibold">
+            <TableCell class="font-mono text-success font-semibold">
               {{ rule.param_name }}
             </TableCell>
-            <TableCell class="font-mono text-slate-400 text-[11px]">
+            <TableCell class="font-mono text-muted-foreground text-[11px]">
               {{ rule.rule_id || 'ALL' }}
             </TableCell>
-            <TableCell class="text-slate-400 truncate max-w-xs text-[11px]">
+            <TableCell class="text-muted-foreground truncate max-w-xs text-[11px]">
               {{ rule.reason }}
             </TableCell>
             <TableCell class="text-right space-x-1">
@@ -167,7 +167,7 @@ const handleDelete = async (id: string) => {
                 size="icon"
                 @click="openTestSimulator(rule)"
                 title="Test with simulator"
-                class="h-7 w-7 text-slate-400 hover:text-white"
+                class="h-7 w-7 text-muted-foreground hover:text-foreground"
               >
                 <Play class="w-3.5 h-3.5" />
               </Button>
@@ -176,7 +176,7 @@ const handleDelete = async (id: string) => {
                 size="icon"
                 @click="handleDelete(rule.id)"
                 title="Delete exception"
-                class="h-7 w-7 text-slate-400 hover:text-red-400"
+                class="h-7 w-7 text-muted-foreground hover:text-threat"
               >
                 <Trash2 class="w-3.5 h-3.5" />
               </Button>
@@ -188,10 +188,10 @@ const handleDelete = async (id: string) => {
 
     <!-- Add Exception Modal -->
     <Dialog :open="showAddModal" @update:open="showAddModal = $event">
-      <DialogContent class="max-w-lg bg-[#1e222a] border-[#2d3440] p-6 font-sans">
+      <DialogContent class="max-w-lg">
         <DialogHeader>
           <div class="flex items-center space-x-2.5">
-            <Shield class="w-5 h-5 text-slate-400" />
+            <Shield class="w-5 h-5 text-muted-foreground" />
             <DialogTitle>New Parameter Exception Rule</DialogTitle>
           </div>
         </DialogHeader>
@@ -199,14 +199,14 @@ const handleDelete = async (id: string) => {
         <div class="space-y-4 py-2">
           <div class="grid grid-cols-2 gap-4">
             <div>
-              <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Host (Optional)</label>
+              <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Host (Optional)</label>
               <Input
                 v-model="newHost"
                 placeholder="* or api.example.com"
               />
             </div>
             <div>
-              <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Path</label>
+              <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Path</label>
               <Input
                 v-model="newPath"
                 placeholder="/api/v1/search"
@@ -216,12 +216,12 @@ const handleDelete = async (id: string) => {
 
           <div class="grid grid-cols-2 gap-4">
             <div>
-              <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">HTTP Method</label>
+              <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">HTTP Method</label>
               <Select v-model="newMethod">
-                <SelectTrigger class="w-full h-9 border-[#363D4C] bg-[#15181F] text-xs text-white">
+                <SelectTrigger class="w-full h-9">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent class="border-[#363D4C] bg-[#1E222A] text-white">
+                <SelectContent>
                   <SelectItem value="ALL">ALL</SelectItem>
                   <SelectItem value="GET">GET</SelectItem>
                   <SelectItem value="POST">POST</SelectItem>
@@ -238,12 +238,12 @@ const handleDelete = async (id: string) => {
               </select>
             </div>
             <div>
-              <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Parameter Location</label>
+              <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Parameter Location</label>
               <Select v-model="newLocation">
-                <SelectTrigger class="w-full h-9 border-[#363D4C] bg-[#15181F] text-xs text-white">
+                <SelectTrigger class="w-full h-9">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent class="border-[#363D4C] bg-[#1E222A] text-white">
+                <SelectContent>
                   <SelectItem value="query">Query Parameter</SelectItem>
                   <SelectItem value="header">Request Header</SelectItem>
                   <SelectItem value="cookie">Cookie</SelectItem>
@@ -261,14 +261,14 @@ const handleDelete = async (id: string) => {
 
           <div class="grid grid-cols-2 gap-4">
             <div>
-              <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Parameter Name</label>
+              <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Parameter Name</label>
               <Input
                 v-model="newParamName"
                 placeholder="e.g. search_term"
               />
             </div>
             <div>
-              <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Rule ID (or ALL)</label>
+              <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Rule ID (or ALL)</label>
               <Input
                 v-model="newRuleId"
                 placeholder="ALL or SQLI_*"
@@ -277,7 +277,7 @@ const handleDelete = async (id: string) => {
           </div>
 
           <div>
-            <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Reason / Context</label>
+            <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Reason / Context</label>
             <Input
               v-model="newReason"
               placeholder="e.g. Valid SQL editor payload in internal tool"
@@ -285,7 +285,7 @@ const handleDelete = async (id: string) => {
           </div>
         </div>
 
-        <DialogFooter class="flex justify-end space-x-2 pt-4 border-t border-[#2d3440]">
+        <DialogFooter>
           <Button
             type="button"
             variant="secondary"

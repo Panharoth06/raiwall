@@ -5,12 +5,38 @@ import (
 	"net/http"
 
 	"github.com/Panharoth06/raiwall/internal/core/bot"
+	"github.com/Panharoth06/raiwall/internal/core/control"
 	"github.com/Panharoth06/raiwall/internal/core/rate"
 )
 
 // handleWaitingRoom checks virtual waiting room admission and returns a lease release func, or handles the queue response.
 func (m *Middleware) handleWaitingRoom(w http.ResponseWriter, r *http.Request, clientIP net.IP, ja4 string) (func(), bool, error) {
 	if m.waitingRoom == nil {
+		return nil, false, nil
+	}
+
+	snap := control.LoadSnapshot()
+	if snap != nil {
+		if rp, found := snap.GetRatePolicyForHost(r.Host); found && rp != nil {
+			if !rp.WaitingRoomEnabled {
+				return nil, false, nil
+			}
+			if len(rp.WaitingRoomPaths) > 0 {
+				matched := false
+				for _, p := range rp.WaitingRoomPaths {
+					if rate.MatchesWaitingRoomPathPrefix(r.URL.Path, p) {
+						matched = true
+						break
+					}
+				}
+				if !matched {
+					return nil, false, nil
+				}
+			}
+		} else if !m.waitingRoom.MatchesPath(r.URL.Path) {
+			return nil, false, nil
+		}
+	} else if !m.waitingRoom.MatchesPath(r.URL.Path) {
 		return nil, false, nil
 	}
 
@@ -21,6 +47,18 @@ func (m *Middleware) handleWaitingRoom(w http.ResponseWriter, r *http.Request, c
 				if !admitted {
 					return nil, true, rate.RenderWaitingRoomPage(w, qCookie.Value, pos, waitSecs, r.URL.RequestURI())
 				}
+				// Client has been admitted from queue: grant clearance cookie and proceed
+				token := m.waitingRoom.GenerateAdmissionToken(clientIP, ja4, 0)
+				http.SetCookie(w, &http.Cookie{
+					Name:     rate.WaitingRoomClearanceCookie,
+					Value:    token,
+					Path:     "/",
+					SameSite: http.SameSiteLaxMode,
+					HttpOnly: true,
+				})
+				m.waitingRoom.RemoveEntry(qCookie.Value)
+				release := m.waitingRoom.AcquireLease()
+				return release, false, nil
 			}
 		}
 

@@ -103,11 +103,11 @@ const handleOpenChange = (openState: boolean) => {
 
 <template>
   <Dialog :open="open" @update:open="handleOpenChange">
-    <DialogContent class="max-w-xl bg-[#1e222a] border-[#2d3440] p-6 font-sans">
+    <DialogContent class="max-w-xl">
       <!-- Header -->
       <DialogHeader>
         <div class="flex items-center space-x-2.5">
-          <Code class="w-5 h-5 text-slate-400" />
+          <Code class="w-5 h-5 text-muted-foreground" />
           <DialogTitle>
             {{ rule ? 'Edit ACL Rule' : 'New ACL Bytecode Rule' }}
           </DialogTitle>
@@ -117,7 +117,7 @@ const handleOpenChange = (openState: boolean) => {
       <!-- Body -->
       <div class="py-2 space-y-4">
         <div>
-          <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Rule Name</label>
+          <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Rule Name</label>
           <Input
             v-model="formName"
             placeholder="e.g. Block External Admin Access"
@@ -126,7 +126,7 @@ const handleOpenChange = (openState: boolean) => {
 
         <div>
           <div class="flex items-center justify-between mb-1">
-            <label class="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+            <label class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               Boolean Expression (expr-lang)
             </label>
             <Button
@@ -135,7 +135,7 @@ const handleOpenChange = (openState: boolean) => {
               size="sm"
               :disabled="validating"
               @click="validateSyntax"
-              class="h-6 text-[11px] text-slate-300 hover:text-white px-2"
+              class="h-6 text-[11px] text-muted-foreground hover:text-foreground px-2"
             >
               {{ validating ? 'Compiling...' : 'Verify Syntax' }}
             </Button>
@@ -143,18 +143,18 @@ const handleOpenChange = (openState: boolean) => {
           <textarea
             v-model="formExpr"
             rows="3"
-            class="w-full px-3 py-2 bg-[#181b20] border border-[#2d3440] rounded-md text-slate-200 font-mono text-xs focus:outline-none focus:border-[#2574F5] focus:ring-1 focus:ring-[#2574F5] transition-colors"
+            class="w-full px-3 py-2 bg-card border border-input rounded-md text-foreground placeholder:text-muted-foreground font-mono text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-ring transition-colors"
             placeholder='ClientIP in "192.168.0.0/16" && Method == "POST"'
           ></textarea>
 
           <!-- Syntax verification banner -->
           <div v-if="validationResult" class="mt-2 text-xs flex items-center space-x-2">
-            <div v-if="validationResult.valid" class="text-emerald-400 flex items-center space-x-1.5">
-              <CheckCircle2 class="w-4 h-4 text-slate-400" />
+            <div v-if="validationResult.valid" class="text-success flex items-center space-x-1.5">
+              <CheckCircle2 class="w-4 h-4 text-success" />
               <span>Expression compiled cleanly (sub-15ns bytecode verified)</span>
             </div>
-            <div v-else class="text-rose-400 flex items-center space-x-1.5 font-mono text-[11px]">
-              <AlertCircle class="w-4 h-4 flex-shrink-0 text-slate-400" />
+            <div v-else class="text-threat flex items-center space-x-1.5 font-mono text-[11px]">
+              <AlertCircle class="w-4 h-4 flex-shrink-0 text-threat" />
               <span>{{ validationResult.error }}</span>
             </div>
           </div>
@@ -162,12 +162,12 @@ const handleOpenChange = (openState: boolean) => {
 
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Action</label>
+            <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Action</label>
             <Select v-model="formAction">
-              <SelectTrigger class="w-full h-9 border-[#363D4C] bg-[#15181F] text-xs text-white">
+              <SelectTrigger class="w-full h-9">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent class="border-[#363D4C] bg-[#1E222A] text-white">
+              <SelectContent>
                 <SelectItem value="block">Block (403 Forbidden)</SelectItem>
                 <SelectItem value="allow">Allow (Bypass Deep Inspection)</SelectItem>
                 <SelectItem value="redirect">Redirect (302 Found)</SelectItem>
@@ -181,7 +181,7 @@ const handleOpenChange = (openState: boolean) => {
           </div>
 
           <div>
-            <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Evaluation Priority</label>
+            <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Evaluation Priority</label>
             <Input
               v-model.number="formPriority"
               type="number"
@@ -192,7 +192,7 @@ const handleOpenChange = (openState: boolean) => {
         </div>
 
         <div v-if="formAction === 'redirect'">
-          <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Redirect Target URL</label>
+          <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Redirect Target URL</label>
           <Input
             v-model="formRedirectUrl"
             placeholder="https://auth.example.com/login"
@@ -201,7 +201,7 @@ const handleOpenChange = (openState: boolean) => {
       </div>
 
       <!-- Footer -->
-      <DialogFooter class="flex justify-end space-x-2 pt-4 border-t border-[#2d3440]">
+      <DialogFooter>
         <Button
           type="button"
           variant="secondary"

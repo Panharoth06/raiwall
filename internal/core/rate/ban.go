@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"sort"
 	"sync"
 	"time"
 
@@ -19,6 +18,9 @@ type BanManager struct {
 	once         sync.Once
 	logger       *zap.Logger
 	storage      RateStorage
+	banStorage   BanStorage
+	onBan        func(entry *BanEntry)
+	onUnblock    func(target string)
 	onUnblockAll func()
 }
 
@@ -37,6 +39,11 @@ func NewBanManager(logger *zap.Logger) *BanManager {
 
 // Ban registers an auto-ban for composite ClientIP + JA4.
 func (bm *BanManager) Ban(ip net.IP, ja4 string, ttl time.Duration, reason string) *BanEntry {
+	return bm.BanWithSite(ip, ja4, ttl, reason, "")
+}
+
+// BanWithSite registers an auto-ban for composite ClientIP + JA4 with optional siteID.
+func (bm *BanManager) BanWithSite(ip net.IP, ja4 string, ttl time.Duration, reason string, siteID string) *BanEntry {
 	if bm == nil {
 		return nil
 	}
@@ -59,6 +66,7 @@ func (bm *BanManager) Ban(ip net.IP, ja4 string, ttl time.Duration, reason strin
 		ClientIP:         ipStr,
 		JA4:              ja4,
 		Reason:           reason,
+		SiteID:           siteID,
 		Duration:         ttl,
 		RemainingSeconds: int64(ttl.Seconds()),
 		BannedAt:         now,
@@ -67,7 +75,16 @@ func (bm *BanManager) Ban(ip net.IP, ja4 string, ttl time.Duration, reason strin
 
 	bm.mu.Lock()
 	bm.entries[key] = entry
+	bs := bm.banStorage
+	onBan := bm.onBan
 	bm.mu.Unlock()
+
+	if bs != nil {
+		_ = bs.StoreBan(context.Background(), entry)
+	}
+	if onBan != nil {
+		onBan(entry)
+	}
 
 	if bm.logger != nil {
 		bm.logger.Warn("Client auto-banned",
@@ -75,6 +92,7 @@ func (bm *BanManager) Ban(ip net.IP, ja4 string, ttl time.Duration, reason strin
 			zap.String("client_ip", ipStr),
 			zap.String("ja4", ja4),
 			zap.String("reason", reason),
+			zap.String("site_id", siteID),
 			zap.Duration("ttl", ttl),
 		)
 	}
@@ -160,100 +178,6 @@ func (bm *BanManager) Count() int {
 	bm.mu.RLock()
 	defer bm.mu.RUnlock()
 	return len(bm.entries)
-}
-
-// SetRateStorage configures the distributed storage layer for ban eviction.
-func (bm *BanManager) SetRateStorage(st RateStorage) {
-	if bm == nil {
-		return
-	}
-	bm.mu.Lock()
-	defer bm.mu.Unlock()
-	bm.storage = st
-}
-
-// SetOnUnblockAll sets a callback invoked when emergency unblock all is triggered.
-func (bm *BanManager) SetOnUnblockAll(fn func()) {
-	if bm == nil {
-		return
-	}
-	bm.mu.Lock()
-	defer bm.mu.Unlock()
-	bm.onUnblockAll = fn
-}
-
-// ListBans returns all currently active, non-expired bans with calculated remaining duration.
-func (bm *BanManager) ListBans() []*BanEntry {
-	if bm == nil {
-		return nil
-	}
-	bm.mu.RLock()
-	defer bm.mu.RUnlock()
-
-	now := time.Now()
-	res := make([]*BanEntry, 0, len(bm.entries))
-	for _, e := range bm.entries {
-		if now.Before(e.ExpiresAt) {
-			clone := *e
-			clone.RemainingSeconds = int64(time.Until(e.ExpiresAt).Seconds())
-			if clone.RemainingSeconds < 0 {
-				clone.RemainingSeconds = 0
-			}
-			res = append(res, &clone)
-		}
-	}
-	sort.Slice(res, func(i, j int) bool {
-		return res[i].BannedAt.After(res[j].BannedAt)
-	})
-	return res
-}
-
-// Release removes an active ban by key or IP and evicts from underlying rate storage.
-func (bm *BanManager) Release(keyOrIP string) bool {
-	if bm == nil || keyOrIP == "" {
-		return false
-	}
-	bm.mu.Lock()
-	found := false
-	if _, ok := bm.entries[keyOrIP]; ok {
-		delete(bm.entries, keyOrIP)
-		found = true
-	}
-	for k, e := range bm.entries {
-		if e.ClientIP == keyOrIP || e.Key == keyOrIP {
-			delete(bm.entries, k)
-			found = true
-		}
-	}
-	st := bm.storage
-	bm.mu.Unlock()
-
-	if st != nil {
-		_ = st.Reset(context.Background(), keyOrIP)
-	}
-	return found
-}
-
-// ReleaseAll purges the entire active ban registry and invokes the unblock broadcast callback.
-func (bm *BanManager) ReleaseAll() int {
-	if bm == nil {
-		return 0
-	}
-	bm.mu.Lock()
-	count := len(bm.entries)
-	bm.entries = make(map[string]*BanEntry)
-	cb := bm.onUnblockAll
-	bm.mu.Unlock()
-
-	if cb != nil {
-		cb()
-	}
-	return count
-}
-
-// Clear removes all active bans.
-func (bm *BanManager) Clear() {
-	_ = bm.ReleaseAll()
 }
 
 // EvictExpired sweeps the ban store and purges expired entries.

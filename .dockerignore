@@ -4,3 +4,9 @@ bin/
 tasks/
 .DS_Store
 scratch/
+node_modules/
+web/node_modules/
+web-draft/
+web/dist/
+.agents/
+graphify-out/

@@ -248,4 +248,108 @@ func TestEndToEndRateLimit_WaitingRoomAndConcurrency(t *testing.T) {
 			t.Errorf("expected queue depth 1 on refresh with cookie, got %d", depth)
 		}
 	})
+
+	t.Run("Path-Level Targeting: Only configured path prefixes enter waiting room", func(t *testing.T) {
+		wm := f.mw.WaitingRoom()
+		if wm == nil {
+			t.Fatal("waiting room not provisioned")
+		}
+		defer wm.Clear()
+		defer wm.SetTargetPaths(nil)
+
+		// Set target paths: only queue /tickets/* and /checkout
+		wm.SetTargetPaths([]string{"/tickets/*", "/checkout"})
+
+		// Saturate waiting room with active leases
+		rel1 := wm.AcquireLease()
+		defer rel1()
+		rel2 := wm.AcquireLease()
+		defer rel2()
+		rel3 := wm.AcquireLease()
+		defer rel3()
+
+		clientIP := "198.51.100.99"
+		clientJA4 := "t13d1516h2_path_target_test"
+
+		// 1. Request to unconfigured path (/dashboard) bypasses waiting room directly to upstream
+		reqNonTarget := httptest.NewRequest(http.MethodGet, "https://example.com/dashboard", nil)
+		reqNonTarget.Header.Set("Accept", "text/html,application/xhtml+xml")
+		reqNonTarget.Header.Set("User-Agent", "Mozilla/5.0")
+		reqNonTarget.Header.Set("X-Real-IP", clientIP)
+		reqNonTarget.Header.Set("X-JA4-Fingerprint", clientJA4)
+		recNonTarget := httptest.NewRecorder()
+
+		_ = f.mw.ServeHTTP(recNonTarget, reqNonTarget, f.next)
+		if recNonTarget.Code != http.StatusOK {
+			t.Errorf("expected non-targeted path /dashboard to return 200, got %d", recNonTarget.Code)
+		}
+
+		// 2. Request to targeted path (/tickets/buy) enters waiting room and gets HTTP 465
+		reqTarget := httptest.NewRequest(http.MethodGet, "https://example.com/tickets/buy", nil)
+		reqTarget.Header.Set("Accept", "text/html,application/xhtml+xml")
+		reqTarget.Header.Set("User-Agent", "Mozilla/5.0")
+		reqTarget.Header.Set("X-Real-IP", clientIP)
+		reqTarget.Header.Set("X-JA4-Fingerprint", clientJA4)
+		recTarget := httptest.NewRecorder()
+
+		_ = f.mw.ServeHTTP(recTarget, reqTarget, f.next)
+		if recTarget.Code != rate.StatusWaitingRoom {
+			t.Errorf("expected targeted path /tickets/buy to return %d, got %d", rate.StatusWaitingRoom, recTarget.Code)
+		}
+
+		// 3. Request to /tickets_cancel must NOT match /tickets/* and bypass waiting room
+		reqBoundary := httptest.NewRequest(http.MethodGet, "https://example.com/tickets_cancel", nil)
+		reqBoundary.Header.Set("Accept", "text/html,application/xhtml+xml")
+		reqBoundary.Header.Set("User-Agent", "Mozilla/5.0")
+		reqBoundary.Header.Set("X-Real-IP", clientIP)
+		reqBoundary.Header.Set("X-JA4-Fingerprint", clientJA4)
+		recBoundary := httptest.NewRecorder()
+
+		_ = f.mw.ServeHTTP(recBoundary, reqBoundary, f.next)
+		if recBoundary.Code != http.StatusOK {
+			t.Errorf("expected boundary path /tickets_cancel to return 200, got %d", recBoundary.Code)
+		}
+
+		// 4. Extract queue cookie from recTarget, admit entry, and verify next request passes with clearance
+		cookies := recTarget.Result().Cookies()
+		var qCookie *http.Cookie
+		for _, c := range cookies {
+			if c.Name == rate.WaitingRoomQueueCookie {
+				qCookie = c
+				break
+			}
+		}
+		if qCookie == nil {
+			t.Fatal("expected queue cookie on HTTP 465 response")
+		}
+
+		// Admit the queued entry
+		wm.AdmitEntry(qCookie.Value)
+
+		// Next request with queue cookie must be granted admission clearance and return 200 OK
+		reqAdmitted := httptest.NewRequest(http.MethodGet, "https://example.com/tickets/buy", nil)
+		reqAdmitted.Header.Set("Accept", "text/html,application/xhtml+xml")
+		reqAdmitted.Header.Set("User-Agent", "Mozilla/5.0")
+		reqAdmitted.Header.Set("X-Real-IP", clientIP)
+		reqAdmitted.Header.Set("X-JA4-Fingerprint", clientJA4)
+		reqAdmitted.AddCookie(qCookie)
+		recAdmitted := httptest.NewRecorder()
+
+		_ = f.mw.ServeHTTP(recAdmitted, reqAdmitted, f.next)
+		if recAdmitted.Code != http.StatusOK {
+			t.Errorf("expected admitted client to pass through with 200, got %d", recAdmitted.Code)
+		}
+
+		// Verify clearance cookie was set
+		foundClearance := false
+		for _, c := range recAdmitted.Result().Cookies() {
+			if c.Name == rate.WaitingRoomClearanceCookie {
+				foundClearance = true
+				break
+			}
+		}
+		if !foundClearance {
+			t.Errorf("expected clearance cookie to be set for admitted client")
+		}
+	})
 }

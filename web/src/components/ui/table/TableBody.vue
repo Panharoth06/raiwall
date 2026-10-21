@@ -8,7 +8,7 @@ const props = defineProps<{
 </script>
 
 <template>
-  <tbody :class="cn('divide-y divide-[#2d3440]/60 [&_tr:last-child]:border-0', props.class)">
+  <tbody :class="cn('divide-y divide-border [&_tr:last-child]:border-0', props.class)">
     <slot />
   </tbody>
 </template>

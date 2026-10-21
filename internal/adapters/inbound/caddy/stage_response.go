@@ -101,6 +101,9 @@ func (m *Middleware) forwardAndInspectResponse(
 		}
 	} else if next != nil {
 		nextErr = next.ServeHTTP(interceptor, forwardReq)
+	} else {
+		interceptor.WriteHeader(http.StatusBadGateway)
+		_, _ = interceptor.Write([]byte("Raiwall Gateway: No upstream backend configured for this host. Configure protected applications in the Web Dashboard at /.raiwall/#/sites\n"))
 	}
 
 	// Record clean transit traffic to passive API cataloger

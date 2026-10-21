@@ -49,7 +49,7 @@
 		}
 
 		acl {
-			threat_feed emerging_threats /etc/raiwall/feeds/emerging_threats.txt
+			threat_feed emerging_threats examples/feeds/emerging_threats.txt
 			geoip_country_db /usr/share/GeoIP/GeoLite2-Country.mmdb
 			geoip_asn_db /usr/share/GeoIP/GeoLite2-ASN.mmdb
 
@@ -101,11 +101,11 @@
 		}
 	}
 
-	reverse_proxy 127.0.0.1:9001 127.0.0.1:9002 {
-		lb_policy weighted_round_robin 3 1
-		health_uri /healthz
-		health_interval 2s
-		health_timeout 1s
-		health_status 200
-	}
+	# Optional: Static reverse proxy fallback if not managing upstreams in Web UI.
+	# When managing upstreams via the Web UI (Applications -> Add Protected Site),
+	# leave this omitted; Raiwall dynamically routes to your configured backends.
+	#
+	# reverse_proxy 127.0.0.1:9001 127.0.0.1:9002 {
+	# 	lb_policy weighted_round_robin 3 1
+	# }
 }

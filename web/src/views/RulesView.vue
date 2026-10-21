@@ -53,7 +53,7 @@ const handleTabChange = (tabId: string) => {
 <template>
   <div class="h-full flex flex-col space-y-4 font-sans">
     <!-- Sub-tab switcher -->
-    <div class="border-b border-[#2d3440] pb-1.5 shrink-0">
+    <div class="border-b border-border pb-1.5 shrink-0">
       <Tabs
         :tabs="tabs"
         :active-tab="activeTab"

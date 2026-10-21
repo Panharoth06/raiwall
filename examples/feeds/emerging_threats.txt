@@ -1,0 +1,4 @@
+# Emerging Threats - Example local threat feed
+198.51.100.50
+203.0.113.100
+192.0.2.10

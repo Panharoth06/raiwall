@@ -1,0 +1,63 @@
+# ==============================================================================
+# All-In-One Container: Raiwall WAF + Embedded Frontend + PostgreSQL 18
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# Stage 1: Build Vue 3 Frontend
+# ------------------------------------------------------------------------------
+FROM node:22-alpine AS frontend-builder
+
+WORKDIR /app/web
+# Enable corepack and prepare pnpm (pinned to v9 to match lockfileVersion 9.0)
+RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
+
+# Copy dependency manifests and install dependencies
+COPY web/package.json web/pnpm-lock.yaml* web/.npmrc* ./
+RUN pnpm install --frozen-lockfile
+COPY web/ ./
+RUN pnpm build
+
+# ------------------------------------------------------------------------------
+# Stage 2: Build Go WAF Binary
+# ------------------------------------------------------------------------------
+FROM golang:alpine AS backend-builder
+
+WORKDIR /src
+RUN apk add --no-cache git ca-certificates
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Patch Caddy v2.8.4 for Go 1.27+ compatibility (encoding/json.RawMessage is jsontext.Value)
+RUN chmod -R u+w /go/pkg/mod/github.com/caddyserver/caddy/v2@v2.8.4 && \
+    sed -i 's/typ.PkgPath() == "encoding\/json" && typ.Name() == "RawMessage"/(typ.PkgPath() == "encoding\/json" \&\& typ.Name() == "RawMessage") || (typ.PkgPath() == "encoding\/json\/jsontext" \&\& typ.Name() == "Value")/' /go/pkg/mod/github.com/caddyserver/caddy/v2@v2.8.4/modules.go
+COPY . .
+COPY --from=frontend-builder /app/web/dist ./web/dist
+
+ARG VERSION=0.1.0
+ARG COMMIT=docker
+RUN CGO_ENABLED=0 GOOS=linux go build \
+    -ldflags="-s -w -X main.Version=${VERSION} -X main.Commit=${COMMIT}" \
+    -trimpath \
+    -o /bin/raiwall ./cmd/raiwall
+
+# ------------------------------------------------------------------------------
+# Stage 3: Official PostgreSQL 18 Alpine Base with Raiwall WAF
+# ------------------------------------------------------------------------------
+FROM postgres:18-alpine
+
+RUN apk add --no-cache ca-certificates tzdata curl su-exec
+
+ENV PGDATA=/var/lib/postgresql/data/pgdata
+RUN mkdir -p /var/lib/postgresql/data /run/postgresql /etc/raiwall /var/lib/raiwall /var/log/raiwall \
+    && chown -R postgres:postgres /var/lib/postgresql /run/postgresql
+
+COPY --from=backend-builder /bin/raiwall /usr/local/bin/raiwall
+COPY examples/Caddyfile /etc/raiwall/Caddyfile
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+EXPOSE 8080 8443 5432
+
+VOLUME ["/var/lib/postgresql/data", "/var/lib/raiwall"]
+
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]

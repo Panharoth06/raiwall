@@ -231,6 +231,7 @@ import SitesView from '@/views/SitesView.vue';
 import ExceptionsView from '@/views/ExceptionsView.vue';
 import ACLsView from '@/views/ACLsView.vue';
 import PoliciesView from '@/views/PoliciesView.vue';
+import HttpFloodView from '@/views/HttpFloodView.vue';
 import SettingsView from '@/views/SettingsView.vue';
 import DeploymentsView from '@/views/DeploymentsView.vue';
 import RulesView from '@/views/RulesView.vue';
@@ -246,7 +247,7 @@ export const router = createSimpleRouter([
   { path: '/inspector', name: 'inspector', component: AttacksView },
   { path: '/allow-deny', name: 'allow-deny', component: ACLsView },
   { path: '/acls', name: 'acls', component: ACLsView },
-  { path: '/http-flood', name: 'http-flood', component: PoliciesView },
+  { path: '/http-flood', name: 'http-flood', component: HttpFloodView },
   { path: '/anti-bot', name: 'anti-bot', component: PoliciesView },
   { path: '/auth', name: 'auth', component: SettingsView },
   { path: '/system', name: 'system', component: SettingsView },

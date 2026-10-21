@@ -25,10 +25,12 @@ func (m *Middleware) provisionRate(_ caddy.Context) error {
 				Client:            redisClient,
 				FallbackOnFailure: true,
 			})
+			m.banManager.SetBanStorage(redis.NewRedisBanStorage(redisClient, "rw:bans:"))
 		} else {
 			m.rateStorage = rate.NewMemoryStorage()
 		}
 	}
+	m.banManager.SetRateStorage(m.rateStorage)
 	rateStorage := m.rateStorage
 
 	if m.tier1Limiter == nil && m.RateLimitConfig != nil && m.RateLimitConfig.Tier1Rate > 0 {
@@ -99,6 +101,7 @@ func (m *Middleware) provisionRate(_ caddy.Context) error {
 			MaxQueueDepth:         m.WaitingRoomConfig.MaxQueueDepth,
 			AdmissionRate:         m.WaitingRoomConfig.AdmissionRate,
 			AdmissionTokenTTL:     ttl,
+			TargetPaths:           m.WaitingRoomConfig.TargetPaths,
 			Secret:                m.PoWSecret,
 			Logger:                m.logger,
 		})

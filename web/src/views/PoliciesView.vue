@@ -63,15 +63,15 @@ const handleSave = async () => {
 </script>
 
 <template>
-  <div class="h-full flex flex-col space-y-4 p-6 bg-[#0d0f14] text-zinc-100 rounded-xl border border-zinc-800 shadow-2xl font-sans overflow-hidden">
+  <div class="h-full flex flex-col space-y-4 p-6 bg-card text-card-foreground rounded-xl border border-border shadow-2xl font-sans overflow-hidden">
     <!-- Header -->
     <div class="flex items-center justify-between shrink-0">
       <div>
-        <h1 class="text-sm font-semibold uppercase tracking-wider text-white flex items-center gap-2">
-          <Sliders class="w-4 h-4 text-slate-400" />
+        <h1 class="text-sm font-semibold uppercase tracking-wider text-foreground flex items-center gap-2">
+          <Sliders class="w-4 h-4 text-muted-foreground" />
           <span>Security & DDoS Defense Policies</span>
         </h1>
-        <p class="text-[11px] text-zinc-400 mt-0.5">
+        <p class="text-sm text-muted-foreground mt-1 leading-relaxed">
           Multi-tier rate limits, stateless SHA-256 bot challenges, and scanner trap thresholds.
         </p>
       </div>
@@ -85,23 +85,23 @@ const handleSave = async () => {
       </Button>
     </div>
 
-    <div v-if="savedNotification" class="p-2.5 bg-emerald-500/10 border border-emerald-500/30 rounded-md flex items-center gap-2 text-emerald-400 text-xs">
-      <CheckCircle2 class="w-4 h-4 text-slate-400" />
+    <div v-if="savedNotification" class="p-2.5 bg-success/10 border border-success/30 rounded-md flex items-center gap-2 text-success text-xs">
+      <CheckCircle2 class="w-4 h-4 text-success" />
       <span>Security policies saved to draft configuration. Review and deploy in Deployments view.</span>
     </div>
 
     <!-- Scrollable Content -->
     <div class="flex-1 min-h-0 overflow-y-auto space-y-4 pr-1">
       <!-- 3-Tier Rate Limiting -->
-      <Card class="bg-[#12151c] border-zinc-800">
+      <Card>
         <CardHeader class="pb-2">
           <div class="flex items-center gap-2">
-            <Flame class="w-4 h-4 text-slate-400" />
-            <CardTitle class="text-xs uppercase tracking-wider text-zinc-200">
+            <Flame class="w-4 h-4 text-muted-foreground" />
+            <CardTitle class="text-xs uppercase tracking-wider text-foreground">
               Three-Tiered Composite Rate Limiting
             </CardTitle>
           </div>
-          <CardDescription class="text-[11px] text-zinc-400">
+          <CardDescription class="text-sm text-muted-foreground mt-1 leading-relaxed">
             Layered threshold defense protecting against high-velocity floods, repeated exploit attacks, and vulnerability scanners.
           </CardDescription>
         </CardHeader>
@@ -109,10 +109,10 @@ const handleSave = async () => {
         <CardContent class="space-y-3 pt-2">
           <div class="grid grid-cols-2 gap-4">
             <!-- Tier 1 -->
-            <div class="p-3 bg-[#181b20] border border-[#2d3440] rounded-md space-y-2.5">
-              <span class="text-xs font-semibold text-white block font-sans">Tier 1: Velocity Rate Limit (PoW Trigger)</span>
+            <div class="p-3 bg-muted/50 border border-border rounded-md space-y-2.5">
+              <span class="text-xs font-semibold text-foreground block font-sans">Tier 1: Velocity Rate Limit (PoW Trigger)</span>
               <div>
-                <label class="block text-[10px] uppercase font-mono text-slate-400 mb-1">Max Requests / Sec</label>
+                <label class="block text-[10px] uppercase font-mono text-muted-foreground mb-1">Max Requests / Sec</label>
                 <Input
                   v-model.number="form.tier1_rate"
                   type="number"
@@ -120,7 +120,7 @@ const handleSave = async () => {
                 />
               </div>
               <div>
-                <label class="block text-[10px] uppercase font-mono text-slate-400 mb-1">Burst Capacity</label>
+                <label class="block text-[10px] uppercase font-mono text-muted-foreground mb-1">Burst Capacity</label>
                 <Input
                   v-model.number="form.tier1_burst"
                   type="number"
@@ -130,10 +130,10 @@ const handleSave = async () => {
             </div>
 
             <!-- Tier 2 -->
-            <div class="p-3 bg-[#181b20] border border-[#2d3440] rounded-md space-y-2.5">
-              <span class="text-xs font-semibold text-white block font-sans">Tier 2: Attack Frequency Auto-Ban</span>
+            <div class="p-3 bg-muted/50 border border-border rounded-md space-y-2.5">
+              <span class="text-xs font-semibold text-foreground block font-sans">Tier 2: Attack Frequency Auto-Ban</span>
               <div>
-                <label class="block text-[10px] uppercase font-mono text-slate-400 mb-1">Threat Threshold (Violations in 10s)</label>
+                <label class="block text-[10px] uppercase font-mono text-muted-foreground mb-1">Threat Threshold (Violations in 10s)</label>
                 <Input
                   v-model.number="form.tier2_threshold"
                   type="number"
@@ -141,7 +141,7 @@ const handleSave = async () => {
                 />
               </div>
               <div>
-                <label class="block text-[10px] uppercase font-mono text-slate-400 mb-1">Ban Duration (Seconds)</label>
+                <label class="block text-[10px] uppercase font-mono text-muted-foreground mb-1">Ban Duration (Seconds)</label>
                 <Input
                   v-model.number="form.tier2_ban_seconds"
                   type="number"
@@ -152,11 +152,11 @@ const handleSave = async () => {
           </div>
 
           <!-- Tier 3 -->
-          <div class="p-3 bg-[#181b20] border border-[#2d3440] rounded-md space-y-2.5">
-            <span class="text-xs font-semibold text-white block font-sans">Tier 3: Upstream Scanner Trap (403/404 Abuse)</span>
+          <div class="p-3 bg-muted/50 border border-border rounded-md space-y-2.5">
+            <span class="text-xs font-semibold text-foreground block font-sans">Tier 3: Upstream Scanner Trap (403/404 Abuse)</span>
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label class="block text-[10px] uppercase font-mono text-slate-400 mb-1">Scanner 403/404 Threshold</label>
+                <label class="block text-[10px] uppercase font-mono text-muted-foreground mb-1">Scanner 403/404 Threshold</label>
                 <Input
                   v-model.number="form.tier3_threshold"
                   type="number"
@@ -164,7 +164,7 @@ const handleSave = async () => {
                 />
               </div>
               <div>
-                <label class="block text-[10px] uppercase font-mono text-slate-400 mb-1">Scanner Ban Duration (Seconds)</label>
+                <label class="block text-[10px] uppercase font-mono text-muted-foreground mb-1">Scanner Ban Duration (Seconds)</label>
                 <Input
                   v-model.number="form.tier3_ban_seconds"
                   type="number"
@@ -177,11 +177,11 @@ const handleSave = async () => {
       </Card>
 
       <!-- Active Bot Defense -->
-      <Card class="bg-[#12151c] border-zinc-800">
+      <Card>
         <CardHeader class="pb-2">
           <div class="flex items-center gap-2">
-            <Bot class="w-4 h-4 text-slate-400" />
-            <CardTitle class="text-xs uppercase tracking-wider text-zinc-200">
+            <Bot class="w-4 h-4 text-muted-foreground" />
+            <CardTitle class="text-xs uppercase tracking-wider text-foreground">
               Active Bot Defense & Proof-of-Work
             </CardTitle>
           </div>
@@ -190,12 +190,12 @@ const handleSave = async () => {
         <CardContent class="space-y-4 pt-2">
           <div class="grid grid-cols-2 gap-4">
             <div>
-              <label class="block text-[10px] font-semibold text-slate-400 uppercase font-mono tracking-wider mb-1">Challenge Mode</label>
+              <label class="block text-[10px] font-semibold text-muted-foreground uppercase font-mono tracking-wider mb-1">Challenge Mode</label>
               <Select v-model="form.bot_defense_mode">
-                <SelectTrigger class="w-full h-9 border-[#363D4C] bg-[#15181F] text-xs text-white">
+                <SelectTrigger class="w-full h-9">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent class="border-[#363D4C] bg-[#1E222A] text-white">
+                <SelectContent>
                   <SelectItem value="defense">Defense (Issue HTTP 468 PoW Challenge)</SelectItem>
                   <SelectItem value="challenge">Interactive Challenge Always</SelectItem>
                   <SelectItem value="audit">Audit Only (Fingerprint without challenge)</SelectItem>
@@ -211,7 +211,7 @@ const handleSave = async () => {
             </div>
 
             <div>
-              <label class="block text-[10px] font-semibold text-slate-400 uppercase font-mono tracking-wider mb-1">
+              <label class="block text-[10px] font-semibold text-muted-foreground uppercase font-mono tracking-wider mb-1">
                 PoW SHA-256 Difficulty: {{ form.pow_difficulty }}
               </label>
               <input
@@ -220,7 +220,7 @@ const handleSave = async () => {
                 min="5000"
                 max="100000"
                 step="5000"
-                class="w-full accent-[#2574F5] cursor-pointer"
+                class="w-full accent-primary cursor-pointer"
               />
             </div>
           </div>
@@ -230,9 +230,9 @@ const handleSave = async () => {
               id="honeypot"
               v-model="form.honeypot_enabled"
               type="checkbox"
-              class="h-4 w-4 rounded bg-[#181b20] border-[#2d3440] text-[#2574F5] focus:ring-[#2574F5] cursor-pointer"
+              class="h-4 w-4 rounded bg-card border-input text-primary focus:ring-ring cursor-pointer"
             />
-            <label for="honeypot" class="text-xs text-slate-300 cursor-pointer font-sans">
+            <label for="honeypot" class="text-xs text-foreground cursor-pointer font-sans">
               Inject invisible honeypot trap hyperlinks into HTML responses to trap headless crawlers
             </label>
           </div>

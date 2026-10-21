@@ -837,20 +837,20 @@ Plus dedicated `/topology` link to access Raiwall's 3D Globe / Sankey operations
 **Description:** Extend `pkg/rate/` to expose an active blocked clients registry tracking banned IPs, trigger reason (Tier 1 velocity, Tier 2 attack frequency, Tier 3 scanner trap, or ACL blacklist), ban timestamp, remaining duration, and target site. Expose REST endpoints: `GET /api/v1/rate/bans`, `POST /api/v1/rate/bans/release` (unblock single IP), and `POST /api/v1/rate/bans/release-all` ("UNBLOCK ALL" emergency release).
 
 **Acceptance criteria:**
-- [ ] Active ban store tracks all currently banned clients across local memory and Redis.
-- [ ] Release endpoint immediately evicts IP from memory cache and Redis ban set.
-- [ ] "Unblock All" clears entire ban registry and broadcasts unblock event across cluster.
-- [ ] Unit tests verify ban listing, single release, and emergency unblock-all.
+- [x] Active ban store tracks all currently banned clients across local memory and Redis.
+- [x] Release endpoint immediately evicts IP from memory cache and Redis ban set.
+- [x] "Unblock All" clears entire ban registry and broadcasts unblock event across cluster.
+- [x] Unit tests verify ban listing, single release, and emergency unblock-all.
 
 **Verification:**
-- [ ] Tests pass: `go test -v -race ./pkg/rate/...`
-- [ ] Build succeeds: `go build ./pkg/rate/...`
+- [x] Tests pass: `go test -v -race ./internal/core/rate/...`
+- [x] Build succeeds: `go build ./internal/core/rate/...`
 
 **Dependencies:** None
 **Files likely touched:**
-- `pkg/rate/ban.go`
-- `pkg/control/api/policies.go`
-- `pkg/rate/ban_test.go`
+- `internal/core/rate/ban.go`
+- `internal/adapters/inbound/http/policies_unified.go`
+- `internal/core/rate/ban_test.go`
 **Estimated scope:** Medium (3 files)
 
 ---
@@ -859,23 +859,23 @@ Plus dedicated `/topology` link to access Raiwall's 3D Globe / Sankey operations
 **Description:** Upgrade [`pkg/rate/waitingroom.go`](file:///Users/macbook/Code/raiwall/pkg/rate/waitingroom.go) and [`pkg/rate/templates.go`](file:///Users/macbook/Code/raiwall/pkg/rate/templates.go) to support path-level targeting (e.g. only queue flash crowd requests targeting `/tickets/checkout` or `/flash-sale/*`, leaving static assets unqueued). Standardize the response code to **HTTP 465** (updating from HTTP 503). Add real-time telemetry tracking: Active In-Flight Users, Total Users Waiting, Peak Queue Depth, Average Wait Seconds, and Client Bounce Rate. Expose `GET /api/v1/waiting-room/metrics`.
 
 **Acceptance criteria:**
-- [ ] Waiting Room supports configurable target path prefixes in policy snapshot.
-- [ ] Waiting Room returns deterministic **HTTP 465** status code on queue redirection and API load shedding.
-- [ ] Telemetry collector computes live queue metrics and bounce rate percentages.
-- [ ] Caddy middleware only enqueues requests matching configured path prefixes.
-- [ ] Unit tests verify path targeting, HTTP 465 responses, and metrics calculation.
+- [x] Waiting Room supports configurable target path prefixes in policy snapshot.
+- [x] Waiting Room returns deterministic **HTTP 465** status code on queue redirection and API load shedding.
+- [x] Telemetry collector computes live queue metrics and bounce rate percentages.
+- [x] Caddy middleware only enqueues requests matching configured path prefixes.
+- [x] Unit tests verify path targeting, HTTP 465 responses, and metrics calculation.
 
 **Verification:**
-- [ ] Tests pass: `go test -v -race ./pkg/rate/...`
-- [ ] Build succeeds: `go build ./pkg/rate/...`
+- [x] Tests pass: `go test -v -race ./internal/core/rate/...`
+- [x] Build succeeds: `go build ./internal/core/rate/...`
 
 **Dependencies:** Task 87
 **Files likely touched:**
-- `pkg/rate/waitingroom.go`
-- `pkg/rate/templates.go`
-- `pkg/rate/types.go`
-- `pkg/control/api/policies.go`
-- `pkg/rate/waitingroom_test.go`
+- `internal/core/rate/waitingroom.go`
+- `internal/core/rate/templates.go`
+- `internal/core/rate/types.go`
+- `internal/adapters/inbound/http/policies_unified.go`
+- `internal/core/rate/waitingroom_test.go`
 **Estimated scope:** Medium (5 files)
 
 ---
@@ -887,14 +887,14 @@ Plus dedicated `/topology` link to access Raiwall's 3D Globe / Sankey operations
 3. `Waiting Room Dashboard`: live gauge cards (Active Users Allowed, Users Waiting, Avg Wait Time), queue trend chart, and path-prefix queue settings.
 
 **Acceptance criteria:**
-- [ ] Active blocked clients table refreshes live and allows single and bulk unblocking.
-- [ ] "UNBLOCK ALL" modal prompts for confirmation before purging ban table.
-- [ ] Waiting Room dashboard displays live queue telemetry and bounce rates.
-- [ ] Vitest tests verify unblock actions, modal confirmation, and form saves.
+- [x] Active blocked clients table refreshes live and allows single and bulk unblocking.
+- [x] "UNBLOCK ALL" modal prompts for confirmation before purging ban table.
+- [x] Waiting Room dashboard displays live queue telemetry and bounce rates.
+- [x] Vitest tests verify unblock actions, modal confirmation, and form saves.
 
 **Verification:**
-- [ ] Tests pass: `cd web && pnpm test -- HttpFlood`
-- [ ] Build succeeds: `cd web && pnpm build`
+- [x] Tests pass: `cd web && pnpm test -- HttpFlood`
+- [x] Build succeeds: `cd web && pnpm build`
 
 **Dependencies:** Tasks 74, 87, 88
 **Files likely touched:**
@@ -907,8 +907,8 @@ Plus dedicated `/topology` link to access Raiwall's 3D Globe / Sankey operations
 ---
 
 ### Checkpoint 5: Volumetric Defense & Traffic Buffering
-- [ ] Active ban registry and emergency "Unblock All" verified in Go tests.
-- [ ] HTTP Flood and Waiting Room dashboard with HTTP 465 verified in Vitest tests.
+- [x] Active ban registry and emergency "Unblock All" verified in Go tests.
+- [x] HTTP Flood and Waiting Room dashboard with HTTP 465 verified in Vitest tests.
 
 ---
 

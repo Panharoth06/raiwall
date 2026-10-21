@@ -170,7 +170,7 @@ withDefaults(
     </svg>
 
     <div v-if="showText" class="flex flex-col justify-center">
-      <span class="font-bold text-white text-base tracking-tight leading-none">Raiwall</span>
+      <span class="font-bold text-foreground text-base tracking-tight leading-none">Raiwall</span>
     </div>
   </div>
 </template>

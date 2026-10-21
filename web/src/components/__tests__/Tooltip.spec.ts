@@ -102,7 +102,7 @@ describe('Tooltip components', () => {
     expect(content.text()).toContain('Tooltip details')
     expect(content.classes()).toContain('custom-class')
     expect(content.classes()).toContain('z-50')
-    expect(content.classes()).toContain('bg-[#1E222A]')
+    expect(content.classes()).toContain('bg-popover')
   })
 
   it('renders TooltipArrow inside TooltipContent', async () => {

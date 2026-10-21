@@ -3,7 +3,7 @@ import { type HTMLAttributes } from 'vue'
 import { cn } from '@/lib/utils'
 
 export interface BadgeProps {
-  variant?: 'default' | 'secondary' | 'destructive' | 'outline' | 'blue' | 'emerald' | 'amber' | 'rose'
+  variant?: 'default' | 'secondary' | 'destructive' | 'outline' | 'threat' | 'success' | 'warning' | 'info' | 'blue' | 'emerald' | 'amber' | 'rose'
   class?: HTMLAttributes['class']
 }
 
@@ -12,14 +12,18 @@ const props = withDefaults(defineProps<BadgeProps>(), {
 })
 
 const variantClasses: Record<NonNullable<BadgeProps['variant']>, string> = {
-  default: 'border-transparent bg-[#2574F5] text-white shadow-none',
-  secondary: 'border-transparent bg-[#17223B] text-slate-200 shadow-none',
-  destructive: 'border-transparent bg-red-600/80 text-white shadow-none',
-  outline: 'border-[#2d3440] text-slate-300 shadow-none',
-  blue: 'border-[#2574F5]/30 bg-[#2574F5]/10 text-[#38BDF8] shadow-none',
-  emerald: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400 shadow-none',
-  amber: 'border-amber-500/30 bg-amber-500/10 text-amber-400 shadow-none',
-  rose: 'border-rose-500/30 bg-rose-500/10 text-rose-400 shadow-none',
+  default: 'border-transparent bg-primary text-primary-foreground shadow-none',
+  secondary: 'border-transparent bg-secondary text-secondary-foreground shadow-none',
+  destructive: 'border-transparent bg-destructive text-destructive-foreground shadow-none',
+  outline: 'border-border text-foreground shadow-none',
+  threat: 'border-threat/30 bg-threat/10 text-threat shadow-none',
+  success: 'border-success/30 bg-success/10 text-success shadow-none',
+  warning: 'border-warning/30 bg-warning/10 text-warning shadow-none',
+  info: 'border-info/30 bg-info/10 text-info shadow-none',
+  blue: 'border-info/30 bg-info/10 text-info shadow-none',
+  emerald: 'border-success/30 bg-success/10 text-success shadow-none',
+  amber: 'border-warning/30 bg-warning/10 text-warning shadow-none',
+  rose: 'border-threat/30 bg-threat/10 text-threat shadow-none',
 }
 </script>
 

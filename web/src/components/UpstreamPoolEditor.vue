@@ -45,8 +45,8 @@ const updateField = (index: number, field: keyof Upstream, val: any) => {
 <template>
   <div class="space-y-3 font-sans">
     <div class="flex items-center justify-between">
-      <label class="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center space-x-1.5">
-        <Activity class="w-3.5 h-3.5 text-slate-400" />
+      <label class="text-xs font-semibold text-foreground uppercase tracking-wider flex items-center space-x-1.5">
+        <Activity class="w-3.5 h-3.5 text-muted-foreground" />
         <span>Upstream Load Balancing Targets</span>
       </label>
       <Button
@@ -61,7 +61,7 @@ const updateField = (index: number, field: keyof Upstream, val: any) => {
       </Button>
     </div>
 
-    <div v-if="modelValue.length === 0" class="p-4 bg-[#181b20] border border-[#2d3440] rounded-lg text-center text-xs text-slate-500">
+    <div v-if="modelValue.length === 0" class="p-4 bg-card border border-border rounded-lg text-center text-xs text-muted-foreground">
       No backend upstreams configured. Requests will be handled locally or return 503.
     </div>
 
@@ -69,10 +69,10 @@ const updateField = (index: number, field: keyof Upstream, val: any) => {
       <div
         v-for="(target, idx) in modelValue"
         :key="idx"
-        class="p-3 bg-[#181b20] border border-[#2d3440] rounded-lg flex flex-wrap items-center gap-3 text-xs"
+        class="p-3 bg-muted/40 border border-border rounded-lg flex flex-wrap items-center gap-3 text-xs"
       >
         <div class="flex-1 min-w-[180px]">
-          <span class="block text-[10px] text-slate-400 mb-0.5">Dial Address</span>
+          <span class="block text-[10px] text-muted-foreground mb-0.5">Dial Address</span>
           <Input
             :model-value="target.dial"
             @update:model-value="updateField(idx, 'dial', String($event))"
@@ -81,7 +81,7 @@ const updateField = (index: number, field: keyof Upstream, val: any) => {
         </div>
 
         <div class="w-24">
-          <span class="block text-[10px] text-slate-400 mb-0.5">Weight ({{ target.weight }})</span>
+          <span class="block text-[10px] text-muted-foreground mb-0.5">Weight ({{ target.weight }})</span>
           <Input
             :model-value="target.weight"
             @update:model-value="updateField(idx, 'weight', parseInt(String($event)) || 1)"
@@ -92,7 +92,7 @@ const updateField = (index: number, field: keyof Upstream, val: any) => {
         </div>
 
         <div class="flex-1 min-w-[120px]">
-          <span class="block text-[10px] text-slate-400 mb-0.5">Health Check Path</span>
+          <span class="block text-[10px] text-muted-foreground mb-0.5">Health Check Path</span>
           <Input
             :model-value="target.health_check_path || ''"
             @update:model-value="updateField(idx, 'health_check_path', String($event))"
@@ -101,7 +101,7 @@ const updateField = (index: number, field: keyof Upstream, val: any) => {
         </div>
 
         <div class="w-20">
-          <span class="block text-[10px] text-slate-400 mb-0.5">Interval</span>
+          <span class="block text-[10px] text-muted-foreground mb-0.5">Interval</span>
           <Input
             :model-value="target.interval || '10s'"
             @update:model-value="updateField(idx, 'interval', String($event))"
@@ -114,7 +114,7 @@ const updateField = (index: number, field: keyof Upstream, val: any) => {
           variant="ghost"
           size="icon"
           @click="removeUpstream(idx)"
-          class="h-8 w-8 text-slate-400 hover:text-red-400 self-end mb-0.5"
+          class="h-8 w-8 text-muted-foreground hover:text-threat self-end mb-0.5"
           title="Remove target"
         >
           <Trash2 class="w-3.5 h-3.5" />

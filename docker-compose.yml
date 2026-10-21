@@ -1,0 +1,64 @@
+services:
+  # ============================================================================
+  # PostgreSQL 18 Database Service
+  # ============================================================================
+  postgres:
+    image: postgres:18-alpine
+    container_name: raiwall-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-raiwall}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-raiwall}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - raiwall-net
+
+  # ============================================================================
+  # Raiwall WAF Gateway (Go Backend + Embedded Vue 3 Dashboard)
+  # ============================================================================
+  raiwall:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: raiwall-waf
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${RAIWALL_HTTP_PORT:-8080}:8080"   # HTTP Gateway & Admin Console
+      - "${RAIWALL_HTTPS_PORT:-8443}:8443"  # HTTPS Gateway (if enabled)
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-raiwall}?sslmode=disable
+    volumes:
+      - raiwall_data:/var/lib/raiwall
+      - ./examples/Caddyfile:/etc/raiwall/Caddyfile:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/.raiwall/api/openapi.json"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - raiwall-net
+
+networks:
+  raiwall-net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  raiwall_data:
+    driver: local

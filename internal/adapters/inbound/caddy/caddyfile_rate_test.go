@@ -21,6 +21,7 @@ func TestUnmarshalCaddyfile_RateLimitAndWaitingRoom(t *testing.T) {
 			max_queue_depth 1000
 			admission_rate 50
 			token_ttl 15m
+			paths /tickets/* /checkout
 		}
 	}`
 
@@ -63,6 +64,9 @@ func TestUnmarshalCaddyfile_RateLimitAndWaitingRoom(t *testing.T) {
 	}
 	if m.WaitingRoomConfig.AdmissionRate != 50 {
 		t.Errorf("expected AdmissionRate 50, got %d", m.WaitingRoomConfig.AdmissionRate)
+	}
+	if len(m.WaitingRoomConfig.TargetPaths) != 2 || m.WaitingRoomConfig.TargetPaths[0] != "/tickets/*" || m.WaitingRoomConfig.TargetPaths[1] != "/checkout" {
+		t.Errorf("unexpected TargetPaths: %v", m.WaitingRoomConfig.TargetPaths)
 	}
 
 	// Test Provision with populated configs

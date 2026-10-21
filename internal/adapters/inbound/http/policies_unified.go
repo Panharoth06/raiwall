@@ -11,17 +11,18 @@ import (
 
 // UnifiedPolicyDTO combines rate limiting and bot defense configurations into a single payload.
 type UnifiedPolicyDTO struct {
-	Tier1Rate                int64  `json:"tier1_rate"`
-	Tier1Burst               int64  `json:"tier1_burst"`
-	Tier2Threshold           int64  `json:"tier2_threshold"`
-	Tier2BanSeconds          int64  `json:"tier2_ban_seconds"`
-	Tier3Threshold           int64  `json:"tier3_threshold"`
-	Tier3BanSeconds          int64  `json:"tier3_ban_seconds"`
-	BotDefenseMode           string `json:"bot_defense_mode"`
-	PowDifficulty            int    `json:"pow_difficulty"`
-	HoneypotEnabled          bool   `json:"honeypot_enabled"`
-	WaitingRoomEnabled       bool   `json:"waiting_room_enabled"`
-	WaitingRoomMaxConcurrent int64  `json:"waiting_room_max_concurrent"`
+	Tier1Rate                int64    `json:"tier1_rate"`
+	Tier1Burst               int64    `json:"tier1_burst"`
+	Tier2Threshold           int64    `json:"tier2_threshold"`
+	Tier2BanSeconds          int64    `json:"tier2_ban_seconds"`
+	Tier3Threshold           int64    `json:"tier3_threshold"`
+	Tier3BanSeconds          int64    `json:"tier3_ban_seconds"`
+	BotDefenseMode           string   `json:"bot_defense_mode"`
+	PowDifficulty            int      `json:"pow_difficulty"`
+	HoneypotEnabled          bool     `json:"honeypot_enabled"`
+	WaitingRoomEnabled       bool     `json:"waiting_room_enabled"`
+	WaitingRoomMaxConcurrent int64    `json:"waiting_room_max_concurrent"`
+	WaitingRoomPaths         []string `json:"waiting_room_paths,omitempty"`
 }
 
 func (s *Server) handleGetUnifiedPolicies(w http.ResponseWriter, r *http.Request) {
@@ -41,6 +42,7 @@ func (s *Server) handleGetUnifiedPolicies(w http.ResponseWriter, r *http.Request
 		HoneypotEnabled:          true,
 		WaitingRoomEnabled:       false,
 		WaitingRoomMaxConcurrent: 1000,
+		WaitingRoomPaths:         []string{},
 	}
 
 	if len(ratePolicies) > 0 {
@@ -53,6 +55,9 @@ func (s *Server) handleGetUnifiedPolicies(w http.ResponseWriter, r *http.Request
 		resp.Tier3BanSeconds = rp.Tier3BanDurationSec
 		resp.WaitingRoomEnabled = rp.WaitingRoomEnabled == 1
 		resp.WaitingRoomMaxConcurrent = rp.WaitingRoomCapacity
+		if rp.WaitingRoomPaths != "" {
+			_ = json.Unmarshal([]byte(rp.WaitingRoomPaths), &resp.WaitingRoomPaths)
+		}
 	}
 
 	if len(botConfigs) > 0 {
@@ -88,11 +93,19 @@ func (s *Server) handleUpdateUnifiedPolicies(w http.ResponseWriter, r *http.Requ
 		waitingRoomEnabled = 1
 	}
 
-	if len(ratePolicies) > 0 {
-		wrPaths := ratePolicies[0].WaitingRoomPaths
-		if wrPaths == "" {
-			wrPaths = "[]"
+	wrPathsJSON, _ := json.Marshal(req.WaitingRoomPaths)
+	if req.WaitingRoomPaths == nil {
+		wrPathsJSON = []byte("[]")
+	}
+
+	if s.waitingRoom != nil {
+		s.waitingRoom.SetTargetPaths(req.WaitingRoomPaths)
+		if req.WaitingRoomMaxConcurrent > 0 {
+			s.waitingRoom.SetMaxConcurrent(req.WaitingRoomMaxConcurrent)
 		}
+	}
+
+	if len(ratePolicies) > 0 {
 		_ = s.store.UpdateRatePolicy(ctx, sqlite.UpdateRatePolicyParams{
 			ID:                  ratePolicies[0].ID,
 			Name:                ratePolicies[0].Name,
@@ -107,7 +120,7 @@ func (s *Server) handleUpdateUnifiedPolicies(w http.ResponseWriter, r *http.Requ
 			Tier3BanDurationSec: req.Tier3BanSeconds,
 			WaitingRoomEnabled:  waitingRoomEnabled,
 			WaitingRoomCapacity: req.WaitingRoomMaxConcurrent,
-			WaitingRoomPaths:    wrPaths,
+			WaitingRoomPaths:    string(wrPathsJSON),
 			IsActive:            1,
 			UpdatedAt:           now,
 		})
@@ -126,7 +139,7 @@ func (s *Server) handleUpdateUnifiedPolicies(w http.ResponseWriter, r *http.Requ
 			Tier3BanDurationSec: req.Tier3BanSeconds,
 			WaitingRoomEnabled:  waitingRoomEnabled,
 			WaitingRoomCapacity: req.WaitingRoomMaxConcurrent,
-			WaitingRoomPaths:    "[]",
+			WaitingRoomPaths:    string(wrPathsJSON),
 			IsActive:            1,
 			CreatedAt:           now,
 			UpdatedAt:           now,
@@ -206,6 +219,9 @@ func (s *Server) handleReleaseBan(w http.ResponseWriter, r *http.Request) {
 	if s.banManager != nil {
 		released = s.banManager.Release(target)
 	}
+	if s.clusterPublisher != nil {
+		_ = s.clusterPublisher.PublishUnblock(r.Context(), target)
+	}
 
 	respondJSON(w, http.StatusOK, map[string]any{
 		"status":   "released",
@@ -218,6 +234,9 @@ func (s *Server) handleReleaseAllBans(w http.ResponseWriter, r *http.Request) {
 	count := 0
 	if s.banManager != nil {
 		count = s.banManager.ReleaseAll()
+	}
+	if s.clusterPublisher != nil {
+		_ = s.clusterPublisher.PublishUnblockAll(r.Context())
 	}
 	respondJSON(w, http.StatusOK, map[string]any{
 		"status":  "unblocked_all",

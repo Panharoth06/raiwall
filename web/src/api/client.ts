@@ -42,6 +42,29 @@ export interface ACLRule {
   enabled: boolean;
 }
 
+export interface BanEntry {
+  key: string;
+  client_ip?: string;
+  ja4?: string;
+  reason: string;
+  site_id?: string;
+  duration?: number;
+  remaining_seconds: number;
+  banned_at: string;
+  expires_at: string;
+}
+
+export interface WaitingRoomMetrics {
+  active_in_flight: number;
+  total_waiting: number;
+  peak_queue_depth: number;
+  avg_wait_seconds: number;
+  bounce_rate: number;
+  total_admitted: number;
+  total_enqueued: number;
+  total_abandoned: number;
+}
+
 export interface PolicySettings {
   tier1_rate: number;
   tier1_burst: number;
@@ -54,6 +77,7 @@ export interface PolicySettings {
   honeypot_enabled: boolean;
   waiting_room_enabled: boolean;
   waiting_room_max_concurrent: number;
+  waiting_room_paths?: string[];
 }
 
 export interface ApiKeyItem {
@@ -99,19 +123,41 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     credentials: 'include',
   });
 
+  const contentType = response.headers.get('content-type') || '';
+  const isJson = contentType.includes('application/json');
+
   if (!response.ok) {
     let errorDetail = response.statusText;
-    try {
-      const errorJson = await response.json();
-      errorDetail = errorJson.message || errorJson.error || JSON.stringify(errorJson);
-    } catch {
-      // ignore
+    if (isJson) {
+      try {
+        const errorJson = await response.json();
+        errorDetail = errorJson.message || errorJson.error || JSON.stringify(errorJson);
+      } catch {
+        // ignore
+      }
+    } else {
+      const text = await response.text();
+      if (text.includes('<!doctype') || text.includes('<html')) {
+        errorDetail = 'Backend server returned HTML. Ensure Raiwall backend is running on :8080.';
+      } else if (text) {
+        errorDetail = text.slice(0, 150);
+      }
     }
     throw new Error(`API error (${response.status}): ${errorDetail}`);
   }
 
   if (response.status === 204) {
     return {} as T;
+  }
+
+  if (!isJson) {
+    const text = await response.text();
+    if (text.includes('<!doctype') || text.includes('<html')) {
+      throw new Error(
+        'Backend server unavailable: received HTML response instead of JSON. Ensure the Raiwall backend server is running on :8080 ("go run ./cmd/raiwall" or "make run").'
+      );
+    }
+    throw new Error(`Unexpected non-JSON content-type received from backend (${contentType || 'unknown'})`);
   }
 
   return response.json();
@@ -193,6 +239,19 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(policies),
     }),
+
+  // Bans & Active Volumetric Defense
+  listBans: () => request<BanEntry[]>('/rate/bans'),
+  releaseBan: (payload: { key?: string; ip?: string }) =>
+    request<{ status: string; target: string; released: boolean }>('/rate/bans/release', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  releaseAllBans: () =>
+    request<{ status: string; cleared: number }>('/rate/bans/release-all', {
+      method: 'POST',
+    }),
+  getWaitingRoomMetrics: () => request<WaitingRoomMetrics>('/waiting-room/metrics'),
 
   // API Keys
   listApiKeys: () => request<ApiKeyItem[]>('/apikeys'),

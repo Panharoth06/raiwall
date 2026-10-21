@@ -22,7 +22,7 @@ const modelValue = defineModel<string | number>()
     :placeholder="placeholder"
     :class="
       cn(
-        'flex h-9 w-full rounded-md border border-[#2d3440] bg-[#1e222a] px-3 py-1 text-xs text-white placeholder:text-slate-500 shadow-none focus-visible:outline-none focus-visible:border-[#2574F5] focus-visible:ring-1 focus-visible:ring-[#2574F5] disabled:cursor-not-allowed disabled:opacity-50 transition-colors font-sans',
+        'flex h-9 w-full rounded-md border border-input bg-card px-3 py-1 text-xs text-foreground placeholder:text-muted-foreground shadow-none focus-visible:outline-none focus-visible:border-primary focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 transition-colors font-sans',
         props.class
       )
     "

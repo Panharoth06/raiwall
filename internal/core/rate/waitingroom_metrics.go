@@ -16,6 +16,24 @@ type WaitingRoomMetrics struct {
 	TotalAbandoned int64   `json:"total_abandoned"`
 }
 
+// MatchesWaitingRoomPathPrefix tests if path matches a waiting room prefix pattern (e.g. "/tickets/*", "/checkout").
+func MatchesWaitingRoomPathPrefix(path string, prefix string) bool {
+	prefix = strings.TrimSpace(prefix)
+	if prefix == "" || prefix == "/*" || prefix == "/" {
+		return true
+	}
+	if strings.HasSuffix(prefix, "/*") {
+		clean := strings.TrimSuffix(prefix, "/*")
+		return path == clean || strings.HasPrefix(path, clean+"/")
+	}
+	if strings.HasSuffix(prefix, "*") {
+		clean := strings.TrimSuffix(prefix, "*")
+		return strings.HasPrefix(path, clean)
+	}
+	clean := strings.TrimSuffix(prefix, "/")
+	return path == clean || strings.HasPrefix(path, clean+"/")
+}
+
 // MatchesPath checks whether the given request path matches configured waiting room target prefixes.
 // If no target paths are configured, all paths match by default.
 func (wm *WaitingRoomManager) MatchesPath(path string) bool {
@@ -30,13 +48,7 @@ func (wm *WaitingRoomManager) MatchesPath(path string) bool {
 	}
 
 	for _, prefix := range wm.targetPaths {
-		prefix = strings.TrimSpace(prefix)
-		if prefix == "" || prefix == "/*" || prefix == "/" {
-			return true
-		}
-		cleanPrefix := strings.TrimSuffix(prefix, "/*")
-		cleanPrefix = strings.TrimSuffix(cleanPrefix, "*")
-		if path == cleanPrefix || strings.HasPrefix(path, cleanPrefix+"/") || strings.HasPrefix(path, cleanPrefix) {
+		if MatchesWaitingRoomPathPrefix(path, prefix) {
 			return true
 		}
 	}

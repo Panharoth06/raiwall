@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Panharoth06/raiwall/internal/core/control"
+	"github.com/Panharoth06/raiwall/internal/core/rate"
 )
 
 // SubscriberConfig holds configuration options for the worker node cluster synchronizer.
@@ -19,6 +20,9 @@ type SubscriberConfig struct {
 	Channel      string
 	SnapshotKey  string
 	PollInterval time.Duration
+	OnBan        func(entry *rate.BanEntry)
+	OnUnblock    func(target string)
+	OnUnblockAll func()
 }
 
 // Subscriber runs on worker nodes to subscribe to version notifications and poll for drift.
@@ -27,6 +31,9 @@ type Subscriber struct {
 	channel      string
 	snapshotKey  string
 	pollInterval time.Duration
+	onBan        func(entry *rate.BanEntry)
+	onUnblock    func(target string)
+	onUnblockAll func()
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -53,6 +60,9 @@ func NewSubscriber(cfg SubscriberConfig) *Subscriber {
 		channel:      cfg.Channel,
 		snapshotKey:  cfg.SnapshotKey,
 		pollInterval: cfg.PollInterval,
+		onBan:        cfg.OnBan,
+		onUnblock:    cfg.OnUnblock,
+		onUnblockAll: cfg.OnUnblockAll,
 	}
 }
 
@@ -83,6 +93,17 @@ func (s *Subscriber) Start(ctx context.Context) error {
 			case rawMsg, ok := <-msgCh:
 				if !ok {
 					return
+				}
+				var banMsg BanBroadcastMessage
+				if err := json.Unmarshal([]byte(rawMsg), &banMsg); err == nil && banMsg.Type != "" {
+					if banMsg.Type == "unblock" && s.onUnblock != nil {
+						s.onUnblock(banMsg.Target)
+					} else if banMsg.Type == "unblock_all" && s.onUnblockAll != nil {
+						s.onUnblockAll()
+					} else if banMsg.Type == "ban" && s.onBan != nil && banMsg.Entry != nil {
+						s.onBan(banMsg.Entry)
+					}
+					continue
 				}
 				var notif VersionNotification
 				if err := json.Unmarshal([]byte(rawMsg), &notif); err != nil {

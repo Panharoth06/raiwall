@@ -185,3 +185,88 @@ func TestWaitingRoomManager_FindActiveEntry(t *testing.T) {
 		t.Errorf("expected nil for unknown ID")
 	}
 }
+
+func TestWaitingRoomManager_PathPrefixMatching(t *testing.T) {
+	tests := []struct {
+		name     string
+		path     string
+		prefix   string
+		expected bool
+	}{
+		{"exact match /checkout", "/checkout", "/checkout", true},
+		{"subpath match /checkout/step1", "/checkout/step1", "/checkout", true},
+		{"prefix boundary safety /checkout_cancel", "/checkout_cancel", "/checkout", false},
+		{"wildcard suffix /* match", "/tickets/buy", "/tickets/*", true},
+		{"wildcard suffix boundary /tickets_cancel", "/tickets_cancel", "/tickets/*", false},
+		{"wildcard suffix exact directory /tickets", "/tickets", "/tickets/*", true},
+		{"wildcard without slash /api* matches /apikeys", "/apikeys", "/api*", true},
+		{"wildcard with slash /api/* rejects /apikeys", "/apikeys", "/api/*", false},
+		{"global wildcard /* matches anything", "/any/path", "/*", true},
+		{"empty prefix matches anything", "/any/path", "", true},
+		{"root prefix / matches anything", "/any/path", "/", true},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := MatchesWaitingRoomPathPrefix(tc.path, tc.prefix)
+			if got != tc.expected {
+				t.Errorf("MatchesWaitingRoomPathPrefix(%q, %q) = %v; expected %v", tc.path, tc.prefix, got, tc.expected)
+			}
+		})
+	}
+}
+
+func TestWaitingRoomManager_SetMaxConcurrent(t *testing.T) {
+	wm := NewWaitingRoomManager(WaitingRoomConfig{
+		MaxConcurrentInFlight: 5,
+		MaxQueueDepth:         10,
+	})
+	defer wm.Close()
+
+	if wm.MaxConcurrent() != 5 {
+		t.Errorf("expected MaxConcurrent 5, got %d", wm.MaxConcurrent())
+	}
+
+	wm.SetMaxConcurrent(20)
+	if wm.MaxConcurrent() != 20 {
+		t.Errorf("expected updated MaxConcurrent 20, got %d", wm.MaxConcurrent())
+	}
+
+	// Negative/zero should be ignored
+	wm.SetMaxConcurrent(-1)
+	if wm.MaxConcurrent() != 20 {
+		t.Errorf("expected MaxConcurrent unchanged on invalid input, got %d", wm.MaxConcurrent())
+	}
+}
+
+func TestWaitingRoomManager_QueueMetricsCalculation(t *testing.T) {
+	wm := NewWaitingRoomManager(WaitingRoomConfig{
+		MaxConcurrentInFlight: 1,
+		MaxQueueDepth:         10,
+		AdmissionRate:         10,
+	})
+	defer wm.Close()
+
+	m0 := wm.Metrics()
+	if m0.ActiveInFlight != 0 || m0.TotalWaiting != 0 {
+		t.Errorf("expected zero metrics initially, got %+v", m0)
+	}
+
+	// Enqueue client and verify metrics
+	entry, _, _, err := wm.Enqueue(net.ParseIP("192.0.2.1"), "ja4")
+	if err != nil {
+		t.Fatalf("enqueue error: %v", err)
+	}
+
+	m1 := wm.Metrics()
+	if m1.TotalWaiting != 1 || m1.PeakQueueDepth != 1 || m1.TotalEnqueued != 1 {
+		t.Errorf("unexpected metrics after enqueue: %+v", m1)
+	}
+
+	// Remove entry (abandonment)
+	wm.RemoveEntry(entry.ID)
+	m2 := wm.Metrics()
+	if m2.TotalAbandoned != 1 || m2.BounceRate != 100.0 {
+		t.Errorf("expected 100%% bounce rate on abandoned entry, got %+v", m2)
+	}
+}

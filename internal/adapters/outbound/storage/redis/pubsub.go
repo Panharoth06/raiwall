@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Panharoth06/raiwall/internal/core/control"
+	"github.com/Panharoth06/raiwall/internal/core/rate"
 )
 
 const (
@@ -95,6 +96,56 @@ func (p *Publisher) PublishVersion(ctx context.Context, version uint64) error {
 		return nil
 	}
 	return p.PublishSnapshot(ctx, active, "cluster-master")
+}
+
+// BanBroadcastMessage is sent across the Redis cluster when a ban or unblock event occurs.
+type BanBroadcastMessage struct {
+	Type      string         `json:"type"` // "ban", "unblock", or "unblock_all"
+	Target    string         `json:"target,omitempty"`
+	Entry     *rate.BanEntry `json:"entry,omitempty"`
+	Timestamp time.Time      `json:"timestamp"`
+}
+
+// PublishBan broadcasts an active ban entry across the cluster.
+func (p *Publisher) PublishBan(ctx context.Context, entry *rate.BanEntry) error {
+	if p == nil || p.client == nil || entry == nil {
+		return nil
+	}
+	msg := BanBroadcastMessage{
+		Type:      "ban",
+		Target:    entry.Key,
+		Entry:     entry,
+		Timestamp: time.Now().UTC(),
+	}
+	data, _ := json.Marshal(msg)
+	return p.client.Publish(ctx, p.channel, string(data))
+}
+
+// PublishUnblock broadcasts an IP or key release to the cluster.
+func (p *Publisher) PublishUnblock(ctx context.Context, target string) error {
+	if p == nil || p.client == nil {
+		return nil
+	}
+	msg := BanBroadcastMessage{
+		Type:      "unblock",
+		Target:    target,
+		Timestamp: time.Now().UTC(),
+	}
+	data, _ := json.Marshal(msg)
+	return p.client.Publish(ctx, p.channel, string(data))
+}
+
+// PublishUnblockAll broadcasts an emergency unblock-all event to the cluster.
+func (p *Publisher) PublishUnblockAll(ctx context.Context) error {
+	if p == nil || p.client == nil {
+		return nil
+	}
+	msg := BanBroadcastMessage{
+		Type:      "unblock_all",
+		Timestamp: time.Now().UTC(),
+	}
+	data, _ := json.Marshal(msg)
+	return p.client.Publish(ctx, p.channel, string(data))
 }
 
 // MockRedisClient is a thread-safe, in-memory implementation of ClusterRedisClient for testing.

@@ -54,6 +54,18 @@ func setupRateLimitFixture(t *testing.T) *rateLimitFixture {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`slow response`))
 	})
+	backendMux.HandleFunc("/tickets/", func(w http.ResponseWriter, r *http.Request) {
+		backendRequests.Add(1)
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`<!DOCTYPE html><html><body><h1>Tickets</h1></body></html>`))
+	})
+	backendMux.HandleFunc("/tickets_cancel", func(w http.ResponseWriter, r *http.Request) {
+		backendRequests.Add(1)
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`<!DOCTYPE html><html><body><h1>Cancelled</h1></body></html>`))
+	})
 
 	powSecret := "e2e-rate-limit-secret-32-bytes"
 	mw := &caddy.Middleware{

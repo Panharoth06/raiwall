@@ -211,3 +211,33 @@ func (s *ConfigSnapshot) GetAppForHost(host string) (*AppConfig, bool) {
 	}
 	return nil, false
 }
+
+// GetRatePolicyForHost resolves a RatePolicySnapshot matching the incoming Host header, or falls back to wildcard (*).
+func (s *ConfigSnapshot) GetRatePolicyForHost(host string) (*RatePolicySnapshot, bool) {
+	if s == nil || len(s.RatePolicies) == 0 {
+		return nil, false
+	}
+	cleanHost := strings.ToLower(strings.TrimSpace(host))
+	if h, _, err := net.SplitHostPort(cleanHost); err == nil {
+		cleanHost = h
+	}
+	cleanHost = strings.Trim(cleanHost, "[]")
+
+	var wildcard *RatePolicySnapshot
+	for _, rp := range s.RatePolicies {
+		if rp == nil {
+			continue
+		}
+		polHost := strings.ToLower(strings.TrimSpace(rp.Host))
+		if polHost == cleanHost {
+			return rp, true
+		}
+		if polHost == "*" || polHost == "" {
+			wildcard = rp
+		}
+	}
+	if wildcard != nil {
+		return wildcard, true
+	}
+	return nil, false
+}

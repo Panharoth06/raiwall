@@ -20,7 +20,7 @@ const isVisible = computed(() => {
     role="tabpanel"
     :class="
       cn(
-        'mt-2 ring-offset-background focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#2574F5]',
+        'mt-2 ring-offset-background focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
         props.class
       )
     "

@@ -11,9 +11,12 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-// ClusterPublisher broadcasts config version changes to other cluster nodes.
+// ClusterPublisher broadcasts config version changes and ban events to other cluster nodes.
 type ClusterPublisher interface {
 	PublishVersion(ctx context.Context, version uint64) error
+	PublishBan(ctx context.Context, entry *rate.BanEntry) error
+	PublishUnblock(ctx context.Context, target string) error
+	PublishUnblockAll(ctx context.Context) error
 }
 
 // Server provides the HTTP handler for the Raiwall Control Plane REST API.
@@ -44,6 +47,11 @@ func NewServer(store *sqlite.Store, hmacSecret []byte) *Server {
 // SetClusterPublisher sets the distributed cluster event publisher.
 func (s *Server) SetClusterPublisher(pub ClusterPublisher) {
 	s.clusterPublisher = pub
+}
+
+// ClusterPublisher returns the configured cluster event publisher.
+func (s *Server) ClusterPublisher() ClusterPublisher {
+	return s.clusterPublisher
 }
 
 // SetBanManager sets the active BanManager.

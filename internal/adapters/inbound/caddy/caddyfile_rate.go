@@ -134,6 +134,10 @@ func (m *Middleware) parseWaitingRoom(d *caddyfile.Dispenser) error {
 				return d.Errf("invalid admission_token_ttl: %s (%v)", d.Val(), err)
 			}
 			m.WaitingRoomConfig.AdmissionTokenTTL = caddy.Duration(dur)
+		case "target_paths", "paths":
+			for d.NextArg() {
+				m.WaitingRoomConfig.TargetPaths = append(m.WaitingRoomConfig.TargetPaths, d.Val())
+			}
 		default:
 			return d.Errf("unrecognized waiting_room subdirective: %s", d.Val())
 		}

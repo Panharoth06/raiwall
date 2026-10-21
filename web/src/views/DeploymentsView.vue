@@ -74,15 +74,15 @@ const handleRollback = async () => {
 </script>
 
 <template>
-  <div class="h-full flex flex-col space-y-4 p-6 bg-[#0d0f14] text-zinc-100 rounded-xl border border-zinc-800 shadow-2xl font-sans overflow-hidden">
+  <div class="h-full flex flex-col space-y-4 p-6 bg-card text-card-foreground rounded-xl border border-border shadow-2xl font-sans overflow-hidden">
     <!-- Header -->
     <div class="flex items-center justify-between shrink-0">
       <div>
-        <h1 class="text-sm font-semibold uppercase tracking-wider text-white flex items-center gap-2">
-          <Rocket class="w-4 h-4 text-slate-400" />
+        <h1 class="text-sm font-semibold uppercase tracking-wider text-foreground flex items-center gap-2">
+          <Rocket class="w-4 h-4 text-muted-foreground" />
           <span>Deployments & Rollback History</span>
         </h1>
-        <p class="text-[11px] text-zinc-400 mt-0.5">
+        <p class="text-sm text-muted-foreground mt-1 leading-relaxed">
           Atomic configuration promotion, pre-flight compiler validation, and 1-click snapshot rollback.
         </p>
       </div>
@@ -97,9 +97,9 @@ const handleRollback = async () => {
         <Button
           v-if="configStore.hasDraftChanges"
           @click="openDeployModal"
-          class="gap-1.5 text-white"
+          class="gap-1.5"
         >
-          <Rocket class="w-3.5 h-3.5 text-white" />
+          <Rocket class="w-3.5 h-3.5" />
           <span>Deploy {{ configStore.diffs.length }} Changes</span>
         </Button>
       </div>
@@ -110,11 +110,11 @@ const handleRollback = async () => {
       <!-- Staged Changes Section -->
       <div class="space-y-2">
         <div class="flex items-center justify-between">
-          <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+          <h2 class="text-xs font-semibold uppercase tracking-wider text-foreground flex items-center gap-2">
             <span>Staged Changes vs. Active Snapshot</span>
             <span
               v-if="configStore.diffs.length > 0"
-              class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30"
+              class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-warning/20 text-warning border border-warning/30"
             >
               {{ configStore.diffs.length }}
             </span>
@@ -127,19 +127,19 @@ const handleRollback = async () => {
       <!-- Deployment History & 1-Click Rollback -->
       <div class="space-y-2 pt-2">
         <div class="flex items-center justify-between">
-          <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-300 flex items-center gap-2">
-            <History class="w-3.5 h-3.5 text-slate-400" />
+          <h2 class="text-xs font-semibold uppercase tracking-wider text-foreground flex items-center gap-2">
+            <History class="w-3.5 h-3.5 text-muted-foreground" />
             <span>Snapshot Deployment History</span>
           </h2>
         </div>
 
-        <div class="bg-[#1e222a] border border-[#2d3440] rounded-lg overflow-hidden">
-          <div v-if="configStore.history.length === 0" class="p-8 text-center text-xs text-slate-400">
+        <div class="bg-card border border-border rounded-lg overflow-hidden">
+          <div v-if="configStore.history.length === 0" class="p-8 text-center text-xs text-muted-foreground">
             No historical snapshots recorded yet.
           </div>
 
           <Table v-else>
-            <TableHeader class="bg-[#14171d]">
+            <TableHeader class="bg-muted">
               <TableRow>
                 <TableHead class="font-mono text-[11px]">Version</TableHead>
                 <TableHead class="font-mono text-[11px]">Description / Commit</TableHead>
@@ -152,23 +152,23 @@ const handleRollback = async () => {
               <TableRow
                 v-for="snap in configStore.history"
                 :key="snap.version"
-                :class="{ 'bg-[#17223B]/20': snap.version === configStore.activeVersion }"
+                :class="{ 'bg-primary/5': snap.version === configStore.activeVersion }"
               >
                 <TableCell class="font-mono font-bold">
                   <span
                     class="px-2 py-0.5 rounded text-[11px]"
-                    :class="snap.version === configStore.activeVersion ? 'bg-[#17223B] text-[#38BDF8] border border-[#2574F5]/30' : 'bg-[#181b20] text-slate-400'"
+                    :class="snap.version === configStore.activeVersion ? 'bg-primary/10 text-primary border border-primary/30' : 'bg-muted text-muted-foreground'"
                   >
                     v{{ snap.version }}
                   </span>
                 </TableCell>
-                <TableCell class="font-medium text-white">
+                <TableCell class="font-medium text-foreground">
                   {{ snap.description || 'Routine update' }}
                 </TableCell>
-                <TableCell class="text-slate-400 font-mono text-[11px]">
+                <TableCell class="text-muted-foreground font-mono text-[11px]">
                   {{ snap.author || 'system' }}
                 </TableCell>
-                <TableCell class="text-slate-400 font-mono text-[11px]">
+                <TableCell class="text-muted-foreground font-mono text-[11px]">
                   {{ new Date(snap.applied_at).toLocaleString() }}
                 </TableCell>
                 <TableCell class="text-right">
@@ -177,12 +177,12 @@ const handleRollback = async () => {
                     variant="outline"
                     size="sm"
                     @click="confirmRollback(snap.version)"
-                    class="h-7 text-[11px] font-mono text-amber-400 border-amber-500/30 hover:bg-amber-500/10 gap-1"
+                    class="h-7 text-[11px] font-mono text-warning border-warning/30 hover:bg-warning/10 gap-1"
                   >
-                    <RotateCcw class="w-3 h-3 text-slate-400" />
+                    <RotateCcw class="w-3 h-3 text-warning" />
                     <span>1-Click Rollback</span>
                   </Button>
-                  <span v-else class="text-[10px] font-mono uppercase text-[#38BDF8] font-semibold">
+                  <span v-else class="text-[10px] font-mono uppercase text-primary font-semibold">
                     Active
                   </span>
                 </TableCell>
@@ -195,35 +195,35 @@ const handleRollback = async () => {
 
     <!-- Deploy Confirmation Modal -->
     <Dialog :open="deployModalOpen" @update:open="deployModalOpen = $event">
-      <DialogContent class="max-w-md bg-[#1e222a] border-[#2d3440] p-6 font-sans">
+      <DialogContent class="max-w-md">
         <DialogHeader>
           <div class="flex items-center space-x-2">
-            <Rocket class="w-5 h-5 text-slate-400" />
+            <Rocket class="w-5 h-5 text-muted-foreground" />
             <DialogTitle>Deploy Staged Configuration</DialogTitle>
           </div>
         </DialogHeader>
 
         <div class="space-y-4 py-2">
-          <p class="text-xs text-slate-400">
+          <p class="text-xs text-muted-foreground">
             This will run pre-flight AST compiler validation, generate a new immutable snapshot, and atomically hot-swap the live pointer across all cluster nodes.
           </p>
 
-          <div v-if="deployError" class="p-3 bg-rose-500/10 border border-rose-500/30 rounded-lg text-rose-400 text-xs">
+          <div v-if="deployError" class="p-3 bg-threat/10 border border-threat/30 rounded-lg text-threat text-xs">
             {{ deployError }}
           </div>
 
           <div>
-            <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Deployment Description</label>
+            <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Deployment Description</label>
             <textarea
               v-model="commitDescription"
               rows="2"
               placeholder="e.g. Added exception rule for payment search query"
-              class="w-full px-3 py-2 bg-[#181b20] border border-[#2d3440] rounded-md text-slate-200 text-xs focus:outline-none focus:border-[#2574F5] focus:ring-1 focus:ring-[#2574F5] transition-colors"
+              class="w-full px-3 py-2 bg-card border border-input rounded-md text-foreground placeholder:text-muted-foreground text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-ring transition-colors"
             ></textarea>
           </div>
         </div>
 
-        <DialogFooter class="flex justify-end space-x-2 pt-4 border-t border-[#2d3440]">
+        <DialogFooter>
           <Button
             type="button"
             variant="secondary"
@@ -235,9 +235,9 @@ const handleRollback = async () => {
             type="button"
             @click="handleDeploy"
             :disabled="deploying"
-            class="gap-1.5 text-white"
+            class="gap-1.5"
           >
-            <Rocket class="w-3.5 h-3.5 text-white" />
+            <Rocket class="w-3.5 h-3.5" />
             <span>{{ deploying ? 'Validating & Applying...' : 'Deploy Now' }}</span>
           </Button>
         </DialogFooter>
@@ -246,24 +246,24 @@ const handleRollback = async () => {
 
     <!-- Rollback Confirmation Modal -->
     <Dialog :open="rollbackModalOpen" @update:open="rollbackModalOpen = $event">
-      <DialogContent class="max-w-md bg-[#1e222a] border-[#2d3440] p-6 font-sans">
+      <DialogContent class="max-w-md">
         <DialogHeader>
           <div class="flex items-center space-x-2">
-            <RotateCcw class="w-5 h-5 text-slate-400" />
+            <RotateCcw class="w-5 h-5 text-muted-foreground" />
             <DialogTitle>Confirm 1-Click Rollback</DialogTitle>
           </div>
         </DialogHeader>
 
         <div class="space-y-3 py-2">
-          <p class="text-xs text-slate-300">
+          <p class="text-xs text-foreground">
             Are you sure you want to rollback to configuration snapshot <strong>v{{ selectedRollbackVersion }}</strong>?
           </p>
-          <p class="text-xs text-amber-400">
+          <p class="text-xs text-warning">
             The active live data plane and all cluster nodes will immediately revert to this historical version.
           </p>
         </div>
 
-        <DialogFooter class="flex justify-end space-x-2 pt-4 border-t border-[#2d3440]">
+        <DialogFooter>
           <Button
             type="button"
             variant="secondary"
@@ -275,9 +275,9 @@ const handleRollback = async () => {
             type="button"
             @click="handleRollback"
             :disabled="rollingBack"
-            class="bg-amber-600 hover:bg-amber-500 text-white gap-1.5"
+            class="bg-warning hover:bg-warning/90 text-warning-foreground gap-1.5"
           >
-            <RotateCcw class="w-3.5 h-3.5 text-white" />
+            <RotateCcw class="w-3.5 h-3.5 text-warning-foreground" />
             <span>{{ rollingBack ? 'Reverting...' : 'Confirm Rollback' }}</span>
           </Button>
         </DialogFooter>

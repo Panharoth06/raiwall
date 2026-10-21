@@ -1,6 +1,7 @@
 package rate
 
 import (
+	"context"
 	"net"
 	"testing"
 	"time"
@@ -133,6 +134,94 @@ func TestBanManager(t *testing.T) {
 			t.Errorf("expected 0 active bans after ReleaseAll")
 		}
 	})
+
+	t.Run("BanStorage and OnUnblock integration", func(t *testing.T) {
+		bm := NewBanManager(nil)
+		defer bm.Close()
+
+		mockStorage := &mockBanStorage{
+			bans: make(map[string]*BanEntry),
+		}
+		bm.SetBanStorage(mockStorage)
+
+		var unblocked string
+		bm.SetOnUnblock(func(target string) {
+			unblocked = target
+		})
+
+		entry := bm.BanWithSite(ip1, ja4_A, 1*time.Hour, "tier2_attack", "site-123")
+		if entry.SiteID != "site-123" {
+			t.Errorf("expected siteID site-123, got %s", entry.SiteID)
+		}
+
+		if len(mockStorage.bans) != 1 {
+			t.Fatalf("expected ban stored in BanStorage")
+		}
+
+		// Verify ListBans includes external bans from storage
+		externalIP := "198.51.100.222"
+		mockStorage.bans[externalIP] = &BanEntry{
+			Key:              externalIP,
+			ClientIP:         externalIP,
+			Reason:           "cluster_node_ban",
+			Duration:         time.Hour,
+			RemainingSeconds: 3600,
+			BannedAt:         time.Now(),
+			ExpiresAt:        time.Now().Add(time.Hour),
+		}
+
+		bans := bm.ListBans()
+		if len(bans) != 2 {
+			t.Errorf("expected 2 bans after merging with storage, got %d", len(bans))
+		}
+
+		// Release and verify OnUnblock and BanStorage.RemoveBan
+		bm.Release(ip1.String())
+		if unblocked != ip1.String() {
+			t.Errorf("expected OnUnblock callback with %s, got %s", ip1.String(), unblocked)
+		}
+		if _, exists := mockStorage.bans[ip1.String()]; exists {
+			t.Errorf("expected ban removed from BanStorage")
+		}
+
+		// ReleaseAll and verify BanStorage.ClearBans
+		bm.ReleaseAll()
+		if len(mockStorage.bans) != 0 {
+			t.Errorf("expected BanStorage cleared on ReleaseAll")
+		}
+	})
+}
+
+type mockBanStorage struct {
+	bans map[string]*BanEntry
+}
+
+func (m *mockBanStorage) StoreBan(ctx context.Context, entry *BanEntry) error {
+	m.bans[entry.Key] = entry
+	return nil
+}
+
+func (m *mockBanStorage) RemoveBan(ctx context.Context, keyOrIP string) error {
+	delete(m.bans, keyOrIP)
+	for k, e := range m.bans {
+		if e.ClientIP == keyOrIP || e.Key == keyOrIP {
+			delete(m.bans, k)
+		}
+	}
+	return nil
+}
+
+func (m *mockBanStorage) ClearBans(ctx context.Context) error {
+	m.bans = make(map[string]*BanEntry)
+	return nil
+}
+
+func (m *mockBanStorage) ListBans(ctx context.Context) ([]*BanEntry, error) {
+	res := make([]*BanEntry, 0, len(m.bans))
+	for _, b := range m.bans {
+		res = append(res, b)
+	}
+	return res, nil
 }
 
 func BenchmarkBanLookup(b *testing.B) {

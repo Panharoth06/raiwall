@@ -215,7 +215,7 @@ provide('tabsActiveTab', computed(() => props.tabs[activeIndex.value]?.id ?? sel
       <!-- Hover Highlight -->
       <div
         data-testid="tab-hover-highlight"
-        class="absolute h-[30px] transition-all duration-300 ease-out bg-[#0e0f1114] dark:bg-[#ffffff1a] rounded-[6px] flex items-center pointer-events-none"
+        class="absolute h-[30px] transition-all duration-300 ease-out bg-muted/60 rounded-[6px] flex items-center pointer-events-none"
         :style="{
           ...hoverStyle,
           opacity: hoveredIndex !== null ? 1 : 0,
@@ -225,7 +225,7 @@ provide('tabsActiveTab', computed(() => props.tabs[activeIndex.value]?.id ?? sel
       <!-- Active Indicator -->
       <div
         data-testid="tab-active-indicator"
-        class="absolute bottom-[-6px] h-[2px] bg-[#0e0f11] dark:bg-white transition-all duration-300 ease-out pointer-events-none"
+        class="absolute bottom-[-6px] h-[2px] bg-primary transition-all duration-300 ease-out pointer-events-none"
         :style="activeStyle"
       />
 
@@ -240,10 +240,10 @@ provide('tabsActiveTab', computed(() => props.tabs[activeIndex.value]?.id ?? sel
           tabindex="0"
           :aria-selected="index === activeIndex"
           :class="cn(
-            'px-3 py-2 cursor-pointer transition-colors duration-300 h-[30px] select-none rounded-[6px] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#2574F5]',
+            'px-3 py-2 cursor-pointer transition-colors duration-300 h-[30px] select-none rounded-[6px] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
             index === activeIndex 
-              ? 'text-[#0e0e10] dark:text-white font-medium' 
-              : 'text-[#0e0f1199] dark:text-[#ffffff99]'
+              ? 'text-foreground font-medium' 
+              : 'text-muted-foreground hover:text-foreground'
           )"
           @mouseenter="hoveredIndex = index"
           @mouseleave="hoveredIndex = null"

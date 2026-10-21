@@ -20,6 +20,7 @@ import (
 	api "github.com/Panharoth06/raiwall/internal/adapters/inbound/http"
 	"github.com/Panharoth06/raiwall/internal/adapters/outbound/storage/sqlite"
 	"github.com/Panharoth06/raiwall/internal/core/control"
+	"github.com/Panharoth06/raiwall/internal/core/rate"
 )
 
 type mockPublisher struct {
@@ -31,6 +32,18 @@ func (m *mockPublisher) PublishVersion(ctx context.Context, version uint64) erro
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.published = append(m.published, version)
+	return nil
+}
+
+func (m *mockPublisher) PublishBan(ctx context.Context, entry *rate.BanEntry) error {
+	return nil
+}
+
+func (m *mockPublisher) PublishUnblock(ctx context.Context, target string) error {
+	return nil
+}
+
+func (m *mockPublisher) PublishUnblockAll(ctx context.Context) error {
 	return nil
 }
 

@@ -225,19 +225,19 @@ onUnmounted(() => {
   <div
     ref="containerRef"
     data-testid="attack-globe-container"
-    class="flex flex-col items-center justify-center p-5 bg-[#0d0f14] text-zinc-100 rounded-xl border border-zinc-800 shadow-2xl relative overflow-hidden font-sans"
+    class="flex flex-col items-center justify-center p-5 bg-card text-card-foreground rounded-xl border border-border shadow-2xl relative overflow-hidden font-sans"
   >
     <!-- Header overlay -->
     <div class="absolute top-4 left-5 z-10 flex items-center gap-2">
-      <GlobeIcon class="w-4 h-4 text-slate-400" />
-      <span class="text-xs font-bold uppercase tracking-wider text-zinc-200">
+      <GlobeIcon class="w-4 h-4 text-muted-foreground" />
+      <span class="text-xs font-bold uppercase tracking-wider text-foreground">
         3D Attack Globe (Geolocated Threats)
       </span>
     </div>
 
     <!-- Active Arcs Counter -->
-    <div class="absolute top-4 right-5 z-10 flex items-center gap-2 text-xs font-mono text-zinc-400">
-      <span class="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
+    <div class="absolute top-4 right-5 z-10 flex items-center gap-2 text-xs font-mono text-muted-foreground">
+      <span class="w-2 h-2 rounded-full bg-threat animate-ping"></span>
       <span>{{ activeArcs.length }} Active Attack Arcs</span>
     </div>
 
@@ -251,12 +251,12 @@ onUnmounted(() => {
     />
 
     <!-- Bottom Gateway Tag -->
-    <div class="absolute bottom-4 z-10 flex items-center gap-3 text-[11px] font-mono text-zinc-400 bg-zinc-900/80 px-3 py-1 rounded-full border border-zinc-800 backdrop-blur-md">
-      <div class="flex items-center gap-1.5 text-slate-300 font-semibold">
-        <Shield class="w-3.5 h-3.5 text-slate-400" />
+    <div class="absolute bottom-4 z-10 flex items-center gap-3 text-[11px] font-mono text-muted-foreground bg-muted/80 px-3 py-1 rounded-full border border-border backdrop-blur-md">
+      <div class="flex items-center gap-1.5 text-foreground font-semibold">
+        <Shield class="w-3.5 h-3.5 text-muted-foreground" />
         Protected Gateway
       </div>
-      <span class="text-zinc-600">|</span>
+      <span class="text-muted-foreground">|</span>
       <span>Lat: {{ gatewayLat.toFixed(2) }}, Lon: {{ gatewayLon.toFixed(2) }}</span>
     </div>
   </div>

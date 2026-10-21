@@ -7,5 +7,5 @@ const props = defineProps<TooltipArrowProps & { class?: HTMLAttributes['class'] 
 </script>
 
 <template>
-  <TooltipArrow v-bind="props" :class="cn('fill-[#1E222A]', props.class)" />
+  <TooltipArrow v-bind="props" :class="cn('fill-popover', props.class)" />
 </template>

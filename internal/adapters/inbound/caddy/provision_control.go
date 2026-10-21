@@ -1,11 +1,13 @@
 package caddy
 
 import (
+	"context"
 	"time"
 
 	"github.com/Panharoth06/raiwall/internal/adapters/inbound/http"
 	"github.com/Panharoth06/raiwall/internal/adapters/outbound/storage/sqlite"
 	"github.com/caddyserver/caddy/v2"
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
 
@@ -29,6 +31,7 @@ func (m *Middleware) provisionControl(_ caddy.Context) error {
 		} else {
 			m.controlStore = store
 			m.controlAPI = api.NewServer(store, secret)
+			m.ensureInitialAdminUser(store)
 		}
 	}
 
@@ -50,4 +53,28 @@ func (m *Middleware) provisionControl(_ caddy.Context) error {
 	}
 
 	return nil
+}
+
+func (m *Middleware) ensureInitialAdminUser(store *sqlite.Store) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	users, err := store.ListUsers(ctx)
+	if err == nil && len(users) == 0 {
+		hash, err := api.HashPassword("admin")
+		if err == nil {
+			now := time.Now().UTC()
+			_ = store.CreateUser(ctx, sqlite.CreateUserParams{
+				ID:           uuid.New().String(),
+				Username:     "admin",
+				PasswordHash: hash,
+				Role:         "admin",
+				IsActive:     1,
+				CreatedAt:    now,
+				UpdatedAt:    now,
+			})
+			if m.logger != nil {
+				m.logger.Info("auto-provisioned initial admin user", zap.String("username", "admin"))
+			}
+		}
+	}
 }

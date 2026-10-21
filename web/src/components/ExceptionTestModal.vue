@@ -91,29 +91,29 @@ const handleOpenChange = (openState: boolean) => {
 
 <template>
   <Dialog :open="open" @update:open="handleOpenChange">
-    <DialogContent class="max-w-xl bg-[#1e222a] border-[#2d3440] p-6 font-sans">
+    <DialogContent class="max-w-xl">
       <!-- Header -->
       <DialogHeader>
         <div class="flex items-center space-x-2.5">
-          <Play class="w-5 h-5 text-slate-400" />
+          <Play class="w-5 h-5 text-muted-foreground" />
           <DialogTitle>Exception Rule Test Simulator</DialogTitle>
         </div>
       </DialogHeader>
 
       <!-- Body -->
       <div class="py-2 space-y-4">
-        <p class="text-xs text-slate-400">
+        <p class="text-xs text-muted-foreground">
           Test synthetic HTTP parameters against this exception rule to confirm false-positive suppression before deployment.
         </p>
 
         <div class="grid grid-cols-3 gap-3">
           <div>
-            <label class="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Method</label>
+            <label class="block text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Method</label>
             <Select v-model="testMethod">
-              <SelectTrigger class="w-full h-9 border-[#363D4C] bg-[#15181F] text-xs text-white">
+              <SelectTrigger class="w-full h-9">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent class="border-[#363D4C] bg-[#1E222A] text-white">
+              <SelectContent>
                 <SelectItem value="GET">GET</SelectItem>
                 <SelectItem value="POST">POST</SelectItem>
                 <SelectItem value="PUT">PUT</SelectItem>
@@ -129,7 +129,7 @@ const handleOpenChange = (openState: boolean) => {
           </div>
 
           <div class="col-span-2">
-            <label class="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Host Header</label>
+            <label class="block text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Host Header</label>
             <Input
               v-model="testHost"
               placeholder="api.example.com"
@@ -138,7 +138,7 @@ const handleOpenChange = (openState: boolean) => {
         </div>
 
         <div>
-          <label class="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Request Path</label>
+          <label class="block text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Request Path</label>
           <Input
             v-model="testPath"
             placeholder="/v1/search"
@@ -147,7 +147,7 @@ const handleOpenChange = (openState: boolean) => {
 
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Param Name</label>
+            <label class="block text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Param Name</label>
             <Input
               v-model="testParamName"
               placeholder="query"
@@ -155,7 +155,7 @@ const handleOpenChange = (openState: boolean) => {
           </div>
 
           <div>
-            <label class="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Test Payload</label>
+            <label class="block text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Test Payload</label>
             <Input
               v-model="testParamVal"
               placeholder="' OR 1=1 --"
@@ -164,18 +164,18 @@ const handleOpenChange = (openState: boolean) => {
         </div>
 
         <!-- Simulation Output Box -->
-        <div v-if="result" class="p-3.5 rounded-lg border text-xs" :class="result.matched ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-rose-500/10 border-rose-500/30'">
-          <div class="flex items-center space-x-2 font-semibold" :class="result.matched ? 'text-emerald-400' : 'text-rose-400'">
-            <ShieldCheck v-if="result.matched" class="w-4 h-4 text-slate-400" />
-            <ShieldAlert v-else class="w-4 h-4 text-slate-400" />
+        <div v-if="result" class="p-3.5 rounded-lg border text-xs" :class="result.matched ? 'bg-success/10 border-success/30' : 'bg-threat/10 border-threat/30'">
+          <div class="flex items-center space-x-2 font-semibold" :class="result.matched ? 'text-success' : 'text-threat'">
+            <ShieldCheck v-if="result.matched" class="w-4 h-4 text-success" />
+            <ShieldAlert v-else class="w-4 h-4 text-threat" />
             <span>{{ result.matched ? 'Suppression Matched (Traffic Allowed)' : 'No Match (Threat Blocked)' }}</span>
           </div>
-          <p class="mt-1 text-slate-300 text-[11px] font-mono">{{ result.reason }}</p>
+          <p class="mt-1 text-foreground text-[11px] font-mono">{{ result.reason }}</p>
         </div>
       </div>
 
       <!-- Footer -->
-      <DialogFooter class="flex justify-end space-x-2 pt-4 border-t border-[#2d3440]">
+      <DialogFooter>
         <Button
           type="button"
           variant="secondary"
