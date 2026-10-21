@@ -47,7 +47,7 @@ const mockMetrics: WaitingRoomMetrics = {
 beforeEach(async () => {
   setActivePinia(createPinia());
   vi.restoreAllMocks();
-  await router.navigate('/http-flood');
+  await router.navigate('/http-flood/limits');
   global.ResizeObserver = MockResizeObserver as unknown as typeof ResizeObserver;
 
   vi.spyOn(api, 'listBans').mockResolvedValue([...mockBans]);
@@ -57,22 +57,16 @@ beforeEach(async () => {
 });
 
 describe('HttpFloodView.vue', () => {
-  it('renders tab headers and defaults to Active Blocked Clients', async () => {
+  it('renders Rate Limiting Table by default on /http-flood/limits', async () => {
     const wrapper = mount(HttpFloodView);
     await nextTick();
-
-    const tabItems = wrapper.findAll('[data-testid="tab-item"]');
-    const tabTexts = tabItems.map((b) => b.text());
-
-    expect(tabTexts.some((t) => t.includes('Active Blocked Clients'))).toBe(true);
-    expect(tabTexts.some((t) => t.includes('3-Tier Limits Configuration'))).toBe(true);
-    expect(tabTexts.some((t) => t.includes('Waiting Room Dashboard'))).toBe(true);
-
-    // Active bans table should be rendered by default
-    expect(api.listBans).toHaveBeenCalled();
     await nextTick();
+
+    expect(api.listBans).toHaveBeenCalled();
     expect(wrapper.text()).toContain('198.51.100.10');
     expect(wrapper.text()).toContain('tier1_velocity_limit');
+    expect(wrapper.text()).toContain('UNBLOCK ALL');
+    expect(wrapper.text()).toContain('SETTINGS');
   });
 
   it('performs single ban release when clicking Unblock button', async () => {
@@ -90,7 +84,6 @@ describe('HttpFloodView.vue', () => {
     });
 
     await nextTick();
-    // After unblocking first item, only second item remains
     expect(wrapper.text()).not.toContain('198.51.100.10|t13d1516h2_bot');
     expect(wrapper.text()).toContain('198.51.100.20');
   });
@@ -106,7 +99,6 @@ describe('HttpFloodView.vue', () => {
     await unblockAllBtn!.trigger('click');
     await nextTick();
 
-    // Confirm button inside teleported dialog
     const confirmBtn = Array.from(document.body.querySelectorAll('button')).find((b) =>
       b.textContent?.includes('Confirm Emergency Unblock')
     );
@@ -121,41 +113,22 @@ describe('HttpFloodView.vue', () => {
     expect(wrapper.text()).toContain('No active client bans');
   });
 
-  it('switches to 3-Tier Limits tab and saves configuration to draft', async () => {
-    const configStore = useConfigStore();
-    const saveSpy = vi.spyOn(configStore, 'savePolicies').mockResolvedValue();
-
+  it('renders 3-Tier Limits configuration in settings view only (/http-flood/limits/settings)', async () => {
+    await router.navigate('/http-flood/limits/settings');
     const wrapper = mount(HttpFloodView);
     await nextTick();
 
-    // Switch to limits tab
-    const limitsTabBtn = wrapper.findAll('[data-testid="tab-item"]').find((b) => b.text().includes('3-Tier Limits Configuration'));
-    expect(limitsTabBtn).toBeDefined();
-    await limitsTabBtn!.trigger('click');
-    await nextTick();
-
-    expect(wrapper.text()).toContain('Tier 1: Access Velocity Limiting');
-    expect(wrapper.text()).toContain('Tier 2: Attack Frequency Auto-Ban');
-    expect(wrapper.text()).toContain('Tier 3: Upstream Scanner Trap');
-
-    // Click Save to Draft
-    const saveBtn = wrapper.findAll('button').find((b) => b.text().includes('Save to Draft'));
-    expect(saveBtn).toBeDefined();
-    await saveBtn!.trigger('click');
-
-    expect(saveSpy).toHaveBeenCalled();
-    await nextTick();
-    expect(wrapper.text()).toContain('Volumetric defense policies saved to draft');
+    expect(wrapper.text()).toContain('Access Limiting');
+    expect(wrapper.text()).toContain('Basic Access Limit');
+    expect(wrapper.text()).toContain('Attack Limiting');
+    expect(wrapper.text()).toContain('Basic Attack Limit');
+    expect(wrapper.text()).toContain('Error Limiting');
+    expect(wrapper.text()).toContain('Basic Error Limit');
   });
 
-  it('switches to Waiting Room Dashboard tab and displays live telemetry', async () => {
+  it('renders Waiting Room Dashboard on /http-flood/waiting-room', async () => {
+    await router.navigate('/http-flood/waiting-room');
     const wrapper = mount(HttpFloodView);
-    await nextTick();
-
-    // Switch to waiting room tab
-    const wrTabBtn = wrapper.findAll('[data-testid="tab-item"]').find((b) => b.text().includes('Waiting Room Dashboard'));
-    expect(wrTabBtn).toBeDefined();
-    await wrTabBtn!.trigger('click');
     await nextTick();
 
     expect(api.getWaitingRoomMetrics).toHaveBeenCalled();
@@ -169,37 +142,7 @@ describe('HttpFloodView.vue', () => {
     await nextTick();
     await nextTick();
 
-    // 198.51.100.20 has remaining_seconds: 3600 -> should format as '1h 00m 00s'
     expect(wrapper.text()).toContain('1h 00m 00s');
-    // 198.51.100.10 has remaining_seconds: 120 -> should format as '2m 00s'
     expect(wrapper.text()).toContain('2m 00s');
-  });
-
-  it('allows updating waiting room capacity from dashboard', async () => {
-    const wrapper = mount(HttpFloodView);
-    await nextTick();
-
-    // Switch to waiting room tab
-    const wrTabBtn = wrapper.findAll('[data-testid="tab-item"]').find((b) => b.text().includes('Waiting Room Dashboard'));
-    await wrTabBtn!.trigger('click');
-    await nextTick();
-
-    const capacityInput = wrapper.find('input[type="number"]');
-    expect(capacityInput.exists()).toBe(true);
-
-    await capacityInput.setValue('2500');
-    await nextTick();
-
-    // Switch to limits tab or save and verify policy capacity updated
-    const saveBtn = wrapper.findAll('button').find((b) => b.text().includes('Save to Draft'));
-    const configStore = useConfigStore();
-    const saveSpy = vi.spyOn(configStore, 'savePolicies').mockResolvedValue();
-    await saveBtn!.trigger('click');
-
-    expect(saveSpy).toHaveBeenCalledWith(
-      expect.objectContaining({
-        waiting_room_max_concurrent: 2500,
-      })
-    );
   });
 });

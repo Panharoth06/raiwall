@@ -13,6 +13,14 @@ import {
   SelectItem,
 } from '@/components/ui/select';
 import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from '@/components/ui/table';
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -23,14 +31,12 @@ import {
 import {
   Globe,
   Settings as SettingsIcon,
-  ShieldAlert,
-  Search,
   RefreshCw,
   AlertTriangle,
   Loader2,
   ChevronRight,
   ShieldOff,
-  Filter,
+  Calendar,
 } from 'lucide-vue-next';
 
 const router = useRouter();
@@ -240,22 +246,20 @@ const goToSettings = () => {
       </nav>
     </div>
 
-    <!-- Filter Bar & SafeLine Action Buttons -->
-    <div class="flex flex-wrap items-center justify-between gap-3 bg-card p-3 rounded-lg border border-border shadow-xs">
+    <!-- Filter Bar & SafeLine Action Buttons (Pure shadcn components) -->
+    <div class="flex flex-wrap items-center justify-between gap-3">
       <div class="flex flex-wrap items-center gap-2.5 flex-1 min-w-0">
         <!-- IP Filter -->
-        <div class="relative w-44">
-          <Input
-            v-model="filterIp"
-            placeholder="IP Addr"
-            class="h-8 text-xs font-mono"
-          />
-        </div>
+        <Input
+          v-model="filterIp"
+          placeholder="IP Addr"
+          class="h-9 w-48 text-xs font-mono"
+        />
 
         <!-- Application Selector -->
-        <div class="w-44">
+        <div class="w-48">
           <Select v-model="filterApp">
-            <SelectTrigger class="h-8 text-xs">
+            <SelectTrigger class="h-9 text-xs">
               <SelectValue placeholder="Application" />
             </SelectTrigger>
             <SelectContent>
@@ -271,30 +275,33 @@ const goToSettings = () => {
           </Select>
         </div>
 
-        <!-- Start At Filter -->
-        <div class="w-40">
+        <!-- Start At Filter with Calendar Icon -->
+        <div class="relative w-44">
           <Input
             v-model="filterStartAt"
             type="date"
             placeholder="Start At"
-            class="h-8 text-xs font-mono"
+            class="h-9 text-xs font-mono pr-8"
           />
+          <Calendar class="w-4 h-4 text-muted-foreground absolute right-2.5 top-2.5 pointer-events-none" />
         </div>
 
-        <!-- End At Filter -->
-        <div class="w-40">
+        <!-- End At Filter with Calendar Icon -->
+        <div class="relative w-44">
           <Input
             v-model="filterEndAt"
             type="date"
             placeholder="End At"
-            class="h-8 text-xs font-mono"
+            class="h-9 text-xs font-mono pr-8"
           />
+          <Calendar class="w-4 h-4 text-muted-foreground absolute right-2.5 top-2.5 pointer-events-none" />
         </div>
 
+        <!-- Refresh Button -->
         <Button
-          variant="ghost"
-          size="sm"
-          class="h-8 px-2 text-muted-foreground hover:text-foreground"
+          variant="outline"
+          size="icon"
+          class="h-9 w-9 text-muted-foreground hover:text-foreground shrink-0"
           @click="loadBans"
           title="Refresh"
         >
@@ -306,8 +313,7 @@ const goToSettings = () => {
       <div class="flex items-center gap-2">
         <Button
           variant="outline"
-          size="sm"
-          class="h-8 px-3 text-xs font-semibold uppercase tracking-wider"
+          class="h-9 px-4 text-xs font-semibold text-primary border-primary/30 hover:bg-primary/10 hover:text-primary uppercase tracking-wider"
           :disabled="bans.length === 0 || loading"
           @click="showUnblockAllModal = true"
         >
@@ -315,8 +321,8 @@ const goToSettings = () => {
         </Button>
 
         <Button
-          size="sm"
-          class="h-8 px-4 text-xs font-semibold uppercase tracking-wider gap-1.5 shadow-xs"
+          variant="default"
+          class="h-9 px-4 text-xs font-semibold uppercase tracking-wider gap-1.5 shadow-xs"
           @click="goToSettings"
         >
           <SettingsIcon class="w-3.5 h-3.5" />
@@ -334,139 +340,137 @@ const goToSettings = () => {
       <span>{{ error }}</span>
     </div>
 
-    <!-- SafeLine Multi-Column Rate Limiting Table -->
+    <!-- SafeLine Multi-Column Rate Limiting Table using shadcn Table components -->
     <div class="bg-card border border-border rounded-lg overflow-hidden shadow-xs">
-      <div class="overflow-x-auto">
-        <table class="w-full text-left border-collapse text-xs">
-          <thead>
-            <tr class="border-b border-border bg-muted/40 text-muted-foreground font-medium select-none">
-              <th class="py-2.5 px-4 w-52">IP Addr</th>
-              <th class="py-2.5 px-4 w-48">Application</th>
-              <th class="py-2.5 px-4 min-w-[280px]">Detail</th>
-              <th class="py-2.5 px-4 w-24 text-center">Blocked</th>
-              <th class="py-2.5 px-4 w-44">Start At</th>
-              <th class="py-2.5 px-4 w-28 text-right">Action</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-border/60">
-            <!-- Loading Skeleton -->
-            <tr v-if="loading && bans.length === 0">
-              <td colspan="6" class="py-12 text-center text-muted-foreground">
-                <Loader2 class="h-6 w-6 animate-spin mx-auto mb-2 text-primary" />
-                <span class="text-xs">Loading active rate limit records...</span>
-              </td>
-            </tr>
+      <Table>
+        <TableHeader>
+          <TableRow class="bg-muted/40 hover:bg-muted/40 border-b border-border">
+            <TableHead class="w-52 font-semibold">IP Addr</TableHead>
+            <TableHead class="w-48 font-semibold">Application</TableHead>
+            <TableHead class="min-w-[280px] font-semibold">Detail</TableHead>
+            <TableHead class="w-24 text-center font-semibold">Blocked</TableHead>
+            <TableHead class="w-44 font-semibold">Start At</TableHead>
+            <TableHead class="w-28 text-right font-semibold">Action</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          <!-- Loading Skeleton -->
+          <TableRow v-if="loading && bans.length === 0">
+            <TableCell colspan="6" class="py-12 text-center text-muted-foreground">
+              <Loader2 class="h-6 w-6 animate-spin mx-auto mb-2 text-primary" />
+              <span class="text-xs">Loading active rate limit records...</span>
+            </TableCell>
+          </TableRow>
 
-            <!-- Empty State -->
-            <tr v-else-if="filteredBans.length === 0">
-              <td colspan="6" class="py-12 text-center">
-                <ShieldOff class="h-8 w-8 mx-auto mb-2 text-muted-foreground/40" />
-                <div class="text-xs font-semibold text-foreground">No active client bans</div>
-                <div class="text-[11px] text-muted-foreground mt-0.5">
-                  No IP addresses currently exceed access velocity, attack threshold, or scanner limits.
-                </div>
-              </td>
-            </tr>
+          <!-- Empty State -->
+          <TableRow v-else-if="filteredBans.length === 0">
+            <TableCell colspan="6" class="py-12 text-center">
+              <ShieldOff class="h-8 w-8 mx-auto mb-2 text-muted-foreground/40" />
+              <div class="text-xs font-semibold text-foreground">No active client bans</div>
+              <div class="text-[11px] text-muted-foreground mt-0.5">
+                No IP addresses currently exceed access velocity, attack threshold, or scanner limits.
+              </div>
+            </TableCell>
+          </TableRow>
 
-            <!-- Table Rows -->
-            <tr
-              v-for="entry in filteredBans"
-              :key="entry.key"
-              class="hover:bg-muted/30 transition-colors group"
-            >
-              <!-- 1. IP Addr + Country + JA4 -->
-              <td class="py-3 px-4 align-top">
-                <div class="font-mono font-medium text-foreground text-xs leading-tight">
-                  {{ entry.client_ip || entry.key }}
-                </div>
-                <div class="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1.5">
-                  <span>{{ resolveCountry(entry.client_ip, entry.country) }}</span>
-                  <span
-                    v-if="entry.ja4"
-                    class="font-mono text-[10px] px-1 py-0.2 rounded bg-muted text-muted-foreground border border-border"
-                  >
-                    {{ entry.ja4 }}
-                  </span>
-                </div>
-              </td>
-
-              <!-- 2. Application -->
-              <td class="py-3 px-4 align-top">
-                <div class="flex items-center gap-1.5">
-                  <Globe class="w-3.5 h-3.5 text-primary shrink-0" />
-                  <span class="font-medium text-foreground text-xs truncate">
-                    {{ resolveAppName(entry.site_id).name }}
-                  </span>
-                </div>
-                <div class="text-[11px] text-muted-foreground mt-0.5 pl-5">
-                  {{ resolveAppName(entry.site_id).host }}
-                </div>
-              </td>
-
-              <!-- 3. Detail: Reason & Action -->
-              <td class="py-3 px-4 align-top">
-                <div class="flex items-baseline gap-1.5">
-                  <span class="text-muted-foreground font-normal">Reason</span>
-                  <span class="text-foreground font-medium text-xs">
-                    {{ formatDetail(entry).reason }}
-                  </span>
-                  <span class="font-mono text-[10px] text-muted-foreground/80">
-                    ({{ entry.reason }})
-                  </span>
-                </div>
-                <div class="flex items-baseline gap-1.5 mt-1">
-                  <span class="text-muted-foreground font-normal">Action</span>
-                  <span class="text-xs font-medium text-amber-500/90 dark:text-amber-400">
-                    {{ formatDetail(entry).action }}
-                  </span>
-                  <span
-                    v-if="entry.remaining_seconds > 0"
-                    class="text-[11px] text-muted-foreground font-mono ml-1"
-                  >
-                    ({{ formatCountdown(entry.remaining_seconds) }})
-                  </span>
-                </div>
-              </td>
-
-              <!-- 4. Blocked Hits -->
-              <td class="py-3 px-4 align-top text-center">
-                <span class="font-mono font-semibold text-foreground text-xs">
-                  {{ entry.blocked_count ?? 0 }}
-                </span>
-              </td>
-
-              <!-- 5. Start At -->
-              <td class="py-3 px-4 align-top font-mono text-[11px] text-muted-foreground">
-                {{ formatStartAt(entry.banned_at) }}
-              </td>
-
-              <!-- 6. Action / Status -->
-              <td class="py-3 px-4 align-top text-right">
+          <!-- Table Rows -->
+          <TableRow
+            v-for="entry in filteredBans"
+            :key="entry.key"
+            class="hover:bg-muted/30 transition-colors"
+          >
+            <!-- 1. IP Addr + Country + JA4 -->
+            <TableCell class="align-top py-3">
+              <div class="font-mono font-medium text-foreground text-xs leading-tight">
+                {{ entry.client_ip || entry.key }}
+              </div>
+              <div class="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1.5">
+                <span>{{ resolveCountry(entry.client_ip, entry.country) }}</span>
                 <span
-                  v-if="releasedKeys.has(entry.key)"
-                  class="text-xs font-medium text-muted-foreground"
+                  v-if="entry.ja4"
+                  class="font-mono text-[10px] px-1 py-0.2 rounded bg-muted text-muted-foreground border border-border"
                 >
-                  Unblocked
+                  {{ entry.ja4 }}
                 </span>
-                <Button
-                  v-else
-                  variant="ghost"
-                  size="sm"
-                  class="h-7 text-xs font-medium text-primary hover:text-primary hover:bg-primary/10"
-                  :disabled="pendingReleaseKey === entry.key"
-                  @click="handleReleaseSingle(entry)"
+              </div>
+            </TableCell>
+
+            <!-- 2. Application -->
+            <TableCell class="align-top py-3">
+              <div class="flex items-center gap-1.5">
+                <Globe class="w-3.5 h-3.5 text-primary shrink-0" />
+                <span class="font-medium text-foreground text-xs truncate">
+                  {{ resolveAppName(entry.site_id).name }}
+                </span>
+              </div>
+              <div class="text-[11px] text-muted-foreground mt-0.5 pl-5">
+                {{ resolveAppName(entry.site_id).host }}
+              </div>
+            </TableCell>
+
+            <!-- 3. Detail: Reason & Action -->
+            <TableCell class="align-top py-3">
+              <div class="flex items-baseline gap-1.5">
+                <span class="text-muted-foreground font-normal">Reason</span>
+                <span class="text-foreground font-medium text-xs">
+                  {{ formatDetail(entry).reason }}
+                </span>
+                <span class="font-mono text-[10px] text-muted-foreground/80">
+                  ({{ entry.reason }})
+                </span>
+              </div>
+              <div class="flex items-baseline gap-1.5 mt-1">
+                <span class="text-muted-foreground font-normal">Action</span>
+                <span class="text-xs font-medium text-amber-500/90 dark:text-amber-400">
+                  {{ formatDetail(entry).action }}
+                </span>
+                <span
+                  v-if="entry.remaining_seconds > 0"
+                  class="text-[11px] text-muted-foreground font-mono ml-1"
                 >
-                  <Loader2
-                    v-if="pendingReleaseKey === entry.key"
-                    class="h-3 w-3 animate-spin mr-1"
-                  />
-                  <span>Unblock</span>
-                </Button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+                  ({{ formatCountdown(entry.remaining_seconds) }})
+                </span>
+              </div>
+            </TableCell>
+
+            <!-- 4. Blocked Hits -->
+            <TableCell class="align-top py-3 text-center">
+              <span class="font-mono font-semibold text-foreground text-xs">
+                {{ entry.blocked_count ?? 0 }}
+              </span>
+            </TableCell>
+
+            <!-- 5. Start At -->
+            <TableCell class="align-top py-3 font-mono text-[11px] text-muted-foreground">
+              {{ formatStartAt(entry.banned_at) }}
+            </TableCell>
+
+            <!-- 6. Action / Status -->
+            <TableCell class="align-top py-3 text-right">
+              <span
+                v-if="releasedKeys.has(entry.key)"
+                class="text-xs font-medium text-muted-foreground"
+              >
+                Unblocked
+              </span>
+              <Button
+                v-else
+                variant="ghost"
+                size="sm"
+                class="h-7 text-xs font-medium text-primary hover:text-primary hover:bg-primary/10"
+                :disabled="pendingReleaseKey === entry.key"
+                @click="handleReleaseSingle(entry)"
+              >
+                <Loader2
+                  v-if="pendingReleaseKey === entry.key"
+                  class="h-3 w-3 animate-spin mr-1"
+                />
+                <span>Unblock</span>
+              </Button>
+            </TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
     </div>
 
     <!-- Emergency Unblock All Confirmation Modal -->
