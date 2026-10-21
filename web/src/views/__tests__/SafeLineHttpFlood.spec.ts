@@ -43,14 +43,15 @@ beforeEach(async () => {
 
 describe('SafeLine HTTP Flood Workflow', () => {
   describe('RateLimitingTable.vue', () => {
-    it('renders SafeLine breadcrumbs, filter bar, and action buttons', async () => {
+    it('renders SafeLine filter bar, shadcn date pickers, and action buttons', async () => {
       const wrapper = mount(RateLimitingTable);
       await nextTick();
       await nextTick();
 
-      expect(wrapper.text()).toContain('Rate Limiting');
       expect(wrapper.text()).toContain('UNBLOCK ALL');
       expect(wrapper.text()).toContain('SETTINGS');
+      expect(wrapper.text()).toContain('Start At');
+      expect(wrapper.text()).toContain('End At');
 
       // Table headers
       expect(wrapper.text()).toContain('IP Addr');

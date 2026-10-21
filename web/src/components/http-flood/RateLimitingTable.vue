@@ -28,15 +28,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { DatePicker } from '@/components/ui/date-picker';
 import {
   Globe,
   Settings as SettingsIcon,
   RefreshCw,
   AlertTriangle,
   Loader2,
-  ChevronRight,
   ShieldOff,
-  Calendar,
 } from 'lucide-vue-next';
 
 const router = useRouter();
@@ -235,17 +234,6 @@ const goToSettings = () => {
 
 <template>
   <div class="space-y-4">
-    <!-- Top Breadcrumb Bar -->
-    <div class="flex items-center justify-between">
-      <nav class="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
-        <span>Raiwall WAF</span>
-        <ChevronRight class="w-3.5 h-3.5" />
-        <span>HTTP Flood</span>
-        <ChevronRight class="w-3.5 h-3.5" />
-        <span class="text-foreground font-semibold">Rate Limiting</span>
-      </nav>
-    </div>
-
     <!-- Filter Bar & SafeLine Action Buttons (Pure shadcn components) -->
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div class="flex flex-wrap items-center gap-2.5 flex-1 min-w-0">
@@ -275,27 +263,19 @@ const goToSettings = () => {
           </Select>
         </div>
 
-        <!-- Start At Filter with Calendar Icon -->
-        <div class="relative w-44">
-          <Input
-            v-model="filterStartAt"
-            type="date"
-            placeholder="Start At"
-            class="h-9 text-xs font-mono pr-8"
-          />
-          <Calendar class="w-4 h-4 text-muted-foreground absolute right-2.5 top-2.5 pointer-events-none" />
-        </div>
+        <!-- Start At Date Picker (shadcn Radix Popover) -->
+        <DatePicker
+          v-model="filterStartAt"
+          placeholder="Start At"
+          class="w-44"
+        />
 
-        <!-- End At Filter with Calendar Icon -->
-        <div class="relative w-44">
-          <Input
-            v-model="filterEndAt"
-            type="date"
-            placeholder="End At"
-            class="h-9 text-xs font-mono pr-8"
-          />
-          <Calendar class="w-4 h-4 text-muted-foreground absolute right-2.5 top-2.5 pointer-events-none" />
-        </div>
+        <!-- End At Date Picker (shadcn Radix Popover) -->
+        <DatePicker
+          v-model="filterEndAt"
+          placeholder="End At"
+          class="w-44"
+        />
 
         <!-- Refresh Button -->
         <Button
