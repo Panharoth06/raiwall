@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import {
-  ChevronRight,
   ArrowLeft,
   Plus,
   Edit2,
@@ -162,28 +161,8 @@ const goBackToLimits = () => {
 
 <template>
   <div class="space-y-4">
-    <!-- Top Breadcrumb & Return Action Bar -->
-    <div class="flex items-center justify-between">
-      <nav class="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
-        <span>Raiwall WAF</span>
-        <ChevronRight class="w-3.5 h-3.5" />
-        <button
-          @click="goBackToLimits"
-          class="hover:text-foreground transition-colors cursor-pointer"
-        >
-          HTTP Flood
-        </button>
-        <ChevronRight class="w-3.5 h-3.5" />
-        <button
-          @click="goBackToLimits"
-          class="hover:text-foreground transition-colors cursor-pointer"
-        >
-          Rate Limiting
-        </button>
-        <ChevronRight class="w-3.5 h-3.5" />
-        <span class="text-foreground font-semibold">Settings</span>
-      </nav>
-
+    <!-- Top Action Bar -->
+    <div class="flex items-center justify-end">
       <Button
         variant="outline"
         size="sm"
