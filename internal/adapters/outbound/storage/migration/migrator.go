@@ -22,6 +22,7 @@ type Migration struct {
 var migrations = []Migration{
 	{Version: 1, Description: "control_initial", File: "0001_control_initial.sql"},
 	{Version: 2, Description: "telemetry_initial", File: "0002_telemetry_initial.sql"},
+	{Version: 3, Description: "phase7_ipgroups_templates", File: "0003_phase7_ipgroups_templates.sql"},
 }
 
 // NormalizeDriver standardizes dialect names to "sqlite" or "postgres".

@@ -1,5 +1,12 @@
 package caddy
 
+import (
+	"net/http"
+	"time"
+
+	"github.com/Panharoth06/raiwall/internal/core/control/templates"
+)
+
 const defaultBlockHTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -49,3 +56,40 @@ p { color: #94a3b8; font-size: 0.95rem; line-height: 1.5; }
 </div>
 </body>
 </html>`
+
+// renderBlockResponse renders the appropriate response template based on status code and event details.
+func (m *Middleware) renderBlockResponse(statusCode int, eventID, clientIP, host, path, fallbackBody string) string {
+	data := templates.TemplateData{
+		EventID:    eventID,
+		ClientIP:   clientIP,
+		Timestamp:  time.Now().UTC().Format(time.RFC3339),
+		Host:       host,
+		Path:       path,
+		StatusCode: statusCode,
+		StatusText: http.StatusText(statusCode),
+	}
+
+	if fallbackBody != "" && fallbackBody != defaultBlockHTML && fallbackBody != defaultOfflineHTML {
+		return templates.SubstituteTemplateVars(fallbackBody, "", data)
+	}
+
+	if m.templateManager != nil {
+		if tmpl, err := m.templateManager.GetTemplate(statusCode); err == nil {
+			if statusCode != http.StatusServiceUnavailable || tmpl.IsCustom {
+				rendered, err := m.templateManager.Render(statusCode, data)
+				if err == nil && rendered != "" {
+					return rendered
+				}
+			}
+		}
+	}
+
+	if fallbackBody != "" {
+		return templates.SubstituteTemplateVars(fallbackBody, "", data)
+	}
+	if statusCode == 466 || statusCode == 503 {
+		return defaultOfflineHTML
+	}
+	return defaultBlockHTML
+}
+

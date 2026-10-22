@@ -76,6 +76,22 @@ func (s *Server) routes() {
 			api.Post("/acls/test", s.handleTestACL)
 			api.Post("/acls/dry-run", s.handleTestACL)
 
+			// Named IP Groups CRUD & Dynamic BART Integration
+			api.Get("/ip-groups", s.handleListIPGroups)
+			api.Post("/ip-groups", s.handleCreateIPGroup)
+			api.Get("/ip-groups/{id}", s.handleGetIPGroup)
+			api.Put("/ip-groups/{id}", s.handleUpdateIPGroup)
+			api.Delete("/ip-groups/{id}", s.handleDeleteIPGroup)
+			api.Post("/ip-groups/{id}/entries", s.handleAddIPGroupEntry)
+			api.Delete("/ip-groups/{id}/entries/{entryId}", s.handleDeleteIPGroupEntry)
+
+			// Custom Response Templates CRUD & Preview
+			api.Get("/templates", s.handleListTemplates)
+			api.Get("/templates/{statusCode}", s.handleGetTemplate)
+			api.Put("/templates/{statusCode}", s.handleUpdateTemplate)
+			api.Post("/templates/{statusCode}/preview", s.handlePreviewTemplate)
+			api.Post("/templates/{statusCode}/reset", s.handleResetTemplate)
+
 			// Unified Policies & Sub-Policies CRUD
 			api.Get("/policies", s.handleGetUnifiedPolicies)
 			api.Put("/policies", s.handleUpdateUnifiedPolicies)

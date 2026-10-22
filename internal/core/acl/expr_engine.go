@@ -13,19 +13,24 @@ import (
 
 // ACLEngine manages a collection of compiled bytecode rules evaluated in priority order.
 type ACLEngine struct {
-	mu        sync.RWMutex
-	rules     []*ACLRule
-	bartTable *BARTTable
-	geoReader GeoIPPort
-	envPool   sync.Pool
+	mu         sync.RWMutex
+	rules      []*ACLRule
+	bartTable  *BARTTable
+	ipGroupMgr *IPGroupManager
+	geoReader  GeoIPPort
+	envPool    sync.Pool
 }
 
 // NewACLEngine constructs an initialized ACLEngine with optional initial rules.
 func NewACLEngine(bartTable *BARTTable, geoReader GeoIPPort, rules ...*ACLRule) (*ACLEngine, error) {
+	if bartTable == nil {
+		bartTable = NewBARTTable()
+	}
 	e := &ACLEngine{
-		bartTable: bartTable,
-		geoReader: geoReader,
-		rules:     make([]*ACLRule, 0, len(rules)),
+		bartTable:  bartTable,
+		ipGroupMgr: NewIPGroupManager(bartTable),
+		geoReader:  geoReader,
+		rules:      make([]*ACLRule, 0, len(rules)),
 	}
 	e.envPool.New = func() any {
 		return &EvalEnv{
@@ -44,13 +49,36 @@ func NewACLEngine(bartTable *BARTTable, geoReader GeoIPPort, rules ...*ACLRule) 
 	return e, nil
 }
 
+// IPGroupManager returns the underlying IPGroupManager.
+func (e *ACLEngine) IPGroupManager() *IPGroupManager {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.ipGroupMgr
+}
+
+// SetIPGroupManager updates the IPGroupManager reference in ACLEngine and recompiles rules.
+func (e *ACLEngine) SetIPGroupManager(mgr *IPGroupManager) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.ipGroupMgr = mgr
+	if mgr != nil && mgr.Table() != nil {
+		e.bartTable = mgr.Table()
+	}
+	for _, r := range e.rules {
+		_ = r.CompileWithProviders(func() *BARTTable { return e.bartTable }, func() *IPGroupManager { return e.ipGroupMgr })
+	}
+}
+
 // SetBARTTable updates the BARTTable reference in ACLEngine and recompiles rules.
 func (e *ACLEngine) SetBARTTable(bt *BARTTable) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.bartTable = bt
+	if e.ipGroupMgr == nil {
+		e.ipGroupMgr = NewIPGroupManager(bt)
+	}
 	for _, r := range e.rules {
-		_ = r.Compile(bt)
+		_ = r.CompileWithProviders(func() *BARTTable { return e.bartTable }, func() *IPGroupManager { return e.ipGroupMgr })
 	}
 }
 
@@ -71,7 +99,12 @@ func (e *ACLEngine) AddRule(rule *ACLRule) error {
 		defer e.mu.RUnlock()
 		return e.bartTable
 	}
-	if err := rule.CompileWithProvider(provider); err != nil {
+	ipGroupProvider := func() *IPGroupManager {
+		e.mu.RLock()
+		defer e.mu.RUnlock()
+		return e.ipGroupMgr
+	}
+	if err := rule.CompileWithProviders(provider, ipGroupProvider); err != nil {
 		return err
 	}
 
@@ -183,6 +216,7 @@ func (e *ACLEngine) acquireEnv(reqCtx *waf.RequestContext, geo GeoData) *EvalEnv
 	env.Geo.ASN_ = geo.ASN
 	env.Geo.ASOrg_ = geo.ASOrg
 	env.bartTable = e.bartTable
+	env.ipGroupMgr = e.ipGroupMgr
 
 	for k := range env.Headers {
 		delete(env.Headers, k)
@@ -260,6 +294,8 @@ func (e *ACLEngine) acquireEnv(reqCtx *waf.RequestContext, geo GeoData) *EvalEnv
 
 func (e *ACLEngine) releaseEnv(env *EvalEnv) {
 	if env != nil {
+		env.bartTable = nil
+		env.ipGroupMgr = nil
 		e.envPool.Put(env)
 	}
 }

@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue';
 import { api, type ApiKeyItem } from '@/api/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { NumberInput } from '@/components/ui/number-input';
 import { Badge } from '@/components/ui/badge';
 import {
   Table,
@@ -91,11 +92,11 @@ const handleDeleteKey = async (id: string) => {
   <div class="space-y-4 font-sans">
     <div class="flex items-center justify-between">
       <div>
-        <h3 class="text-sm font-semibold text-white flex items-center space-x-2">
-          <Key class="w-4 h-4 text-slate-400" />
+        <h3 class="text-sm font-semibold text-foreground flex items-center space-x-2">
+          <Key class="w-4 h-4 text-muted-foreground" />
           <span>Management API & MCP Bearer Keys</span>
         </h3>
-        <p class="text-xs text-slate-400 mt-0.5">
+        <p class="text-xs text-muted-foreground mt-0.5">
           Authenticate automated CI/CD pipelines, MCP desktop agents, and external scripts.
         </p>
       </div>
@@ -194,11 +195,11 @@ const handleDeleteKey = async (id: string) => {
 
               <div>
                 <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Expiration (Days)</label>
-                <Input
-                  v-model.number="newKeyExpires"
-                  type="number"
-                  min="1"
-                  max="365"
+                <NumberInput
+                  v-model="newKeyExpires"
+                  :min="1"
+                  :max="365"
+                  suffix="days"
                 />
               </div>
             </div>

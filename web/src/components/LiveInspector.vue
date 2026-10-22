@@ -1,9 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import {
-  Play,
-  Pause,
-  Trash2,
   Search,
   ShieldAlert,
   FileCode,
@@ -80,30 +77,30 @@ const filteredEvents = computed(() => {
 function getActionBadgeClass(action: string): string {
   switch (action) {
     case 'allow':
-      return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+      return 'bg-success/10 text-success border-success/30';
     case 'block':
-      return 'bg-rose-500/10 text-rose-400 border-rose-500/20';
+      return 'bg-threat/10 text-threat border-threat/30';
     case 'challenge':
-      return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+      return 'bg-warning/10 text-warning border-warning/30';
     case 'ban':
-      return 'bg-purple-500/10 text-purple-400 border-purple-500/20';
+      return 'bg-threat/20 text-threat border-threat/40';
     default:
-      return 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20';
+      return 'bg-muted text-muted-foreground border-border';
   }
 }
 
 function getSeverityBadgeClass(sev: string): string {
   switch (sev) {
     case 'critical':
-      return 'text-rose-400 bg-rose-500/10';
     case 'high':
-      return 'text-orange-400 bg-orange-500/10';
+      return 'text-threat bg-threat/10';
     case 'medium':
-      return 'text-amber-400 bg-amber-500/10';
+      return 'text-warning bg-warning/10';
     case 'low':
-      return 'text-blue-400 bg-blue-500/10';
+    case 'info':
+      return 'text-info bg-info/10';
     default:
-      return 'text-zinc-400 bg-zinc-500/10';
+      return 'text-muted-foreground bg-muted';
   }
 }
 
@@ -178,48 +175,44 @@ function getPayloadOrQuery(ev: ForensicEvent): string {
 </script>
 
 <template>
-  <div class="flex flex-col h-full bg-[#0d0f14] text-zinc-100 rounded-xl border border-zinc-800 shadow-2xl overflow-hidden font-sans">
+  <div class="flex flex-col h-full bg-card text-card-foreground rounded-xl border border-border shadow-none overflow-hidden font-sans">
     <!-- Header Controls Toolbar -->
-    <div class="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 border-b border-zinc-800 bg-[#12151c]/90 backdrop-blur-md">
-      <!-- Connection & Title -->
+    <div class="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 border-b border-border bg-card/90 backdrop-blur-md relative z-20">
+      <!-- Connection & Title (green dot removed) -->
       <div class="flex items-center gap-3">
-        <div class="flex items-center gap-2">
-          <div
-            data-testid="status-indicator"
-            class="w-2.5 h-2.5 rounded-full transition-all duration-300"
-            :class="isConnected ? 'bg-emerald-400 shadow-[0_0_8px_#34d399]' : 'bg-rose-500'"
-          />
-          <span class="text-xs font-semibold tracking-wider uppercase text-zinc-400">
-            {{ isConnected ? 'Live Telemetry' : 'Disconnected' }}
-          </span>
-        </div>
-        <span class="text-xs text-zinc-600">|</span>
-        <span class="text-xs text-zinc-400 font-mono">
+        <span
+          data-testid="status-text"
+          class="text-xs font-semibold tracking-wider uppercase text-muted-foreground"
+        >
+          {{ isConnected ? 'Live Telemetry' : 'Disconnected' }}
+        </span>
+        <span class="text-xs text-muted-foreground/60">|</span>
+        <span class="text-xs text-muted-foreground font-mono">
           {{ filteredEvents.length }} events
         </span>
       </div>
 
-      <!-- Controls: Pause/Resume, Clear, Filter, Search -->
+      <!-- Controls: Filter, Search -->
       <div class="flex items-center gap-2.5">
         <!-- Search Input -->
         <div class="relative">
-          <Search class="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-zinc-500" />
+          <Search class="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-muted-foreground" />
           <input
             v-model="searchQuery"
             type="text"
             placeholder="Filter IP, Rule, Method, Country..."
             data-testid="live-search-input"
-            class="w-48 sm:w-64 pl-8 pr-3 py-1.5 text-xs bg-zinc-900 border border-zinc-700/80 rounded-lg text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all"
+            class="w-48 sm:w-64 pl-8 pr-3 py-1.5 text-xs bg-background border border-input rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring transition-all"
           />
         </div>
 
         <!-- Action Filter Select Component Dropdown -->
-        <div class="relative">
+        <div class="relative z-30">
           <Select v-model="selectedAction">
-            <SelectTrigger class="h-8 w-32 border-zinc-700/80 bg-zinc-900 text-zinc-200 text-xs">
+            <SelectTrigger class="h-8 w-32 border-input bg-background text-foreground text-xs">
               <SelectValue placeholder="All Actions" />
             </SelectTrigger>
-            <SelectContent class="border-zinc-700 bg-zinc-900 text-zinc-200">
+            <SelectContent class="border-border bg-popover text-popover-foreground z-50">
               <SelectItem value="all">All Actions</SelectItem>
               <SelectItem value="allow">Allow</SelectItem>
               <SelectItem value="block">Block</SelectItem>
@@ -241,41 +234,13 @@ function getPayloadOrQuery(ev: ForensicEvent): string {
             <option value="ban">Ban</option>
           </select>
         </div>
-
-        <!-- Pause / Resume Toggle -->
-        <button
-          type="button"
-          data-testid="pause-resume-btn"
-          @click="isPaused ? resume() : pause()"
-          class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-all"
-          :class="
-            isPaused
-              ? 'bg-amber-500/15 border-amber-500/40 text-amber-300 hover:bg-amber-500/25'
-              : 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700'
-          "
-        >
-          <Play v-if="isPaused" class="w-3.5 h-3.5" />
-          <Pause v-else class="w-3.5 h-3.5" />
-          <span>{{ isPaused ? 'Resume' : 'Pause' }}</span>
-        </button>
-
-        <!-- Clear Table Button -->
-        <button
-          type="button"
-          data-testid="clear-events-btn"
-          @click="clear"
-          class="p-1.5 text-zinc-400 hover:text-zinc-200 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg transition-all"
-          title="Clear Event Stream"
-        >
-          <Trash2 class="w-3.5 h-3.5" />
-        </button>
       </div>
     </div>
 
     <!-- Live Event Table -->
     <div class="flex-1 overflow-auto">
       <table class="w-full text-left border-collapse text-xs">
-        <thead class="sticky top-0 bg-[#12151c] text-zinc-400 font-semibold border-b border-zinc-800 z-10 shadow-sm">
+        <thead class="sticky top-0 bg-muted/60 text-muted-foreground font-semibold border-b border-border z-10 shadow-none">
           <tr>
             <th class="py-2.5 px-4">Time</th>
             <th class="py-2.5 px-4">Action</th>
@@ -286,16 +251,16 @@ function getPayloadOrQuery(ev: ForensicEvent): string {
             <th class="py-2.5 px-4 text-right">Actions</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-zinc-800/60 font-mono">
+        <tbody class="divide-y divide-border font-mono">
           <tr
             v-for="ev in filteredEvents"
             :key="ev.event_id"
             data-testid="event-row"
-            class="hover:bg-zinc-800/40 transition-colors group cursor-pointer"
+            class="hover:bg-muted/40 transition-colors group cursor-pointer"
             @click="openModal(ev)"
           >
             <!-- Time -->
-            <td class="py-2.5 px-4 text-zinc-400 whitespace-nowrap">
+            <td class="py-2.5 px-4 text-muted-foreground whitespace-nowrap">
               {{ new Date(ev.timestamp).toLocaleTimeString() }}
             </td>
 
@@ -305,38 +270,38 @@ function getPayloadOrQuery(ev: ForensicEvent): string {
                 class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide uppercase border"
                 :class="getActionBadgeClass(ev.action)"
               >
-                <CheckCircle2 v-if="ev.action === 'allow'" class="w-2.5 h-2.5 text-slate-400" />
-                <ShieldAlert v-else-if="ev.action === 'block'" class="w-2.5 h-2.5 text-slate-400" />
-                <AlertTriangle v-else-if="ev.action === 'challenge'" class="w-2.5 h-2.5 text-slate-400" />
-                <Ban v-else-if="ev.action === 'ban'" class="w-2.5 h-2.5 text-slate-400" />
+                <CheckCircle2 v-if="ev.action === 'allow'" class="w-2.5 h-2.5" />
+                <ShieldAlert v-else-if="ev.action === 'block'" class="w-2.5 h-2.5" />
+                <AlertTriangle v-else-if="ev.action === 'challenge'" class="w-2.5 h-2.5" />
+                <Ban v-else-if="ev.action === 'ban'" class="w-2.5 h-2.5" />
                 {{ ev.action }}
               </span>
             </td>
 
             <!-- Method & Path -->
-            <td class="py-2.5 px-4 max-w-xs truncate text-zinc-200">
-              <span class="font-bold text-cyan-400 mr-1.5">{{ ev.method }}</span>
+            <td class="py-2.5 px-4 max-w-xs truncate text-foreground">
+              <span class="font-bold text-primary mr-1.5">{{ ev.method }}</span>
               <span :title="ev.path">{{ ev.path }}</span>
             </td>
 
             <!-- Client IP & Geo -->
-            <td class="py-2.5 px-4 whitespace-nowrap text-zinc-300">
+            <td class="py-2.5 px-4 whitespace-nowrap text-foreground">
               <span>{{ ev.client_ip }}</span>
-              <span v-if="ev.geo_data?.country" class="ml-1.5 text-zinc-500 text-[11px]">
+              <span v-if="ev.geo_data?.country" class="ml-1.5 text-muted-foreground text-[11px]">
                 [{{ ev.geo_data.country }}]
               </span>
             </td>
 
             <!-- Rule / Threat -->
             <td class="py-2.5 px-4 whitespace-nowrap">
-              <span v-if="ev.rule_id" class="text-amber-300 font-semibold">
+              <span v-if="ev.rule_id" class="text-warning font-semibold">
                 {{ ev.rule_id }}
               </span>
-              <span v-else class="text-zinc-600">-</span>
+              <span v-else class="text-muted-foreground">-</span>
             </td>
 
             <!-- Latency -->
-            <td class="py-2.5 px-4 text-zinc-400 whitespace-nowrap">
+            <td class="py-2.5 px-4 text-muted-foreground whitespace-nowrap">
               {{ formatLatency(ev.latency) }}
             </td>
 
@@ -347,7 +312,7 @@ function getPayloadOrQuery(ev: ForensicEvent): string {
                 type="button"
                 data-testid="create-exception-quick-btn"
                 @click="handleCreateException(ev)"
-                class="px-2 py-1 text-[11px] font-medium text-primary hover:text-primary-foreground bg-primary/10 hover:bg-primary border border-primary/30 rounded transition-all mr-2 shadow-none"
+                class="px-2 py-1 text-[11px] font-medium text-primary hover:text-primary-foreground bg-primary/10 hover:bg-primary border border-primary/30 rounded transition-all mr-2 shadow-none cursor-pointer"
                 title="Create 1-Click Rule Exception"
               >
                 Exception
@@ -355,7 +320,7 @@ function getPayloadOrQuery(ev: ForensicEvent): string {
               <button
                 type="button"
                 @click="openModal(ev)"
-                class="px-2 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground bg-muted hover:bg-muted/80 border border-border rounded transition-all"
+                class="px-2 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground bg-muted hover:bg-muted/80 border border-border rounded transition-all cursor-pointer"
               >
                 Inspect
               </button>
@@ -364,10 +329,10 @@ function getPayloadOrQuery(ev: ForensicEvent): string {
 
           <!-- Empty State -->
           <tr v-if="filteredEvents.length === 0">
-            <td colspan="7" class="py-12 text-center text-zinc-500 font-sans">
-              <Activity class="w-8 h-8 mx-auto mb-2 text-zinc-600 opacity-60 animate-pulse" />
+            <td colspan="7" class="py-12 text-center text-muted-foreground font-sans">
+              <Activity class="w-8 h-8 mx-auto mb-2 text-muted-foreground/60 opacity-60 animate-pulse" />
               <p class="text-sm font-medium">Waiting for incoming telemetry events...</p>
-              <p class="text-xs text-zinc-600 mt-1">Events will appear automatically via Server-Sent Events</p>
+              <p class="text-xs text-muted-foreground/80 mt-1">Events will appear automatically via Server-Sent Events</p>
             </td>
           </tr>
         </tbody>
@@ -378,9 +343,9 @@ function getPayloadOrQuery(ev: ForensicEvent): string {
     <div
       v-if="activeEvent"
       data-testid="forensic-modal"
-      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
     >
-      <div class="w-full max-w-3xl max-h-[85vh] flex flex-col bg-[#12151c] border border-zinc-700 rounded-xl shadow-2xl overflow-hidden font-sans">
+      <div class="w-full max-w-3xl max-h-[85vh] flex flex-col bg-popover border border-border rounded-xl shadow-none overflow-hidden font-sans text-popover-foreground">
         <!-- Modal Header -->
         <div class="flex items-center justify-between px-6 py-4 border-b border-border bg-card">
           <div class="flex items-center gap-3">
@@ -406,14 +371,14 @@ function getPayloadOrQuery(ev: ForensicEvent): string {
             type="button"
             data-testid="modal-close-btn"
             @click="closeModal"
-            class="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
+            class="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors cursor-pointer"
           >
             <X class="w-5 h-5" />
           </button>
         </div>
 
         <!-- Modal Body Content -->
-        <div class="flex-1 overflow-y-auto p-6 space-y-5 text-xs font-mono">
+        <div class="flex-1 overflow-y-auto p-6 space-y-5 text-xs font-mono bg-popover text-popover-foreground">
           <!-- Request & Client Summary Grid -->
           <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 font-sans">
             <div class="p-3 bg-muted/40 border border-border rounded-lg">
@@ -426,7 +391,7 @@ function getPayloadOrQuery(ev: ForensicEvent): string {
             </div>
             <div class="p-3 bg-muted/40 border border-border rounded-lg">
               <span class="text-[10px] text-muted-foreground uppercase tracking-wider block mb-1">Rule ID</span>
-              <span class="font-mono text-amber-400 font-semibold block truncate">
+              <span class="font-mono text-warning font-semibold block truncate">
                 {{ activeEvent.rule_id || 'NONE' }}
               </span>
             </div>
@@ -458,7 +423,7 @@ function getPayloadOrQuery(ev: ForensicEvent): string {
               <span>Sanitized Request Headers</span>
               <span class="text-[10px] text-muted-foreground font-normal">PII/PCI-DSS masked</span>
             </h4>
-            <div class="p-3.5 bg-muted/50 border border-border rounded-lg overflow-x-auto max-h-48 text-foreground">
+            <div class="p-3.5 bg-muted/60 border border-border rounded-lg overflow-x-auto max-h-48 text-foreground font-mono text-xs">
               <pre>{{ JSON.stringify(activeEvent.headers || {}, null, 2) }}</pre>
             </div>
           </div>
@@ -469,7 +434,7 @@ function getPayloadOrQuery(ev: ForensicEvent): string {
               <span>{{ activeEvent.method === 'GET' ? 'Inspected Query & URI Parameters' : 'Payload Snippet' }}</span>
               <span class="text-[10px] text-muted-foreground font-normal">Clamped to 2 KB cap</span>
             </h4>
-            <div class="p-3.5 bg-muted/50 border border-border rounded-lg overflow-x-auto max-h-48 text-foreground">
+            <div class="p-3.5 bg-muted/60 border border-border rounded-lg overflow-x-auto max-h-48 text-foreground font-mono text-xs">
               <pre>{{ getPayloadOrQuery(activeEvent) }}</pre>
             </div>
           </div>
@@ -478,8 +443,8 @@ function getPayloadOrQuery(ev: ForensicEvent): string {
         <!-- Modal Footer Actions -->
         <div class="flex items-center justify-between px-6 py-3.5 border-t border-border bg-card font-sans">
           <div class="text-xs text-muted-foreground">
-            <span v-if="activeEvent.action === 'allow'" class="text-emerald-400 flex items-center gap-1.5 font-medium">
-              <CheckCircle2 class="w-3.5 h-3.5" />
+            <span v-if="activeEvent.action === 'allow'" class="text-success flex items-center gap-1.5 font-medium">
+              <CheckCircle2 class="w-3.5 h-3.5 text-success" />
               <span>Request verified benign and allowed. No false-positive rule exception required.</span>
             </span>
             <span v-else>
@@ -490,7 +455,7 @@ function getPayloadOrQuery(ev: ForensicEvent): string {
             <button
               type="button"
               @click="closeModal"
-              class="px-4 py-2 text-xs font-medium text-foreground hover:bg-muted rounded-lg border border-border transition-colors"
+              class="px-4 py-2 text-xs font-medium text-foreground hover:bg-muted rounded-lg border border-border transition-colors cursor-pointer"
             >
               Close
             </button>
@@ -499,7 +464,7 @@ function getPayloadOrQuery(ev: ForensicEvent): string {
               type="button"
               data-testid="modal-create-exception-btn"
               @click="handleCreateException(activeEvent)"
-              class="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-primary-foreground bg-primary hover:bg-primary/90 active:brightness-95 rounded-lg shadow-none transition-colors"
+              class="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-primary-foreground bg-primary hover:bg-primary/90 active:brightness-95 rounded-lg shadow-none transition-colors cursor-pointer"
             >
               <ExternalLink class="w-3.5 h-3.5" />
               <span>Create Exception</span>

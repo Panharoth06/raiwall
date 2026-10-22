@@ -18,7 +18,7 @@ func TestMigrator_SQLite(t *testing.T) {
 
 	ctx := context.Background()
 
-	// 1. Initial run: should apply all migrations (versions 1 and 2)
+	// 1. Initial run: should apply all migrations (versions 1, 2, and 3)
 	err = Run(ctx, db, "sqlite")
 	require.NoError(t, err)
 
@@ -27,6 +27,14 @@ func TestMigrator_SQLite(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, applied[1])
 	require.True(t, applied[2])
+	require.True(t, applied[3])
+
+	// Verify Phase 7 tables exist
+	var count int
+	err = db.QueryRowContext(ctx, "SELECT count(*) FROM raiwall_ip_groups").Scan(&count)
+	require.NoError(t, err)
+	err = db.QueryRowContext(ctx, "SELECT count(*) FROM raiwall_response_templates").Scan(&count)
+	require.NoError(t, err)
 
 	// 2. Second run: idempotency test (should skip applied)
 	err = Run(ctx, db, "sqlite")

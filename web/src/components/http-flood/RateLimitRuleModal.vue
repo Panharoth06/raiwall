@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { NumberInput } from '@/components/ui/number-input';
 import {
   Select,
   SelectTrigger,
@@ -157,11 +158,21 @@ const handleClose = () => {
             <label class="text-xs font-medium text-foreground block">
               {{ tier === 'access' ? 'Requests Threshold' : tier === 'attack' ? 'Violations Threshold' : 'Errors Threshold' }}
             </label>
-            <Input v-model.number="form.threshold" type="number" min="1" class="h-8 text-xs font-mono" />
+            <NumberInput
+              v-model="form.threshold"
+              :min="1"
+              :suffix="tier === 'access' ? 'reqs' : tier === 'attack' ? 'pts' : 'errs'"
+              class="h-8 text-xs font-mono shadow-none"
+            />
           </div>
           <div class="space-y-1.5">
             <label class="text-xs font-medium text-foreground block">Window (Seconds)</label>
-            <Input v-model.number="form.window_seconds" type="number" min="1" class="h-8 text-xs font-mono" />
+            <NumberInput
+              v-model="form.window_seconds"
+              :min="1"
+              suffix="sec"
+              class="h-8 text-xs font-mono shadow-none"
+            />
           </div>
         </div>
 
@@ -181,7 +192,12 @@ const handleClose = () => {
           </div>
           <div class="space-y-1.5">
             <label class="text-xs font-medium text-foreground block">Duration (Minutes)</label>
-            <Input v-model.number="form.duration_minutes" type="number" min="1" class="h-8 text-xs font-mono" />
+            <NumberInput
+              v-model="form.duration_minutes"
+              :min="1"
+              suffix="min"
+              class="h-8 text-xs font-mono shadow-none"
+            />
           </div>
         </div>
       </div>

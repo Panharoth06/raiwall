@@ -1030,16 +1030,16 @@ Plus dedicated `/topology` link to access Raiwall's 3D Globe / Sankey operations
 **Description:** Implement `pkg/acl/ipgroup.go` managing named IP groups: Enhanced Malicious IP Group (5,000 active threat IPs), Search Engine Spider Group (verified Google, Bing, Baidu spider CIDRs), Threat Intelligence Feeds, and custom user-defined CIDR groups. Integrate directly with `gaissmai/bart` routing tables for sub-15 ns evaluation. Expose "In IP Group" operator in `expr` ACL engine and "Add to IP Group" endpoint.
 
 **Acceptance criteria:**
-- [ ] SQLite schema and `driver.go` store `raiwall_ip_groups` and entries.
-- [ ] BART routing tables compiled in memory for sub-15 ns lookups across 500K+ IPs.
-- [ ] Pre-populate verified Search Spiders and Malicious Threat Intelligence CIDRs.
-- [ ] `expr` ACL engine supports `client_ip in ip_group("search_spiders")`.
-- [ ] "Add to IP Group" API dynamically updates memory table and SQLite.
-- [ ] Unit tests verify BART IP group matching, dynamic appends, and ACL integration.
+- [x] SQLite schema and `driver.go` store `raiwall_ip_groups` and entries.
+- [x] BART routing tables compiled in memory for sub-15 ns lookups across 500K+ IPs.
+- [x] Pre-populate verified Search Spiders and Malicious Threat Intelligence CIDRs.
+- [x] `expr` ACL engine supports `client_ip in ip_group("search_spiders")`.
+- [x] "Add to IP Group" API dynamically updates memory table and SQLite.
+- [x] Unit tests verify BART IP group matching, dynamic appends, and ACL integration.
 
 **Verification:**
-- [ ] Tests pass: `go test -v -race ./pkg/acl/...`
-- [ ] Build succeeds: `go build ./pkg/acl/...`
+- [x] Tests pass: `go test -v -race ./pkg/acl/...`
+- [x] Build succeeds: `go build ./pkg/acl/...`
 
 **Dependencies:** None
 **Files likely touched:**
@@ -1057,16 +1057,16 @@ Plus dedicated `/topology` link to access Raiwall's 3D Globe / Sankey operations
 **Description:** Implement `pkg/control/templates/` storing and rendering custom HTML error and challenge templates for deterministic status codes: `403` (Attack Blocked), `404` (Not Found), `429` (Rate Limited), `465` (Waiting Room), `466` (App Offline), `467` (Auth Challenge), `468` (Anti-Bot PoW), `502` (Bad Gateway), `504` (Timeout). Expose REST API and Vue UI editor `web/src/views/BlockPagesView.vue` with live in-browser preview, CSS customization, and corporate branding support.
 
 **Acceptance criteria:**
-- [ ] SQLite schema and `driver.go` store custom HTML/CSS templates per status code with fallback to defaults.
-- [ ] Proxy middleware serves customized templates on corresponding status code triggers.
-- [ ] REST API endpoints for fetching, updating, and previewing rendered templates.
-- [ ] Frontend template editor view with responsive preview pane and custom branding.
-- [ ] Unit and frontend tests verify template rendering and editor persistence.
+- [x] SQLite schema and `driver.go` store custom HTML/CSS templates per status code with fallback to defaults.
+- [x] Proxy middleware serves customized templates on corresponding status code triggers.
+- [x] REST API endpoints for fetching, updating, and previewing rendered templates.
+- [x] Frontend template editor view with responsive preview pane and custom branding.
+- [x] Unit and frontend tests verify template rendering and editor persistence.
 
 **Verification:**
-- [ ] Tests pass: `go test -v -race ./pkg/control/...`
-- [ ] Frontend tests pass: `cd web && pnpm test -- BlockPage`
-- [ ] Build succeeds: `go build ./...`
+- [x] Tests pass: `go test -v -race ./pkg/control/...`
+- [x] Frontend tests pass: `cd web && pnpm test -- BlockPage`
+- [x] Build succeeds: `go build ./...`
 
 **Dependencies:** None
 **Files likely touched:**
@@ -1084,7 +1084,7 @@ Plus dedicated `/topology` link to access Raiwall's 3D Globe / Sankey operations
 **Description:** Implement comprehensive end-to-end integration tests in `tests/e2e/enterprise_waf_test.go` exercising the entire major update lifecycle: 14-module threat blocking, CVE virtual patches, path-prefix forwarding with dynamic `UpstreamPool`, active IP ban & unblock-all, Waiting Room queuing (HTTP 465), pre-application HTTP 467 auth challenge, and custom template rendering. Verify single binary builds cleanly as a compact binary (~50 MB) with all embedded web assets.
 
 **Acceptance criteria:**
-- [ ] End-to-end integration tests verify:
+- [x] End-to-end integration tests verify:
   - 14 semantic modules block exploits according to configured sensitivity modes.
   - CVE virtual patch blocks Log4j and Shiro exploits while permitting benign traffic.
   - Dynamic `UpstreamPool` routes path prefixes with header overrides.
@@ -1092,13 +1092,13 @@ Plus dedicated `/topology` link to access Raiwall's 3D Globe / Sankey operations
   - Virtual Waiting Room returns HTTP 465 and admits clients in FIFO queue order.
   - Unauthenticated requests to protected app receive HTTP 467 auth challenge.
   - Custom HTML templates render with custom branding.
-- [ ] Zero race conditions under high concurrent requests (`go test -race`).
-- [ ] Production binary `bin/raiwall` builds cleanly as a compact binary (~50 MB, not strictly $< 50\text{ MB}$).
+- [x] Zero race conditions under high concurrent requests (`go test -race`).
+- [x] Production binary `bin/raiwall` builds cleanly as a compact binary (~50 MB, not strictly $< 50\text{ MB}$).
 
 **Verification:**
-- [ ] Tests pass: `go test -v -race -tags=integration ./tests/e2e/...`
-- [ ] Build succeeds: `make build`
-- [ ] Manual check: verify compact binary size (~50 MB) via `ls -lh bin/raiwall`.
+- [x] Tests pass: `go test -v -race -tags=integration ./tests/e2e/...`
+- [x] Build succeeds: `make build`
+- [x] Manual check: verify compact binary size (~50 MB) via `ls -lh bin/raiwall`.
 
 **Dependencies:** Tasks 73–95
 **Files likely touched:**
@@ -1109,6 +1109,6 @@ Plus dedicated `/topology` link to access Raiwall's 3D Globe / Sankey operations
 ---
 
 ## Final Checkpoint: Major Update Complete
-- [ ] All 24 tasks (Tasks 73–96) implemented and verified.
-- [ ] 100% functional, operational, and UX parity with SafeLine v9.4.2 achieved.
-- [ ] Single compact binary (~50 MB, not strictly < 50 MB) verified with zero CGO dependencies and zero runtime regressions.
+- [x] All 24 tasks (Tasks 73–96) implemented and verified.
+- [x] 100% functional, operational, and UX parity with SafeLine v9.4.2 achieved.
+- [x] Single compact binary (~50 MB, not strictly < 50 MB) verified with zero CGO dependencies and zero runtime regressions.

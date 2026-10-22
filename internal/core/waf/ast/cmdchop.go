@@ -138,5 +138,12 @@ func checkSubstitutions(s string) (bool, string) {
 			return true, "unbalanced backtick shell breakout"
 		}
 	}
+	if strings.Contains(s, "${") {
+		if idx := strings.Index(s, "${"); idx != -1 {
+			if strings.Contains(s[idx+2:], "}") {
+				return true, "parameter expansion / template injection ${...}"
+			}
+		}
+	}
 	return false, ""
 }

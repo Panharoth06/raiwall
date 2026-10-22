@@ -32,12 +32,19 @@ func (m *Middleware) provisionACL(_ caddy.Context) error {
 		m.geoIPReader = geoip.NewGeoIPReaderOptional(countryPath, asnPath)
 	}
 
+	if m.ipGroupMgr == nil {
+		m.ipGroupMgr = acl.NewIPGroupManager(m.bartTable)
+	}
+
 	if m.aclEngine == nil && m.ACLConfig != nil && len(m.ACLConfig.Rules) > 0 {
 		aclEng, err := acl.NewACLEngine(m.bartTable, m.geoIPReader, m.ACLConfig.Rules...)
 		if err != nil {
 			return fmt.Errorf("provision acl engine: %w", err)
 		}
+		aclEng.SetIPGroupManager(m.ipGroupMgr)
 		m.aclEngine = aclEng
+	} else if m.aclEngine != nil {
+		m.aclEngine.SetIPGroupManager(m.ipGroupMgr)
 	}
 
 	return nil

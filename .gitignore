@@ -17,3 +17,6 @@ reference/
 test-lab/coreruleset/
 test-lab/logs/
 web/screenshots/
+
+# Persistent local database & services data
+data/

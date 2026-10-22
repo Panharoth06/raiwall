@@ -27,6 +27,7 @@ import { Switch } from '@/components/ui/switch'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { useRouter, useRoute } from '@/router'
 import { useAuthStore } from '@/stores/auth'
+import { useTheme } from '@/composables/useTheme'
 import type {
   ViewMode,
   IngressSourceId,
@@ -40,6 +41,7 @@ export type NavSection = 'topology' | 'analytics' | 'inspector' | 'globe' | 'sit
 
 const router = useRouter()
 const route = useRoute()
+const { isDark } = useTheme()
 
 // Navigation and Reactive State
 const activeNav = ref<NavSection>('topology')
@@ -453,6 +455,13 @@ const computeCubicPath = (x1: number, y1: number, x2: number, y2: number): strin
 }
 
 // Sankey Ribbons
+const getCleanRibbonColor = (isHovered: boolean) => {
+  if (isDark.value) {
+    return isHovered ? 'rgba(220, 232, 245, 0.52)' : 'rgba(175, 188, 204, 0.22)'
+  }
+  return isHovered ? 'rgba(37, 99, 235, 0.55)' : 'rgba(100, 116, 139, 0.28)'
+}
+
 const sankeyRibbons = computed<SankeyRibbon[]>(() => {
   const ribbons: SankeyRibbon[] = []
 
@@ -493,7 +502,7 @@ const sankeyRibbons = computed<SankeyRibbon[]>(() => {
     d: computeCubicPath(240, 460, 800, 330),
     sourceId: 'humans',
     targetId: 'waf-core',
-    stroke: hoveredRibbonId.value === 'ribbon-humans-wafcore' ? 'rgba(220, 232, 245, 0.52)' : 'rgba(175, 188, 204, 0.22)',
+    stroke: getCleanRibbonColor(hoveredRibbonId.value === 'ribbon-humans-wafcore'),
     strokeWidth: 10,
     isThreat: false,
     dimmed: humansDimmed,
@@ -506,7 +515,7 @@ const sankeyRibbons = computed<SankeyRibbon[]>(() => {
     d: computeCubicPath(240, 460, 800, 600),
     sourceId: 'humans',
     targetId: 'edge-defense',
-    stroke: hoveredRibbonId.value === 'ribbon-humans-edgedefense' ? 'rgba(220, 232, 245, 0.52)' : 'rgba(175, 188, 204, 0.22)',
+    stroke: getCleanRibbonColor(hoveredRibbonId.value === 'ribbon-humans-edgedefense'),
     strokeWidth: 8,
     isThreat: false,
     dimmed: humansDimmed,
@@ -521,7 +530,7 @@ const sankeyRibbons = computed<SankeyRibbon[]>(() => {
     d: computeCubicPath(240, 730, 800, 330),
     sourceId: 'api',
     targetId: 'waf-core',
-    stroke: hoveredRibbonId.value === 'ribbon-api-wafcore' ? 'rgba(220, 232, 245, 0.52)' : 'rgba(175, 188, 204, 0.22)',
+    stroke: getCleanRibbonColor(hoveredRibbonId.value === 'ribbon-api-wafcore'),
     strokeWidth: 9,
     isThreat: false,
     dimmed: apiDimmed,
@@ -534,7 +543,7 @@ const sankeyRibbons = computed<SankeyRibbon[]>(() => {
     d: computeCubicPath(240, 730, 800, 600),
     sourceId: 'api',
     targetId: 'edge-defense',
-    stroke: hoveredRibbonId.value === 'ribbon-api-edgedefense' ? 'rgba(220, 232, 245, 0.52)' : 'rgba(175, 188, 204, 0.22)',
+    stroke: getCleanRibbonColor(hoveredRibbonId.value === 'ribbon-api-edgedefense'),
     strokeWidth: 7,
     isThreat: false,
     dimmed: apiDimmed,
@@ -552,7 +561,7 @@ const sankeyRibbons = computed<SankeyRibbon[]>(() => {
 
     let stroke = isThreat
       ? (isHovered ? 'rgba(239, 68, 68, 0.60)' : 'rgba(239, 68, 68, 0.28)')
-      : (isHovered ? 'rgba(220, 232, 245, 0.52)' : 'rgba(175, 188, 204, 0.22)')
+      : getCleanRibbonColor(isHovered)
 
     ribbons.push({
       id: ribbonId,
@@ -577,7 +586,7 @@ const sankeyRibbons = computed<SankeyRibbon[]>(() => {
 
     let stroke = isThreat
       ? (isHovered ? 'rgba(239, 68, 68, 0.60)' : 'rgba(239, 68, 68, 0.28)')
-      : (isHovered ? 'rgba(220, 232, 245, 0.52)' : 'rgba(175, 188, 204, 0.22)')
+      : getCleanRibbonColor(isHovered)
 
     ribbons.push({
       id: ribbonId,
@@ -638,32 +647,32 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
 <template>
   <div
     data-testid="waf-dashboard-root"
-    class="w-full h-full min-h-0 relative flex flex-col bg-[#0d0f14] text-zinc-100 rounded-xl border border-zinc-800 shadow-2xl overflow-hidden font-sans select-none flex-1"
+    class="w-full h-full min-h-0 relative flex flex-col bg-card text-card-foreground rounded-xl border border-border shadow-none overflow-hidden font-sans select-none flex-1"
   >
     <!-- Main Command Center Canvas Area -->
     <main class="flex-1 min-h-0 relative overflow-hidden flex flex-col">
       <!-- Floating Top Bar (h-14) -->
-      <header class="h-14 w-full flex items-center justify-between px-6 z-20 shrink-0 border-b border-zinc-800 bg-[#12151c]/90 backdrop-blur-md">
+      <header class="h-14 w-full flex items-center justify-between px-6 z-20 shrink-0 border-b border-border bg-card/90 backdrop-blur-md">
         <!-- Left: Brand / Title -->
         <div class="flex items-center gap-2">
-          <span class="text-xs uppercase tracking-widest font-semibold text-[#B0B8C4]">RAIWALL</span>
-          <span class="text-xs text-[#363D4C]">/</span>
-          <span class="text-xs font-medium text-white uppercase tracking-wider font-mono">
+          <span class="text-xs uppercase tracking-widest font-semibold text-muted-foreground">RAIWALL</span>
+          <span class="text-xs text-muted-foreground/40">/</span>
+          <span class="text-xs font-medium text-foreground uppercase tracking-wider font-mono">
             COMMAND CENTER
           </span>
         </div>
 
         <!-- Top-Center View Switcher -->
         <div
-          class="flex items-center bg-[#15181F] border border-[#2A303C] rounded-full p-1 shadow-lg"
+          class="flex items-center bg-muted border border-border rounded-full p-1 shadow-none"
         >
           <button
             data-testid="mode-btn-traffic"
             :class="[
               'rounded-full px-4 py-1 text-xs font-medium transition-all cursor-pointer',
               viewMode === 'traffic'
-                ? 'bg-[#2C323F] text-white shadow-sm'
-                : 'text-[#848D9C] hover:text-white'
+                ? 'bg-card text-foreground shadow-none'
+                : 'text-muted-foreground hover:text-foreground'
             ]"
             @click="viewMode = 'traffic'"
           >
@@ -674,8 +683,8 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
             :class="[
               'rounded-full px-4 py-1 text-xs font-medium transition-all cursor-pointer',
               viewMode === 'threats'
-                ? 'bg-[#2C323F] text-white shadow-sm'
-                : 'text-[#848D9C] hover:text-white'
+                ? 'bg-card text-foreground shadow-none'
+                : 'text-muted-foreground hover:text-foreground'
             ]"
             @click="viewMode = 'threats'"
           >
@@ -685,29 +694,29 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
 
         <!-- Top-Right Telemetry & Filter Bar -->
         <div class="flex items-center gap-4">
-          <span class="text-xs text-[#848D9C] font-mono hidden md:inline">NODE: PROD-EDGE-01</span>
+          <span class="text-xs text-muted-foreground font-mono hidden md:inline">NODE: PROD-EDGE-01</span>
 
           <!-- Filter Popover (Topology) -->
           <Popover v-if="activeNav === 'topology'">
             <PopoverTrigger as-child>
               <button
                 data-testid="filter-trigger-btn"
-                class="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-[#363D4C] bg-[#1E222A] hover:bg-[#2A303C] text-xs font-medium text-white shadow transition-colors cursor-pointer"
+                class="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border bg-card hover:bg-muted text-xs font-medium text-foreground shadow-none transition-colors cursor-pointer"
               >
-                <Filter class="w-3.5 h-3.5 text-[#848D9C]" />
+                <Filter class="w-3.5 h-3.5 text-muted-foreground" />
                 <span>{{ owaspOnly ? 'Filters: 1' : 'Filters' }}</span>
               </button>
             </PopoverTrigger>
             <PopoverContent
               align="end"
-              class="w-[260px] bg-[#1E222A] border border-[#363D4C] text-white p-4 shadow-2xl rounded-md"
+              class="w-[260px] bg-popover border border-border text-popover-foreground p-4 shadow-none rounded-md"
             >
               <!-- Popover Header -->
-              <div class="flex items-center justify-between pb-3 border-b border-[#363D4C] mb-3">
-                <span class="text-xs font-semibold uppercase tracking-wider text-[#B0B8C4]">More Filters</span>
+              <div class="flex items-center justify-between pb-3 border-b border-border mb-3">
+                <span class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">More Filters</span>
                 <button
                   data-testid="filter-reset-btn"
-                  class="text-xs text-[#60A5FA] hover:underline font-medium cursor-pointer"
+                  class="text-xs text-primary hover:underline font-medium cursor-pointer"
                   @click="handleResetFilters"
                 >
                   Reset
@@ -716,7 +725,7 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
 
               <!-- Tenant Select -->
               <div class="space-y-1.5 mb-4">
-                <label class="text-[11px] font-semibold text-[#848D9C] uppercase tracking-wider block">
+                <label class="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block">
                   VIRTUAL HOST / TENANT
                 </label>
                 <Select v-model="selectedTenant">
@@ -733,7 +742,7 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
 
               <!-- OWASP Filter Switch -->
               <div class="flex items-center justify-between pt-1">
-                <label for="owasp-filter" class="text-xs text-[#B0B8C4] cursor-pointer">
+                <label for="owasp-filter" class="text-xs text-foreground cursor-pointer">
                   OWASP Top 10 Attacks only
                 </label>
                 <div class="flex items-center gap-2">
@@ -742,7 +751,7 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
                     data-testid="owasp-filter-switch"
                     v-model:checked="owaspOnly"
                   />
-                  <span class="text-xs font-medium text-[#848D9C] w-6">
+                  <span class="text-xs font-medium text-muted-foreground w-6">
                     {{ owaspOnly ? 'ON' : 'OFF' }}
                   </span>
                 </div>
@@ -751,9 +760,9 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
           </Popover>
 
           <!-- Time Range Selector -->
-          <button class="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-[#363D4C] bg-[#1E222A] hover:bg-[#2A303C] text-xs font-medium text-white shadow transition-colors cursor-pointer">
+          <button class="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border bg-card hover:bg-muted text-xs font-medium text-foreground shadow-none transition-colors cursor-pointer">
             <span>Past 30 Days</span>
-            <ChevronDown class="w-3.5 h-3.5 text-[#848D9C]" />
+            <ChevronDown class="w-3.5 h-3.5 text-muted-foreground" />
           </button>
         </div>
       </header>
@@ -887,8 +896,8 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
               class="cursor-pointer"
             >
               <!-- Concentric Dashed Rings -->
-              <circle cx="240" cy="200" r="78" fill="none" stroke="#2E3644" stroke-dasharray="2 5" />
-              <circle cx="240" cy="200" r="108" fill="none" stroke="#2E3644" stroke-dasharray="2 5" />
+              <circle cx="240" cy="200" r="78" fill="none" :stroke="isDark ? '#2E3644' : '#CBD5E1'" stroke-dasharray="2 5" />
+              <circle cx="240" cy="200" r="108" fill="none" :stroke="isDark ? '#2E3644' : '#CBD5E1'" stroke-dasharray="2 5" />
 
               <!-- Orbiting Perimeter Badges (4 badges along rings) -->
               <g
@@ -897,28 +906,28 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
                 @mouseleave="hoveredBadgeCluster = null"
               >
                 <!-- Badge 1: 45° r=108 -> (316, 276) -->
-                <circle cx="316" cy="276" r="12" fill="#161A22" stroke="#2E3644" stroke-width="1.5" />
-                <Bot class="w-3.5 h-3.5 text-[#848D9C]" x="309" y="269" width="14" height="14" />
+                <circle cx="316" cy="276" r="12" :fill="isDark ? '#161A22' : '#F1F5F9'" :stroke="isDark ? '#2E3644' : '#CBD5E1'" stroke-width="1.5" />
+                <Bot class="w-3.5 h-3.5 text-muted-foreground" x="309" y="269" width="14" height="14" />
 
                 <!-- Badge 2: 135° r=108 -> (164, 276) -->
-                <circle cx="164" cy="276" r="12" fill="#161A22" stroke="#2E3644" stroke-width="1.5" />
-                <Lock class="w-3.5 h-3.5 text-[#848D9C]" x="157" y="269" width="14" height="14" />
+                <circle cx="164" cy="276" r="12" :fill="isDark ? '#161A22' : '#F1F5F9'" :stroke="isDark ? '#2E3644' : '#CBD5E1'" stroke-width="1.5" />
+                <Lock class="w-3.5 h-3.5 text-muted-foreground" x="157" y="269" width="14" height="14" />
 
                 <!-- Badge 3: 225° r=78 -> (185, 145) -->
-                <circle cx="185" cy="145" r="12" fill="#161A22" stroke="#2E3644" stroke-width="1.5" />
-                <Globe class="w-3.5 h-3.5 text-[#848D9C]" x="178" y="138" width="14" height="14" />
+                <circle cx="185" cy="145" r="12" :fill="isDark ? '#161A22' : '#F1F5F9'" :stroke="isDark ? '#2E3644' : '#CBD5E1'" stroke-width="1.5" />
+                <Globe class="w-3.5 h-3.5 text-muted-foreground" x="178" y="138" width="14" height="14" />
 
                 <!-- Badge 4: 315° r=78 -> (295, 145) -->
-                <circle cx="295" cy="145" r="12" fill="#161A22" stroke="#2E3644" stroke-width="1.5" />
-                <Smartphone class="w-3.5 h-3.5 text-[#848D9C]" x="288" y="138" width="14" height="14" />
+                <circle cx="295" cy="145" r="12" :fill="isDark ? '#161A22' : '#F1F5F9'" :stroke="isDark ? '#2E3644' : '#CBD5E1'" stroke-width="1.5" />
+                <Smartphone class="w-3.5 h-3.5 text-muted-foreground" x="288" y="138" width="14" height="14" />
               </g>
 
               <!-- Central Node Surface -->
-              <circle cx="240" cy="200" r="52" fill="#11141A" stroke="#EF4444" stroke-width="1.5" />
+              <circle cx="240" cy="200" r="52" :fill="isDark ? '#11141A' : '#FFFFFF'" stroke="#EF4444" stroke-width="1.5" />
               <!-- Text -->
-              <text x="240" y="192" text-anchor="middle" fill="#FFFFFF" font-size="20" font-weight="bold" class="tabular-nums">48.2k</text>
-              <text x="240" y="210" text-anchor="middle" fill="#B0B8C4" font-size="11" font-weight="600" letter-spacing="1">AUTOMATED BOTS</text>
-              <text x="240" y="226" text-anchor="middle" fill="#848D9C" font-size="11">{{ botsSubtext }}</text>
+              <text x="240" y="192" text-anchor="middle" :fill="isDark ? '#FFFFFF' : '#0F172A'" font-size="20" font-weight="bold" class="tabular-nums">48.2k</text>
+              <text x="240" y="210" text-anchor="middle" :fill="isDark ? '#B0B8C4' : '#475569'" font-size="11" font-weight="600" letter-spacing="1">AUTOMATED BOTS</text>
+              <text x="240" y="226" text-anchor="middle" :fill="isDark ? '#848D9C' : '#64748B'" font-size="11">{{ botsSubtext }}</text>
             </g>
 
             <!-- 2. Middle Cluster: Human Clients (y = 460) with Drill-Down -->
@@ -928,8 +937,8 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
               @click="toggleHumansExpanded"
             >
               <!-- Outer Dashed Rings -->
-              <circle cx="240" cy="460" r="78" fill="none" stroke="#2E3644" stroke-dasharray="2 5" />
-              <circle cx="240" cy="460" r="108" fill="none" stroke="#2E3644" stroke-dasharray="2 5" />
+              <circle cx="240" cy="460" r="78" fill="none" :stroke="isDark ? '#2E3644' : '#CBD5E1'" stroke-dasharray="2 5" />
+              <circle cx="240" cy="460" r="108" fill="none" :stroke="isDark ? '#2E3644' : '#CBD5E1'" stroke-dasharray="2 5" />
 
               <!-- Orbiting Badges -->
               <g
@@ -937,62 +946,62 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
                 @mouseenter="hoveredBadgeCluster = 'humans'"
                 @mouseleave="hoveredBadgeCluster = null"
               >
-                <circle cx="316" cy="536" r="12" fill="#161A22" stroke="#2E3644" stroke-width="1.5" />
-                <Globe class="w-3.5 h-3.5 text-[#848D9C]" x="309" y="529" width="14" height="14" />
+                <circle cx="316" cy="536" r="12" :fill="isDark ? '#161A22' : '#F1F5F9'" :stroke="isDark ? '#2E3644' : '#CBD5E1'" stroke-width="1.5" />
+                <Globe class="w-3.5 h-3.5 text-muted-foreground" x="309" y="529" width="14" height="14" />
 
-                <circle cx="164" cy="536" r="12" fill="#161A22" stroke="#2E3644" stroke-width="1.5" />
-                <Smartphone class="w-3.5 h-3.5 text-[#848D9C]" x="157" y="529" width="14" height="14" />
+                <circle cx="164" cy="536" r="12" :fill="isDark ? '#161A22' : '#F1F5F9'" :stroke="isDark ? '#2E3644' : '#CBD5E1'" stroke-width="1.5" />
+                <Smartphone class="w-3.5 h-3.5 text-muted-foreground" x="157" y="529" width="14" height="14" />
 
-                <circle cx="185" cy="405" r="12" fill="#161A22" stroke="#2E3644" stroke-width="1.5" />
-                <Lock class="w-3.5 h-3.5 text-[#848D9C]" x="178" y="398" width="14" height="14" />
+                <circle cx="185" cy="405" r="12" :fill="isDark ? '#161A22' : '#F1F5F9'" :stroke="isDark ? '#2E3644' : '#CBD5E1'" stroke-width="1.5" />
+                <Lock class="w-3.5 h-3.5 text-muted-foreground" x="178" y="398" width="14" height="14" />
 
-                <circle cx="295" cy="405" r="12" fill="#161A22" stroke="#2E3644" stroke-width="1.5" />
-                <Bot class="w-3.5 h-3.5 text-[#848D9C]" x="288" y="398" width="14" height="14" />
+                <circle cx="295" cy="405" r="12" :fill="isDark ? '#161A22' : '#F1F5F9'" :stroke="isDark ? '#2E3644' : '#CBD5E1'" stroke-width="1.5" />
+                <Bot class="w-3.5 h-3.5 text-muted-foreground" x="288" y="398" width="14" height="14" />
               </g>
 
               <!-- Central Node Surface -->
-              <circle cx="240" cy="460" r="52" fill="#11141A" stroke="#10B981" stroke-width="1.5" />
-              <text x="240" y="450" text-anchor="middle" fill="#FFFFFF" font-size="20" font-weight="bold" class="tabular-nums">142.8k</text>
-              <text x="240" y="468" text-anchor="middle" fill="#B0B8C4" font-size="11" font-weight="600" letter-spacing="1">HUMAN CLIENTS</text>
-              <text x="240" y="484" text-anchor="middle" fill="#848D9C" font-size="11">{{ humansSubtext }}</text>
+              <circle cx="240" cy="460" r="52" :fill="isDark ? '#11141A' : '#FFFFFF'" stroke="#10B981" stroke-width="1.5" />
+              <text x="240" y="450" text-anchor="middle" :fill="isDark ? '#FFFFFF' : '#0F172A'" font-size="20" font-weight="bold" class="tabular-nums">142.8k</text>
+              <text x="240" y="468" text-anchor="middle" :fill="isDark ? '#B0B8C4' : '#475569'" font-size="11" font-weight="600" letter-spacing="1">HUMAN CLIENTS</text>
+              <text x="240" y="484" text-anchor="middle" :fill="isDark ? '#848D9C' : '#64748B'" font-size="11">{{ humansSubtext }}</text>
 
               <!-- Expand / Collapse Indicator -->
               <g transform="translate(233, 495)">
-                <rect x="0" y="0" width="14" height="14" rx="7" :fill="isHumansExpanded ? '#2574F5' : '#1E232D'" :stroke="isHumansExpanded ? '#2574F5' : '#363D4C'" stroke-width="1" />
-                <Minus v-if="isHumansExpanded" class="text-white" :size="10" :x="2" :y="2" />
-                <ChevronDown v-else class="text-[#848D9C]" :size="10" :x="2" :y="2" />
+                <rect x="0" y="0" width="14" height="14" rx="7" :fill="isHumansExpanded ? '#2574F5' : (isDark ? '#1E232D' : '#E2E8F0')" :stroke="isHumansExpanded ? '#2574F5' : (isDark ? '#363D4C' : '#CBD5E1')" stroke-width="1" />
+                <Minus v-if="isHumansExpanded" class="text-primary-foreground" :size="10" :x="2" :y="2" />
+                <ChevronDown v-else class="text-muted-foreground" :size="10" :x="2" :y="2" />
               </g>
             </g>
 
             <!-- Expanded Sub-nodes when isHumansExpanded is true -->
             <g v-if="isHumansExpanded" class="humans-expansion-layer transition-opacity">
               <!-- Outer dotted expansion ring (r = 195) -->
-              <circle cx="240" cy="460" r="195" fill="none" stroke="#2E3644" stroke-dasharray="2 5" />
+              <circle cx="240" cy="460" r="195" fill="none" :stroke="isDark ? '#2E3644' : '#CBD5E1'" stroke-dasharray="2 5" />
 
               <!-- Connector Lines -->
-              <path d="M 292 460 C 340 460, 360 345, 415 345" fill="none" stroke="#2E3644" stroke-dasharray="2 4" />
-              <path d="M 292 460 C 340 460, 360 575, 415 575" fill="none" stroke="#2E3644" stroke-dasharray="2 4" />
+              <path d="M 292 460 C 340 460, 360 345, 415 345" fill="none" :stroke="isDark ? '#2E3644' : '#CBD5E1'" stroke-dasharray="2 4" />
+              <path d="M 292 460 C 340 460, 360 575, 415 575" fill="none" :stroke="isDark ? '#2E3644' : '#CBD5E1'" stroke-dasharray="2 4" />
 
               <!-- Sub-node 1: Verified Sessions at (415, 345) -->
               <g data-testid="subnode-verified" class="cursor-pointer">
-                <circle cx="415" cy="345" r="44" fill="#161A22" stroke="#10B981" stroke-width="1.5" />
-                <text x="415" y="338" text-anchor="middle" fill="#FFFFFF" font-size="15" font-weight="bold" class="tabular-nums">128.4k</text>
-                <text x="415" y="352" text-anchor="middle" fill="#B0B8C4" font-size="10" font-weight="600" letter-spacing="0.5">VERIFIED SESSIONS</text>
-                <text x="415" y="366" text-anchor="middle" fill="#848D9C" font-size="9.5">17.8M Reqs (JWT Valid)</text>
+                <circle cx="415" cy="345" r="44" :fill="isDark ? '#161A22' : '#FFFFFF'" stroke="#10B981" stroke-width="1.5" />
+                <text x="415" y="338" text-anchor="middle" :fill="isDark ? '#FFFFFF' : '#0F172A'" font-size="15" font-weight="bold" class="tabular-nums">128.4k</text>
+                <text x="415" y="352" text-anchor="middle" :fill="isDark ? '#B0B8C4' : '#475569'" font-size="10" font-weight="600" letter-spacing="0.5">VERIFIED SESSIONS</text>
+                <text x="415" y="366" text-anchor="middle" :fill="isDark ? '#848D9C' : '#64748B'" font-size="9.5">17.8M Reqs (JWT Valid)</text>
 
                 <!-- Info Badge (i) -->
                 <g transform="translate(444, 318)">
                   <circle r="8" fill="#2574F5" />
-                  <Info class="w-2.5 h-2.5 text-white" x="-5" y="-5" width="10" height="10" />
+                  <Info class="w-2.5 h-2.5 text-primary-foreground" x="-5" y="-5" width="10" height="10" />
                 </g>
               </g>
 
               <!-- Sub-node 2: Anonymous / Proxy at (415, 575) -->
               <g data-testid="subnode-anonymous" class="cursor-pointer">
-                <circle cx="415" cy="575" r="44" fill="#161A22" stroke="#F59E0B" stroke-width="1.5" />
-                <text x="415" y="568" text-anchor="middle" fill="#FFFFFF" font-size="15" font-weight="bold" class="tabular-nums">14.4k</text>
-                <text x="415" y="582" text-anchor="middle" fill="#B0B8C4" font-size="10" font-weight="600" letter-spacing="0.5">ANONYMOUS / PROXY</text>
-                <text x="415" y="596" text-anchor="middle" fill="#848D9C" font-size="9.5">1.1M Reqs (Challenged)</text>
+                <circle cx="415" cy="575" r="44" :fill="isDark ? '#161A22' : '#FFFFFF'" stroke="#F59E0B" stroke-width="1.5" />
+                <text x="415" y="568" text-anchor="middle" :fill="isDark ? '#FFFFFF' : '#0F172A'" font-size="15" font-weight="bold" class="tabular-nums">14.4k</text>
+                <text x="415" y="582" text-anchor="middle" :fill="isDark ? '#B0B8C4' : '#475569'" font-size="10" font-weight="600" letter-spacing="0.5">ANONYMOUS / PROXY</text>
+                <text x="415" y="596" text-anchor="middle" :fill="isDark ? '#848D9C' : '#64748B'" font-size="9.5">1.1M Reqs (Challenged)</text>
               </g>
             </g>
 
@@ -1002,8 +1011,8 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
               class="cursor-pointer"
             >
               <!-- Outer Dashed Rings -->
-              <circle cx="240" cy="730" r="78" fill="none" stroke="#2E3644" stroke-dasharray="2 5" />
-              <circle cx="240" cy="730" r="108" fill="none" stroke="#2E3644" stroke-dasharray="2 5" />
+              <circle cx="240" cy="730" r="78" fill="none" :stroke="isDark ? '#2E3644' : '#CBD5E1'" stroke-dasharray="2 5" />
+              <circle cx="240" cy="730" r="108" fill="none" :stroke="isDark ? '#2E3644' : '#CBD5E1'" stroke-dasharray="2 5" />
 
               <!-- Orbiting Badges -->
               <g
@@ -1011,24 +1020,24 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
                 @mouseenter="hoveredBadgeCluster = 'api'"
                 @mouseleave="hoveredBadgeCluster = null"
               >
-                <circle cx="316" cy="806" r="12" fill="#161A22" stroke="#2E3644" stroke-width="1.5" />
-                <Server class="w-3.5 h-3.5 text-[#848D9C]" x="309" y="799" width="14" height="14" />
+                <circle cx="316" cy="806" r="12" :fill="isDark ? '#161A22' : '#F1F5F9'" :stroke="isDark ? '#2E3644' : '#CBD5E1'" stroke-width="1.5" />
+                <Server class="w-3.5 h-3.5 text-muted-foreground" x="309" y="799" width="14" height="14" />
 
-                <circle cx="164" cy="806" r="12" fill="#161A22" stroke="#2E3644" stroke-width="1.5" />
-                <Lock class="w-3.5 h-3.5 text-[#848D9C]" x="157" y="799" width="14" height="14" />
+                <circle cx="164" cy="806" r="12" :fill="isDark ? '#161A22' : '#F1F5F9'" :stroke="isDark ? '#2E3644' : '#CBD5E1'" stroke-width="1.5" />
+                <Lock class="w-3.5 h-3.5 text-muted-foreground" x="157" y="799" width="14" height="14" />
 
-                <circle cx="185" cy="675" r="12" fill="#161A22" stroke="#2E3644" stroke-width="1.5" />
-                <Globe class="w-3.5 h-3.5 text-[#848D9C]" x="178" y="668" width="14" height="14" />
+                <circle cx="185" cy="675" r="12" :fill="isDark ? '#161A22' : '#F1F5F9'" :stroke="isDark ? '#2E3644' : '#CBD5E1'" stroke-width="1.5" />
+                <Globe class="w-3.5 h-3.5 text-muted-foreground" x="178" y="668" width="14" height="14" />
 
-                <circle cx="295" cy="675" r="12" fill="#161A22" stroke="#2E3644" stroke-width="1.5" />
-                <Key class="w-3.5 h-3.5 text-[#848D9C]" x="288" y="668" width="14" height="14" />
+                <circle cx="295" cy="675" r="12" :fill="isDark ? '#161A22' : '#F1F5F9'" :stroke="isDark ? '#2E3644' : '#CBD5E1'" stroke-width="1.5" />
+                <Key class="w-3.5 h-3.5 text-muted-foreground" x="288" y="668" width="14" height="14" />
               </g>
 
               <!-- Central Node Surface -->
-              <circle cx="240" cy="730" r="52" fill="#11141A" stroke="#2574F5" stroke-width="1.5" />
-              <text x="240" y="722" text-anchor="middle" fill="#FFFFFF" font-size="20" font-weight="bold" class="tabular-nums">12.1k</text>
-              <text x="240" y="740" text-anchor="middle" fill="#B0B8C4" font-size="11" font-weight="600" letter-spacing="1">API CONSUMERS</text>
-              <text x="240" y="756" text-anchor="middle" fill="#848D9C" font-size="11">{{ apiSubtext }}</text>
+              <circle cx="240" cy="730" r="52" :fill="isDark ? '#11141A' : '#FFFFFF'" stroke="#2574F5" stroke-width="1.5" />
+              <text x="240" y="722" text-anchor="middle" :fill="isDark ? '#FFFFFF' : '#0F172A'" font-size="20" font-weight="bold" class="tabular-nums">12.1k</text>
+              <text x="240" y="740" text-anchor="middle" :fill="isDark ? '#B0B8C4' : '#475569'" font-size="11" font-weight="600" letter-spacing="1">API CONSUMERS</text>
+              <text x="240" y="756" text-anchor="middle" :fill="isDark ? '#848D9C' : '#64748B'" font-size="11">{{ apiSubtext }}</text>
             </g>
           </g>
 
@@ -1074,8 +1083,8 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
                   cx="800"
                   cy="330"
                   r="56"
-                  :fill="hoveredHubId === 'waf-core' ? '#18202A' : '#161A22'"
-                  :stroke="hoveredHubId === 'waf-core' ? '#10B981' : '#363D4C'"
+                  :fill="hoveredHubId === 'waf-core' ? (isDark ? '#18202A' : '#ecfdf5') : (isDark ? '#161A22' : '#FFFFFF')"
+                  :stroke="hoveredHubId === 'waf-core' ? '#10B981' : (isDark ? '#363D4C' : '#CBD5E1')"
                   :stroke-width="hoveredHubId === 'waf-core' ? 2.5 : 2"
                   class="transition-colors duration-200"
                 />
@@ -1083,7 +1092,7 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
                   cx="800"
                   cy="330"
                   r="44"
-                  :fill="hoveredHubId === 'waf-core' ? '#13231E' : '#11141A'"
+                  :fill="hoveredHubId === 'waf-core' ? (isDark ? '#13231E' : '#d1fae5') : (isDark ? '#11141A' : '#F8FAFC')"
                   :stroke="hoveredHubId === 'waf-core' ? '#34D399' : '#10B981'"
                   :stroke-opacity="hoveredHubId === 'waf-core' ? 1 : 0.8"
                   stroke-width="1.5"
@@ -1096,8 +1105,8 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
                     :class="[
                       'w-6 h-6 transition-all duration-300',
                       hoveredHubId === 'waf-core'
-                        ? 'text-[#34D399] drop-shadow-[0_0_12px_rgba(52,211,153,0.7)]'
-                        : 'text-[#10B981]'
+                        ? 'text-success'
+                        : 'text-success'
                     ]"
                     width="24"
                     height="24"
@@ -1109,7 +1118,7 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
                   x="800"
                   y="440"
                   text-anchor="middle"
-                  :fill="hoveredHubId === 'waf-core' ? '#34D399' : '#FFFFFF'"
+                  :fill="hoveredHubId === 'waf-core' ? '#10B981' : (isDark ? '#FFFFFF' : '#0F172A')"
                   font-size="13"
                   font-weight="bold"
                   letter-spacing="0.5"
@@ -1117,7 +1126,7 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
                 >
                   WAF CORE ENGINE
                 </text>
-                <text x="800" y="456" text-anchor="middle" fill="#848D9C" font-size="11">
+                <text x="800" y="456" text-anchor="middle" :fill="isDark ? '#848D9C' : '#64748B'" font-size="11">
                   OWASP CRS v4 + 42 Custom Rules • 0.8ms p95
                 </text>
               </g>
@@ -1163,8 +1172,8 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
                   cx="800"
                   cy="600"
                   r="56"
-                  :fill="hoveredHubId === 'edge-defense' ? '#18202A' : '#161A22'"
-                  :stroke="hoveredHubId === 'edge-defense' ? '#2574F5' : '#363D4C'"
+                  :fill="hoveredHubId === 'edge-defense' ? (isDark ? '#18202A' : '#eff6ff') : (isDark ? '#161A22' : '#FFFFFF')"
+                  :stroke="hoveredHubId === 'edge-defense' ? '#2574F5' : (isDark ? '#363D4C' : '#CBD5E1')"
                   :stroke-width="hoveredHubId === 'edge-defense' ? 2.5 : 2"
                   class="transition-colors duration-200"
                 />
@@ -1172,7 +1181,7 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
                   cx="800"
                   cy="600"
                   r="44"
-                  :fill="hoveredHubId === 'edge-defense' ? '#121D2C' : '#11141A'"
+                  :fill="hoveredHubId === 'edge-defense' ? (isDark ? '#121D2C' : '#dbeafe') : (isDark ? '#11141A' : '#F8FAFC')"
                   :stroke="hoveredHubId === 'edge-defense' ? '#60A5FA' : '#2574F5'"
                   :stroke-opacity="hoveredHubId === 'edge-defense' ? 1 : 0.8"
                   stroke-width="1.5"
@@ -1185,8 +1194,8 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
                     :class="[
                       'w-6 h-6 transition-all duration-300',
                       hoveredHubId === 'edge-defense'
-                        ? 'text-[#60A5FA] drop-shadow-[0_0_12px_rgba(96,165,250,0.7)]'
-                        : 'text-[#2574F5]'
+                        ? 'text-primary'
+                        : 'text-primary'
                     ]"
                     width="24"
                     height="24"
@@ -1198,7 +1207,7 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
                   x="800"
                   y="710"
                   text-anchor="middle"
-                  :fill="hoveredHubId === 'edge-defense' ? '#60A5FA' : '#FFFFFF'"
+                  :fill="hoveredHubId === 'edge-defense' ? '#2574F5' : (isDark ? '#FFFFFF' : '#0F172A')"
                   font-size="13"
                   font-weight="bold"
                   letter-spacing="0.5"
@@ -1206,7 +1215,7 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
                 >
                   EDGE & BOT DEFENSE
                 </text>
-                <text x="800" y="726" text-anchor="middle" fill="#848D9C" font-size="11">
+                <text x="800" y="726" text-anchor="middle" :fill="isDark ? '#848D9C' : '#64748B'" font-size="11">
                   18 Rate Policies, Geo-IP & JA4 Fingerprinting
                 </text>
               </g>
@@ -1221,20 +1230,20 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
               <path
                 d="M 1250 190 A 170 170 0 0 1 1310 330 A 170 170 0 0 1 1250 470"
                 fill="none"
-                stroke="#363D4C"
+                :stroke="isDark ? '#363D4C' : '#CBD5E1'"
                 stroke-dasharray="2 5"
                 stroke-width="1.5"
               />
 
               <!-- Upper Summary Counter (x = 1140) -->
               <g data-testid="dest-summary-upper" class="cursor-default">
-                <text x="1140" y="318" fill="#FFFFFF" font-size="28" font-weight="bold" class="tabular-nums">
+                <text x="1140" y="318" :fill="isDark ? '#FFFFFF' : '#0F172A'" font-size="28" font-weight="bold" class="tabular-nums">
                   {{ upperSummary.count }}
                 </text>
-                <text x="1140" y="338" fill="#B0B8C4" font-size="11" font-weight="600" letter-spacing="1">
+                <text x="1140" y="338" :fill="isDark ? '#B0B8C4' : '#475569'" font-size="11" font-weight="600" letter-spacing="1">
                   {{ upperSummary.title }}
                 </text>
-                <text x="1140" y="354" fill="#848D9C" font-size="12">
+                <text x="1140" y="354" :fill="isDark ? '#848D9C' : '#64748B'" font-size="12">
                   {{ upperSummary.subtext }}
                 </text>
               </g>
@@ -1260,7 +1269,7 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
                   :cy="item.y"
                   r="5"
                   :fill="item.isAttackTarget || viewMode === 'threats' ? '#EF4444' : '#10B981'"
-                  stroke="#161A22"
+                  :stroke="isDark ? '#161A22' : '#FFFFFF'"
                   stroke-width="1.5"
                 />
 
@@ -1272,10 +1281,10 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
                     :width="Math.max(item.label.length * 7 + (item.method ? 44 : 20), 80)"
                     height="20"
                     rx="4"
-                    fill="#1E222A"
-                    stroke="#363D4C"
+                    :fill="isDark ? '#1E222A' : '#F1F5F9'"
+                    :stroke="isDark ? '#363D4C' : '#CBD5E1'"
                     stroke-width="1"
-                    class="transition-colors group-hover:stroke-[#60A5FA]"
+                    class="transition-colors group-hover:stroke-primary"
                   />
                   <!-- Optional Method Tag -->
                   <text
@@ -1291,7 +1300,7 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
                   <text
                     :x="item.method ? 38 : 8"
                     y="14"
-                    fill="#FFFFFF"
+                    :fill="isDark ? '#FFFFFF' : '#0F172A'"
                     font-size="10.5"
                     font-family="monospace"
                   >
@@ -1310,20 +1319,20 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
               <path
                 d="M 1250 460 A 170 170 0 0 1 1310 600 A 170 170 0 0 1 1250 740"
                 fill="none"
-                stroke="#363D4C"
+                :stroke="isDark ? '#363D4C' : '#CBD5E1'"
                 stroke-dasharray="2 5"
                 stroke-width="1.5"
               />
 
               <!-- Lower Summary Counter (x = 1140) -->
               <g data-testid="dest-summary-lower" class="cursor-default">
-                <text x="1140" y="588" fill="#FFFFFF" font-size="28" font-weight="bold" class="tabular-nums">
+                <text x="1140" y="588" :fill="isDark ? '#FFFFFF' : '#0F172A'" font-size="28" font-weight="bold" class="tabular-nums">
                   {{ lowerSummary.count }}
                 </text>
-                <text x="1140" y="608" fill="#B0B8C4" font-size="11" font-weight="600" letter-spacing="1">
+                <text x="1140" y="608" :fill="isDark ? '#B0B8C4' : '#475569'" font-size="11" font-weight="600" letter-spacing="1">
                   {{ lowerSummary.title }}
                 </text>
-                <text x="1140" y="624" fill="#848D9C" font-size="12">
+                <text x="1140" y="624" :fill="isDark ? '#848D9C' : '#64748B'" font-size="12">
                   {{ lowerSummary.subtext }}
                 </text>
               </g>
@@ -1349,7 +1358,7 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
                   :cy="item.y"
                   r="5"
                   :fill="viewMode === 'threats' ? '#EF4444' : '#10B981'"
-                  stroke="#161A22"
+                  :stroke="isDark ? '#161A22' : '#FFFFFF'"
                   stroke-width="1.5"
                 />
 
@@ -1361,10 +1370,10 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
                     :width="Math.max(item.label.length * 7 + (item.method ? 44 : 20), 80)"
                     height="20"
                     rx="4"
-                    fill="#1E222A"
-                    stroke="#363D4C"
+                    :fill="isDark ? '#1E222A' : '#F1F5F9'"
+                    :stroke="isDark ? '#363D4C' : '#CBD5E1'"
                     stroke-width="1"
-                    class="transition-colors group-hover:stroke-[#60A5FA]"
+                    class="transition-colors group-hover:stroke-primary"
                   />
                   <!-- Optional Method Tag -->
                   <text
@@ -1380,7 +1389,7 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
                   <text
                     :x="item.method ? 38 : 8"
                     y="14"
-                    fill="#FFFFFF"
+                    :fill="isDark ? '#FFFFFF' : '#0F172A'"
                     font-size="10.5"
                     font-family="monospace"
                   >
@@ -1397,17 +1406,17 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
       <div
         v-if="tooltip.visible"
         data-testid="topology-tooltip"
-        class="fixed w-[275px] bg-[#222731] border border-[#3E4656] rounded-md p-3.5 shadow-2xl pointer-events-none z-50 transition-all duration-75"
+        class="fixed w-[275px] bg-popover border border-border rounded-md p-3.5 shadow-none pointer-events-none z-50 transition-all duration-75 text-popover-foreground"
         :style="{
           left: `${tooltip.x}px`,
           top: `${tooltip.y}px`,
         }"
       >
-        <div class="text-[13px] font-bold text-white leading-snug">
+        <div class="text-[13px] font-bold text-popover-foreground leading-snug">
           {{ tooltip.header }}
         </div>
-        <div class="border-t border-[#363D4C] my-2"></div>
-        <div class="text-[12px] text-[#B0B8C4] leading-relaxed">
+        <div class="border-t border-border my-2"></div>
+        <div class="text-[12px] text-muted-foreground leading-relaxed">
           {{ tooltip.subtext }}
         </div>
       </div>

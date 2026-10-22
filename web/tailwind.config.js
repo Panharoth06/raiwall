@@ -6,6 +6,25 @@ export default {
     './src/**/*.{vue,js,ts,jsx,tsx}',
   ],
   theme: {
+    boxShadow: {
+      none: 'none',
+      sm: 'none',
+      DEFAULT: 'none',
+      md: 'none',
+      lg: 'none',
+      xl: 'none',
+      '2xl': 'none',
+      inner: 'none',
+    },
+    dropShadow: {
+      none: 'none',
+      sm: 'none',
+      DEFAULT: 'none',
+      md: 'none',
+      lg: 'none',
+      xl: 'none',
+      '2xl': 'none',
+    },
     extend: {
       fontFamily: {
         sans: [

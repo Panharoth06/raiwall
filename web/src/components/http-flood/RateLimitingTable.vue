@@ -241,7 +241,7 @@ const goToSettings = () => {
         <Input
           v-model="filterIp"
           placeholder="IP Addr"
-          class="h-9 w-48 text-xs font-mono"
+          class="h-9 w-48 text-xs font-sans"
         />
 
         <!-- Application Selector -->
@@ -293,16 +293,17 @@ const goToSettings = () => {
       <div class="flex items-center gap-2">
         <Button
           variant="outline"
-          class="h-9 px-4 text-xs font-semibold text-primary border-primary/30 hover:bg-primary/10 hover:text-primary uppercase tracking-wider"
+          class="h-9 px-4 text-xs font-bold text-primary border border-primary bg-primary/10 hover:bg-primary/20 hover:text-primary uppercase tracking-wider transition-colors disabled:opacity-40 disabled:border-border disabled:bg-transparent disabled:text-muted-foreground flex items-center gap-1.5"
           :disabled="bans.length === 0 || loading"
           @click="showUnblockAllModal = true"
         >
-          UNBLOCK ALL
+          <ShieldOff class="w-3.5 h-3.5 shrink-0" />
+          <span>UNBLOCK ALL</span>
         </Button>
 
         <Button
           variant="default"
-          class="h-9 px-4 text-xs font-semibold uppercase tracking-wider gap-1.5 shadow-xs"
+          class="h-9 px-4 text-xs font-semibold uppercase tracking-wider gap-1.5 shadow-none"
           @click="goToSettings"
         >
           <SettingsIcon class="w-3.5 h-3.5" />
@@ -321,7 +322,7 @@ const goToSettings = () => {
     </div>
 
     <!-- SafeLine Multi-Column Rate Limiting Table using shadcn Table components -->
-    <div class="bg-card border border-border rounded-lg overflow-hidden shadow-xs">
+    <div class="bg-card border border-border rounded-lg overflow-hidden shadow-none">
       <Table>
         <TableHeader>
           <TableRow class="bg-muted/40 hover:bg-muted/40 border-b border-border">

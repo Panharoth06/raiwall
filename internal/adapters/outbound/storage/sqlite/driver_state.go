@@ -21,6 +21,9 @@ type databaseState struct {
 	apiKeys         map[string]*RaiwallApiKey
 	forwardingRules map[string]*RaiwallForwardingRule
 	apiResources    map[string]*RaiwallApiResource
+	ipGroups        map[string]*RaiwallIPGroup
+	ipGroupEntries  map[string]*RaiwallIPGroupEntry
+	templates       map[int]*RaiwallResponseTemplate
 	migrations      map[int]string
 	nextVersion     int64
 }
@@ -38,6 +41,9 @@ func newDatabaseState(name string) *databaseState {
 		apiKeys:         make(map[string]*RaiwallApiKey),
 		forwardingRules: make(map[string]*RaiwallForwardingRule),
 		apiResources:    make(map[string]*RaiwallApiResource),
+		ipGroups:        make(map[string]*RaiwallIPGroup),
+		ipGroupEntries:  make(map[string]*RaiwallIPGroupEntry),
+		templates:       make(map[int]*RaiwallResponseTemplate),
 		migrations:      make(map[int]string),
 		nextVersion:     1,
 	}
@@ -90,6 +96,18 @@ func (s *databaseState) clone() *databaseState {
 		val := *v
 		cp.apiResources[k] = &val
 	}
+	for k, v := range s.ipGroups {
+		val := *v
+		cp.ipGroups[k] = &val
+	}
+	for k, v := range s.ipGroupEntries {
+		val := *v
+		cp.ipGroupEntries[k] = &val
+	}
+	for k, v := range s.templates {
+		val := *v
+		cp.templates[k] = &val
+	}
 	for k, v := range s.migrations {
 		cp.migrations[k] = v
 	}
@@ -114,6 +132,9 @@ func (s *databaseState) applyFrom(src *databaseState) {
 	s.apiKeys = src.apiKeys
 	s.forwardingRules = src.forwardingRules
 	s.apiResources = src.apiResources
+	s.ipGroups = src.ipGroups
+	s.ipGroupEntries = src.ipGroupEntries
+	s.templates = src.templates
 	s.migrations = src.migrations
 }
 

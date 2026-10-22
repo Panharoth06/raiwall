@@ -69,7 +69,7 @@ describe('LiveInspector.vue', () => {
     };
   }
 
-  it('renders live event table and status indicator', () => {
+  it('renders live event table and clean status text without green dot', () => {
     const stream = createMockStream();
     const wrapper = mount(LiveInspector, {
       props: {
@@ -77,9 +77,10 @@ describe('LiveInspector.vue', () => {
       },
     });
 
-    const indicator = wrapper.find('[data-testid="status-indicator"]');
-    expect(indicator.exists()).toBe(true);
-    expect(indicator.classes()).toContain('bg-emerald-400');
+    const statusText = wrapper.find('[data-testid="status-text"]');
+    expect(statusText.exists()).toBe(true);
+    expect(statusText.text()).toBe('Live Telemetry');
+    expect(wrapper.find('[data-testid="status-indicator"]').exists()).toBe(false);
 
     const rows = wrapper.findAll('[data-testid="event-row"]');
     expect(rows.length).toBe(2);
@@ -120,7 +121,7 @@ describe('LiveInspector.vue', () => {
     expect(wrapper.text()).toContain('/public/styles.css');
   });
 
-  it('handles pause and resume controls', async () => {
+  it('does not render pause or clear buttons', () => {
     const stream = createMockStream();
     const wrapper = mount(LiveInspector, {
       props: {
@@ -128,24 +129,8 @@ describe('LiveInspector.vue', () => {
       },
     });
 
-    const pauseBtn = wrapper.find('[data-testid="pause-resume-btn"]');
-    expect(pauseBtn.text()).toContain('Pause');
-
-    await pauseBtn.trigger('click');
-    expect(stream.pause).toHaveBeenCalled();
-  });
-
-  it('clears event table on clear button click', async () => {
-    const stream = createMockStream();
-    const wrapper = mount(LiveInspector, {
-      props: {
-        streamComposable: stream as any,
-      },
-    });
-
-    const clearBtn = wrapper.find('[data-testid="clear-events-btn"]');
-    await clearBtn.trigger('click');
-    expect(stream.clear).toHaveBeenCalled();
+    expect(wrapper.find('[data-testid="pause-resume-btn"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="clear-events-btn"]').exists()).toBe(false);
   });
 
   it('opens detail modal and emits create-exception action', async () => {

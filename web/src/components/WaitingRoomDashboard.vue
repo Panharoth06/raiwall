@@ -3,6 +3,7 @@ import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { api, type WaitingRoomMetrics, type PolicySettings } from '@/api/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { NumberInput } from '@/components/ui/number-input';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import {
   Users,
@@ -128,12 +129,12 @@ const toggleWaitingRoom = () => {
       <div class="flex items-center gap-2.5">
         <div class="flex items-center gap-1.5">
           <label class="text-[11px] text-muted-foreground whitespace-nowrap">Capacity:</label>
-          <Input
+          <NumberInput
             :model-value="policy.waiting_room_max_concurrent"
-            type="number"
-            min="1"
-            class="h-8 w-24 text-xs font-mono"
-            @update:model-value="(val) => emit('update:policy', { ...policy, waiting_room_max_concurrent: Number(val) || 100 })"
+            :min="1"
+            suffix="users"
+            class="h-8 w-28 text-xs font-mono shadow-none"
+            @update:model-value="(val) => emit('update:policy', { ...policy, waiting_room_max_concurrent: val ?? 100 })"
           />
         </div>
 

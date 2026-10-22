@@ -173,7 +173,7 @@ const clearDate = (e?: MouseEvent) => {
           )
         "
       >
-        <span class="truncate font-mono font-normal">
+        <span class="truncate font-sans font-normal">
           {{ modelValue || placeholder }}
         </span>
 
@@ -188,7 +188,7 @@ const clearDate = (e?: MouseEvent) => {
       </button>
     </PopoverTrigger>
 
-    <PopoverContent class="w-64 p-3 bg-card text-foreground border border-border shadow-md rounded-lg">
+    <PopoverContent class="w-64 p-3 bg-card text-foreground border border-border shadow-none rounded-lg">
       <!-- Calendar Header -->
       <div class="flex items-center justify-between pb-2 mb-2 border-b border-border/60">
         <Button

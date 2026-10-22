@@ -5,7 +5,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 
@@ -128,7 +127,7 @@ func (m *Middleware) inspectWAFRequest(
 				}
 			}
 
-			rendered := strings.ReplaceAll(body, "{{EVENT_ID}}", eventID)
+			rendered := m.renderBlockResponse(statusCode, eventID, clientIP.String(), r.Host, r.URL.Path, body)
 			m.recordTelemetry(&telemetry.ForensicEvent{
 				EventID:          eventID,
 				Timestamp:        startTime,

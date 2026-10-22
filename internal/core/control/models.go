@@ -143,3 +143,37 @@ type ApiResourceRecord struct {
 	LastSeen    time.Time `json:"last_seen"`
 	CreatedAt   time.Time `json:"created_at"`
 }
+
+// IPGroupRecord represents a named collection of IP/CIDR prefixes in persistent storage.
+type IPGroupRecord struct {
+	ID          string    `json:"id"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	Type        string    `json:"type"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+// IPGroupEntryRecord represents an entry in an IP group.
+type IPGroupEntryRecord struct {
+	ID        string    `json:"id"`
+	GroupID   string    `json:"group_id"`
+	CIDR      string    `json:"cidr"`
+	Comment   string    `json:"comment"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// TemplateRecord represents a deterministic HTML/CSS response template.
+type TemplateRecord struct {
+	ID          string    `json:"id"`
+	StatusCode  int       `json:"status_code"`
+	Title       string    `json:"title"`
+	ContentHTML string    `json:"content_html"`
+	CustomCSS   string    `json:"custom_css"`
+	BrandName   string    `json:"brand_name"`
+	LogoURL     string    `json:"logo_url"`
+	IsCustom    int64     `json:"is_custom"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+

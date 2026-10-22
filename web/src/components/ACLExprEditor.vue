@@ -9,6 +9,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { NumberInput } from '@/components/ui/number-input';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -182,11 +183,11 @@ const handleOpenChange = (openState: boolean) => {
 
           <div>
             <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Evaluation Priority</label>
-            <Input
-              v-model.number="formPriority"
-              type="number"
-              min="1"
-              max="999"
+            <NumberInput
+              v-model="formPriority"
+              :min="1"
+              :max="999"
+              suffix="pts"
             />
           </div>
         </div>

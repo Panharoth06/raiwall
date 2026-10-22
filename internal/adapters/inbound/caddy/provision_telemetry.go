@@ -33,7 +33,7 @@ func (m *Middleware) provisionTelemetry(_ caddy.Context) error {
 	}
 
 	if m.telemetryStore == nil {
-		if m.storageRegistry != nil && (m.StorageConfig.Telemetry != "" || m.StorageConfig.Control != "") {
+		if m.storageRegistry != nil {
 			tStore, err := m.storageRegistry.TelemetryStore(context.Background())
 			if err != nil {
 				return fmt.Errorf("provision telemetry store from registry: %w", err)

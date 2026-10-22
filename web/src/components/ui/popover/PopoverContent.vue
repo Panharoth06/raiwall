@@ -23,7 +23,7 @@ const forwarded = useForwardPropsEmits(props, emits)
     <PopoverContent
       v-bind="{ ...forwarded, ...$attrs }"
       :class="[
-        'z-50 w-72 rounded-md border border-border bg-popover p-4 text-popover-foreground shadow-xl outline-none',
+        'z-50 w-72 rounded-md border border-border bg-popover p-4 text-popover-foreground shadow-none outline-none',
         props.class
       ]"
     >

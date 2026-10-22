@@ -15,22 +15,18 @@ import {
   Gauge,
   LogOut,
   AlertTriangle,
-  Building2,
+  Sun,
+  Moon,
+  ChevronRight,
+  FileCode,
 } from 'lucide-vue-next';
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from '@/components/ui/select';
+import { useTheme } from '@/composables/useTheme';
 
 const router = useRouter();
 const route = useRoute();
 const authStore = useAuthStore();
 const configStore = useConfigStore();
-
-const selectedTenant = ref('default');
+const { isDark, toggleTheme } = useTheme();
 
 onMounted(async () => {
   await authStore.fetchCurrentUser();
@@ -73,9 +69,43 @@ const navItems: NavItem[] = [
     ],
   },
   { name: 'Anti-Bot', path: '/anti-bot', icon: Bot, testId: 'nav-anti-bot' },
+  { name: 'Block Pages', path: '/block-pages', icon: FileCode, testId: 'nav-block-pages' },
   { name: 'Auth', path: '/auth', icon: Lock, testId: 'nav-auth' },
   { name: 'Settings', path: '/system', icon: Settings, testId: 'nav-settings' },
 ];
+
+const expandedMenus = ref<Record<string, boolean>>({});
+
+const isExpanded = (path: string): boolean => {
+  if (expandedMenus.value[path] !== undefined) {
+    return expandedMenus.value[path];
+  }
+  return isItemActive(path);
+};
+
+const toggleMenu = (path: string) => {
+  const current = isExpanded(path);
+  expandedMenus.value[path] = !current;
+};
+
+const handleParentNavClick = (item: NavItem) => {
+  if (isItemActive(item.path) && isExpanded(item.path)) {
+    toggleMenu(item.path);
+  } else {
+    expandedMenus.value[item.path] = true;
+    navigateTo(item.children?.[0]?.path || item.path);
+  }
+};
+
+const isChildActive = (childPath: string): boolean => {
+  if (childPath === '/http-flood/limits') {
+    return (
+      currentPath.value === '/http-flood' ||
+      currentPath.value.startsWith('/http-flood/limits')
+    );
+  }
+  return currentPath.value.startsWith(childPath);
+};
 
 const isItemActive = (path: string): boolean => {
   if (path === '/statistics') {
@@ -88,16 +118,6 @@ const isItemActive = (path: string): boolean => {
     return currentPath.value.startsWith('/system') || currentPath.value.startsWith('/settings');
   }
   return currentPath.value.startsWith(path);
-};
-
-const isChildActive = (childPath: string): boolean => {
-  if (childPath === '/http-flood/limits') {
-    return (
-      currentPath.value === '/http-flood' ||
-      currentPath.value.startsWith('/http-flood/limits')
-    );
-  }
-  return currentPath.value.startsWith(childPath);
 };
 
 const isTopologyActive = computed(() => currentPath.value.startsWith('/topology') || currentPath.value.startsWith('/command-center'));
@@ -138,116 +158,139 @@ const handleLogout = async () => {
           data-testid="nav-topology"
           @click="navigateTo('/topology')"
           :class="[
-            'relative w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-[15px] font-medium transition-colors text-left cursor-pointer overflow-hidden',
+            'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-[15px] font-medium transition-colors text-left cursor-pointer',
             isTopologyActive
-              ? 'bg-primary/10 text-primary border-l-[3px] border-primary rounded-l-none font-semibold'
+              ? 'bg-primary/10 text-primary font-semibold'
               : 'text-muted-foreground hover:text-foreground hover:bg-muted'
           ]"
         >
-          <div v-if="isTopologyActive" class="absolute left-0 top-0 bottom-0 w-[3px] bg-primary"></div>
           <Gauge class="w-[18px] h-[18px] flex-shrink-0" :class="isTopologyActive ? 'text-primary' : 'text-muted-foreground'" />
-          <span class="truncate font-semibold" :class="isTopologyActive ? 'text-foreground' : 'text-muted-foreground'">Command Center</span>
+          <span class="truncate" :class="isTopologyActive ? 'text-foreground font-semibold' : 'text-muted-foreground'">Command Center</span>
         </button>
       </div>
 
       <!-- SafeLine 8-Domain Navigation Links with Vertical Auto-Scroll -->
       <nav class="flex-1 min-h-0 px-3 py-2 space-y-1 overflow-y-auto">
         <div v-for="item in navItems" :key="item.path" class="space-y-0.5">
+          <!-- Standard Nav Item (without children) -->
           <button
+            v-if="!item.children"
             :data-testid="item.testId"
+            type="button"
             @click="navigateTo(item.path)"
             :class="[
-              'relative w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-[15px] font-medium transition-colors text-left cursor-pointer overflow-hidden',
+              'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-[15px] font-medium transition-colors text-left cursor-pointer',
               isItemActive(item.path)
-                ? 'bg-primary/10 text-primary border-l-[3px] border-primary rounded-l-none font-semibold'
+                ? 'bg-primary/10 text-primary font-semibold'
                 : 'text-muted-foreground hover:text-foreground hover:bg-muted'
             ]"
           >
-            <div
-              v-if="isItemActive(item.path)"
-              class="absolute left-0 top-0 bottom-0 w-[3px] bg-primary"
-            />
             <component
               :is="item.icon"
               class="w-[18px] h-[18px] flex-shrink-0"
               :class="isItemActive(item.path) ? 'text-primary' : 'text-muted-foreground'"
             />
-            <span class="truncate" :class="isItemActive(item.path) ? 'text-foreground' : 'text-muted-foreground'">{{ item.name }}</span>
+            <span class="truncate" :class="isItemActive(item.path) ? 'text-foreground font-semibold' : 'text-muted-foreground'">{{ item.name }}</span>
           </button>
 
-          <!-- SafeLine Expandable Sub-Menu for HTTP Flood -->
+          <!-- Nav Item with Nested Children (dropdown with arrow toggle) -->
           <div
-            v-if="item.children && isItemActive(item.path)"
-            class="ml-6 pl-2.5 border-l border-border/80 space-y-0.5 py-1"
+            v-else
+            :class="[
+              'w-full flex items-center justify-between rounded-lg text-[15px] font-medium transition-colors',
+              isItemActive(item.path)
+                ? 'bg-primary/10 text-primary font-semibold'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+            ]"
           >
             <button
-              v-for="child in item.children"
-              :key="child.path"
-              :data-testid="child.testId"
-              @click="navigateTo(child.path)"
-              :class="[
-                'w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors text-left cursor-pointer',
-                isChildActive(child.path)
-                  ? 'text-primary font-semibold bg-primary/10'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'
-              ]"
+              :data-testid="item.testId"
+              type="button"
+              @click="handleParentNavClick(item)"
+              class="flex-1 flex items-center gap-3 px-3 py-2.5 text-left cursor-pointer min-w-0"
             >
-              <span
-                class="w-1.5 h-1.5 rounded-full shrink-0"
-                :class="isChildActive(child.path) ? 'bg-primary' : 'bg-muted-foreground/40'"
+              <component
+                :is="item.icon"
+                class="w-[18px] h-[18px] flex-shrink-0"
+                :class="isItemActive(item.path) ? 'text-primary' : 'text-muted-foreground'"
               />
-              <span class="truncate">{{ child.name }}</span>
+              <span class="truncate" :class="isItemActive(item.path) ? 'text-foreground font-semibold' : 'text-muted-foreground'">
+                {{ item.name }}
+              </span>
+            </button>
+
+            <button
+              :data-testid="item.testId + '-chevron'"
+              type="button"
+              @click.stop="toggleMenu(item.path)"
+              class="p-2 mr-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer flex items-center justify-center shrink-0"
+              :title="isExpanded(item.path) ? 'Collapse ' + item.name : 'Drop ' + item.name"
+              :aria-label="isExpanded(item.path) ? 'Collapse ' + item.name : 'Drop ' + item.name"
+              :aria-expanded="isExpanded(item.path)"
+            >
+              <ChevronRight
+                class="w-4 h-4 transition-transform duration-200"
+                :class="{ 'rotate-90': isExpanded(item.path) }"
+              />
             </button>
           </div>
+
+          <!-- Dropped Nested Sub-Menu with Animation -->
+          <Transition
+            enter-active-class="transition-all duration-200 ease-out overflow-hidden"
+            enter-from-class="opacity-0 max-h-0"
+            enter-to-class="opacity-100 max-h-40"
+            leave-active-class="transition-all duration-150 ease-in overflow-hidden"
+            leave-from-class="opacity-100 max-h-40"
+            leave-to-class="opacity-0 max-h-0"
+          >
+            <div
+              v-if="item.children && isExpanded(item.path)"
+              class="ml-6 pl-2.5 border-l border-border/80 space-y-0.5 py-1"
+            >
+              <button
+                v-for="child in item.children"
+                :key="child.path"
+                :data-testid="child.testId"
+                type="button"
+                @click="navigateTo(child.path)"
+                :class="[
+                  'w-full flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors text-left cursor-pointer',
+                  isChildActive(child.path)
+                    ? 'text-primary font-semibold bg-primary/10'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'
+                ]"
+              >
+                <span class="truncate">{{ child.name }}</span>
+              </button>
+            </div>
+          </Transition>
         </div>
       </nav>
 
       <!-- Bottom User Profile & Session Controls with Pinned mt-auto -->
-      <div class="p-3 border-t border-border bg-card flex flex-col gap-2.5 mt-auto flex-shrink-0">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-2.5 min-w-0">
-            <div class="h-8 w-8 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0">
-              {{ authStore.user?.username?.slice(0, 2).toUpperCase() || 'AD' }}
-            </div>
-            <div class="min-w-0">
-              <span class="text-[13px] font-medium text-foreground block truncate">
-                {{ authStore.user?.username || 'Operator' }}
-              </span>
-              <span class="text-[11px] text-primary uppercase tracking-wider block font-semibold font-mono">
-                {{ authStore.user?.role || 'admin' }}
-              </span>
-            </div>
+      <div class="p-3 border-t border-border bg-card flex items-center justify-between mt-auto flex-shrink-0">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div class="h-8 w-8 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0">
+            {{ authStore.user?.username?.slice(0, 2).toUpperCase() || 'AD' }}
           </div>
-          <button
-            data-testid="logout-btn"
-            @click="handleLogout"
-            title="Sign out"
-            class="p-1.5 text-muted-foreground hover:text-threat hover:bg-muted rounded-md transition-colors cursor-pointer"
-          >
-            <LogOut class="w-4 h-4" />
-          </button>
+          <div class="min-w-0">
+            <span class="text-[13px] font-medium text-foreground block truncate">
+              {{ authStore.user?.username || 'Operator' }}
+            </span>
+            <span class="text-[11px] text-primary uppercase tracking-wider block font-semibold font-mono">
+              {{ authStore.user?.role || 'admin' }}
+            </span>
+          </div>
         </div>
-
-        <!-- Node Mode / Cluster Status Indicator (Moved from Top Navbar) -->
-        <div class="pt-2 border-t border-border/70 flex items-center justify-between text-xs text-muted-foreground">
-          <span class="text-[11px] uppercase font-mono tracking-wider text-muted-foreground">Mode</span>
-          <span
-            v-if="configStore.cluster?.redis_connected"
-            data-testid="cluster-status"
-            class="inline-flex items-center gap-1.5 text-success font-medium font-mono text-xs"
-          >
-            <span class="h-1.5 w-1.5 rounded-full bg-success animate-pulse"></span>
-            <span>Cluster Synced</span>
-          </span>
-          <span
-            v-else
-            data-testid="cluster-status"
-            class="inline-flex items-center gap-1.5 text-muted-foreground font-mono text-xs"
-          >
-            <span class="h-1.5 w-1.5 rounded-full bg-muted-foreground/60"></span>
-            <span>Standalone Mode</span>
-          </span>
-        </div>
+        <button
+          data-testid="logout-btn"
+          @click="handleLogout"
+          title="Sign out"
+          class="p-1.5 text-muted-foreground hover:text-threat hover:bg-muted rounded-md transition-colors cursor-pointer"
+        >
+          <LogOut class="w-4 h-4" />
+        </button>
       </div>
     </aside>
 
@@ -256,34 +299,6 @@ const handleLogout = async () => {
       <!-- Top Action Bar -->
       <header class="h-14 bg-card border-b border-border px-5 flex items-center justify-between flex-shrink-0">
         <div class="flex items-center gap-3">
-          <!-- Tenant / Workspace Selector Component Dropdown -->
-          <div class="flex items-center gap-2">
-            <Building2 class="w-3.5 h-3.5 text-muted-foreground" />
-            <Select v-model="selectedTenant">
-              <SelectTrigger
-                data-testid="tenant-selector"
-                class="h-8 w-56 border-input bg-background text-xs text-foreground"
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent class="border-border bg-popover text-popover-foreground">
-                <SelectItem value="default">Default Tenant (Production)</SelectItem>
-                <SelectItem value="staging">Staging Gateway</SelectItem>
-                <SelectItem value="dmz">External DMZ Edge</SelectItem>
-              </SelectContent>
-            </Select>
-            <select
-              v-model="selectedTenant"
-              class="sr-only"
-              tabindex="-1"
-              aria-hidden="true"
-            >
-              <option value="default">Default Tenant (Production)</option>
-              <option value="staging">Staging Gateway</option>
-              <option value="dmz">External DMZ Edge</option>
-            </select>
-          </div>
-
           <!-- Staged Deployment Alert Banner -->
           <button
             v-if="configStore.hasDraftChanges"
@@ -296,8 +311,19 @@ const handleLogout = async () => {
           </button>
         </div>
 
-        <!-- Right Side Gateway State / Controls (Cleaned) -->
-        <div class="flex items-center gap-3 text-xs text-muted-foreground">
+        <!-- Right Side Controls (Circular Theme Toggle) -->
+        <div class="flex items-center gap-3">
+          <button
+            data-testid="theme-toggle-btn"
+            type="button"
+            @click="toggleTheme"
+            class="flex items-center justify-center w-8 h-8 rounded-full border border-border bg-card text-foreground hover:bg-muted transition-colors cursor-pointer"
+            :title="isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'"
+            :aria-label="isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'"
+          >
+            <Sun v-if="isDark" class="w-4 h-4 text-warning" />
+            <Moon v-else class="w-4 h-4 text-primary" />
+          </button>
         </div>
       </header>
 

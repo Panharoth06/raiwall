@@ -222,4 +222,91 @@ func TestControlPlane_E2E_FullLifecycle(t *testing.T) {
 	require.Equal(t, uint64(1), revertedSnap.Version)
 	require.Eventually(t, func() bool { return pub.count() >= 3 }, 1*time.Second, 10*time.Millisecond)
 	require.Equal(t, uint64(1), pub.get(2))
+
+	// 11. Test HTTP Basic Auth
+	basicAuthReq := httptest.NewRequest(http.MethodGet, "/.raiwall/api/v1/sites", nil)
+	basicAuthReq.SetBasicAuth("admin_e2e", "adminpass123")
+	basicAuthRec := httptest.NewRecorder()
+	router.ServeHTTP(basicAuthRec, basicAuthReq)
+	require.Equal(t, http.StatusOK, basicAuthRec.Code, "valid basic auth should return 200")
+
+	badBasicReq := httptest.NewRequest(http.MethodGet, "/.raiwall/api/v1/sites", nil)
+	badBasicReq.SetBasicAuth("admin_e2e", "wrongpassword")
+	badBasicRec := httptest.NewRecorder()
+	router.ServeHTTP(badBasicRec, badBasicReq)
+	require.Equal(t, http.StatusUnauthorized, badBasicRec.Code, "invalid basic auth should return 401")
+
+	// 12. Test Named IP Groups API Lifecycle (Task 94)
+	createIPGPayload := map[string]string{
+		"name":        "e2e_ip_group",
+		"description": "Integration test IP group",
+		"type":        "custom",
+	}
+	ipgCreateRec := doAuth(http.MethodPost, "/.raiwall/api/v1/ip-groups", createIPGPayload)
+	require.Equal(t, http.StatusCreated, ipgCreateRec.Code)
+	var createdIPG struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+	}
+	err = json.NewDecoder(ipgCreateRec.Body).Decode(&createdIPG)
+	require.NoError(t, err)
+	require.NotEmpty(t, createdIPG.ID)
+	require.Equal(t, "e2e_ip_group", createdIPG.Name)
+
+	// List IP groups
+	ipgListRec := doAuth(http.MethodGet, "/.raiwall/api/v1/ip-groups", nil)
+	require.Equal(t, http.StatusOK, ipgListRec.Code)
+
+	// Add entry to IP group
+	addEntryPayload := map[string]string{
+		"cidr":    "192.0.2.0/24",
+		"comment": "RFC 5737 Test Subnet",
+	}
+	addEntryRec := doAuth(http.MethodPost, fmt.Sprintf("/.raiwall/api/v1/ip-groups/%s/entries", createdIPG.ID), addEntryPayload)
+	require.Equal(t, http.StatusCreated, addEntryRec.Code)
+	var createdEntry struct {
+		ID   string `json:"id"`
+		CIDR string `json:"cidr"`
+	}
+	err = json.NewDecoder(addEntryRec.Body).Decode(&createdEntry)
+	require.NoError(t, err)
+	require.NotEmpty(t, createdEntry.ID)
+
+	// Get group details
+	ipgGetRec := doAuth(http.MethodGet, fmt.Sprintf("/.raiwall/api/v1/ip-groups/%s", createdIPG.ID), nil)
+	require.Equal(t, http.StatusOK, ipgGetRec.Code)
+
+	// Delete entry
+	delEntryRec := doAuth(http.MethodDelete, fmt.Sprintf("/.raiwall/api/v1/ip-groups/%s/entries/%s", createdIPG.ID, createdEntry.ID), nil)
+	require.Equal(t, http.StatusOK, delEntryRec.Code)
+
+	// Delete group
+	delGroupRec := doAuth(http.MethodDelete, fmt.Sprintf("/.raiwall/api/v1/ip-groups/%s", createdIPG.ID), nil)
+	require.Equal(t, http.StatusOK, delGroupRec.Code)
+
+	// 13. Test Custom Response Templates API Lifecycle (Task 95)
+	tmplsListRec := doAuth(http.MethodGet, "/.raiwall/api/v1/templates", nil)
+	require.Equal(t, http.StatusOK, tmplsListRec.Code)
+
+	tmpl403Rec := doAuth(http.MethodGet, "/.raiwall/api/v1/templates/403", nil)
+	require.Equal(t, http.StatusOK, tmpl403Rec.Code)
+
+	updateTmplPayload := map[string]string{
+		"title":        "Corporate Block",
+		"content_html": "<h1>Security Warning</h1><p>{{.EventID}}</p>",
+		"custom_css":   "h1 { color: #f00; }",
+		"brand_name":   "Enterprise Shield",
+	}
+	updateTmplRec := doAuth(http.MethodPut, "/.raiwall/api/v1/templates/403", updateTmplPayload)
+	require.Equal(t, http.StatusOK, updateTmplRec.Code)
+
+	previewPayload := map[string]string{
+		"content_html": "<h1>Preview Warning</h1>",
+		"brand_name":   "Enterprise Shield",
+	}
+	previewRec := doAuth(http.MethodPost, "/.raiwall/api/v1/templates/403/preview", previewPayload)
+	require.Equal(t, http.StatusOK, previewRec.Code)
+
+	resetRec := doAuth(http.MethodPost, "/.raiwall/api/v1/templates/403/reset", nil)
+	require.Equal(t, http.StatusOK, resetRec.Code)
 }

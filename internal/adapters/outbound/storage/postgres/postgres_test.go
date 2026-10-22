@@ -194,7 +194,57 @@ func TestControlStore_QueryFormatting(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, mock.lastQuery, "ON CONFLICT (app_id, method, path_pattern) DO UPDATE")
 
-	// 11. Standalone vs Shared Close
+	// 11. IP Groups (Phase 7)
+	err = store.CreateIPGroup(ctx, control.IPGroupRecord{
+		ID:          "ipg-1",
+		Name:        "test-group",
+		Description: "A test IP group",
+		Type:        "custom",
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	})
+	require.NoError(t, err)
+	require.Contains(t, mock.lastQuery, "INSERT INTO raiwall_ip_groups")
+	require.Equal(t, "ipg-1", mock.lastArgs[0])
+
+	err = store.DeleteIPGroup(ctx, "ipg-1")
+	require.NoError(t, err)
+	require.Contains(t, mock.lastQuery, "DELETE FROM raiwall_ip_groups WHERE id = $1")
+
+	// 12. IP Group Entries (Phase 7)
+	err = store.CreateIPGroupEntry(ctx, control.IPGroupEntryRecord{
+		ID:        "entry-1",
+		GroupID:   "ipg-1",
+		CIDR:      "192.0.2.0/24",
+		Comment:   "test subnet",
+		CreatedAt: now,
+	})
+	require.NoError(t, err)
+	require.Contains(t, mock.lastQuery, "INSERT INTO raiwall_ip_group_entries")
+
+	err = store.DeleteIPGroupEntry(ctx, "entry-1")
+	require.NoError(t, err)
+	require.Contains(t, mock.lastQuery, "DELETE FROM raiwall_ip_group_entries WHERE id = $1")
+
+	// 13. Templates (Phase 7)
+	err = store.UpsertTemplate(ctx, control.TemplateRecord{
+		ID:          "tmpl-1",
+		StatusCode:  403,
+		Title:       "Blocked",
+		ContentHTML: "<h1>Forbidden</h1>",
+		IsCustom:    1,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	})
+	require.NoError(t, err)
+	require.Contains(t, mock.lastQuery, "INSERT INTO raiwall_response_templates")
+	require.Contains(t, mock.lastQuery, "ON CONFLICT (status_code) DO UPDATE")
+
+	err = store.DeleteTemplate(ctx, 403)
+	require.NoError(t, err)
+	require.Contains(t, mock.lastQuery, "DELETE FROM raiwall_response_templates WHERE status_code = $1")
+
+	// 14. Standalone vs Shared Close
 	sharedStore := NewControlStore(nil)
 	require.NoError(t, sharedStore.Close())
 

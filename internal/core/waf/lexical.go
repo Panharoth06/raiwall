@@ -132,6 +132,7 @@ func isCmdBoundary(b byte) bool {
 var traversalSequences = [...]string{
 	"../", "..\\",
 	"/..", "\\..",
+	"..;", ";/", "/;",
 	"..%2f", "..%2F", "..%5c", "..%5C",
 	"%2e%2e/", "%2e%2e\\", "%2e%2e%2f", "%2e%2e%5c",
 	".../", "..../", "...\\", "....\\",
@@ -147,6 +148,7 @@ var sensitivePaths = [...]string{
 	"/var/log/",
 	"/.env", "\\.env",
 	"/.ssh/", "\\.ssh\\",
+	".git/config", ".git/head",
 	"id_rsa", "id_ed25519", "authorized_keys",
 }
 
@@ -161,8 +163,8 @@ func ScanPathTraversal(s string) (bool, string) {
 		return false, ""
 	}
 
-	// Fast-path: must contain dot, slash, backslash, or percent
-	if !strings.ContainsAny(s, "./\\%") {
+	// Fast-path: must contain dot, slash, backslash, semicolon, or percent
+	if !strings.ContainsAny(s, "./\\%;") {
 		return false, ""
 	}
 

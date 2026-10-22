@@ -235,6 +235,7 @@ import HttpFloodView from '@/views/HttpFloodView.vue';
 import SettingsView from '@/views/SettingsView.vue';
 import DeploymentsView from '@/views/DeploymentsView.vue';
 import RulesView from '@/views/RulesView.vue';
+import BlockPagesView from '@/views/BlockPagesView.vue';
 
 export const router = createSimpleRouter([
   { path: '/', name: 'statistics', component: StatisticsView },
@@ -252,6 +253,8 @@ export const router = createSimpleRouter([
   { path: '/http-flood/limits/settings', name: 'http-flood-settings', component: HttpFloodView },
   { path: '/http-flood/waiting-room', name: 'http-flood-waiting-room', component: HttpFloodView },
   { path: '/anti-bot', name: 'anti-bot', component: PoliciesView },
+  { path: '/block-pages', name: 'block-pages', component: BlockPagesView },
+  { path: '/templates', name: 'templates', component: BlockPagesView },
   { path: '/auth', name: 'auth', component: SettingsView },
   { path: '/system', name: 'system', component: SettingsView },
   { path: '/settings', name: 'settings', component: SettingsView },

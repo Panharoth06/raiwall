@@ -1,4 +1,4 @@
-import { ref, watch, onMounted } from 'vue';
+import { ref, onMounted, getCurrentInstance } from 'vue';
 
 export type ThemeMode = 'dark' | 'light' | 'system';
 
@@ -39,6 +39,23 @@ function applyTheme(mode: ThemeMode) {
   }
 }
 
+// Immediately synchronize at module load time if running in browser
+if (typeof localStorage !== 'undefined') {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY) as ThemeMode | null;
+    if (stored && ['dark', 'light', 'system'].includes(stored)) {
+      theme.value = stored;
+      if (stored === 'system') {
+        updateDOM(resolveSystemPreference());
+      } else {
+        updateDOM(stored === 'dark');
+      }
+    }
+  } catch {
+    // ignore
+  }
+}
+
 export function useTheme() {
   const initTheme = () => {
     if (typeof localStorage !== 'undefined') {
@@ -61,21 +78,25 @@ export function useTheme() {
     applyTheme(mode);
   };
 
-  onMounted(() => {
-    initTheme();
+  if (getCurrentInstance()) {
+    onMounted(() => {
+      initTheme();
 
-    if (typeof window !== 'undefined' && window.matchMedia) {
-      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-      const listener = (e: MediaQueryListEvent) => {
-        if (theme.value === 'system') {
-          updateDOM(e.matches);
+      if (typeof window !== 'undefined' && window.matchMedia) {
+        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        const listener = (e: MediaQueryListEvent) => {
+          if (theme.value === 'system') {
+            updateDOM(e.matches);
+          }
+        };
+        if (mediaQuery.addEventListener) {
+          mediaQuery.addEventListener('change', listener);
         }
-      };
-      if (mediaQuery.addEventListener) {
-        mediaQuery.addEventListener('change', listener);
       }
-    }
-  });
+    });
+  } else {
+    initTheme();
+  }
 
   return {
     theme,

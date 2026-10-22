@@ -86,6 +86,23 @@ type ControlStore interface {
 	DeleteAPIResource(ctx context.Context, id string) error
 	DeleteAPIResourcesByApp(ctx context.Context, appID string) error
 
+	// IP Groups
+	ListIPGroups(ctx context.Context) ([]IPGroupRecord, error)
+	GetIPGroup(ctx context.Context, id string) (IPGroupRecord, error)
+	GetIPGroupByName(ctx context.Context, name string) (IPGroupRecord, error)
+	CreateIPGroup(ctx context.Context, group IPGroupRecord) error
+	UpdateIPGroup(ctx context.Context, group IPGroupRecord) error
+	DeleteIPGroup(ctx context.Context, id string) error
+	ListIPGroupEntries(ctx context.Context, groupID string) ([]IPGroupEntryRecord, error)
+	CreateIPGroupEntry(ctx context.Context, entry IPGroupEntryRecord) error
+	DeleteIPGroupEntry(ctx context.Context, id string) error
+
+	// Response Templates
+	ListTemplates(ctx context.Context) ([]TemplateRecord, error)
+	GetTemplate(ctx context.Context, statusCode int) (TemplateRecord, error)
+	UpsertTemplate(ctx context.Context, tmpl TemplateRecord) error
+	DeleteTemplate(ctx context.Context, statusCode int) error
+
 	// Transactions & Lifecycle
 	WithTx(ctx context.Context, fn func(store ControlStore) error) error
 	Close() error

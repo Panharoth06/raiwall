@@ -186,7 +186,7 @@ const goBackToLimits = () => {
     <!-- Limiting Panels Strip -->
     <div class="space-y-4">
       <!-- 1. Access Limiting -->
-      <Card class="bg-card border-border shadow-xs">
+      <Card class="bg-card border-border shadow-none">
         <CardHeader class="py-3 px-4 border-b border-border/60 flex flex-row items-center justify-between">
           <div class="flex items-center gap-2">
             <Sliders class="w-4 h-4 text-primary" />
@@ -239,7 +239,7 @@ const goBackToLimits = () => {
       </Card>
 
       <!-- 2. Attack Limiting -->
-      <Card class="bg-card border-border shadow-xs">
+      <Card class="bg-card border-border shadow-none">
         <CardHeader class="py-3 px-4 border-b border-border/60 flex flex-row items-center justify-between">
           <div class="flex items-center gap-2">
             <Sliders class="w-4 h-4 text-primary" />
@@ -283,7 +283,7 @@ const goBackToLimits = () => {
       </Card>
 
       <!-- 3. Error Limiting -->
-      <Card class="bg-card border-border shadow-xs">
+      <Card class="bg-card border-border shadow-none">
         <CardHeader class="py-3 px-4 border-b border-border/60 flex flex-row items-center justify-between">
           <div class="flex items-center gap-2">
             <Sliders class="w-4 h-4 text-primary" />

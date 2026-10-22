@@ -26,6 +26,9 @@ func (s *controlStmt) Exec(args []driver.Value) (driver.Result, error) {
 	if res, handled := s.execMore(st, q, args); handled {
 		return res, nil
 	}
+	if res, handled := s.execPhase7(st, q, args); handled {
+		return res, nil
+	}
 
 	return driver.RowsAffected(0), nil
 }

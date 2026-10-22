@@ -123,7 +123,7 @@ func (m *Middleware) evaluateBotMitigation(w http.ResponseWriter, r *http.Reques
 				w.Header().Set("Content-Type", "text/html; charset=utf-8")
 				w.Header().Set("X-Raiwall-Event-ID", eventID)
 				w.WriteHeader(statusCode)
-				rendered := strings.ReplaceAll(m.BlockResponseBody, "{{EVENT_ID}}", eventID)
+				rendered := m.renderBlockResponse(statusCode, eventID, clientIP.String(), r.Host, r.URL.Path, m.BlockResponseBody)
 				_, _ = w.Write([]byte(rendered))
 				return true, nil
 			}

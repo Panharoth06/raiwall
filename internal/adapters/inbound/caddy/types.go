@@ -11,6 +11,7 @@ import (
 	"github.com/Panharoth06/raiwall/internal/core/auth"
 	"github.com/Panharoth06/raiwall/internal/core/bot"
 	"github.com/Panharoth06/raiwall/internal/core/control"
+	"github.com/Panharoth06/raiwall/internal/core/control/templates"
 	"github.com/Panharoth06/raiwall/internal/core/rate"
 	"github.com/Panharoth06/raiwall/internal/core/telemetry"
 	"github.com/Panharoth06/raiwall/internal/core/waf"
@@ -179,6 +180,7 @@ type Middleware struct {
 
 	exceptionEngine *acl.ExceptionEngine
 	bartTable       *acl.BARTTable
+	ipGroupMgr      *acl.IPGroupManager
 	geoIPReader     acl.GeoIPReader
 	aclEngine       *acl.ACLEngine
 	authGateway     *auth.AuthGateway
@@ -193,6 +195,7 @@ type Middleware struct {
 	uiHandler          *UIHandler
 	controlStore       control.ControlStore
 	controlAPI         *api.Server
+	templateManager    *templates.TemplateManager
 	sidecarServer      *grpc.ExtProcServer
 	upstreamRegistry   *UpstreamRegistry
 	discoveryCataloger *APIDiscoveryCataloger

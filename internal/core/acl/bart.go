@@ -198,6 +198,48 @@ func (b *BARTTable) BatchInsert(prefixes []netip.Prefix, feedName string, desc s
 	b.current.Store(newTable)
 }
 
+// Delete removes a prefix from the designated feedName. If feedName is empty or after removal no feeds remain, the prefix is removed from the table entirely.
+func (b *BARTTable) Delete(pfx netip.Prefix, feedName string) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	curr := b.current.Load()
+	if curr == nil {
+		return
+	}
+	newTable := curr.Clone()
+	newTable.Modify(pfx, func(existing FeedMetadata, ok bool) (FeedMetadata, bool) {
+		if !ok {
+			return existing, false
+		}
+		if feedName == "" {
+			return existing, true // delete entirely
+		}
+		updatedFeeds := make([]string, 0, len(existing.Feeds))
+		for _, f := range existing.Feeds {
+			if f != feedName {
+				updatedFeeds = append(updatedFeeds, f)
+			}
+		}
+		if len(updatedFeeds) == 0 {
+			return existing, true // delete entry from table
+		}
+		existing.Feeds = updatedFeeds
+		return existing, false
+	})
+	b.current.Store(newTable)
+}
+
+// DeleteCIDR parses a CIDR or IP string and deletes it from the table for the feedName.
+func (b *BARTTable) DeleteCIDR(cidr string, feedName string) error {
+	pfx, err := ParsePrefix(cidr)
+	if err != nil {
+		return err
+	}
+	b.Delete(pfx, feedName)
+	return nil
+}
+
 // LookupAddr retrieves the FeedMetadata for a netip.Addr in sub-microsecond time.
 func (b *BARTTable) LookupAddr(addr netip.Addr) (FeedMetadata, bool) {
 	t := b.current.Load()

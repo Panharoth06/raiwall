@@ -4,6 +4,7 @@ import { setActivePinia, createPinia } from 'pinia';
 import { nextTick } from 'vue';
 import RateLimitingTable from '@/components/http-flood/RateLimitingTable.vue';
 import RateLimitingSettings from '@/components/http-flood/RateLimitingSettings.vue';
+import HttpFloodView from '../HttpFloodView.vue';
 import DashboardLayout from '@/layouts/DashboardLayout.vue';
 import { router } from '@/router';
 import { useConfigStore } from '@/stores/config';
@@ -149,14 +150,43 @@ describe('SafeLine HTTP Flood Workflow', () => {
     });
   });
 
-  describe('Sidebar Navigation in DashboardLayout.vue', () => {
-    it('renders sub-menu items for Rate Limiting and Waiting Room when HTTP Flood is active', async () => {
+  describe('Arrow Nested Dropdown Navigation in DashboardLayout.vue and HttpFloodView.vue', () => {
+    it('renders HTTP Flood with arrow chevron and toggles nested menu in DashboardLayout', async () => {
       await router.navigate('/http-flood/limits');
       const wrapper = mount(DashboardLayout);
       await nextTick();
 
+      expect(wrapper.find('[data-testid="nav-http-flood"]').exists()).toBe(true);
+      const chevron = wrapper.find('[data-testid="nav-http-flood-chevron"]');
+      expect(chevron.exists()).toBe(true);
+
+      // Initially dropped on /http-flood/limits
       expect(wrapper.find('[data-testid="nav-http-flood-limits"]').exists()).toBe(true);
       expect(wrapper.find('[data-testid="nav-http-flood-waiting-room"]').exists()).toBe(true);
+
+      // Click arrow chevron to collapse nested menu
+      await chevron.trigger('click');
+      await nextTick();
+
+      expect(wrapper.find('[data-testid="nav-http-flood-limits"]').exists()).toBe(false);
+      expect(wrapper.find('[data-testid="nav-http-flood-waiting-room"]').exists()).toBe(false);
+
+      // Click arrow chevron again to drop nested menu
+      await chevron.trigger('click');
+      await nextTick();
+
+      expect(wrapper.find('[data-testid="nav-http-flood-limits"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="nav-http-flood-waiting-room"]').exists()).toBe(true);
+    });
+
+    it('renders sub-tabs for Rate Limiting and Waiting Room inside HttpFloodView', async () => {
+      await router.navigate('/http-flood/limits');
+      const wrapper = mount(HttpFloodView);
+      await nextTick();
+
+      expect(wrapper.find('[data-testid="tab-http-flood-limits"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="tab-http-flood-waiting-room"]').exists()).toBe(true);
+      expect(wrapper.text()).toContain('HTTP Flood & Rate Limiting Defense');
     });
   });
 });

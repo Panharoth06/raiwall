@@ -74,7 +74,7 @@ const handleRollback = async () => {
 </script>
 
 <template>
-  <div class="h-full flex flex-col space-y-4 p-6 bg-card text-card-foreground rounded-xl border border-border shadow-2xl font-sans overflow-hidden">
+  <div class="h-full flex flex-col space-y-4 p-6 bg-card text-card-foreground rounded-xl border border-border shadow-none font-sans overflow-hidden">
     <!-- Header -->
     <div class="flex items-center justify-between shrink-0">
       <div>

@@ -57,11 +57,11 @@
     --card: 220 20% 8%;
     --card-foreground: 210 40% 98%;
 
-    --popover: 221 44% 16%;
+    --popover: 220 20% 10%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 217 91% 55%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 180 100% 50%;
+    --primary-foreground: 210 20% 4%;
 
     --secondary: 220 20% 12%;
     --secondary-foreground: 210 40% 98%;
@@ -69,7 +69,7 @@
     --muted: 220 18% 10%;
     --muted-foreground: 218 14% 68%;
 
-    --accent: 221 44% 16%;
+    --accent: 220 20% 12%;
     --accent-foreground: 210 40% 98%;
 
     --destructive: 0 84% 60%;
@@ -77,7 +77,7 @@
 
     --border: 220 20% 15%;
     --input: 220 20% 15%;
-    --ring: 217 91% 55%;
+    --ring: 180 100% 50%;
 
     /* Security Domain Tokens */
     --threat: 0 84% 60%;
@@ -96,6 +96,25 @@
   * {
     box-sizing: border-box;
     border-color: hsl(var(--border));
+  }
+
+  /* Completely eliminate shadows and glow across the entire web application */
+  *, ::before, ::after {
+    --tw-shadow: 0 0 #0000 !important;
+    --tw-shadow-colored: 0 0 #0000 !important;
+    --tw-drop-shadow: none !important;
+    box-shadow: none !important;
+  }
+
+  /* Remove native number input spinners globally */
+  input[type='number']::-webkit-outer-spin-button,
+  input[type='number']::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type='number'] {
+    -moz-appearance: textfield;
+    appearance: textfield;
   }
 
   html, body, #app {

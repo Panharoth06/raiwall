@@ -52,17 +52,18 @@ describe('DashboardLayout.vue (Task 74)', () => {
     expect(attacksNav.classes()).not.toContain('text-primary');
   });
 
-  it('displays tenant selector, crisp PNG brand logo, cluster status in profile, and no version badges', () => {
+  it('displays crisp PNG brand logo, circular theme toggle, and no obsolete header clutter', () => {
     const wrapper = mount(DashboardLayout);
 
-    expect(wrapper.find('[data-testid="tenant-selector"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="tenant-selector"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="cluster-status"]').exists()).toBe(false);
+
     const brandLogo = wrapper.find('[data-testid="brand-logo"]');
     expect(brandLogo.exists()).toBe(true);
     const logoImg = brandLogo.find('img');
     expect(logoImg.exists()).toBe(true);
     expect(logoImg.attributes('src')).toMatch(/logo\.png$/);
 
-    expect(wrapper.find('[data-testid="cluster-status"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="version-badge"]').exists()).toBe(false);
     expect(wrapper.text()).not.toContain('WAF v2.8.4');
     expect(wrapper.text()).not.toContain('v1 Live');
@@ -78,5 +79,17 @@ describe('DashboardLayout.vue (Task 74)', () => {
 
     await wrapper.find('[data-testid="nav-attacks"]').trigger('click');
     expect(mockPush).toHaveBeenCalledWith('/attacks');
+  });
+
+  it('renders circular theme toggle button and toggles theme on click', async () => {
+    const wrapper = mount(DashboardLayout);
+
+    const themeBtn = wrapper.find('[data-testid="theme-toggle-btn"]');
+    expect(themeBtn.exists()).toBe(true);
+    expect(themeBtn.classes()).toContain('rounded-full');
+    expect(themeBtn.attributes('title')).toBeDefined();
+
+    await themeBtn.trigger('click');
+    expect(document.documentElement.classList.contains('light') || document.documentElement.classList.contains('dark')).toBe(true);
   });
 });

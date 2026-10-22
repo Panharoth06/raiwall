@@ -14,7 +14,8 @@ services:
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - ${POSTGRES_DATA_DIR:-./data/postgres}:/var/lib/postgresql/data
+      - ./internal/adapters/outbound/storage/migration/postgres:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-raiwall}"]
       interval: 5s
@@ -60,7 +61,5 @@ networks:
     driver: bridge
 
 volumes:
-  postgres_data:
-    driver: local
   raiwall_data:
     driver: local

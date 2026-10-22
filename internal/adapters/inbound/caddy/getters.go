@@ -7,6 +7,7 @@ import (
 	"github.com/Panharoth06/raiwall/internal/core/auth"
 	"github.com/Panharoth06/raiwall/internal/core/bot"
 	"github.com/Panharoth06/raiwall/internal/core/control"
+	"github.com/Panharoth06/raiwall/internal/core/control/templates"
 	"github.com/Panharoth06/raiwall/internal/core/rate"
 	"github.com/Panharoth06/raiwall/internal/core/telemetry"
 	"github.com/Panharoth06/raiwall/internal/core/waf"
@@ -51,6 +52,25 @@ func (m *Middleware) SetBARTTable(bt *acl.BARTTable) {
 // BARTTable returns the active BARTTable.
 func (m *Middleware) BARTTable() *acl.BARTTable {
 	return m.bartTable
+}
+
+// SetIPGroupManager overrides the IPGroupManager (used for testing).
+func (m *Middleware) SetIPGroupManager(mgr *acl.IPGroupManager) {
+	m.ipGroupMgr = mgr
+	if m.aclEngine != nil {
+		m.aclEngine.SetIPGroupManager(mgr)
+	}
+	if m.controlAPI != nil {
+		m.controlAPI.SetIPGroupManager(mgr)
+	}
+}
+
+// IPGroupManager returns the active IPGroupManager.
+func (m *Middleware) IPGroupManager() *acl.IPGroupManager {
+	if m.aclEngine != nil && m.aclEngine.IPGroupManager() != nil {
+		return m.aclEngine.IPGroupManager()
+	}
+	return m.ipGroupMgr
 }
 
 // SetGeoIPReader overrides the GeoIPReader (used for testing).
@@ -278,4 +298,14 @@ func (m *Middleware) SetDiscoveryCataloger(dc *APIDiscoveryCataloger) {
 // DiscoveryCataloger returns the active APIDiscoveryCataloger.
 func (m *Middleware) DiscoveryCataloger() *APIDiscoveryCataloger {
 	return m.discoveryCataloger
+}
+
+// SetTemplateManager sets the active TemplateManager.
+func (m *Middleware) SetTemplateManager(mgr *templates.TemplateManager) {
+	m.templateManager = mgr
+}
+
+// TemplateManager returns the active TemplateManager.
+func (m *Middleware) TemplateManager() *templates.TemplateManager {
+	return m.templateManager
 }

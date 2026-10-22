@@ -11,7 +11,7 @@ const props = withDefaults(
   {
     position: 'popper',
     sideOffset: 4,
-    disabled: true,
+    disabled: false,
   }
 )
 const emits = defineEmits<SelectContentEmits>()
@@ -23,7 +23,7 @@ const forwarded = useForwardPropsEmits(props, emits)
     <SelectContent
       v-bind="{ ...forwarded, ...$attrs }"
       :class="[
-        'relative z-50 max-h-96 min-w-[8rem] overflow-hidden rounded-md border border-border bg-popover text-popover-foreground shadow-xl',
+        'relative z-50 max-h-96 min-w-[8rem] overflow-hidden rounded-md border border-border bg-popover text-popover-foreground shadow-none',
         props.class
       ]"
     >

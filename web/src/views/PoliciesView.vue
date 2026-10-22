@@ -3,7 +3,7 @@ import { ref, onMounted, watch } from 'vue';
 import { useConfigStore } from '@/stores/config';
 import type { PolicySettings } from '@/api/client';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { NumberInput } from '@/components/ui/number-input';
 import {
   Card,
   CardHeader,
@@ -63,7 +63,7 @@ const handleSave = async () => {
 </script>
 
 <template>
-  <div class="h-full flex flex-col space-y-4 p-6 bg-card text-card-foreground rounded-xl border border-border shadow-2xl font-sans overflow-hidden">
+  <div class="h-full flex flex-col space-y-4 p-6 bg-card text-card-foreground rounded-xl border border-border shadow-none font-sans overflow-hidden">
     <!-- Header -->
     <div class="flex items-center justify-between shrink-0">
       <div>
@@ -113,18 +113,20 @@ const handleSave = async () => {
               <span class="text-xs font-semibold text-foreground block font-sans">Tier 1: Velocity Rate Limit (PoW Trigger)</span>
               <div>
                 <label class="block text-[10px] uppercase font-mono text-muted-foreground mb-1">Max Requests / Sec</label>
-                <Input
-                  v-model.number="form.tier1_rate"
-                  type="number"
-                  class="font-mono"
+                <NumberInput
+                  v-model="form.tier1_rate"
+                  :min="1"
+                  suffix="/s"
+                  class="shadow-none"
                 />
               </div>
               <div>
                 <label class="block text-[10px] uppercase font-mono text-muted-foreground mb-1">Burst Capacity</label>
-                <Input
-                  v-model.number="form.tier1_burst"
-                  type="number"
-                  class="font-mono"
+                <NumberInput
+                  v-model="form.tier1_burst"
+                  :min="1"
+                  suffix="reqs"
+                  class="shadow-none"
                 />
               </div>
             </div>
@@ -134,18 +136,20 @@ const handleSave = async () => {
               <span class="text-xs font-semibold text-foreground block font-sans">Tier 2: Attack Frequency Auto-Ban</span>
               <div>
                 <label class="block text-[10px] uppercase font-mono text-muted-foreground mb-1">Threat Threshold (Violations in 10s)</label>
-                <Input
-                  v-model.number="form.tier2_threshold"
-                  type="number"
-                  class="font-mono"
+                <NumberInput
+                  v-model="form.tier2_threshold"
+                  :min="1"
+                  suffix="pts"
+                  class="shadow-none"
                 />
               </div>
               <div>
                 <label class="block text-[10px] uppercase font-mono text-muted-foreground mb-1">Ban Duration (Seconds)</label>
-                <Input
-                  v-model.number="form.tier2_ban_seconds"
-                  type="number"
-                  class="font-mono"
+                <NumberInput
+                  v-model="form.tier2_ban_seconds"
+                  :min="1"
+                  suffix="sec"
+                  class="shadow-none"
                 />
               </div>
             </div>
@@ -157,18 +161,20 @@ const handleSave = async () => {
             <div class="grid grid-cols-2 gap-4">
               <div>
                 <label class="block text-[10px] uppercase font-mono text-muted-foreground mb-1">Scanner 403/404 Threshold</label>
-                <Input
-                  v-model.number="form.tier3_threshold"
-                  type="number"
-                  class="font-mono"
+                <NumberInput
+                  v-model="form.tier3_threshold"
+                  :min="1"
+                  suffix="reqs"
+                  class="shadow-none"
                 />
               </div>
               <div>
                 <label class="block text-[10px] uppercase font-mono text-muted-foreground mb-1">Scanner Ban Duration (Seconds)</label>
-                <Input
-                  v-model.number="form.tier3_ban_seconds"
-                  type="number"
-                  class="font-mono"
+                <NumberInput
+                  v-model="form.tier3_ban_seconds"
+                  :min="1"
+                  suffix="sec"
+                  class="shadow-none"
                 />
               </div>
             </div>

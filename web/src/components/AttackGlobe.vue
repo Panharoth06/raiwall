@@ -111,22 +111,30 @@ function renderGlobe() {
 
   rotation = (rotation + 0.3) % 360;
 
+  const isDark = typeof document !== 'undefined' ? document.documentElement.classList.contains('dark') : true;
+
   // 1. Draw Globe Base Atmosphere
   const grad = ctx.createRadialGradient(cx - radius * 0.2, cy - radius * 0.2, radius * 0.1, cx, cy, radius);
-  grad.addColorStop(0, '#121824');
-  grad.addColorStop(0.8, '#0d1117');
-  grad.addColorStop(1, '#080a0f');
+  if (isDark) {
+    grad.addColorStop(0, '#121824');
+    grad.addColorStop(0.8, '#0d1117');
+    grad.addColorStop(1, '#080a0f');
+  } else {
+    grad.addColorStop(0, '#f8fafc');
+    grad.addColorStop(0.8, '#e2e8f0');
+    grad.addColorStop(1, '#cbd5e1');
+  }
 
   ctx.beginPath();
   ctx.arc(cx, cy, radius, 0, 2 * Math.PI);
   ctx.fillStyle = grad;
   ctx.fill();
-  ctx.strokeStyle = '#1e293b';
+  ctx.strokeStyle = isDark ? '#1e293b' : '#94a3b8';
   ctx.lineWidth = 1.5;
   ctx.stroke();
 
   // 2. Latitude & Longitude grid lines
-  ctx.strokeStyle = 'rgba(34, 211, 238, 0.08)';
+  ctx.strokeStyle = isDark ? 'rgba(34, 211, 238, 0.08)' : 'rgba(15, 23, 42, 0.08)';
   ctx.lineWidth = 0.8;
   for (let lat = -60; lat <= 60; lat += 30) {
     ctx.beginPath();
@@ -145,11 +153,9 @@ function renderGlobe() {
   if (gw.z > 0) {
     ctx.beginPath();
     ctx.arc(cx + gw.x, cy + gw.y, 4, 0, 2 * Math.PI);
-    ctx.fillStyle = '#22d3ee';
-    ctx.shadowColor = '#22d3ee';
-    ctx.shadowBlur = 10;
+    const nodeColor = isDark ? '#22d3ee' : '#0284c7';
+    ctx.fillStyle = nodeColor;
     ctx.fill();
-    ctx.shadowBlur = 0;
   }
 
   // 4. Draw Animated Attack Arcs
@@ -171,10 +177,7 @@ function renderGlobe() {
       ctx.lineTo(cx + pCur.x, cy + pCur.y);
       ctx.strokeStyle = arc.color;
       ctx.lineWidth = 2;
-      ctx.shadowColor = arc.color;
-      ctx.shadowBlur = 6;
       ctx.stroke();
-      ctx.shadowBlur = 0;
     }
 
     if (arc.progress >= 1) {
@@ -225,7 +228,7 @@ onUnmounted(() => {
   <div
     ref="containerRef"
     data-testid="attack-globe-container"
-    class="flex flex-col items-center justify-center p-5 bg-card text-card-foreground rounded-xl border border-border shadow-2xl relative overflow-hidden font-sans"
+    class="flex flex-col items-center justify-center p-5 bg-card text-card-foreground rounded-xl border border-border shadow-none relative overflow-hidden font-sans"
   >
     <!-- Header overlay -->
     <div class="absolute top-4 left-5 z-10 flex items-center gap-2">

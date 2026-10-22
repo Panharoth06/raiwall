@@ -4,10 +4,12 @@ import { useAuthStore } from '@/stores/auth';
 import { useRouter } from '@/router';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Lock, User, AlertCircle } from 'lucide-vue-next';
+import { Lock, User, AlertCircle, Sun, Moon } from 'lucide-vue-next';
+import { useTheme } from '@/composables/useTheme';
 
 const authStore = useAuthStore();
 const router = useRouter();
+const { isDark, toggleTheme } = useTheme();
 
 const username = ref('admin');
 const password = ref('');
@@ -34,8 +36,23 @@ const handleLogin = async () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-background flex flex-col items-center justify-center p-4 font-sans text-foreground">
-    <div class="w-full max-w-md bg-card border border-border rounded-xl p-8 shadow-xl">
+  <div class="min-h-screen bg-background flex flex-col items-center justify-center p-4 font-sans text-foreground relative">
+    <!-- Top-Right Theme Toggle -->
+    <div class="absolute top-4 right-4">
+      <button
+        data-testid="login-theme-toggle-btn"
+        type="button"
+        @click="toggleTheme"
+        class="flex items-center justify-center w-8 h-8 rounded-full border border-border bg-card text-foreground hover:bg-muted transition-colors cursor-pointer"
+        :title="isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'"
+        :aria-label="isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'"
+      >
+        <Sun v-if="isDark" class="w-4 h-4 text-warning" />
+        <Moon v-else class="w-4 h-4 text-primary" />
+      </button>
+    </div>
+
+    <div class="w-full max-w-md bg-card border border-border rounded-xl p-8 shadow-none">
       <div class="flex items-center justify-center space-x-3 mb-6">
         <img
           src="/logo.png"

@@ -3,6 +3,7 @@ import { Plus, Trash2, Activity } from 'lucide-vue-next';
 import type { Upstream } from '@/api/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { NumberInput } from '@/components/ui/number-input';
 
 const props = defineProps<{
   modelValue: Upstream[];
@@ -82,12 +83,11 @@ const updateField = (index: number, field: keyof Upstream, val: any) => {
 
         <div class="w-24">
           <span class="block text-[10px] text-muted-foreground mb-0.5">Weight ({{ target.weight }})</span>
-          <Input
+          <NumberInput
             :model-value="target.weight"
-            @update:model-value="updateField(idx, 'weight', parseInt(String($event)) || 1)"
-            type="number"
-            min="1"
-            max="100"
+            :min="1"
+            :max="100"
+            @update:model-value="updateField(idx, 'weight', $event ?? 1)"
           />
         </div>
 

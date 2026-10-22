@@ -3,7 +3,6 @@ package caddy
 import (
 	"net"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/Panharoth06/raiwall/internal/core/acl"
@@ -115,7 +114,7 @@ func (m *Middleware) evaluateAccessControl(
 					w.Header().Set("Content-Type", "text/html; charset=utf-8")
 					w.Header().Set("X-Raiwall-Event-ID", eventID)
 					w.WriteHeader(statusCode)
-					rendered := strings.ReplaceAll(body, "{{EVENT_ID}}", eventID)
+					rendered := m.renderBlockResponse(statusCode, eventID, clientIP.String(), r.Host, r.URL.Path, body)
 					_, _ = w.Write([]byte(rendered))
 					return false, true, nil
 
@@ -175,26 +174,40 @@ func (m *Middleware) evaluateAccessControl(
 		// Direct BART Threat Feed fast-path check
 		if !bypassWAF && m.bartTable != nil {
 			if meta, found := m.bartTable.Lookup(clientIP); found && len(meta.Feeds) > 0 {
-				if currentMode == control.ModeAudit {
-					if m.logger != nil {
-						m.logger.Info("Threat feed matched client IP in audit mode (not blocked)",
-							zap.String("client_ip", clientIP.String()),
-							zap.Strings("feeds", meta.Feeds),
-						)
+				var threatFeeds []string
+				for _, f := range meta.Feeds {
+					if m.ipGroupMgr != nil {
+						if grp, ok := m.ipGroupMgr.GetGroup(f); ok {
+							if grp.Type == "threat_feed" || grp.Name == "malicious_threat_intel" {
+								threatFeeds = append(threatFeeds, f)
+							}
+							continue
+						}
 					}
-				} else {
-					eventID := uuid.New().String()
-					if m.logger != nil {
-						m.logger.Warn("Threat feed blocked client IP",
-							zap.String("event_id", eventID),
-							zap.String("client_ip", clientIP.String()),
-							zap.Strings("feeds", meta.Feeds),
-						)
-					}
-					statusCode := m.BlockStatusCode
-					if statusCode == 0 {
-						statusCode = http.StatusForbidden
-					}
+					threatFeeds = append(threatFeeds, f)
+				}
+
+				if len(threatFeeds) > 0 {
+					if currentMode == control.ModeAudit {
+						if m.logger != nil {
+							m.logger.Info("Threat feed matched client IP in audit mode (not blocked)",
+								zap.String("client_ip", clientIP.String()),
+								zap.Strings("feeds", threatFeeds),
+							)
+						}
+					} else {
+						eventID := uuid.New().String()
+						if m.logger != nil {
+							m.logger.Warn("Threat feed blocked client IP",
+								zap.String("event_id", eventID),
+								zap.String("client_ip", clientIP.String()),
+								zap.Strings("feeds", threatFeeds),
+							)
+						}
+						statusCode := m.BlockStatusCode
+						if statusCode == 0 {
+							statusCode = http.StatusForbidden
+						}
 					body := m.BlockResponseBody
 					if appCfg != nil {
 						if appCfg.BlockStatusCode != 0 {
@@ -226,12 +239,13 @@ func (m *Middleware) evaluateAccessControl(
 					w.Header().Set("Content-Type", "text/html; charset=utf-8")
 					w.Header().Set("X-Raiwall-Event-ID", eventID)
 					w.WriteHeader(statusCode)
-					rendered := strings.ReplaceAll(body, "{{EVENT_ID}}", eventID)
+					rendered := m.renderBlockResponse(statusCode, eventID, clientIP.String(), r.Host, r.URL.Path, body)
 					_, _ = w.Write([]byte(rendered))
 					return false, true, nil
 				}
 			}
 		}
+	}
 	}
 
 	return bypassWAF, false, nil

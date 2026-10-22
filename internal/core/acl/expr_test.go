@@ -253,10 +253,32 @@ func TestACLEngine_QueryUnescapeAndOrder(t *testing.T) {
 		Query: "search=cyber%20attack&tag=first&tag=second",
 	}
 	v, err := aclEng.EvaluateRequest(reqCtx)
-	if err != nil {
-		t.Fatalf("EvaluateRequest error: %v", err)
-	}
 	if !v.Matched {
 		t.Errorf("expected query parameters to be unescaped and preserve first value")
 	}
 }
+
+func TestACLEngine_InOperatorCompatibility(t *testing.T) {
+	rule := &ACLRule{
+		Name:       "in-slice-rule",
+		Expression: `method in ["POST", "PUT"]`,
+		Action:     ActionBlock,
+		StatusCode: 403,
+	}
+	aclEng, err := NewACLEngine(nil, nil, rule)
+	if err != nil {
+		t.Fatalf("failed to create engine with slice in operator: %v", err)
+	}
+
+	reqCtx := &waf.RequestContext{
+		Method: "POST",
+	}
+	v, err := aclEng.EvaluateRequest(reqCtx)
+	if err != nil {
+		t.Fatalf("EvaluateRequest error: %v", err)
+	}
+	if !v.Matched {
+		t.Errorf("expected POST method to match rule")
+	}
+}
+

@@ -30,15 +30,12 @@ type EvalEnv struct {
 	UserAgent string            `expr:"user_agent"`
 	Geo       GeoData           `expr:"geo"`
 
-	bartTable *BARTTable
+	bartTable  *BARTTable
+	ipGroupMgr *IPGroupManager
 }
 
 func cleanIPStr(s string) net.IP {
-	s = strings.TrimSpace(s)
-	if idx := strings.IndexByte(s, ','); idx != -1 {
-		s = strings.TrimSpace(s[:idx])
-	}
-	return net.ParseIP(s)
+	return CleanIP(s)
 }
 
 // InCIDR checks if the provided IP belongs to a CIDR subnet.
@@ -60,6 +57,19 @@ func (e *EvalEnv) InFeed(ipStr, feedName string) bool {
 		return false
 	}
 	return e.bartTable.InFeed(ip, feedName)
+}
+
+// InIPGroup checks if the provided IP belongs to a named IP group.
+func (e *EvalEnv) InIPGroup(ipStr, groupName string) bool {
+	if e.ipGroupMgr != nil {
+		return e.ipGroupMgr.InGroupStr(ipStr, groupName)
+	}
+	return e.InFeed(ipStr, groupName)
+}
+
+// IPGroup returns an IPGroupRef for expression evaluation.
+func (e *EvalEnv) IPGroup(name string) IPGroupRef {
+	return IPGroupRef{Name: name, manager: e.ipGroupMgr}
 }
 
 // HasPrefix reports whether s begins with prefix.
@@ -90,12 +100,18 @@ func (e *EvalEnv) RegexMatch(pattern, s string) bool {
 
 // BuildEvalEnv constructs an EvalEnv from an waf.RequestContext, GeoData, and optional BARTTable.
 func BuildEvalEnv(reqCtx *waf.RequestContext, geo GeoData, bartTable *BARTTable) *EvalEnv {
+	return BuildEvalEnvWithManager(reqCtx, geo, bartTable, nil)
+}
+
+// BuildEvalEnvWithManager constructs an EvalEnv with both BARTTable and IPGroupManager.
+func BuildEvalEnvWithManager(reqCtx *waf.RequestContext, geo GeoData, bartTable *BARTTable, ipGroupMgr *IPGroupManager) *EvalEnv {
 	env := &EvalEnv{
-		Headers:   make(map[string]string),
-		Cookies:   make(map[string]string),
-		Query:     make(map[string]string),
-		Geo:       geo,
-		bartTable: bartTable,
+		Headers:    make(map[string]string),
+		Cookies:    make(map[string]string),
+		Query:      make(map[string]string),
+		Geo:        geo,
+		bartTable:  bartTable,
+		ipGroupMgr: ipGroupMgr,
 	}
 	env.Geo.Country_ = geo.Country
 	env.Geo.Continent_ = geo.Continent

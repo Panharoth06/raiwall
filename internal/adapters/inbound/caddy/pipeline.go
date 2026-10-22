@@ -73,6 +73,9 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 	// 4. Evaluate Offline Mode immediately
 	if currentMode == control.ModeOffline {
 		statusCode := m.OfflineStatusCode
+		if statusCode == 0 {
+			statusCode = 466
+		}
 		body := m.OfflineResponseBody
 		if appCfg != nil {
 			if appCfg.OfflineStatusCode != 0 {
@@ -82,12 +85,20 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 				body = appCfg.OfflineResponseBody
 			}
 		}
+		eventID := uuid.New().String()
+		clientIPStr := ""
+		if clientIP != nil {
+			clientIPStr = clientIP.String()
+		}
+		rendered := m.renderBlockResponse(statusCode, eventID, clientIPStr, r.Host, r.URL.Path, body)
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Header().Set("Retry-After", "300")
+		w.Header().Set("X-Raiwall-Event-ID", eventID)
 		w.WriteHeader(statusCode)
-		_, _ = w.Write([]byte(body))
+		_, _ = w.Write([]byte(rendered))
 		return nil
 	}
+
 
 	// 5. Fast-Path: Check Auto-Ban state
 	if m.banManager != nil {
@@ -133,10 +144,7 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 				w.Header().Set("Content-Type", "text/html; charset=utf-8")
 				w.Header().Set("X-Raiwall-Event-ID", eventID)
 				w.WriteHeader(statusCode)
-				banMsg := "<!DOCTYPE html><html><head><title>403 Forbidden</title></head><body><h1>403 Forbidden</h1><p>Client is blocked due to security violations.</p></body></html>"
-				if m.BlockResponseBody != defaultBlockHTML && m.BlockResponseBody != "" {
-					banMsg = strings.ReplaceAll(m.BlockResponseBody, "{{EVENT_ID}}", eventID)
-				}
+				banMsg := m.renderBlockResponse(statusCode, eventID, clientIP.String(), r.Host, r.URL.Path, m.BlockResponseBody)
 				_, _ = w.Write([]byte(banMsg))
 				return nil
 			}

@@ -21,6 +21,7 @@ export interface Tab {
   label: string
   icon?: any
   description?: string
+  testId?: string
   [key: string]: any
 }
 
@@ -235,7 +236,7 @@ provide('tabsActiveTab', computed(() => props.tabs[activeIndex.value]?.id ?? sel
           v-for="(tab, index) in tabs"
           :key="tab.id"
           :ref="(el) => setTabRef(el, index)"
-          data-testid="tab-item"
+          :data-testid="tab.testId || 'tab-item'"
           role="tab"
           tabindex="0"
           :aria-selected="index === activeIndex"
