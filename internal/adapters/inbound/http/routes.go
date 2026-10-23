@@ -61,6 +61,12 @@ func (s *Server) routes() {
 			api.Post("/identity/users/{id}/password-reset", s.handleResetIdentityUserPassword)
 			api.Post("/identity/users/{id}/totp-reset", s.handleResetIdentityUserTOTP)
 
+			// External Identity Provider Connectors (LDAP / GitHub / OIDC)
+			api.Get("/identity/providers", s.handleListIdentityProviders)
+			api.Post("/identity/providers", s.handleCreateIdentityProvider)
+			api.Put("/identity/providers/{id}", s.handleUpdateIdentityProvider)
+			api.Delete("/identity/providers/{id}", s.handleDeleteIdentityProvider)
+
 			// Sites (Apps) CRUD
 			api.Get("/sites", s.handleListSites)
 			api.Post("/sites", s.handleCreateSite)
