@@ -228,6 +228,7 @@ import StatisticsView from '@/views/StatisticsView.vue';
 import AttacksView from '@/views/AttacksView.vue';
 import LoginView from '@/views/LoginView.vue';
 import SitesView from '@/views/SitesView.vue';
+import SiteDetailView from '@/views/SiteDetailView.vue';
 import ExceptionsView from '@/views/ExceptionsView.vue';
 import ACLsView from '@/views/ACLsView.vue';
 import PoliciesView from '@/views/PoliciesView.vue';
@@ -246,7 +247,10 @@ export const router = createSimpleRouter([
   { path: '/topology', name: 'topology', component: CommandCenterView },
   { path: '/command-center', name: 'command-center', component: CommandCenterView },
   { path: '/sites', name: 'sites', component: SitesView },
-  { path: '/sites/:id', name: 'site-detail', component: SitesView },
+  { path: '/sites/:id', name: 'site-detail', component: SiteDetailView },
+  { path: '/sites/:id/rules', name: 'site-detail-rules', component: SiteDetailView },
+  { path: '/sites/:id/proxy', name: 'site-detail-proxy', component: SiteDetailView },
+  { path: '/sites/:id/inventory', name: 'site-detail-inventory', component: SiteDetailView },
   { path: '/attacks', name: 'attacks', component: AttacksView },
   { path: '/inspector', name: 'inspector', component: AttacksView },
   { path: '/allow-deny', name: 'allow-deny', component: ACLsView },

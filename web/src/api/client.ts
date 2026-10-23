@@ -14,6 +14,8 @@ export interface Site {
   // Zero-trust HTTP 467 gate (unified SSO clearance)
   auth_enabled?: boolean;
   auth_bypass_paths?: string[];
+  proxy_settings?: ProxySettings;
+  forwarding_rules?: ForwardingRule[];
 }
 
 export interface Upstream {
@@ -22,6 +24,40 @@ export interface Upstream {
   health_check_path?: string;
   interval?: string;
   fail_timeout?: string;
+}
+
+export interface ForwardingRule {
+  id: string;
+  app_id: string;
+  prefix: string;
+  upstreams: Upstream[];
+  strip_prefix: boolean;
+  host_header_override: string;
+  comment: string;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface APIResource {
+  id: string;
+  app_id: string;
+  method: string;
+  path_pattern: string;
+  content_type: string;
+  hit_count: number;
+  last_seen?: string;
+  created_at?: string;
+}
+
+export interface ProxySettings {
+  client_ip_source?: string;
+  rewrite_xff?: boolean;
+  hsts?: boolean;
+  enable_sse?: boolean;
+  enable_compression?: boolean;
+  enable_ipv6?: boolean;
+  redirect_http?: boolean;
 }
 
 export interface ExceptionRule {
@@ -214,6 +250,30 @@ export const api = {
     }),
   deleteSite: (id: string) =>
     request<void>(`/sites/${id}`, {
+      method: 'DELETE',
+    }),
+
+  // Forwarding rules (path-prefix routing)
+  listForwardingRules: (siteId: string) => request<ForwardingRule[]>(`/sites/${siteId}/forwarding-rules`),
+  createForwardingRule: (siteId: string, rule: Partial<ForwardingRule>) =>
+    request<ForwardingRule>(`/sites/${siteId}/forwarding-rules`, {
+      method: 'POST',
+      body: JSON.stringify(rule),
+    }),
+  updateForwardingRule: (siteId: string, ruleId: string, rule: Partial<ForwardingRule>) =>
+    request<ForwardingRule>(`/sites/${siteId}/forwarding-rules/${ruleId}`, {
+      method: 'PUT',
+      body: JSON.stringify(rule),
+    }),
+  deleteForwardingRule: (siteId: string, ruleId: string) =>
+    request<{ status: string }>(`/sites/${siteId}/forwarding-rules/${ruleId}`, {
+      method: 'DELETE',
+    }),
+
+  // Auto-discovered API inventory
+  listAPIResources: (siteId: string) => request<APIResource[]>(`/sites/${siteId}/resources`),
+  deleteAPIResource: (siteId: string, resourceId: string) =>
+    request<{ status: string }>(`/sites/${siteId}/resources/${resourceId}`, {
       method: 'DELETE',
     }),
 
