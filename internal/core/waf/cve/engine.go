@@ -12,9 +12,10 @@ import (
 // index. Index buckets avoid scanning every rule: each request narrows to the
 // method bucket (and the wildcard bucket) whose prefixes match the URI.
 type Engine struct {
-	base  []Signature
-	index atomic.Pointer[cveIndex]
-	state atomic.Pointer[RuleState]
+	base        []Signature
+	index       atomic.Pointer[cveIndex]
+	state       atomic.Pointer[RuleState]
+	stateSource atomic.Pointer[StateSource]
 }
 
 // cveIndex precomputes lowercase tokens and the method-to-rule buckets once.
@@ -23,6 +24,30 @@ type cveIndex struct {
 	entry []compiledRule
 	// buckets by method (upper) and "*" for any method
 	buckets map[string][]int
+}
+
+// StateSource resolves runtime rule-state externally (e.g. from the atomic
+// control-plane config snapshot). When installed it wins over local toggles.
+type StateSource func() *RuleState
+
+// SetStateSource installs an external state resolver; a nil return reverts
+// to the locally stored toggle set.
+func (e *Engine) SetStateSource(src StateSource) {
+	if src == nil {
+		e.stateSource.Store(nil)
+		return
+	}
+	e.stateSource.Store(&src)
+}
+
+// currentState resolves the effective rule state (local or external source).
+func (e *Engine) currentState() *RuleState {
+	if src := e.stateSource.Load(); src != nil {
+		if st := (*src)(); st != nil {
+			return st
+		}
+	}
+	return e.state.Load()
 }
 
 type compiledRule struct {
@@ -154,7 +179,7 @@ func (e *Engine) SetEnabled(disabled map[string]struct{}) {
 // prefix, then match compiled tokens across the pre-lowered request surfaces.
 // Returns the first fired signature.
 func (e *Engine) Evaluate(in *Input) (*Match, bool) {
-	st := e.state.Load()
+	st := e.currentState()
 	if st != nil && st.IsDisabled("*") {
 		return nil, false // engine-wide disable
 	}

@@ -47,6 +47,11 @@ func (s *Server) routes() {
 			api.Get("/detector/apps/{id}", s.handleGetAppPolicy)
 			api.Put("/detector/apps/{id}", s.handleUpdateAppPolicy)
 
+			// Inner Rules (CVE virtual patches)
+			api.Get("/inner-rules", s.handleListInnerRules)
+			api.Put("/inner-rules/{id}", s.handleUpdateInnerRule)
+			api.Put("/inner-rules/categories/{category}", s.handleUpdateInnerRuleCategory)
+
 			// Sites (Apps) CRUD
 			api.Get("/sites", s.handleListSites)
 			api.Post("/sites", s.handleCreateSite)

@@ -106,6 +106,9 @@ type ControlStore interface {
 	// Semantic Detector Matrix
 	ListDetectorConfig(ctx context.Context) ([]DetectorConfigRecord, error)
 	UpsertDetectorConfig(ctx context.Context, cfg DetectorConfigRecord) error
+	ListDisabledInnerRules(ctx context.Context) ([]string, error)
+	SetInnerRuleDisabled(ctx context.Context, ruleID string, disabled bool) error
+	ClearDisabledInnerRules(ctx context.Context) error
 	DeleteDetectorConfig(ctx context.Context, module string) error
 	ListAppSemanticPolicies(ctx context.Context) ([]AppSemanticPolicyRecord, error)
 	UpsertAppSemanticPolicy(ctx context.Context, rec AppSemanticPolicyRecord) error

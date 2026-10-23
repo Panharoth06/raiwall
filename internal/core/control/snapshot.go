@@ -4,6 +4,7 @@ import (
 	"sync/atomic"
 
 	"github.com/Panharoth06/raiwall/internal/core/waf"
+	"github.com/Panharoth06/raiwall/internal/core/waf/cve"
 )
 
 // SnapshotManager manages atomic, lock-free access to ConfigSnapshot.
@@ -64,4 +65,14 @@ func (SnapshotMatrixSource) MatrixFor(appID string) waf.SemanticMatrix {
 		return snap.SemanticMatrixFor(appID)
 	}
 	return waf.DefaultMatrix()
+}
+
+// SnapshotInnerRuleState is a cve.StateSource resolver that reflects the
+// disabled inner-rule set of the active config snapshot.
+func SnapshotInnerRuleState() *cve.RuleState {
+	snap := LoadSnapshot()
+	if snap == nil {
+		return nil
+	}
+	return &cve.RuleState{Disabled: snap.InnerRulesDisabled}
 }

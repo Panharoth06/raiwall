@@ -226,6 +226,9 @@ type ConfigSnapshot struct {
 	RatePolicies     []*RatePolicySnapshot         `json:"rate_policies,omitempty"`
 	BotConfigs       []*BotConfigSnapshot          `json:"bot_configs,omitempty"`
 	SemanticDefaults map[waf.Module]waf.ModuleMode `json:"semantic_defaults,omitempty"`
+	// InnerRulesDisabled holds virtual-patch (inner rule) signatures switched
+	// off at runtime; every bundled rule is enabled unless listed here.
+	InnerRulesDisabled map[string]struct{} `json:"inner_rules_disabled,omitempty"`
 
 	hostToAppID map[string]string
 }

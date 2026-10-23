@@ -224,6 +224,17 @@ func CompileSnapshot(ctx context.Context, store ControlStore) (*ConfigSnapshot, 
 	snap.BotConfigs = botConfigs
 	snap.SemanticDefaults = semanticDefaults
 
+	// 7. Load disabled inner rules (virtual-patch toggles)
+	dbDisabledRules, err := store.ListDisabledInnerRules(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load disabled inner rules: %w", err)
+	}
+	innerRulesDisabled := make(map[string]struct{}, len(dbDisabledRules))
+	for _, id := range dbDisabledRules {
+		innerRulesDisabled[id] = struct{}{}
+	}
+	snap.InnerRulesDisabled = innerRulesDisabled
+
 	// Join per-app semantic overrides (matrix step runs after apps are registered).
 	for appID, overrides := range appSemOverrides {
 		if app, ok := snap.Apps[appID]; ok && app != nil {

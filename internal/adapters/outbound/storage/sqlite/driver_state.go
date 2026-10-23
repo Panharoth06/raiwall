@@ -9,47 +9,49 @@ import (
 )
 
 type databaseState struct {
-	mu              sync.RWMutex
-	name            string
-	apps            map[string]*RaiwallApp
-	exceptions      map[string]*RaiwallException
-	aclRules        map[string]*RaiwallAclRule
-	ratePolicies    map[string]*RaiwallRatePolicy
-	botConfigs      map[string]*RaiwallBotConfig
-	snapshots       []*RaiwallConfigSnapshot
-	users           map[string]*RaiwallUser
-	apiKeys         map[string]*RaiwallApiKey
-	forwardingRules map[string]*RaiwallForwardingRule
-	apiResources    map[string]*RaiwallApiResource
-	ipGroups        map[string]*RaiwallIPGroup
-	ipGroupEntries  map[string]*RaiwallIPGroupEntry
-	templates       map[int]*RaiwallResponseTemplate
-	detectorConfig  map[string]string
-	appSemPolicies  map[string]string
-	migrations      map[int]string
-	nextVersion     int64
+	mu                sync.RWMutex
+	name              string
+	apps              map[string]*RaiwallApp
+	exceptions        map[string]*RaiwallException
+	aclRules          map[string]*RaiwallAclRule
+	ratePolicies      map[string]*RaiwallRatePolicy
+	botConfigs        map[string]*RaiwallBotConfig
+	snapshots         []*RaiwallConfigSnapshot
+	users             map[string]*RaiwallUser
+	apiKeys           map[string]*RaiwallApiKey
+	forwardingRules   map[string]*RaiwallForwardingRule
+	apiResources      map[string]*RaiwallApiResource
+	ipGroups          map[string]*RaiwallIPGroup
+	ipGroupEntries    map[string]*RaiwallIPGroupEntry
+	templates         map[int]*RaiwallResponseTemplate
+	detectorConfig    map[string]string
+	appSemPolicies    map[string]string
+	innerRuleDisabled map[string]time.Time
+	migrations        map[int]string
+	nextVersion       int64
 }
 
 func newDatabaseState(name string) *databaseState {
 	return &databaseState{
-		name:            name,
-		apps:            make(map[string]*RaiwallApp),
-		exceptions:      make(map[string]*RaiwallException),
-		aclRules:        make(map[string]*RaiwallAclRule),
-		ratePolicies:    make(map[string]*RaiwallRatePolicy),
-		botConfigs:      make(map[string]*RaiwallBotConfig),
-		snapshots:       make([]*RaiwallConfigSnapshot, 0),
-		users:           make(map[string]*RaiwallUser),
-		apiKeys:         make(map[string]*RaiwallApiKey),
-		forwardingRules: make(map[string]*RaiwallForwardingRule),
-		apiResources:    make(map[string]*RaiwallApiResource),
-		ipGroups:        make(map[string]*RaiwallIPGroup),
-		ipGroupEntries:  make(map[string]*RaiwallIPGroupEntry),
-		templates:       make(map[int]*RaiwallResponseTemplate),
-		detectorConfig:  make(map[string]string),
-		appSemPolicies:  make(map[string]string),
-		migrations:      make(map[int]string),
-		nextVersion:     1,
+		name:              name,
+		apps:              make(map[string]*RaiwallApp),
+		exceptions:        make(map[string]*RaiwallException),
+		aclRules:          make(map[string]*RaiwallAclRule),
+		ratePolicies:      make(map[string]*RaiwallRatePolicy),
+		botConfigs:        make(map[string]*RaiwallBotConfig),
+		snapshots:         make([]*RaiwallConfigSnapshot, 0),
+		users:             make(map[string]*RaiwallUser),
+		apiKeys:           make(map[string]*RaiwallApiKey),
+		forwardingRules:   make(map[string]*RaiwallForwardingRule),
+		apiResources:      make(map[string]*RaiwallApiResource),
+		ipGroups:          make(map[string]*RaiwallIPGroup),
+		ipGroupEntries:    make(map[string]*RaiwallIPGroupEntry),
+		templates:         make(map[int]*RaiwallResponseTemplate),
+		detectorConfig:    make(map[string]string),
+		appSemPolicies:    make(map[string]string),
+		innerRuleDisabled: make(map[string]time.Time),
+		migrations:        make(map[int]string),
+		nextVersion:       1,
 	}
 }
 
@@ -118,6 +120,9 @@ func (s *databaseState) clone() *databaseState {
 	for k, v := range s.appSemPolicies {
 		cp.appSemPolicies[k] = v
 	}
+	for k, v := range s.innerRuleDisabled {
+		cp.innerRuleDisabled[k] = v
+	}
 	for k, v := range s.migrations {
 		cp.migrations[k] = v
 	}
@@ -147,6 +152,7 @@ func (s *databaseState) applyFrom(src *databaseState) {
 	s.templates = src.templates
 	s.detectorConfig = src.detectorConfig
 	s.appSemPolicies = src.appSemPolicies
+	s.innerRuleDisabled = src.innerRuleDisabled
 	s.migrations = src.migrations
 }
 

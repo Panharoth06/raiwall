@@ -32,6 +32,9 @@ func (s *controlStmt) Exec(args []driver.Value) (driver.Result, error) {
 	if res, handled := s.execMatrix(st, q, args); handled {
 		return res, nil
 	}
+	if res, handled := s.execInnerRules(st, q, args); handled {
+		return res, nil
+	}
 
 	return driver.RowsAffected(0), nil
 }

@@ -190,3 +190,8 @@ CREATE TABLE IF NOT EXISTS raiwall_app_semantic_policies (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS raiwall_inner_rule_disabled (
+    rule_id TEXT PRIMARY KEY,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+

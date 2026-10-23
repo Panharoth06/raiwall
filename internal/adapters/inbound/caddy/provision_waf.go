@@ -43,6 +43,7 @@ func (m *Middleware) provisionWAF(_ caddy.Context) error {
 		opts = append(opts, waf.WithMatrixSource(control.SnapshotMatrixSource{}))
 		// Virtual-patch signatures (inner rules) run as Stage 0 ahead of triage.
 		if innerRules, err := cve.NewBundled(); err == nil {
+			innerRules.SetStateSource(control.SnapshotInnerRuleState)
 			opts = append(opts, waf.WithInnerRules(innerRules))
 		} else if m.logger != nil {
 			m.logger.Error("cve virtual-patch library failed to load; inner rules disabled", zap.Error(err))
