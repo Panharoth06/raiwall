@@ -27,3 +27,16 @@ type RaiwallIdentityProvider struct {
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
+
+// RaiwallIdentityAuthEvent mirrors a raiwall_identity_auth_log row.
+type RaiwallIdentityAuthEvent struct {
+	CreatedAt time.Time
+	Username  string
+	AppID     string
+	Host      string
+	Method    string
+	Result    string
+	ClientIP  string
+	Country   string
+	Detail    string
+}

@@ -34,6 +34,9 @@ func (s *controlStmt) Query(args []driver.Value) (driver.Rows, error) {
 	if rows, handled := s.queryIdentity(st, q, args); handled {
 		return rows, nil
 	}
+	if rows, handled := s.queryAuthGate(st, q, args); handled {
+		return rows, nil
+	}
 
 	return &driverMemoryRows{}, nil
 }
@@ -67,13 +70,15 @@ func (s *controlStmt) queryCore(st *databaseState, q string, args []driver.Value
 				columns: []string{
 					"id", "name", "hostnames", "mode", "upstreams", "block_status_code",
 					"block_response_body", "offline_status_code", "offline_response_body",
-					"custom_headers", "proxy_settings", "created_at", "updated_at",
+					"custom_headers", "proxy_settings", "auth_enabled", "auth_bypass_paths",
+					"created_at", "updated_at",
 				},
 				data: [][]driver.Value{
 					{
 						app.ID, app.Name, app.Hostnames, app.Mode, app.Upstreams,
 						app.BlockStatusCode, app.BlockResponseBody, app.OfflineStatusCode,
-						app.OfflineResponseBody, app.CustomHeaders, app.ProxySettings, app.CreatedAt, app.UpdatedAt,
+						app.OfflineResponseBody, app.CustomHeaders, app.ProxySettings,
+						app.AuthEnabled, app.AuthBypassPaths, app.CreatedAt, app.UpdatedAt,
 					},
 				},
 			}, true
@@ -93,14 +98,16 @@ func (s *controlStmt) queryCore(st *databaseState, q string, args []driver.Value
 			rows[i] = []driver.Value{
 				app.ID, app.Name, app.Hostnames, app.Mode, app.Upstreams,
 				app.BlockStatusCode, app.BlockResponseBody, app.OfflineStatusCode,
-				app.OfflineResponseBody, app.CustomHeaders, app.ProxySettings, app.CreatedAt, app.UpdatedAt,
+				app.OfflineResponseBody, app.CustomHeaders, app.ProxySettings,
+				app.AuthEnabled, app.AuthBypassPaths, app.CreatedAt, app.UpdatedAt,
 			}
 		}
 		return &driverMemoryRows{
 			columns: []string{
 				"id", "name", "hostnames", "mode", "upstreams", "block_status_code",
 				"block_response_body", "offline_status_code", "offline_response_body",
-				"custom_headers", "proxy_settings", "created_at", "updated_at",
+				"custom_headers", "proxy_settings", "auth_enabled", "auth_bypass_paths",
+				"created_at", "updated_at",
 			},
 			data: rows,
 		}, true

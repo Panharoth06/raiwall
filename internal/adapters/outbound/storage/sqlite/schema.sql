@@ -12,6 +12,8 @@ CREATE TABLE IF NOT EXISTS raiwall_apps (
     offline_response_body TEXT NOT NULL DEFAULT '',
     custom_headers TEXT NOT NULL DEFAULT '{}',
     proxy_settings TEXT NOT NULL DEFAULT '{}',
+    auth_enabled INTEGER NOT NULL DEFAULT 0,
+    auth_bypass_paths TEXT NOT NULL DEFAULT '[]',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -220,3 +222,22 @@ CREATE TABLE IF NOT EXISTS raiwall_identity_providers (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+
+CREATE TABLE IF NOT EXISTS raiwall_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL DEFAULT '',
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS raiwall_identity_auth_log (
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    username TEXT NOT NULL,
+    app_id TEXT NOT NULL DEFAULT '',
+    host TEXT NOT NULL DEFAULT '',
+    method TEXT NOT NULL DEFAULT 'directory',
+    result TEXT NOT NULL,
+    client_ip TEXT NOT NULL DEFAULT '',
+    country TEXT NOT NULL DEFAULT '',
+    detail TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY (created_at, username, result)
+);

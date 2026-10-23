@@ -12,20 +12,22 @@ import (
 
 // SiteDTO represents application domain configuration.
 type SiteDTO struct {
-	ID                  string                  `json:"id"`
-	Name                string                  `json:"name"`
-	Hostnames           []string                `json:"hostnames"`
-	Mode                string                  `json:"mode"`
+	ID                  string                   `json:"id"`
+	Name                string                   `json:"name"`
+	Hostnames           []string                 `json:"hostnames"`
+	Mode                string                   `json:"mode"`
 	Upstreams           []control.UpstreamTarget `json:"upstreams"`
 	ForwardingRules     []control.ForwardingRule `json:"forwarding_rules,omitempty"`
 	ProxySettings       *control.ProxySettings   `json:"proxy_settings,omitempty"`
-	BlockStatusCode     int                     `json:"block_status_code"`
-	BlockResponseBody   string                  `json:"block_response_body"`
-	OfflineStatusCode   int                     `json:"offline_status_code"`
-	OfflineResponseBody string                  `json:"offline_response_body"`
-	CustomHeaders       map[string]string       `json:"custom_headers"`
-	CreatedAt           time.Time               `json:"created_at"`
-	UpdatedAt           time.Time               `json:"updated_at"`
+	BlockStatusCode     int                      `json:"block_status_code"`
+	BlockResponseBody   string                   `json:"block_response_body"`
+	OfflineStatusCode   int                      `json:"offline_status_code"`
+	OfflineResponseBody string                   `json:"offline_response_body"`
+	CustomHeaders       map[string]string        `json:"custom_headers"`
+	AuthEnabled         bool                     `json:"auth_enabled,omitempty"`
+	AuthBypassPaths     []string                 `json:"auth_bypass_paths,omitempty"`
+	CreatedAt           time.Time                `json:"created_at"`
+	UpdatedAt           time.Time                `json:"updated_at"`
 }
 
 func (s *Server) handleListSites(w http.ResponseWriter, r *http.Request) {
@@ -63,6 +65,8 @@ func (s *Server) handleListSites(w http.ResponseWriter, r *http.Request) {
 			OfflineStatusCode:   int(a.OfflineStatusCode),
 			OfflineResponseBody: a.OfflineResponseBody,
 			CustomHeaders:       headers,
+			AuthEnabled:         a.AuthEnabled == 1,
+			AuthBypassPaths:     parseBypassPaths(a.AuthBypassPaths),
 			CreatedAt:           a.CreatedAt,
 			UpdatedAt:           a.UpdatedAt,
 		})
@@ -128,9 +132,29 @@ func (s *Server) handleGetSite(w http.ResponseWriter, r *http.Request) {
 		OfflineStatusCode:   int(app.OfflineStatusCode),
 		OfflineResponseBody: app.OfflineResponseBody,
 		CustomHeaders:       headers,
+		AuthEnabled:         app.AuthEnabled == 1,
+		AuthBypassPaths:     parseBypassPaths(app.AuthBypassPaths),
 		CreatedAt:           app.CreatedAt,
 		UpdatedAt:           app.UpdatedAt,
 	})
+}
+
+// parseBypassPaths decodes the embedded auth_bypass_paths JSON array.
+func parseBypassPaths(raw string) []string {
+	var paths []string
+	if raw != "" {
+		_ = json.Unmarshal([]byte(raw), &paths)
+	}
+	return paths
+}
+
+// marshalBypassPaths serializes auth path prefixes for storage (nil → []).
+func marshalBypassPaths(paths []string) []byte {
+	if paths == nil {
+		paths = []string{}
+	}
+	raw, _ := json.Marshal(paths)
+	return raw
 }
 
 func (s *Server) handleCreateSite(w http.ResponseWriter, r *http.Request) {
@@ -157,6 +181,7 @@ func (s *Server) handleCreateSite(w http.ResponseWriter, r *http.Request) {
 	upstreamsJSON, _ := json.Marshal(req.Upstreams)
 	headersJSON, _ := json.Marshal(req.CustomHeaders)
 	proxySettingsJSON, _ := json.Marshal(req.ProxySettings)
+	bypassPathsJSON := marshalBypassPaths(req.AuthBypassPaths)
 	now := time.Now().UTC()
 
 	err := s.store.CreateApp(r.Context(), control.SiteApp{
@@ -171,6 +196,8 @@ func (s *Server) handleCreateSite(w http.ResponseWriter, r *http.Request) {
 		OfflineResponseBody: req.OfflineResponseBody,
 		CustomHeaders:       string(headersJSON),
 		ProxySettings:       string(proxySettingsJSON),
+		AuthEnabled:         boolToInt64(req.AuthEnabled),
+		AuthBypassPaths:     string(bypassPathsJSON),
 		CreatedAt:           now,
 		UpdatedAt:           now,
 	})
@@ -196,6 +223,7 @@ func (s *Server) handleUpdateSite(w http.ResponseWriter, r *http.Request) {
 	upstreamsJSON, _ := json.Marshal(req.Upstreams)
 	headersJSON, _ := json.Marshal(req.CustomHeaders)
 	proxySettingsJSON, _ := json.Marshal(req.ProxySettings)
+	bypassPathsJSON := marshalBypassPaths(req.AuthBypassPaths)
 	now := time.Now().UTC()
 
 	err := s.store.UpdateApp(r.Context(), control.SiteApp{
@@ -210,6 +238,8 @@ func (s *Server) handleUpdateSite(w http.ResponseWriter, r *http.Request) {
 		OfflineResponseBody: req.OfflineResponseBody,
 		CustomHeaders:       string(headersJSON),
 		ProxySettings:       string(proxySettingsJSON),
+		AuthEnabled:         boolToInt64(req.AuthEnabled),
+		AuthBypassPaths:     string(bypassPathsJSON),
 		UpdatedAt:           now,
 	})
 	if err != nil {

@@ -20,6 +20,8 @@ func toControlSiteApp(r RaiwallApp) control.SiteApp {
 		OfflineResponseBody: r.OfflineResponseBody,
 		CustomHeaders:       r.CustomHeaders,
 		ProxySettings:       r.ProxySettings,
+		AuthEnabled:         r.AuthEnabled,
+		AuthBypassPaths:     r.AuthBypassPaths,
 		CreatedAt:           r.CreatedAt,
 		UpdatedAt:           r.UpdatedAt,
 	}

@@ -30,8 +30,10 @@ func (m *Middleware) evaluateAccessControl(
 		if !ok {
 			return false, true, nil
 		}
-	} else {
-		// Zero-Trust: strip untrusted client-supplied identity headers
+	} else if appCfg == nil || !appCfg.AuthEnabled {
+		// Zero-Trust: strip untrusted client-supplied identity headers.
+		// App-gate-managed sites were already sanitized + injected at the
+		// per-app gate stage (11b).
 		auth.StripAuthHeaders(r.Header)
 	}
 
@@ -208,44 +210,44 @@ func (m *Middleware) evaluateAccessControl(
 						if statusCode == 0 {
 							statusCode = http.StatusForbidden
 						}
-					body := m.BlockResponseBody
-					if appCfg != nil {
-						if appCfg.BlockStatusCode != 0 {
-							statusCode = appCfg.BlockStatusCode
+						body := m.BlockResponseBody
+						if appCfg != nil {
+							if appCfg.BlockStatusCode != 0 {
+								statusCode = appCfg.BlockStatusCode
+							}
+							if appCfg.BlockResponseBody != "" {
+								body = appCfg.BlockResponseBody
+							}
 						}
-						if appCfg.BlockResponseBody != "" {
-							body = appCfg.BlockResponseBody
+						if body == "" {
+							body = defaultBlockHTML
 						}
+						m.recordTelemetry(&telemetry.ForensicEvent{
+							EventID:    eventID,
+							Timestamp:  startTime,
+							Host:       r.Host,
+							Path:       r.URL.RequestURI(),
+							Method:     r.Method,
+							ClientIP:   clientIP.String(),
+							JA4:        ja4,
+							GeoData:    m.lookupGeo(clientIP),
+							RuleID:     "threat_feed",
+							Action:     "block",
+							Severity:   "high",
+							Headers:    extractHeadersMap(r.Header),
+							Latency:    time.Since(startTime),
+							StatusCode: statusCode,
+						})
+						w.Header().Set("Content-Type", "text/html; charset=utf-8")
+						w.Header().Set("X-Raiwall-Event-ID", eventID)
+						w.WriteHeader(statusCode)
+						rendered := m.renderBlockResponse(statusCode, eventID, clientIP.String(), r.Host, r.URL.Path, body)
+						_, _ = w.Write([]byte(rendered))
+						return false, true, nil
 					}
-					if body == "" {
-						body = defaultBlockHTML
-					}
-					m.recordTelemetry(&telemetry.ForensicEvent{
-						EventID:    eventID,
-						Timestamp:  startTime,
-						Host:       r.Host,
-						Path:       r.URL.RequestURI(),
-						Method:     r.Method,
-						ClientIP:   clientIP.String(),
-						JA4:        ja4,
-						GeoData:    m.lookupGeo(clientIP),
-						RuleID:     "threat_feed",
-						Action:     "block",
-						Severity:   "high",
-						Headers:    extractHeadersMap(r.Header),
-						Latency:    time.Since(startTime),
-						StatusCode: statusCode,
-					})
-					w.Header().Set("Content-Type", "text/html; charset=utf-8")
-					w.Header().Set("X-Raiwall-Event-ID", eventID)
-					w.WriteHeader(statusCode)
-					rendered := m.renderBlockResponse(statusCode, eventID, clientIP.String(), r.Host, r.URL.Path, body)
-					_, _ = w.Write([]byte(rendered))
-					return false, true, nil
 				}
 			}
 		}
-	}
 	}
 
 	return bypassWAF, false, nil

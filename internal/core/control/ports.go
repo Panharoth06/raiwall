@@ -117,6 +117,10 @@ type ControlStore interface {
 	ListIdentityProviders(ctx context.Context) ([]IdentityProviderRecord, error)
 	UpsertIdentityProvider(ctx context.Context, provider IdentityProviderRecord) error
 	DeleteIdentityProvider(ctx context.Context, id string) error
+	GetSetting(ctx context.Context, key string) (string, error)
+	PutSetting(ctx context.Context, key, value string) error
+	RecordIdentityAuthEvent(ctx context.Context, event IdentityAuthEventRecord) error
+	ListIdentityAuthEvents(ctx context.Context, limit int) ([]IdentityAuthEventRecord, error)
 	DeleteDetectorConfig(ctx context.Context, module string) error
 	ListAppSemanticPolicies(ctx context.Context) ([]AppSemanticPolicyRecord, error)
 	UpsertAppSemanticPolicy(ctx context.Context, rec AppSemanticPolicyRecord) error

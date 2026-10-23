@@ -29,6 +29,8 @@ type databaseState struct {
 	innerRuleDisabled map[string]time.Time
 	identityUsers     map[string]*RaiwallIdentityUser
 	identityProviders map[string]*RaiwallIdentityProvider
+	settings          map[string]string
+	authLog           []*RaiwallIdentityAuthEvent
 	migrations        map[int]string
 	nextVersion       int64
 }
@@ -54,6 +56,7 @@ func newDatabaseState(name string) *databaseState {
 		innerRuleDisabled: make(map[string]time.Time),
 		identityUsers:     make(map[string]*RaiwallIdentityUser),
 		identityProviders: make(map[string]*RaiwallIdentityProvider),
+		settings:          make(map[string]string),
 		migrations:        make(map[int]string),
 		nextVersion:       1,
 	}
@@ -135,6 +138,13 @@ func (s *databaseState) clone() *databaseState {
 		provCopy := *v
 		cp.identityProviders[k] = &provCopy
 	}
+	for k, v := range s.settings {
+		cp.settings[k] = v
+	}
+	for _, e := range s.authLog {
+		evCopy := *e
+		cp.authLog = append(cp.authLog, &evCopy)
+	}
 	for k, v := range s.migrations {
 		cp.migrations[k] = v
 	}
@@ -167,6 +177,8 @@ func (s *databaseState) applyFrom(src *databaseState) {
 	s.innerRuleDisabled = src.innerRuleDisabled
 	s.identityUsers = src.identityUsers
 	s.identityProviders = src.identityProviders
+	s.settings = src.settings
+	s.authLog = src.authLog
 	s.migrations = src.migrations
 }
 

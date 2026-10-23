@@ -186,6 +186,12 @@ type AppConfig struct {
 	OfflineStatusCode   int                           `json:"offline_status_code,omitempty"`
 	OfflineResponseBody string                        `json:"offline_response_body,omitempty"`
 	CustomHeaders       map[string]string             `json:"custom_headers,omitempty"`
+	// AuthEnabled turns on the per-site zero-trust gate: unauthenticated
+	// browsers receive HTTP 467 with the branded login portal; API
+	// transports (Bearer / JSON / /api/*) bypass transparently.
+	AuthEnabled bool `json:"auth_enabled,omitempty"`
+	// AuthBypassPaths lists path prefixes served without clearance.
+	AuthBypassPaths []string `json:"auth_bypass_paths,omitempty"`
 }
 
 // RatePolicySnapshot holds compiled rate limiting configuration for a host or global (*).
@@ -229,6 +235,9 @@ type ConfigSnapshot struct {
 	// InnerRulesDisabled holds virtual-patch (inner rule) signatures switched
 	// off at runtime; every bundled rule is enabled unless listed here.
 	InnerRulesDisabled map[string]struct{} `json:"inner_rules_disabled,omitempty"`
+	// AppAuthSessionSecret signs the per-site clearance cookie (sl_jwt_session)
+	// for zero-trust HTTP 467 gates; unified SSO across authorized sites.
+	AppAuthSessionSecret string `json:"app_auth_session_secret,omitempty"`
 
 	hostToAppID map[string]string
 }

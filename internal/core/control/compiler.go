@@ -64,6 +64,10 @@ func CompileSnapshot(ctx context.Context, store ControlStore) (*ConfigSnapshot, 
 				proxySettings = &ps
 			}
 		}
+		var bypassPaths []string
+		if a.AuthBypassPaths != "" {
+			_ = json.Unmarshal([]byte(a.AuthBypassPaths), &bypassPaths)
+		}
 
 		appConfigs = append(appConfigs, &AppConfig{
 			ID:                  a.ID,
@@ -78,6 +82,8 @@ func CompileSnapshot(ctx context.Context, store ControlStore) (*ConfigSnapshot, 
 			OfflineStatusCode:   int(a.OfflineStatusCode),
 			OfflineResponseBody: a.OfflineResponseBody,
 			CustomHeaders:       customHeaders,
+			AuthEnabled:         a.AuthEnabled == 1,
+			AuthBypassPaths:     bypassPaths,
 		})
 	}
 
@@ -234,6 +240,11 @@ func CompileSnapshot(ctx context.Context, store ControlStore) (*ConfigSnapshot, 
 		innerRulesDisabled[id] = struct{}{}
 	}
 	snap.InnerRulesDisabled = innerRulesDisabled
+
+	// 8. Load portal-wide settings (clearance-cookie signing secret).
+	if secret, err := store.GetSetting(ctx, "app_auth_session_secret"); err == nil && secret != "" {
+		snap.AppAuthSessionSecret = secret
+	}
 
 	// Join per-app semantic overrides (matrix step runs after apps are registered).
 	for appID, overrides := range appSemOverrides {

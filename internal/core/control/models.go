@@ -6,6 +6,7 @@ import (
 )
 
 // SiteApp represents a protected application domain in the control plane.
+// SiteApp represents an application domain configuration row.
 type SiteApp struct {
 	ID                  string    `json:"id"`
 	Name                string    `json:"name"`
@@ -18,6 +19,8 @@ type SiteApp struct {
 	OfflineResponseBody string    `json:"offline_response_body"`
 	CustomHeaders       string    `json:"custom_headers"`
 	ProxySettings       string    `json:"proxy_settings"`
+	AuthEnabled         int64     `json:"auth_enabled"`
+	AuthBypassPaths     string    `json:"auth_bypass_paths"`
 	CreatedAt           time.Time `json:"created_at"`
 	UpdatedAt           time.Time `json:"updated_at"`
 }
@@ -206,6 +209,21 @@ type IdentityUserRecord struct {
 	Enabled      int64     `json:"enabled"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
+}
+
+// IdentityAuthEventRecord is one login-attempt audit row for the
+// authentication logs table (Task 93 audit source).
+type IdentityAuthEventRecord struct {
+	ID        time.Time `json:"id"` // event timestamp (UTC) as sortable PK
+	Username  string    `json:"username"`
+	AppID     string    `json:"app_id"`
+	Host      string    `json:"host"`
+	Method    string    `json:"method"` // "directory" | "ldap" | "github" | "oidc"
+	Result    string    `json:"result"` // "success" | "invalid_password" | ...
+	ClientIP  string    `json:"client_ip"`
+	Country   string    `json:"country"`
+	Detail    string    `json:"detail"` // failure reason / provider hint
+	CreatedAt time.Time `json:"created_at"`
 }
 
 // IdentityProviderRecord stores an external identity provider connector

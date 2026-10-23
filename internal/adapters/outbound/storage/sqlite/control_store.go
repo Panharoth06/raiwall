@@ -43,6 +43,8 @@ func (s *Store) CreateApp(ctx context.Context, app control.SiteApp) error {
 		OfflineResponseBody: app.OfflineResponseBody,
 		CustomHeaders:       app.CustomHeaders,
 		ProxySettings:       app.ProxySettings,
+		AuthEnabled:         app.AuthEnabled,
+		AuthBypassPaths:     app.AuthBypassPaths,
 		CreatedAt:           app.CreatedAt,
 		UpdatedAt:           app.UpdatedAt,
 	})
@@ -61,6 +63,8 @@ func (s *Store) UpdateApp(ctx context.Context, app control.SiteApp) error {
 		OfflineResponseBody: app.OfflineResponseBody,
 		CustomHeaders:       app.CustomHeaders,
 		ProxySettings:       app.ProxySettings,
+		AuthEnabled:         app.AuthEnabled,
+		AuthBypassPaths:     app.AuthBypassPaths,
 		UpdatedAt:           app.UpdatedAt,
 	})
 }

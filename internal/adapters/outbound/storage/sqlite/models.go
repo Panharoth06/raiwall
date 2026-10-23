@@ -56,6 +56,8 @@ type RaiwallApp struct {
 	OfflineResponseBody string
 	CustomHeaders       string
 	ProxySettings       string
+	AuthEnabled         int64
+	AuthBypassPaths     string
 	CreatedAt           time.Time
 	UpdatedAt           time.Time
 }

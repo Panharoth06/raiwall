@@ -38,6 +38,9 @@ func (s *controlStmt) Exec(args []driver.Value) (driver.Result, error) {
 	if res, handled := s.execIdentity(st, q, args); handled {
 		return res, nil
 	}
+	if res, handled := s.execAuthGate(st, q, args); handled {
+		return res, nil
+	}
 
 	return driver.RowsAffected(0), nil
 }
@@ -57,14 +60,16 @@ func (s *controlStmt) execCore(st *databaseState, q string, args []driver.Value)
 			OfflineResponseBody: toStringVal(args[8]),
 			CustomHeaders:       toStringVal(args[9]),
 			ProxySettings:       toStringVal(args[10]),
-			CreatedAt:           toTime(args[11]),
-			UpdatedAt:           toTime(args[12]),
+			AuthEnabled:         toInt64Val(args[11]),
+			AuthBypassPaths:     toStringVal(args[12]),
+			CreatedAt:           toTime(args[13]),
+			UpdatedAt:           toTime(args[14]),
 		}
 		st.apps[app.ID] = app
 		return driver.RowsAffected(1), true
 	}
 	if strings.Contains(q, "UPDATE raiwall_apps SET") {
-		id := toStringVal(args[11])
+		id := toStringVal(args[13])
 		if app, ok := st.apps[id]; ok {
 			app.Name = toStringVal(args[0])
 			app.Hostnames = toStringVal(args[1])
@@ -76,7 +81,9 @@ func (s *controlStmt) execCore(st *databaseState, q string, args []driver.Value)
 			app.OfflineResponseBody = toStringVal(args[7])
 			app.CustomHeaders = toStringVal(args[8])
 			app.ProxySettings = toStringVal(args[9])
-			app.UpdatedAt = toTime(args[10])
+			app.AuthEnabled = toInt64Val(args[10])
+			app.AuthBypassPaths = toStringVal(args[11])
+			app.UpdatedAt = toTime(args[12])
 			return driver.RowsAffected(1), true
 		}
 		return driver.RowsAffected(0), true

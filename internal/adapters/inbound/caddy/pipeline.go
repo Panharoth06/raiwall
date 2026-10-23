@@ -99,7 +99,6 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 		return nil
 	}
 
-
 	// 5. Fast-Path: Check Auto-Ban state
 	if m.banManager != nil {
 		if banned, entry := m.banManager.IsBanned(clientIP, ja4); banned {
@@ -187,6 +186,11 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 
 	// 11. Bot Mitigation & Route Classification
 	if handledBot, err := m.evaluateBotMitigation(w, r, clientIP, ja4, currentMode, startTime); handledBot {
+		return err
+	}
+
+	// 11b. Per-App Zero-Trust Auth Gate (HTTP 467 challenge & clearance)
+	if handledGate, err := m.evaluateAppAuthGate(w, r, clientIP, appCfg); handledGate {
 		return err
 	}
 

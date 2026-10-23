@@ -56,6 +56,11 @@ func (m *Middleware) provisionControl(_ caddy.Context) error {
 		if m.ipGroupMgr != nil {
 			m.syncIPGroupsWithStore(m.controlStore, m.ipGroupMgr)
 		}
+		// Bootstrap the app-auth clearance signing secret so the next
+		// snapshot compile carries it into the data plane.
+		if _, err := m.resolveAppAuthSecret(context.Background()); err != nil && m.logger != nil {
+			m.logger.Warn("failed to bootstrap app auth session secret", zap.Error(err))
+		}
 	}
 
 	if m.controlAPI != nil {

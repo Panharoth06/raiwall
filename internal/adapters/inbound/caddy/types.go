@@ -184,6 +184,13 @@ type Middleware struct {
 	geoIPReader     acl.GeoIPReader
 	aclEngine       *acl.ACLEngine
 	authGateway     *auth.AuthGateway
+	appAuthGate     *auth.AppAuthGate
+	// appAuthGateMu guards the cached gate across concurrent pipeline
+	// requests; appAuthGateSecret tracks the snapshot secret the gate was
+	// built with so rotations invalidate prior clearance cookies.
+	appAuthGateMu     sync.Mutex
+	appAuthGateSecret string
+	appAuthSecretOnce sync.Once
 
 	storageRegistry    *storage.Registry
 	telemetryStore     telemetry.ForensicStore

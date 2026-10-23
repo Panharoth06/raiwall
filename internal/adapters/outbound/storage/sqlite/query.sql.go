@@ -80,8 +80,9 @@ func (q *Queries) CreateAPIKey(ctx context.Context, arg CreateAPIKeyParams) erro
 const createApp = `-- name: CreateApp :exec
 INSERT INTO raiwall_apps (
     id, name, hostnames, mode, upstreams, block_status_code, block_response_body,
-    offline_status_code, offline_response_body, custom_headers, proxy_settings, created_at, updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    offline_status_code, offline_response_body, custom_headers, proxy_settings,
+    auth_enabled, auth_bypass_paths, created_at, updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateAppParams struct {
@@ -96,6 +97,8 @@ type CreateAppParams struct {
 	OfflineResponseBody string
 	CustomHeaders       string
 	ProxySettings       string
+	AuthEnabled         int64
+	AuthBypassPaths     string
 	CreatedAt           time.Time
 	UpdatedAt           time.Time
 }
@@ -113,6 +116,8 @@ func (q *Queries) CreateApp(ctx context.Context, arg CreateAppParams) error {
 		arg.OfflineResponseBody,
 		arg.CustomHeaders,
 		arg.ProxySettings,
+		arg.AuthEnabled,
+		arg.AuthBypassPaths,
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)
@@ -522,7 +527,7 @@ func (q *Queries) GetAPIResource(ctx context.Context, id string) (RaiwallApiReso
 }
 
 const getApp = `-- name: GetApp :one
-SELECT id, name, hostnames, mode, upstreams, block_status_code, block_response_body, offline_status_code, offline_response_body, custom_headers, proxy_settings, created_at, updated_at FROM raiwall_apps WHERE id = ? LIMIT 1
+SELECT id, name, hostnames, mode, upstreams, block_status_code, block_response_body, offline_status_code, offline_response_body, custom_headers, proxy_settings, auth_enabled, auth_bypass_paths, created_at, updated_at FROM raiwall_apps WHERE id = ? LIMIT 1
 `
 
 func (q *Queries) GetApp(ctx context.Context, id string) (RaiwallApp, error) {
@@ -540,6 +545,8 @@ func (q *Queries) GetApp(ctx context.Context, id string) (RaiwallApp, error) {
 		&i.OfflineResponseBody,
 		&i.CustomHeaders,
 		&i.ProxySettings,
+		&i.AuthEnabled,
+		&i.AuthBypassPaths,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -1061,7 +1068,7 @@ func (q *Queries) ListAllActiveForwardingRules(ctx context.Context) ([]RaiwallFo
 }
 
 const listApps = `-- name: ListApps :many
-SELECT id, name, hostnames, mode, upstreams, block_status_code, block_response_body, offline_status_code, offline_response_body, custom_headers, proxy_settings, created_at, updated_at FROM raiwall_apps ORDER BY name ASC
+SELECT id, name, hostnames, mode, upstreams, block_status_code, block_response_body, offline_status_code, offline_response_body, custom_headers, proxy_settings, auth_enabled, auth_bypass_paths, created_at, updated_at FROM raiwall_apps ORDER BY name ASC
 `
 
 func (q *Queries) ListApps(ctx context.Context) ([]RaiwallApp, error) {
@@ -1085,6 +1092,8 @@ func (q *Queries) ListApps(ctx context.Context) ([]RaiwallApp, error) {
 			&i.OfflineResponseBody,
 			&i.CustomHeaders,
 			&i.ProxySettings,
+			&i.AuthEnabled,
+			&i.AuthBypassPaths,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -1419,7 +1428,8 @@ const updateApp = `-- name: UpdateApp :exec
 UPDATE raiwall_apps SET
     name = ?, hostnames = ?, mode = ?, upstreams = ?, block_status_code = ?,
     block_response_body = ?, offline_status_code = ?, offline_response_body = ?,
-    custom_headers = ?, proxy_settings = ?, updated_at = ?
+    custom_headers = ?, proxy_settings = ?, auth_enabled = ?, auth_bypass_paths = ?,
+    updated_at = ?
 WHERE id = ?
 `
 
@@ -1434,6 +1444,8 @@ type UpdateAppParams struct {
 	OfflineResponseBody string
 	CustomHeaders       string
 	ProxySettings       string
+	AuthEnabled         int64
+	AuthBypassPaths     string
 	UpdatedAt           time.Time
 	ID                  string
 }
@@ -1450,6 +1462,8 @@ func (q *Queries) UpdateApp(ctx context.Context, arg UpdateAppParams) error {
 		arg.OfflineResponseBody,
 		arg.CustomHeaders,
 		arg.ProxySettings,
+		arg.AuthEnabled,
+		arg.AuthBypassPaths,
 		arg.UpdatedAt,
 		arg.ID,
 	)
