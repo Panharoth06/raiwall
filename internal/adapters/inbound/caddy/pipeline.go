@@ -70,6 +70,13 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 		r.Header.Set("X-Forwarded-For", clientIP.String())
 	}
 
+	// Compression policy: when per-site compression is off, strip the client
+	// Accept-Encoding upstream so bodies arrive uncompressed and remain fully
+	// inspectable by the WAF (and block pages). Enabled keeps native encoding.
+	if appCfg != nil && appCfg.ProxySettings != nil && !appCfg.ProxySettings.EnableCompression {
+		r.Header.Del("Accept-Encoding")
+	}
+
 	// 4. Evaluate Offline Mode immediately
 	if currentMode == control.ModeOffline {
 		statusCode := m.OfflineStatusCode
