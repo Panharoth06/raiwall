@@ -236,6 +236,8 @@ import SettingsView from '@/views/SettingsView.vue';
 import DeploymentsView from '@/views/DeploymentsView.vue';
 import RulesView from '@/views/RulesView.vue';
 import BlockPagesView from '@/views/BlockPagesView.vue';
+import SemanticsView from '@/views/SemanticsView.vue';
+import InnerRulesView from '@/views/InnerRulesView.vue';
 
 export const router = createSimpleRouter([
   { path: '/', name: 'statistics', component: StatisticsView },
@@ -260,6 +262,8 @@ export const router = createSimpleRouter([
   { path: '/settings', name: 'settings', component: SettingsView },
   { path: '/rules', name: 'rules', component: RulesView },
   { path: '/exceptions', name: 'exceptions', component: ExceptionsView },
+  { path: '/semantics', name: 'semantics', component: SemanticsView },
+  { path: '/inner-rules', name: 'inner-rules', component: InnerRulesView },
   { path: '/deployments', name: 'deployments', component: DeploymentsView },
   { path: '/login', name: 'login', component: LoginView },
 ]);
