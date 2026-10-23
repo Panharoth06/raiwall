@@ -34,7 +34,8 @@ describe('DashboardLayout.vue (Task 74)', () => {
     expect(wrapper.find('[data-testid="nav-allow-deny"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="nav-http-flood"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="nav-anti-bot"]').exists()).toBe(true);
-    expect(wrapper.find('[data-testid="nav-auth"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="nav-auth-gateway"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="nav-auth-gateway-chevron"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="nav-settings"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="nav-topology"]').exists()).toBe(true);
 

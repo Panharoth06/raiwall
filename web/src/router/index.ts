@@ -238,6 +238,7 @@ import RulesView from '@/views/RulesView.vue';
 import BlockPagesView from '@/views/BlockPagesView.vue';
 import SemanticsView from '@/views/SemanticsView.vue';
 import InnerRulesView from '@/views/InnerRulesView.vue';
+import AuthGatewayView from '@/views/AuthGatewayView.vue';
 
 export const router = createSimpleRouter([
   { path: '/', name: 'statistics', component: StatisticsView },
@@ -254,6 +255,11 @@ export const router = createSimpleRouter([
   { path: '/http-flood/limits', name: 'http-flood-limits', component: HttpFloodView },
   { path: '/http-flood/limits/settings', name: 'http-flood-settings', component: HttpFloodView },
   { path: '/http-flood/waiting-room', name: 'http-flood-waiting-room', component: HttpFloodView },
+  { path: '/auth-gateway', name: 'auth-gateway', component: AuthGatewayView },
+  { path: '/auth-gateway/logs', name: 'auth-gateway-logs', component: AuthGatewayView },
+  { path: '/auth-gateway/users', name: 'auth-gateway-users', component: AuthGatewayView },
+  { path: '/auth-gateway/sso', name: 'auth-gateway-sso', component: AuthGatewayView },
+  { path: '/auth-gateway/idp', name: 'auth-gateway-idp', component: AuthGatewayView },
   { path: '/anti-bot', name: 'anti-bot', component: PoliciesView },
   { path: '/block-pages', name: 'block-pages', component: BlockPagesView },
   { path: '/templates', name: 'templates', component: BlockPagesView },

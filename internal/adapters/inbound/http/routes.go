@@ -67,6 +67,9 @@ func (s *Server) routes() {
 			api.Put("/identity/providers/{id}", s.handleUpdateIdentityProvider)
 			api.Delete("/identity/providers/{id}", s.handleDeleteIdentityProvider)
 
+			// Authentication Audit Log
+			api.Get("/identity/auth-events", s.handleListIdentityAuthEvents)
+
 			// Sites (Apps) CRUD
 			api.Get("/sites", s.handleListSites)
 			api.Post("/sites", s.handleCreateSite)

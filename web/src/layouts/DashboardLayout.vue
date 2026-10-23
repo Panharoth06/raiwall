@@ -81,7 +81,18 @@ const navItems: NavItem[] = [
     ],
   },
   { name: 'Block Pages', path: '/block-pages', icon: FileCode, testId: 'nav-block-pages' },
-  { name: 'Auth', path: '/auth', icon: Lock, testId: 'nav-auth' },
+  {
+    name: 'Auth Gateway',
+    path: '/auth-gateway',
+    icon: Lock,
+    testId: 'nav-auth-gateway',
+    children: [
+      { name: 'Authentication Logs', path: '/auth-gateway/logs', testId: 'nav-auth-logs' },
+      { name: 'User Management', path: '/auth-gateway/users', testId: 'nav-auth-users' },
+      { name: 'Single Sign-On', path: '/auth-gateway/sso', testId: 'nav-auth-sso' },
+      { name: 'Login Configuration', path: '/auth-gateway/idp', testId: 'nav-auth-idp' },
+    ],
+  },
   { name: 'Settings', path: '/system', icon: Settings, testId: 'nav-settings' },
 ];
 

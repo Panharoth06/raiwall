@@ -11,6 +11,9 @@ export interface Site {
   offline_status_code: number;
   offline_response_body?: string;
   custom_headers?: Record<string, string>;
+  // Zero-trust HTTP 467 gate (unified SSO clearance)
+  auth_enabled?: boolean;
+  auth_bypass_paths?: string[];
 }
 
 export interface Upstream {
