@@ -143,6 +143,90 @@ func lexicalBlockReason(triage TriageResult, details, paramName, location string
 	return fmt.Sprintf("%s detected in param %q (%s): %s", triageReasonLabel(triage), paramName, location, details)
 }
 
+// moduleRuleID returns the canonical verdict RuleID for an extended module detector.
+func moduleRuleID(m Module) string {
+	switch m {
+	case ModuleFileUpload:
+		return "SEMANTIC_FILE_UPLOAD"
+	case ModuleJavaCodeInj:
+		return "SEMANTIC_JAVA_CODE_INJ"
+	case ModuleJavaDeser:
+		return "SEMANTIC_JAVA_DESER"
+	case ModulePHPDeser:
+		return "SEMANTIC_PHP_DESER"
+	case ModulePHPCodeInj:
+		return "SEMANTIC_PHP_CODE_INJ"
+	case ModuleASPCodeInj:
+		return "SEMANTIC_ASP_CODE_INJ"
+	case ModuleSSTI:
+		return "SEMANTIC_SSTI"
+	case ModuleSSRF:
+		return "SEMANTIC_SSRF"
+	case ModuleCSRF:
+		return "SEMANTIC_CSRF"
+	case ModuleMalHTTP:
+		return "SEMANTIC_MAL_HTTP"
+	default:
+		return ""
+	}
+}
+
+// blockVerdict builds the terminal block verdict for an extended module detection.
+func blockVerdict(det Detection, paramName, location, ruleID string) *Verdict {
+	return &Verdict{
+		Action:          ActionBlock,
+		RuleID:          ruleID,
+		Reason:          fmt.Sprintf("%s in param %q (%s): %s", det.Reason, paramName, location, det.Matched),
+		AttackCategory:  string(det.Module),
+		MatchedToken:    det.Matched,
+		PayloadLocation: location,
+	}
+}
+
+// inspectExtendedModule runs the Stage 2b lexical detectors over a value the
+// main triage classified as benign and applies the matrix gating.
+// Return values: (nil, false) no detector matched; (nil, true) match was
+// suppressed (disabled module / tolerated weak heuristics / excepted rule);
+// (verdict, true) the verdict should be recorded (audit) or returned (block).
+func (s *SemanticEngine) inspectExtendedModule(
+	matrix SemanticMatrix,
+	ctx *RequestContext,
+	param normalizer.Parameter,
+	normalized string,
+) (*Verdict, bool) {
+	det, matched := scanSemanticModules(normalized)
+	if !matched {
+		return nil, false
+	}
+
+	mode := matrix.Mode(det.Module)
+	switch mode {
+	case ModeDisabled:
+		return nil, true
+	case ModeAudit:
+		return &Verdict{
+			Action:          ActionAudit,
+			RuleID:          moduleRuleID(det.Module),
+			Reason:          fmt.Sprintf("%s in param %q (%s): %s", det.Reason, param.Name, param.Location, det.Matched),
+			AttackCategory:  string(det.Module),
+			MatchedToken:    det.Matched,
+			PayloadLocation: string(param.Location),
+		}, true
+	}
+
+	ruleID := moduleRuleID(det.Module)
+	if s.excepted(ctx.Host, ctx.Path, ctx.Method, string(param.Location), param.Name, ruleID) {
+		return nil, true
+	}
+
+	// Balance tolerates low-confidence heuristics; Strict enforces both levels.
+	if det.Level == LevelWeak && mode == ModeBalance {
+		return nil, true
+	}
+
+	return blockVerdict(det, param.Name, string(param.Location), ruleID), true
+}
+
 func triageReasonLabel(triage TriageResult) string {
 	switch triage {
 	case TriageSuspectSQLi:
@@ -227,7 +311,20 @@ func (s *SemanticEngine) InspectRequest(ctx *RequestContext) (*Verdict, error) {
 		// Stage 2: Fast Lexical Triage (<2 µs)
 		triage, details := TriageWithDetails(normalized)
 		if triage == TriageBenign {
-			continue
+			// Stage 2b: extended module detectors (code injection,
+			// deserialization, SSTI) for values the main triage passed.
+			verdict, handled := s.inspectExtendedModule(matrix, ctx, param, normalized)
+			if !handled {
+				continue
+			}
+			if verdict == nil {
+				continue
+			}
+			if verdict.Action == ActionAudit {
+				finding.record(verdict)
+				continue
+			}
+			return verdict, nil
 		}
 
 		module := moduleForTriage(triage)

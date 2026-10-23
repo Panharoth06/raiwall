@@ -5,7 +5,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
 )
 
 func TestSQLChop_BenignInputs(t *testing.T) {

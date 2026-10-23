@@ -5,7 +5,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
 )
 
 func TestXSSChop_BenignInputs(t *testing.T) {

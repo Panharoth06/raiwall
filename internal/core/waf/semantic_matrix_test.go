@@ -197,6 +197,137 @@ func withAppID(ctx *RequestContext, appID string) *RequestContext {
 	return ctx
 }
 
+func TestInspectExtendedModulesCodeInj(t *testing.T) {
+	t.Run("BalanceBlocksStrongDeserPayload", func(t *testing.T) {
+		engine := matrixEngine(t, nil)
+		ctx := &RequestContext{
+			Method: "POST",
+			Host:   "java.test",
+			Path:   "/api/session",
+			Body:   []byte(`{"token":"rO0ABXNyABFqYXZhLnV0aWwuSGFzaE1hcGo"}`),
+		}
+		verdict, err := engine.InspectRequest(ctx)
+		if err != nil {
+			t.Fatalf("inspect: %v", err)
+		}
+		if verdict.Action != ActionBlock {
+			t.Fatalf("expected block for Java deser payload, got %s (%s)", verdict.Action, verdict.Reason)
+		}
+		if verdict.RuleID != "SEMANTIC_JAVA_DESER" {
+			t.Errorf("rule ID = %q, want SEMANTIC_JAVA_DESER", verdict.RuleID)
+		}
+		if verdict.AttackCategory != string(ModuleJavaDeser) {
+			t.Errorf("attack category = %q", verdict.AttackCategory)
+		}
+	})
+
+	t.Run("BalanceBlocksPHPCodeInj", func(t *testing.T) {
+		engine := matrixEngine(t, nil)
+		ctx := &RequestContext{
+			Method: "POST",
+			Host:   "php.test",
+			Path:   "/index.php",
+			Query:  "payload=eval($_POST['x']);",
+		}
+		verdict, err := engine.InspectRequest(ctx)
+		if err != nil {
+			t.Fatalf("inspect: %v", err)
+		}
+		if verdict.Action != ActionBlock || verdict.RuleID != "SEMANTIC_PHP_CODE_INJ" {
+			t.Fatalf("expected SEMANTIC_PHP_CODE_INJ block, got %s (%s)", verdict.Action, verdict.Reason)
+		}
+	})
+
+	t.Run("BalanceToleratesWeakSSTI", func(t *testing.T) {
+		engine := matrixEngine(t, nil)
+		ctx := &RequestContext{
+			Method: "GET",
+			Host:   "web.test",
+			Path:   "/page",
+			Query:  "tpl={{ username }}",
+		}
+		verdict, err := engine.InspectRequest(ctx)
+		if err != nil {
+			t.Fatalf("inspect: %v", err)
+		}
+		if verdict.Action != ActionAllow {
+			t.Fatalf("expected allow for weak SSTI in balance mode, got %s (%s)", verdict.Action, verdict.Reason)
+		}
+	})
+
+	t.Run("StrictBlocksWeakSSTI", func(t *testing.T) {
+		engine := matrixEngine(t, map[Module]ModuleMode{ModuleSSTI: ModeStrict})
+		ctx := &RequestContext{
+			Method: "GET",
+			Host:   "web.test",
+			Path:   "/page",
+			Query:  "tpl={{ username }}",
+		}
+		verdict, err := engine.InspectRequest(ctx)
+		if err != nil {
+			t.Fatalf("inspect: %v", err)
+		}
+		if verdict.Action != ActionBlock || verdict.RuleID != "SEMANTIC_SSTI" {
+			t.Fatalf("expected SEMANTIC_SSTI block in strict mode, got %s (%s)", verdict.Action, verdict.Reason)
+		}
+	})
+
+	t.Run("BalanceBlocksSSTICanary", func(t *testing.T) {
+		engine := matrixEngine(t, nil)
+		ctx := &RequestContext{
+			Method: "GET",
+			Host:   "web.test",
+			Path:   "/page",
+			Query:  "tpl={{7*7}}",
+		}
+		verdict, err := engine.InspectRequest(ctx)
+		if err != nil {
+			t.Fatalf("inspect: %v", err)
+		}
+		if verdict.Action != ActionBlock || verdict.RuleID != "SEMANTIC_SSTI" {
+			t.Fatalf("expected SSTI canary block, got %s (%s)", verdict.Action, verdict.Reason)
+		}
+	})
+
+	t.Run("AuditModeDowngradesExtendedModule", func(t *testing.T) {
+		engine := matrixEngine(t, map[Module]ModuleMode{ModuleSSTI: ModeAudit})
+		ctx := &RequestContext{
+			Method: "GET",
+			Host:   "web.test",
+			Path:   "/page",
+			Query:  "tpl={{7*7}}",
+		}
+		verdict, err := engine.InspectRequest(ctx)
+		if err != nil {
+			t.Fatalf("inspect: %v", err)
+		}
+		if verdict.Action != ActionAudit {
+			t.Fatalf("expected audit verdict, got %s (%s)", verdict.Action, verdict.Reason)
+		}
+	})
+
+	t.Run("DisabledModuleSkipsExtendedDetector", func(t *testing.T) {
+		engine := matrixEngine(t, map[Module]ModuleMode{
+			ModuleSSTI:       ModeDisabled,
+			ModulePHPCodeInj: ModeDisabled,
+		})
+		ctx := &RequestContext{
+			Method: "POST",
+			Host:   "web.test",
+			Path:   "/page",
+			Query:  "tpl={{7*7}}",
+			Body:   []byte("x=eval($_POST['y']);"),
+		}
+		verdict, err := engine.InspectRequest(ctx)
+		if err != nil {
+			t.Fatalf("inspect: %v", err)
+		}
+		if verdict.Action != ActionAllow {
+			t.Fatalf("expected allow with disabled modules, got %s (%s)", verdict.Action, verdict.Reason)
+		}
+	})
+}
+
 func matrixFuncSrc(fn func(appID string) SemanticMatrix) MatrixSource {
 	return matrixFunc(fn)
 }

@@ -5,7 +5,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
 )
 
 func TestCMDChop_BenignInputs(t *testing.T) {

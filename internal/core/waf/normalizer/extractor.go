@@ -1,6 +1,8 @@
 package normalizer
 
 import (
+	"bytes"
+	"encoding/json"
 	"mime"
 	"net/http"
 	"net/url"
@@ -136,7 +138,9 @@ func ExtractParameters(path string, query string, headers http.Header, body []by
 			}
 
 		case mediaType == "application/x-www-form-urlencoded" || mediaType == "":
-			if parsedForm, err := url.ParseQuery(string(body)); err == nil && len(parsedForm) > 0 {
+			if looksLikeJSON(body) {
+				params = append(params, extractJSONParameters(body)...)
+			} else if parsedForm, err := url.ParseQuery(string(body)); err == nil && len(parsedForm) > 0 {
 				for key, values := range parsedForm {
 					for _, val := range values {
 						params = append(params, Parameter{
@@ -164,4 +168,21 @@ func ExtractParameters(path string, query string, headers http.Header, body []by
 	}
 
 	return params
+}
+
+// looksLikeJSON reports whether a body should be parsed as JSON regardless of
+// a missing Content-Type header. JSON without a declared media type is common
+// for non-browser clients; treating it as a bare form key would leave the
+// payload unscanned inside the parameter name.
+func looksLikeJSON(body []byte) bool {
+	trimmed := bytes.TrimSpace(body)
+	if len(trimmed) == 0 {
+		return false
+	}
+	switch trimmed[0] {
+	case '{', '[':
+	default:
+		return false
+	}
+	return json.Valid(trimmed)
 }
