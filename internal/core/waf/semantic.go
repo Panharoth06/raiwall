@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Panharoth06/raiwall/internal/core/waf/ast"
+	"github.com/Panharoth06/raiwall/internal/core/waf/cve"
 	"github.com/Panharoth06/raiwall/internal/core/waf/normalizer"
 )
 
@@ -54,6 +55,7 @@ type SemanticEngine struct {
 	xssChop          *ast.XSSChop
 	exceptionMatcher ExceptionMatcher
 	matrixSource     MatrixSource
+	innerRules       *cve.Engine
 	maxParamSize     int
 	astTimeout       time.Duration
 }
@@ -284,6 +286,11 @@ func (s *SemanticEngine) InspectRequest(ctx *RequestContext) (*Verdict, error) {
 	reqCtx := ctx.Context
 	if reqCtx == nil {
 		reqCtx = context.Background()
+	}
+
+	// Stage 0: Virtual-patch signatures (hard CVE exploit blocks).
+	if verdict, superseded := s.inspectInnerRules(ctx); superseded {
+		return verdict, nil
 	}
 
 	// Resolve the effective per-application semantic matrix (hot path: single atomic read).

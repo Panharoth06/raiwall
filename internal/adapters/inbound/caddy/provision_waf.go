@@ -9,7 +9,9 @@ import (
 	"github.com/Panharoth06/raiwall/internal/core/acl"
 	"github.com/Panharoth06/raiwall/internal/core/control"
 	"github.com/Panharoth06/raiwall/internal/core/waf"
+	"github.com/Panharoth06/raiwall/internal/core/waf/cve"
 	"github.com/caddyserver/caddy/v2"
+	"go.uber.org/zap"
 )
 
 func (m *Middleware) provisionWAF(_ caddy.Context) error {
@@ -39,6 +41,12 @@ func (m *Middleware) provisionWAF(_ caddy.Context) error {
 		}
 		// Resolve per-app semantic matrices live from the atomic config snapshot.
 		opts = append(opts, waf.WithMatrixSource(control.SnapshotMatrixSource{}))
+		// Virtual-patch signatures (inner rules) run as Stage 0 ahead of triage.
+		if innerRules, err := cve.NewBundled(); err == nil {
+			opts = append(opts, waf.WithInnerRules(innerRules))
+		} else if m.logger != nil {
+			m.logger.Error("cve virtual-patch library failed to load; inner rules disabled", zap.Error(err))
+		}
 		m.engine = waf.NewSemanticEngine(opts...)
 	} else if sem, ok := m.engine.(*waf.SemanticEngine); ok {
 		sem.SetExceptionEngine(m.exceptionEngine)
