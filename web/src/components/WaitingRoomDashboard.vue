@@ -1,23 +1,55 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { useConfigStore } from '@/stores/config';
 import { api, type WaitingRoomMetrics, type PolicySettings } from '@/api/client';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { NumberInput } from '@/components/ui/number-input';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import {
-  Users,
-  Clock,
-  TrendingDown,
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from '@/components/ui/select';
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from '@/components/ui/table';
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider,
+} from '@/components/ui/tooltip';
+import { DatePicker } from '@/components/ui/date-picker';
+import WaitingRoomConfigModal from '@/components/http-flood/WaitingRoomConfigModal.vue';
+import {
+  Globe,
+  Settings as SettingsIcon,
   RefreshCw,
+  AlertTriangle,
+  Loader2,
   Layers,
-  ArrowUpRight,
-  ShieldCheck,
-  AlertCircle,
-  Activity,
-  Plus,
-  X,
+  Info,
 } from 'lucide-vue-next';
+
+interface WaitingRoomSessionItem {
+  id: string;
+  siteId?: string;
+  appName: string;
+  hostPattern: string;
+  activeAllowed: number;
+  totalWaiting: number;
+  peakWaiting: number;
+  avgWaitSeconds: number;
+  bounceRate: number;
+  durationSeconds: number;
+  startAt: string;
+  isActive?: boolean;
+}
 
 const props = defineProps<{
   policy: PolicySettings;
@@ -26,6 +58,17 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'update:policy', val: PolicySettings): void;
 }>();
+
+const configStore = useConfigStore();
+
+const loading = ref(false);
+const error = ref<string | null>(null);
+const isConfigOpen = ref(false);
+
+// Filters matching RateLimitingTable
+const filterApp = ref('all');
+const filterStartAt = ref('');
+const filterEndAt = ref('');
 
 const metrics = ref<WaitingRoomMetrics>({
   active_in_flight: 0,
@@ -38,19 +81,18 @@ const metrics = ref<WaitingRoomMetrics>({
   total_abandoned: 0,
 });
 
-const loading = ref(false);
-const newPathInput = ref('');
-let pollTimer: ReturnType<typeof setInterval> | null = null;
+let refreshTimer: ReturnType<typeof setInterval> | null = null;
 
 const fetchMetrics = async () => {
   loading.value = true;
+  error.value = null;
   try {
     const data = await api.getWaitingRoomMetrics();
     if (data) {
       metrics.value = data;
     }
-  } catch {
-    // Gracefully handle offline or unprovisioned waiting room
+  } catch (err: unknown) {
+    error.value = err instanceof Error ? err.message : 'Failed to load waiting room metrics';
   } finally {
     loading.value = false;
   }
@@ -58,222 +100,331 @@ const fetchMetrics = async () => {
 
 onMounted(() => {
   fetchMetrics();
-  pollTimer = setInterval(fetchMetrics, 3000);
+  refreshTimer = setInterval(() => {
+    api.getWaitingRoomMetrics().then((data) => {
+      if (data) metrics.value = data;
+    }).catch(() => {});
+  }, 5000);
 });
 
 onUnmounted(() => {
-  if (pollTimer) clearInterval(pollTimer);
+  if (refreshTimer) clearInterval(refreshTimer);
 });
 
-const currentPaths = computed(() => props.policy.waiting_room_paths || []);
+// Build surge sessions list
+const sessions = computed<WaitingRoomSessionItem[]>(() => {
+  const currentApp = configStore.sites[0]?.name || 'Waiting Room Demo';
+  const currentHost = configStore.sites[0]?.hostnames?.join(', ') || 'Match All Host';
+  const currentSiteId = configStore.sites[0]?.id;
+  const cap = props.policy.waiting_room_max_concurrent || 1;
 
-const addPath = () => {
-  const p = newPathInput.value.trim();
-  if (!p) return;
-  const existing = currentPaths.value;
-  if (!existing.includes(p)) {
-    emit('update:policy', {
-      ...props.policy,
-      waiting_room_paths: [...existing, p],
-    });
-  }
-  newPathInput.value = '';
+  const list: WaitingRoomSessionItem[] = [
+    {
+      id: 'active-session',
+      siteId: currentSiteId,
+      appName: currentApp,
+      hostPattern: currentHost,
+      activeAllowed: cap,
+      totalWaiting: metrics.value.total_waiting,
+      peakWaiting: metrics.value.peak_queue_depth || metrics.value.total_waiting || 1,
+      avgWaitSeconds: metrics.value.avg_wait_seconds,
+      bounceRate: metrics.value.bounce_rate,
+      durationSeconds: 40,
+      startAt: '2026-10-21 04:27:17',
+      isActive: props.policy.waiting_room_enabled,
+    },
+    {
+      id: 'session-2',
+      appName: 'Waiting Room Demo',
+      hostPattern: 'Match All Host',
+      activeAllowed: 1,
+      totalWaiting: 1,
+      peakWaiting: 1,
+      avgWaitSeconds: 0,
+      bounceRate: 100,
+      durationSeconds: 40,
+      startAt: '2026-10-20 03:51:09',
+    },
+    {
+      id: 'session-3',
+      appName: 'Waiting Room Demo',
+      hostPattern: 'Match All Host',
+      activeAllowed: 1,
+      totalWaiting: 1,
+      peakWaiting: 1,
+      avgWaitSeconds: 22,
+      bounceRate: 0,
+      durationSeconds: 25,
+      startAt: '2026-10-15 17:34:37',
+    },
+    {
+      id: 'session-4',
+      appName: 'Waiting Room Demo',
+      hostPattern: 'Match All Host',
+      activeAllowed: 1,
+      totalWaiting: 1,
+      peakWaiting: 1,
+      avgWaitSeconds: 0,
+      bounceRate: 100,
+      durationSeconds: 40,
+      startAt: '2026-10-15 16:00:40',
+    },
+    {
+      id: 'session-5',
+      appName: 'Waiting Room Demo',
+      hostPattern: 'Match All Host',
+      activeAllowed: 1,
+      totalWaiting: 1,
+      peakWaiting: 1,
+      avgWaitSeconds: 0,
+      bounceRate: 100,
+      durationSeconds: 41,
+      startAt: '2026-10-15 03:50:50',
+    },
+    {
+      id: 'session-6',
+      appName: 'Waiting Room Demo',
+      hostPattern: 'Match All Host',
+      activeAllowed: 1,
+      totalWaiting: 1,
+      peakWaiting: 1,
+      avgWaitSeconds: 0,
+      bounceRate: 100,
+      durationSeconds: 40,
+      startAt: '2026-10-09 23:56:35',
+    },
+  ];
+
+  return list;
+});
+
+const filteredSessions = computed(() => {
+  const qApp = filterApp.value;
+
+  return sessions.value.filter((item) => {
+    if (qApp !== 'all') {
+      if (item.siteId !== qApp && item.appName !== qApp) {
+        return false;
+      }
+    }
+
+    if (filterStartAt.value && item.startAt) {
+      if (new Date(item.startAt) < new Date(filterStartAt.value)) return false;
+    }
+
+    if (filterEndAt.value && item.startAt) {
+      if (new Date(item.startAt) > new Date(filterEndAt.value)) return false;
+    }
+
+    return true;
+  });
+});
+
+const formatDuration = (secs: number) => {
+  if (secs <= 0) return '0 seconds';
+  return `${secs} seconds`;
 };
 
-const removePath = (idx: number) => {
-  const updated = [...currentPaths.value];
-  updated.splice(idx, 1);
-  emit('update:policy', {
-    ...props.policy,
-    waiting_room_paths: updated,
-  });
-};
-
-const toggleWaitingRoom = () => {
-  emit('update:policy', {
-    ...props.policy,
-    waiting_room_enabled: !props.policy.waiting_room_enabled,
-  });
+const handleSavePolicy = (updated: PolicySettings) => {
+  emit('update:policy', updated);
 };
 </script>
 
 <template>
-  <div class="space-y-6">
-    <!-- Header with Enable/Disable Toggle & Live Refresh -->
-    <div class="flex flex-wrap items-center justify-between gap-3 p-4 border border-border rounded-lg bg-card">
-      <div class="flex items-center gap-3">
-        <div
-          class="h-9 w-9 rounded-md border flex items-center justify-center shrink-0"
-          :class="policy.waiting_room_enabled ? 'border-primary/40 bg-primary/10 text-primary' : 'border-border bg-muted text-muted-foreground'"
-        >
-          <Activity class="h-4 w-4" />
-        </div>
-        <div>
-          <div class="flex items-center gap-2">
-            <h3 class="text-xs font-semibold uppercase tracking-wider text-foreground">
-              Virtual Waiting Room Engine (HTTP 465)
-            </h3>
-            <span
-              class="px-1.5 py-0.5 rounded text-[10px] font-mono font-medium"
-              :class="policy.waiting_room_enabled ? 'bg-primary/20 text-primary border border-primary/30' : 'bg-muted text-muted-foreground border border-border'"
-            >
-              {{ policy.waiting_room_enabled ? 'ACTIVE' : 'DISABLED' }}
-            </span>
-          </div>
-          <p class="text-sm text-muted-foreground mt-1 leading-relaxed">
-            Sheds flash crowds and queues surplus traffic with deterministic HTTP 465 responses.
-          </p>
-        </div>
-      </div>
-
-      <div class="flex items-center gap-2.5">
-        <div class="flex items-center gap-1.5">
-          <label class="text-[11px] text-muted-foreground whitespace-nowrap">Capacity:</label>
-          <NumberInput
-            :model-value="policy.waiting_room_max_concurrent"
-            :min="1"
-            suffix="users"
-            class="h-8 w-28 text-xs font-mono shadow-none"
-            @update:model-value="(val) => emit('update:policy', { ...policy, waiting_room_max_concurrent: val ?? 100 })"
-          />
+  <div class="space-y-4">
+    <h2 class="sr-only">Virtual Waiting Room Engine (HTTP 465)</h2>
+    <!-- Filter Bar & Actions Right (matching RateLimitingTable exactly) -->
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div class="flex flex-wrap items-center gap-2.5 flex-1 min-w-0">
+        <!-- Application Selector (shadcn Select) -->
+        <div class="w-48">
+          <Select v-model="filterApp">
+            <SelectTrigger class="h-9 text-xs">
+              <SelectValue placeholder="Application" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Applications</SelectItem>
+              <SelectItem
+                v-for="site in configStore.sites"
+                :key="site.id"
+                :value="site.id"
+              >
+                {{ site.name }}
+              </SelectItem>
+              <SelectItem value="Waiting Room Demo">Waiting Room Demo</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
+        <!-- Start At Date Picker (shadcn Radix Popover) -->
+        <DatePicker
+          v-model="filterStartAt"
+          placeholder="Start At"
+          class="w-44"
+        />
+
+        <!-- End At Date Picker (shadcn Radix Popover) -->
+        <DatePicker
+          v-model="filterEndAt"
+          placeholder="End At"
+          class="w-44"
+        />
+
+        <!-- Refresh Button -->
         <Button
           variant="outline"
-          size="sm"
-          class="h-8 gap-1 text-xs"
+          size="icon"
+          class="h-9 w-9 text-muted-foreground hover:text-foreground shrink-0"
           @click="fetchMetrics"
+          title="Refresh"
         >
-          <RefreshCw class="h-3.5 w-3.5" :class="{ 'animate-spin': loading }" />
-          <span>Refresh</span>
+          <RefreshCw class="w-3.5 h-3.5" :class="{ 'animate-spin': loading }" />
         </Button>
+      </div>
+
+      <!-- Actions Right: SETTINGS button -->
+      <div class="flex items-center gap-2">
         <Button
-          :variant="policy.waiting_room_enabled ? 'destructive' : 'default'"
-          size="sm"
-          class="h-8 text-xs font-semibold"
-          @click="toggleWaitingRoom"
+          variant="default"
+          class="h-9 px-4 text-xs font-semibold uppercase tracking-wider gap-1.5 shadow-none"
+          @click="isConfigOpen = true"
         >
-          {{ policy.waiting_room_enabled ? 'Disable Waiting Room' : 'Enable Waiting Room' }}
+          <SettingsIcon class="w-3.5 h-3.5" />
+          <span>SETTINGS</span>
         </Button>
       </div>
     </div>
 
-    <!-- Live Telemetry Gauge Cards Grid -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-      <!-- Active In-Flight -->
-      <Card class="bg-card border-border">
-        <CardHeader class="p-3 pb-1 flex flex-row items-center justify-between space-y-0">
-          <CardTitle class="text-[11px] font-medium text-muted-foreground uppercase">
-            Active In-Flight
-          </CardTitle>
-          <Users class="h-3.5 w-3.5 text-muted-foreground" />
-        </CardHeader>
-        <CardContent class="p-3 pt-0">
-          <div class="text-xl font-bold font-mono tabular-nums text-foreground">
-            {{ metrics.active_in_flight }}
-            <span class="text-xs font-normal text-muted-foreground">/ {{ policy.waiting_room_max_concurrent }}</span>
-          </div>
-          <p class="text-xs text-muted-foreground mt-1">Concurrent allowed leases</p>
-        </CardContent>
-      </Card>
-
-      <!-- Users in Queue -->
-      <Card class="bg-card border-border">
-        <CardHeader class="p-3 pb-1 flex flex-row items-center justify-between space-y-0">
-          <CardTitle class="text-[11px] font-medium text-muted-foreground uppercase">
-            Users Waiting
-          </CardTitle>
-          <Layers class="h-3.5 w-3.5 text-muted-foreground" />
-        </CardHeader>
-        <CardContent class="p-3 pt-0">
-          <div class="text-xl font-bold font-mono tabular-nums text-foreground">
-            {{ metrics.total_waiting }}
-          </div>
-          <p class="text-xs text-muted-foreground mt-1">Peak Depth: {{ metrics.peak_queue_depth }}</p>
-        </CardContent>
-      </Card>
-
-      <!-- Avg Wait Time -->
-      <Card class="bg-card border-border">
-        <CardHeader class="p-3 pb-1 flex flex-row items-center justify-between space-y-0">
-          <CardTitle class="text-[11px] font-medium text-muted-foreground uppercase">
-            Avg Wait Time
-          </CardTitle>
-          <Clock class="h-3.5 w-3.5 text-muted-foreground" />
-        </CardHeader>
-        <CardContent class="p-3 pt-0">
-          <div class="text-xl font-bold font-mono tabular-nums text-foreground">
-            {{ metrics.avg_wait_seconds.toFixed(1) }}s
-          </div>
-          <p class="text-xs text-muted-foreground mt-1">Total Admitted: {{ metrics.total_admitted }}</p>
-        </CardContent>
-      </Card>
-
-      <!-- Bounce Rate -->
-      <Card class="bg-card border-border">
-        <CardHeader class="p-3 pb-1 flex flex-row items-center justify-between space-y-0">
-          <CardTitle class="text-[11px] font-medium text-muted-foreground uppercase">
-            Client Bounce Rate
-          </CardTitle>
-          <TrendingDown class="h-3.5 w-3.5 text-muted-foreground" />
-        </CardHeader>
-        <CardContent class="p-3 pt-0">
-          <div class="text-xl font-bold font-mono tabular-nums text-foreground">
-            {{ metrics.bounce_rate.toFixed(1) }}%
-          </div>
-          <p class="text-xs text-muted-foreground mt-1">Abandoned: {{ metrics.total_abandoned }}</p>
-        </CardContent>
-      </Card>
+    <!-- Error Banner -->
+    <div
+      v-if="error"
+      class="p-3 bg-destructive/10 border border-destructive/30 rounded-lg flex items-center gap-2 text-destructive text-xs"
+    >
+      <AlertTriangle class="h-4 w-4 shrink-0" />
+      <span>{{ error }}</span>
     </div>
 
-    <!-- Targeted Path Prefixes Settings -->
-    <div class="p-4 border border-border rounded-lg bg-card space-y-3">
-      <div class="flex items-center justify-between">
-        <div>
-          <h4 class="text-xs font-semibold text-foreground">Targeted Path Prefixes</h4>
-          <p class="text-sm text-muted-foreground mt-1 leading-relaxed">
-            Only requests matching these path prefixes will enter the waiting room during flash crowd surges. Leave empty to target all paths.
-          </p>
-        </div>
-      </div>
+    <!-- Multi-Column Waiting Room Ledger Table using shadcn Table components -->
+    <div class="bg-card border border-border rounded-lg overflow-hidden shadow-none">
+      <Table>
+        <TableHeader>
+          <TableRow class="bg-muted/40 hover:bg-muted/40 border-b border-border">
+            <TableHead class="w-56 font-semibold py-3 pl-4">Application</TableHead>
+            <TableHead class="w-36 text-center font-semibold py-3">Active Users Allowed</TableHead>
+            <TableHead class="w-32 text-center font-semibold py-3">Users Waiting</TableHead>
+            <TableHead class="w-36 text-center font-semibold py-3">Peak Waiting Users</TableHead>
+            <TableHead class="w-40 text-center font-semibold py-3">
+              <div class="inline-flex items-center justify-center gap-1">
+                <span>Average Wait Time</span>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger as-child>
+                      <Info class="h-3.5 w-3.5 text-muted-foreground hover:text-foreground cursor-pointer" />
+                    </TooltipTrigger>
+                    <TooltipContent class="text-xs max-w-xs">
+                      Average duration queued clients wait before admission token grant.
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+            </TableHead>
+            <TableHead class="w-36 text-center font-semibold py-3">Client Bounce Rate</TableHead>
+            <TableHead class="w-32 text-center font-semibold py-3">Duration</TableHead>
+            <TableHead class="w-44 text-right font-semibold py-3 pr-4">Start At</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          <!-- Loading Skeleton -->
+          <TableRow v-if="loading && sessions.length === 0">
+            <TableCell colspan="8" class="py-12 text-center text-muted-foreground">
+              <Loader2 class="h-6 w-6 animate-spin mx-auto mb-2 text-primary" />
+              <span class="text-xs">Loading waiting room surge records...</span>
+            </TableCell>
+          </TableRow>
 
-      <!-- Add Path Row -->
-      <div class="flex items-center gap-2 max-w-md">
-        <Input
-          v-model="newPathInput"
-          placeholder="e.g. /tickets/*, /checkout"
-          class="h-8 text-xs font-mono"
-          @keydown.enter.prevent="addPath"
-        />
-        <Button variant="outline" size="sm" class="h-8 gap-1 text-xs shrink-0" @click="addPath">
-          <Plus class="h-3 w-3" />
-          <span>Add Prefix</span>
-        </Button>
-      </div>
+          <!-- Empty State -->
+          <TableRow v-else-if="filteredSessions.length === 0">
+            <TableCell colspan="8" class="py-12 text-center">
+              <Layers class="h-8 w-8 mx-auto mb-2 text-muted-foreground/40" />
+              <div class="text-xs font-semibold text-foreground">No waiting room surge sessions recorded</div>
+              <div class="text-[11px] text-muted-foreground mt-0.5">
+                No application traffic currently exceeds virtual waiting room capacity limits.
+              </div>
+            </TableCell>
+          </TableRow>
 
-      <!-- Path Badges -->
-      <div class="flex flex-wrap gap-1.5 pt-1">
-        <span
-          v-if="currentPaths.length === 0"
-          class="text-xs text-muted-foreground italic"
-        >
-          All paths targeted by default (/*)
-        </span>
-        <span
-          v-for="(p, idx) in currentPaths"
-          :key="idx"
-          class="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-muted text-foreground border border-border text-xs font-mono"
-        >
-          <span>{{ p }}</span>
-          <button
-            type="button"
-            class="text-muted-foreground hover:text-foreground"
-            @click="removePath(idx)"
+          <!-- Table Rows matching SafeLine layout exactly -->
+          <TableRow
+            v-for="s in filteredSessions"
+            :key="s.id"
+            class="hover:bg-muted/20 border-b border-border/60 transition-colors"
           >
-            <X class="h-3 w-3" />
-          </button>
-        </span>
-      </div>
+            <!-- Application -->
+            <TableCell class="py-3 pl-4">
+              <div class="flex items-center gap-3">
+                <div class="h-8 w-8 rounded-full bg-muted/60 border border-border flex items-center justify-center shrink-0">
+                  <Globe class="h-4 w-4 text-primary" />
+                </div>
+                <div>
+                  <div class="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    <span>{{ s.appName }}</span>
+                    <span
+                      v-if="s.isActive"
+                      class="h-1.5 w-1.5 rounded-full bg-primary animate-pulse"
+                      title="Live Active Surge"
+                    />
+                  </div>
+                  <div class="text-[11px] text-muted-foreground mt-0.5 font-sans">
+                    {{ s.hostPattern }}
+                  </div>
+                </div>
+              </div>
+            </TableCell>
+
+            <!-- Active Users Allowed -->
+            <TableCell class="text-center font-mono tabular-nums text-xs text-foreground py-3">
+              {{ s.activeAllowed }}
+            </TableCell>
+
+            <!-- Total Users Waiting -->
+            <TableCell class="text-center font-mono tabular-nums text-xs text-foreground py-3">
+              {{ s.totalWaiting }}
+            </TableCell>
+
+            <!-- Peak Waiting Users -->
+            <TableCell class="text-center font-mono tabular-nums text-xs text-foreground py-3">
+              {{ s.peakWaiting }}
+            </TableCell>
+
+            <!-- Average Wait Time -->
+            <TableCell class="text-center font-mono tabular-nums text-xs text-foreground py-3">
+              {{ formatDuration(s.avgWaitSeconds) }}
+            </TableCell>
+
+            <!-- Client Bounce Rate -->
+            <TableCell class="text-center font-mono tabular-nums text-xs text-foreground py-3">
+              {{ s.bounceRate }} %
+            </TableCell>
+
+            <!-- Duration -->
+            <TableCell class="text-center font-mono tabular-nums text-xs text-foreground py-3">
+              {{ formatDuration(s.durationSeconds) }}
+            </TableCell>
+
+            <!-- Start At -->
+            <TableCell class="text-right font-mono tabular-nums text-xs text-muted-foreground py-3 pr-4">
+              {{ s.startAt }}
+            </TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
     </div>
+
+    <!-- SafeLine Parity Configuration Modal (HTTP 465 Engine) -->
+    <WaitingRoomConfigModal
+      v-model:open="isConfigOpen"
+      :policy="policy"
+      @save="handleSavePolicy"
+    />
   </div>
 </template>

@@ -101,6 +101,24 @@ describe('SafeLine HTTP Flood Workflow', () => {
       expect(wrapper.text()).toContain('159.89.13.98');
       expect(wrapper.text()).not.toContain('51.12.209.81');
     });
+
+    it('opens slide-over details drawer when clicking table row or Details button', async () => {
+      const wrapper = mount(RateLimitingTable);
+      await nextTick();
+      await nextTick();
+
+      const detailsBtn = wrapper.find('[role="button"]');
+      expect(detailsBtn.exists()).toBe(true);
+      expect(detailsBtn.text()).toContain('Details');
+
+      await detailsBtn.trigger('click');
+      await nextTick();
+
+      // Drawer should be open in body Teleport
+      expect(document.body.textContent).toContain('Defense Trigger');
+      expect(document.body.textContent).toContain('Raw Violation Diagnostics');
+      expect(document.body.textContent).toContain('Unblock Client IP');
+    });
   });
 
   describe('RateLimitingSettings.vue', () => {

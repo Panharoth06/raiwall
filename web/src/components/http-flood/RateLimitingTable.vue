@@ -29,6 +29,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { DatePicker } from '@/components/ui/date-picker';
+import RateLimitDetailDrawer from '@/components/http-flood/RateLimitDetailDrawer.vue';
 import {
   Globe,
   Settings as SettingsIcon,
@@ -36,6 +37,7 @@ import {
   AlertTriangle,
   Loader2,
   ShieldOff,
+  SlidersHorizontal,
 } from 'lucide-vue-next';
 
 const router = useRouter();
@@ -44,6 +46,15 @@ const configStore = useConfigStore();
 const bans = ref<BanEntry[]>([]);
 const loading = ref(false);
 const error = ref<string | null>(null);
+
+// Detail Slider Drawer State
+const selectedBan = ref<BanEntry | null>(null);
+const showDetailDrawer = ref(false);
+
+const openDetail = (entry: BanEntry) => {
+  selectedBan.value = entry;
+  showDetailDrawer.value = true;
+};
 
 // Filters
 const filterIp = ref('');
@@ -144,6 +155,26 @@ const formatDetail = (entry: BanEntry) => {
   }
 
   return { reason, action };
+};
+
+const getTierBadge = (reason?: string) => {
+  const r = (reason || '').toLowerCase();
+  if (r.includes('tier2') || r.includes('attack')) {
+    return {
+      name: 'Attack Limit',
+      cls: 'bg-threat/10 text-threat border-threat/20',
+    };
+  }
+  if (r.includes('tier3') || r.includes('scanner') || r.includes('error')) {
+    return {
+      name: 'Scanner Trap',
+      cls: 'bg-warning/10 text-warning border-warning/20',
+    };
+  }
+  return {
+    name: 'Access Velocity',
+    cls: 'bg-primary/10 text-primary border-primary/20',
+  };
 };
 
 const formatStartAt = (isoDate?: string): string => {
@@ -354,22 +385,25 @@ const goToSettings = () => {
             </TableCell>
           </TableRow>
 
-          <!-- Table Rows -->
+          <!-- Table Rows (Compact with Details Slider Drawer) -->
           <TableRow
             v-for="entry in filteredBans"
             :key="entry.key"
-            class="hover:bg-muted/30 transition-colors"
+            class="hover:bg-muted/40 transition-colors cursor-pointer group"
+            @click="openDetail(entry)"
           >
             <!-- 1. IP Addr + Country + JA4 -->
-            <TableCell class="align-top py-3">
-              <div class="font-mono font-medium text-foreground text-xs leading-tight">
-                {{ entry.client_ip || entry.key }}
-              </div>
-              <div class="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1.5">
-                <span>{{ resolveCountry(entry.client_ip, entry.country) }}</span>
+            <TableCell class="align-middle py-2.5">
+              <div class="flex items-center gap-2">
+                <span class="font-mono font-medium text-foreground text-xs">
+                  {{ entry.client_ip || entry.key }}
+                </span>
+                <span class="text-[11px] text-muted-foreground">
+                  {{ resolveCountry(entry.client_ip, entry.country) }}
+                </span>
                 <span
                   v-if="entry.ja4"
-                  class="font-mono text-[10px] px-1 py-0.2 rounded bg-muted text-muted-foreground border border-border"
+                  class="font-mono text-[10px] px-1 py-0.2 rounded bg-muted text-muted-foreground border border-border truncate max-w-[120px]"
                 >
                   {{ entry.ja4 }}
                 </span>
@@ -377,82 +411,99 @@ const goToSettings = () => {
             </TableCell>
 
             <!-- 2. Application -->
-            <TableCell class="align-top py-3">
+            <TableCell class="align-middle py-2.5">
               <div class="flex items-center gap-1.5">
                 <Globe class="w-3.5 h-3.5 text-primary shrink-0" />
-                <span class="font-medium text-foreground text-xs truncate">
+                <span class="font-medium text-foreground text-xs truncate max-w-[140px]">
                   {{ resolveAppName(entry.site_id).name }}
                 </span>
-              </div>
-              <div class="text-[11px] text-muted-foreground mt-0.5 pl-5">
-                {{ resolveAppName(entry.site_id).host }}
+                <span class="text-[11px] text-muted-foreground truncate max-w-[120px]">
+                  ({{ resolveAppName(entry.site_id).host }})
+                </span>
               </div>
             </TableCell>
 
             <!-- 3. Detail: Reason & Action -->
-            <TableCell class="align-top py-3">
-              <div class="flex items-baseline gap-1.5">
-                <span class="text-muted-foreground font-normal">Reason</span>
-                <span class="text-foreground font-medium text-xs">
-                  {{ formatDetail(entry).reason }}
+            <TableCell class="align-middle py-2.5">
+              <div class="flex items-center gap-2">
+                <span
+                  class="font-medium text-[11px] px-2 py-0.5 rounded border shrink-0"
+                  :class="getTierBadge(entry.reason).cls"
+                >
+                  {{ getTierBadge(entry.reason).name }}
                 </span>
-                <span class="font-mono text-[10px] text-muted-foreground/80">
-                  ({{ entry.reason }})
-                </span>
-              </div>
-              <div class="flex items-baseline gap-1.5 mt-1">
-                <span class="text-muted-foreground font-normal">Action</span>
-                <span class="text-xs font-medium text-amber-500/90 dark:text-amber-400">
+                <span class="text-xs text-muted-foreground truncate max-w-[200px]">
                   {{ formatDetail(entry).action }}
                 </span>
                 <span
                   v-if="entry.remaining_seconds > 0"
-                  class="text-[11px] text-muted-foreground font-mono ml-1"
+                  class="text-[11px] text-muted-foreground font-mono shrink-0"
                 >
                   ({{ formatCountdown(entry.remaining_seconds) }})
                 </span>
+                <span class="sr-only">({{ entry.reason }})</span>
               </div>
             </TableCell>
 
             <!-- 4. Blocked Hits -->
-            <TableCell class="align-top py-3 text-center">
-              <span class="font-mono font-semibold text-foreground text-xs">
+            <TableCell class="align-middle py-2.5 text-center">
+              <span class="font-mono font-semibold text-foreground text-xs tabular-nums">
                 {{ entry.blocked_count ?? 0 }}
               </span>
             </TableCell>
 
             <!-- 5. Start At -->
-            <TableCell class="align-top py-3 font-mono text-[11px] text-muted-foreground">
+            <TableCell class="align-middle py-2.5 font-mono text-[11px] text-muted-foreground tabular-nums">
               {{ formatStartAt(entry.banned_at) }}
             </TableCell>
 
             <!-- 6. Action / Status -->
-            <TableCell class="align-top py-3 text-right">
-              <span
-                v-if="releasedKeys.has(entry.key)"
-                class="text-xs font-medium text-muted-foreground"
-              >
-                Unblocked
-              </span>
-              <Button
-                v-else
-                variant="ghost"
-                size="sm"
-                class="h-7 text-xs font-medium text-primary hover:text-primary hover:bg-primary/10"
-                :disabled="pendingReleaseKey === entry.key"
-                @click="handleReleaseSingle(entry)"
-              >
-                <Loader2
-                  v-if="pendingReleaseKey === entry.key"
-                  class="h-3 w-3 animate-spin mr-1"
-                />
-                <span>Unblock</span>
-              </Button>
+            <TableCell class="align-middle py-2.5 text-right">
+              <div class="flex items-center justify-end gap-1.5" @click.stop>
+                <span
+                  role="button"
+                  tabindex="0"
+                  class="inline-flex items-center justify-center rounded-md text-xs font-medium h-7 px-2 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer select-none"
+                  @click.stop="openDetail(entry)"
+                  @keydown.enter.space.prevent="openDetail(entry)"
+                >
+                  <SlidersHorizontal class="h-3 w-3 mr-1" />
+                  <span>Details</span>
+                </span>
+                <span
+                  v-if="releasedKeys.has(entry.key)"
+                  class="text-xs font-medium text-muted-foreground px-2"
+                >
+                  Unblocked
+                </span>
+                <Button
+                  v-else
+                  variant="ghost"
+                  size="sm"
+                  class="h-7 px-2 text-xs font-medium text-primary hover:text-primary hover:bg-primary/10"
+                  :disabled="pendingReleaseKey === entry.key"
+                  @click.stop="handleReleaseSingle(entry)"
+                >
+                  <Loader2
+                    v-if="pendingReleaseKey === entry.key"
+                    class="h-3 w-3 animate-spin mr-1"
+                  />
+                  <span>Unblock</span>
+                </Button>
+              </div>
             </TableCell>
           </TableRow>
         </TableBody>
       </Table>
     </div>
+
+    <!-- Slide-over Right Drawer (Sheet) for Granular Ban Forensics -->
+    <RateLimitDetailDrawer
+      v-model:open="showDetailDrawer"
+      :entry="selectedBan"
+      :unblocking="pendingReleaseKey === selectedBan?.key"
+      @unblock="handleReleaseSingle"
+    />
 
     <!-- Emergency Unblock All Confirmation Modal -->
     <Dialog :open="showUnblockAllModal" @update:open="(val) => (showUnblockAllModal = val)">
