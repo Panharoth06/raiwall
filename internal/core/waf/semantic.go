@@ -171,18 +171,6 @@ func moduleRuleID(m Module) string {
 	}
 }
 
-// blockVerdict builds the terminal block verdict for an extended module detection.
-func blockVerdict(det Detection, paramName, location, ruleID string) *Verdict {
-	return &Verdict{
-		Action:          ActionBlock,
-		RuleID:          ruleID,
-		Reason:          fmt.Sprintf("%s in param %q (%s): %s", det.Reason, paramName, location, det.Matched),
-		AttackCategory:  string(det.Module),
-		MatchedToken:    det.Matched,
-		PayloadLocation: location,
-	}
-}
-
 // inspectExtendedModule runs the Stage 2b lexical detectors over a value the
 // main triage classified as benign and applies the matrix gating.
 // Return values: (nil, false) no detector matched; (nil, true) match was
@@ -194,11 +182,22 @@ func (s *SemanticEngine) inspectExtendedModule(
 	param normalizer.Parameter,
 	normalized string,
 ) (*Verdict, bool) {
-	det, matched := scanSemanticModules(normalized)
+	det, matched := scanSemanticModules(param.Name, normalized)
 	if !matched {
 		return nil, false
 	}
+	return s.gateDetection(matrix, ctx, det, moduleRuleID(det.Module), string(param.Location), param.Name)
+}
 
+// gateDetection applies semantic matrix gating to a detection. Return values
+// follow inspectExtendedModule semantics: (nil, false) never; (nil, true)
+// suppressed; (verdict, true) record (audit) or return (block).
+func (s *SemanticEngine) gateDetection(
+	matrix SemanticMatrix,
+	ctx *RequestContext,
+	det Detection,
+	ruleID, location, paramName string,
+) (*Verdict, bool) {
 	mode := matrix.Mode(det.Module)
 	switch mode {
 	case ModeDisabled:
@@ -206,16 +205,15 @@ func (s *SemanticEngine) inspectExtendedModule(
 	case ModeAudit:
 		return &Verdict{
 			Action:          ActionAudit,
-			RuleID:          moduleRuleID(det.Module),
-			Reason:          fmt.Sprintf("%s in param %q (%s): %s", det.Reason, param.Name, param.Location, det.Matched),
+			RuleID:          ruleID,
+			Reason:          fmt.Sprintf("%s in param %q (%s): %s", det.Reason, paramName, location, det.Matched),
 			AttackCategory:  string(det.Module),
 			MatchedToken:    det.Matched,
-			PayloadLocation: string(param.Location),
+			PayloadLocation: location,
 		}, true
 	}
 
-	ruleID := moduleRuleID(det.Module)
-	if s.excepted(ctx.Host, ctx.Path, ctx.Method, string(param.Location), param.Name, ruleID) {
+	if s.excepted(ctx.Host, ctx.Path, ctx.Method, location, paramName, ruleID) {
 		return nil, true
 	}
 
@@ -224,7 +222,14 @@ func (s *SemanticEngine) inspectExtendedModule(
 		return nil, true
 	}
 
-	return blockVerdict(det, param.Name, string(param.Location), ruleID), true
+	return &Verdict{
+		Action:          ActionBlock,
+		RuleID:          ruleID,
+		Reason:          fmt.Sprintf("%s in param %q (%s): %s", det.Reason, paramName, location, det.Matched),
+		AttackCategory:  string(det.Module),
+		MatchedToken:    det.Matched,
+		PayloadLocation: location,
+	}, true
 }
 
 func triageReasonLabel(triage TriageResult) string {
@@ -284,13 +289,31 @@ func (s *SemanticEngine) InspectRequest(ctx *RequestContext) (*Verdict, error) {
 	// Resolve the effective per-application semantic matrix (hot path: single atomic read).
 	matrix := matrixForApp(s.matrixSource, ctx.AppID)
 
+	finding := &auditFinding{}
+
+	// Stage 2a: request-level structural and contextual checks (malformed
+	// HTTP smuggling markers and cross-origin validation). Audits are recorded
+	// without preempting deeper parameter inspection.
+	for _, rl := range requestLevelDetections(ctx) {
+		verdict, controlled := s.gateDetection(matrix, ctx, rl.detection, moduleRuleID(rl.detection.Module), "Header", rl.paramName)
+		if !controlled {
+			continue
+		}
+		if verdict == nil {
+			continue
+		}
+		if verdict.Action == ActionAudit {
+			finding.record(verdict)
+			continue
+		}
+		return verdict, nil
+	}
+
 	// Stage 1: Extract all parameters (Path, Query, Headers, JSON/Form/Multipart Body)
 	params := normalizer.ExtractParameters(ctx.Path, ctx.Query, ctx.Headers, ctx.Body)
 	if len(params) == 0 {
 		return VerdictAllow, nil
 	}
-
-	finding := &auditFinding{}
 
 	for _, param := range params {
 		if len(param.Value) == 0 {

@@ -192,7 +192,7 @@ func TestScanPHPDeser(t *testing.T) {
 func TestScanSemanticModulesOrchestration(t *testing.T) {
 	t.Run("NoMatchBenign", func(t *testing.T) {
 		for _, v := range []string{"", "john", "2024-01-01T00:00:00Z", "a/b/c?d=e"} {
-			if _, found := scanSemanticModules(v); found {
+			if _, found := scanSemanticModules("body", v); found {
 				t.Errorf("unexpected detection for %q", v)
 			}
 		}
@@ -201,7 +201,7 @@ func TestScanSemanticModulesOrchestration(t *testing.T) {
 	t.Run("SerializationPrecedesCodeInj", func(t *testing.T) {
 		// Payload carrying both a deser magic byte marker and an OGNL gadget:
 		// the dedicated deserializer scanner wins.
-		det, found := scanSemanticModules("aced0005 + #{#_memberAccess}")
+		det, found := scanSemanticModules("body", "aced0005 + #{#_memberAccess}")
 		if !found {
 			t.Fatal("expected detection")
 		}
@@ -211,7 +211,7 @@ func TestScanSemanticModulesOrchestration(t *testing.T) {
 	})
 
 	t.Run("StrongVerdictMetadata", func(t *testing.T) {
-		det, found := scanSemanticModules("greeting={{7*7}}")
+		det, found := scanSemanticModules("body", "greeting={{7*7}}")
 		requireDetection(t, det, found, ModuleSSTI, LevelStrong, "canary")
 		if det.Matched == "" {
 			t.Error("Expected non-empty Matched token for telemetry")

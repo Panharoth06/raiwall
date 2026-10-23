@@ -1,6 +1,9 @@
 package waf
 
 import (
+	"bytes"
+	"mime/multipart"
+	"net/http"
 	"strings"
 	"testing"
 )
@@ -335,3 +338,168 @@ func matrixFuncSrc(fn func(appID string) SemanticMatrix) MatrixSource {
 type matrixFunc func(appID string) SemanticMatrix
 
 func (f matrixFunc) MatrixFor(appID string) SemanticMatrix { return f(appID) }
+
+func TestInspectRequestLevelDetectors(t *testing.T) {
+	t.Run("SmugglingDuplicateContentLengthBlocked", func(t *testing.T) {
+		engine := matrixEngine(t, nil)
+		h := http.Header{}
+		h["Content-Length"] = []string{"10", "20"}
+		ctx := &RequestContext{
+			Method:  "POST",
+			Host:    "api.test",
+			Path:    "/upload",
+			Headers: h,
+		}
+		verdict, err := engine.InspectRequest(ctx)
+		if err != nil {
+			t.Fatalf("inspect: %v", err)
+		}
+		if verdict.Action != ActionBlock || verdict.RuleID != "SEMANTIC_MAL_HTTP" {
+			t.Fatalf("expected SEMANTIC_MAL_HTTP block, got %s (%s)", verdict.Action, verdict.Reason)
+		}
+	})
+
+	t.Run("MalHTTPAuditDowngrades", func(t *testing.T) {
+		engine := matrixEngine(t, map[Module]ModuleMode{ModuleMalHTTP: ModeAudit})
+		h := http.Header{}
+		h["Content-Length"] = []string{"10", "20"}
+		ctx := &RequestContext{
+			Method:  "POST",
+			Host:    "api.test",
+			Path:    "/upload",
+			Headers: h,
+		}
+		verdict, err := engine.InspectRequest(ctx)
+		if err != nil {
+			t.Fatalf("inspect: %v", err)
+		}
+		if verdict.Action != ActionAudit || verdict.RuleID != "SEMANTIC_MAL_HTTP" {
+			t.Fatalf("expected SEMANTIC_MAL_HTTP audit, got %s (%s)", verdict.Action, verdict.Reason)
+		}
+	})
+
+	t.Run("CSRFOriginMismatchBlocked", func(t *testing.T) {
+		engine := matrixEngine(t, nil)
+		h := http.Header{"Origin": []string{"https://attacker.example"}}
+		ctx := &RequestContext{
+			Method:  "POST",
+			Host:    "shop.test",
+			Path:    "/transfer",
+			Headers: h,
+		}
+		verdict, err := engine.InspectRequest(ctx)
+		if err != nil {
+			t.Fatalf("inspect: %v", err)
+		}
+		if verdict.Action != ActionBlock || verdict.RuleID != "SEMANTIC_CSRF" {
+			t.Fatalf("expected SEMANTIC_CSRF block, got %s (%s)", verdict.Action, verdict.Reason)
+		}
+	})
+
+	t.Run("CSRFDisabledSkipsOriginChecks", func(t *testing.T) {
+		engine := matrixEngine(t, map[Module]ModuleMode{ModuleCSRF: ModeDisabled})
+		h := http.Header{"Origin": []string{"https://attacker.example"}}
+		ctx := &RequestContext{
+			Method:  "POST",
+			Host:    "shop.test",
+			Path:    "/transfer",
+			Headers: h,
+		}
+		verdict, err := engine.InspectRequest(ctx)
+		if err != nil {
+			t.Fatalf("inspect: %v", err)
+		}
+		if verdict.Action != ActionAllow {
+			t.Fatalf("expected allow with CSRF disabled, got %s (%s)", verdict.Action, verdict.Reason)
+		}
+	})
+
+	t.Run("CSRFWeakRefererToleratedInBalance", func(t *testing.T) {
+		engine := matrixEngine(t, nil)
+		h := http.Header{"Referer": []string{"https://other.example/form"}}
+		ctx := &RequestContext{
+			Method:  "POST",
+			Host:    "shop.test",
+			Path:    "/comment",
+			Headers: h,
+		}
+		verdict, err := engine.InspectRequest(ctx)
+		if err != nil {
+			t.Fatalf("inspect: %v", err)
+		}
+		if verdict.Action != ActionAllow {
+			t.Fatalf("expected allow for weak referer mismatch in balance mode, got %s (%s)", verdict.Action, verdict.Reason)
+		}
+	})
+
+	t.Run("SSRFMetadataEndpointBlocked", func(t *testing.T) {
+		engine := matrixEngine(t, nil)
+		ctx := &RequestContext{
+			Method: "GET",
+			Host:   "app.test",
+			Path:   "/fetch",
+			Query:  "url=http://169.254.169.254/latest/meta-data/",
+		}
+		verdict, err := engine.InspectRequest(ctx)
+		if err != nil {
+			t.Fatalf("inspect: %v", err)
+		}
+		if verdict.Action != ActionBlock || verdict.RuleID != "SEMANTIC_SSRF" {
+			t.Fatalf("expected SEMANTIC_SSRF block, got %s (%s)", verdict.Action, verdict.Reason)
+		}
+	})
+
+	t.Run("FileUploadExecutableBlocked", func(t *testing.T) {
+		engine := matrixEngine(t, nil)
+
+		var buf bytes.Buffer
+		writer := multipart.NewWriter(&buf)
+		file, _ := writer.CreateFormFile("attachment", "shell.php")
+		_, _ = file.Write([]byte("<?php system($_GET['c']); ?>"))
+		_ = writer.Close()
+
+		ctx := &RequestContext{
+			Method: "POST",
+			Host:   "site.test",
+			Path:   "/upload",
+			Headers: http.Header{
+				"Content-Type": []string{writer.FormDataContentType()},
+			},
+			Body: buf.Bytes(),
+		}
+		verdict, err := engine.InspectRequest(ctx)
+		if err != nil {
+			t.Fatalf("inspect: %v", err)
+		}
+		if verdict.Action != ActionBlock || verdict.RuleID != "SEMANTIC_FILE_UPLOAD" {
+			t.Fatalf("expected SEMANTIC_FILE_UPLOAD block, got %s (%s)", verdict.Action, verdict.Reason)
+		}
+	})
+
+	t.Run("FileUploadBenignImageAllowed", func(t *testing.T) {
+		engine := matrixEngine(t, nil)
+
+		var buf bytes.Buffer
+		writer := multipart.NewWriter(&buf)
+		file, _ := writer.CreateFormFile("attachment", "photo.png")
+		_, _ = file.Write([]byte("\x89PNG\r\n\x1a\n binary-ish"))
+		_ = writer.Close()
+
+		ctx := &RequestContext{
+			Method: "POST",
+			Host:   "site.test",
+			Path:   "/upload",
+			Headers: http.Header{
+				"Content-Type": []string{writer.FormDataContentType()},
+			},
+			Body: buf.Bytes(),
+		}
+		verdict, err := engine.InspectRequest(ctx)
+		if err != nil {
+			t.Fatalf("inspect: %v", err)
+		}
+		if verdict.Action != ActionAllow {
+			t.Fatalf("expected allow for benign image upload, got %s (%s)", verdict.Action, verdict.Reason)
+		}
+	})
+}

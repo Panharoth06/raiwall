@@ -21,12 +21,17 @@ type Detection struct {
 }
 
 // scanSemanticModules evaluates the extended module detectors (code injection,
-// deserialization, SSTI) over a normalized parameter value using pure lexical
-// heuristics in < 2 µs. The first match wins; scanners order from cheapest
-// fast-path prechecks to richest signatures.
-func scanSemanticModules(v string) (Detection, bool) {
+// deserialization, SSTI, SSRF, uploads) over a normalized parameter value using
+// pure lexical heuristics. The first match wins; scanners order from
+// context-gated to cheapest fast-path prechecks to richest signatures.
+func scanSemanticModules(paramName, v string) (Detection, bool) {
 	if len(v) == 0 {
 		return Detection{}, false
+	}
+
+	// 0. Context-gated upload detection (multipart <field>.filename parts only)
+	if d, ok := scanFileUpload(paramName, v); ok {
+		return d, true
 	}
 
 	// 1. Serialization magic bytes (cheapest: fixed substrings)
@@ -48,6 +53,11 @@ func scanSemanticModules(v string) (Detection, bool) {
 		return d, true
 	}
 	if d, ok := scanSSTI(v); ok {
+		return d, true
+	}
+
+	// 3. URL-shaped internal/metadata fetch attempts
+	if d, ok := scanSSRF(v); ok {
 		return d, true
 	}
 
