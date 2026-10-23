@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/Panharoth06/raiwall/internal/core/acl"
+	"github.com/Panharoth06/raiwall/internal/core/waf"
 )
 
 // ValidationError represents an individual configuration issue.
@@ -276,6 +277,53 @@ func ValidateSnapshot(snap *ConfigSnapshot) error {
 					ID:     bc.ID,
 					Field:  "trap_urls",
 					Reason: fmt.Sprintf("trap URL %q must begin with /", trap),
+				})
+			}
+		}
+	}
+
+	// Validate Semantic Detector Matrix (global + per-app overrides)
+	if snap.SemanticDefaults != nil {
+		for module, mode := range snap.SemanticDefaults {
+			if !waf.IsValidModule(module) {
+				errs = append(errs, ValidationError{
+					Entity: "Detector",
+					ID:     string(module),
+					Field:  "module",
+					Reason: fmt.Sprintf("unknown semantic module %q", module),
+				})
+				continue
+			}
+			if mode > waf.ModeStrict {
+				errs = append(errs, ValidationError{
+					Entity: "Detector",
+					ID:     string(module),
+					Field:  "mode",
+					Reason: fmt.Sprintf("semantic mode %d out of range (0-3)", uint8(mode)),
+				})
+			}
+		}
+	}
+	for appID, app := range snap.Apps {
+		if app == nil || len(app.SemanticPolicy) == 0 {
+			continue
+		}
+		for module, mode := range app.SemanticPolicy {
+			if !waf.IsValidModule(module) {
+				errs = append(errs, ValidationError{
+					Entity: "Detector",
+					ID:     appID + "/" + string(module),
+					Field:  "module",
+					Reason: fmt.Sprintf("unknown semantic module %q in per-app policy", module),
+				})
+				continue
+			}
+			if mode > waf.ModeStrict {
+				errs = append(errs, ValidationError{
+					Entity: "Detector",
+					ID:     appID + "/" + string(module),
+					Field:  "mode",
+					Reason: fmt.Sprintf("semantic mode %d out of range (0-3)", uint8(mode)),
 				})
 			}
 		}

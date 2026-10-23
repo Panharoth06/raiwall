@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Panharoth06/raiwall/internal/core/acl"
+	"github.com/Panharoth06/raiwall/internal/core/control"
 	"github.com/Panharoth06/raiwall/internal/core/waf"
 	"github.com/caddyserver/caddy/v2"
 )
@@ -36,6 +37,8 @@ func (m *Middleware) provisionWAF(_ caddy.Context) error {
 		if m.exceptionEngine != nil {
 			opts = append(opts, waf.WithExceptionEngine(m.exceptionEngine))
 		}
+		// Resolve per-app semantic matrices live from the atomic config snapshot.
+		opts = append(opts, waf.WithMatrixSource(control.SnapshotMatrixSource{}))
 		m.engine = waf.NewSemanticEngine(opts...)
 	} else if sem, ok := m.engine.(*waf.SemanticEngine); ok {
 		sem.SetExceptionEngine(m.exceptionEngine)

@@ -41,6 +41,12 @@ func (s *Server) routes() {
 			api.Get("/status", s.handleStatus)
 			api.Get("/cluster/status", s.handleClusterStatus)
 
+			// Semantic Detection Matrix (SafeLine parity: 14 modules, 4 modes)
+			api.Get("/detector", s.handleGetDetector)
+			api.Put("/detector/modules/{module}", s.handleUpdateDetectorModule)
+			api.Get("/detector/apps/{id}", s.handleGetAppPolicy)
+			api.Put("/detector/apps/{id}", s.handleUpdateAppPolicy)
+
 			// Sites (Apps) CRUD
 			api.Get("/sites", s.handleListSites)
 			api.Post("/sites", s.handleCreateSite)

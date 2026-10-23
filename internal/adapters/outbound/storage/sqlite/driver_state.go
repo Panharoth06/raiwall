@@ -24,6 +24,8 @@ type databaseState struct {
 	ipGroups        map[string]*RaiwallIPGroup
 	ipGroupEntries  map[string]*RaiwallIPGroupEntry
 	templates       map[int]*RaiwallResponseTemplate
+	detectorConfig  map[string]string
+	appSemPolicies  map[string]string
 	migrations      map[int]string
 	nextVersion     int64
 }
@@ -44,6 +46,8 @@ func newDatabaseState(name string) *databaseState {
 		ipGroups:        make(map[string]*RaiwallIPGroup),
 		ipGroupEntries:  make(map[string]*RaiwallIPGroupEntry),
 		templates:       make(map[int]*RaiwallResponseTemplate),
+		detectorConfig:  make(map[string]string),
+		appSemPolicies:  make(map[string]string),
 		migrations:      make(map[int]string),
 		nextVersion:     1,
 	}
@@ -108,6 +112,12 @@ func (s *databaseState) clone() *databaseState {
 		val := *v
 		cp.templates[k] = &val
 	}
+	for k, v := range s.detectorConfig {
+		cp.detectorConfig[k] = v
+	}
+	for k, v := range s.appSemPolicies {
+		cp.appSemPolicies[k] = v
+	}
 	for k, v := range s.migrations {
 		cp.migrations[k] = v
 	}
@@ -135,6 +145,8 @@ func (s *databaseState) applyFrom(src *databaseState) {
 	s.ipGroups = src.ipGroups
 	s.ipGroupEntries = src.ipGroupEntries
 	s.templates = src.templates
+	s.detectorConfig = src.detectorConfig
+	s.appSemPolicies = src.appSemPolicies
 	s.migrations = src.migrations
 }
 

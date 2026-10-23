@@ -2,6 +2,8 @@ package control
 
 import (
 	"sync/atomic"
+
+	"github.com/Panharoth06/raiwall/internal/core/waf"
 )
 
 // SnapshotManager manages atomic, lock-free access to ConfigSnapshot.
@@ -49,4 +51,17 @@ func GetActiveSnapshot() *ConfigSnapshot {
 // SetActiveSnapshot atomically sets the global active snapshot.
 func SetActiveSnapshot(newSnap *ConfigSnapshot) {
 	StoreSnapshot(newSnap)
+}
+
+// SnapshotMatrixSource resolves the effective SemanticMatrix for an application
+// from the current global active config snapshot. Live config applies are picked
+// up automatically because the snapshot reference is swapped atomically.
+type SnapshotMatrixSource struct{}
+
+// MatrixFor resolves the semantic matrix from the active snapshot.
+func (SnapshotMatrixSource) MatrixFor(appID string) waf.SemanticMatrix {
+	if snap := LoadSnapshot(); snap != nil {
+		return snap.SemanticMatrixFor(appID)
+	}
+	return waf.DefaultMatrix()
 }

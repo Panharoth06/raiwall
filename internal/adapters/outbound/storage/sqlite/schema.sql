@@ -178,3 +178,15 @@ CREATE TABLE IF NOT EXISTS raiwall_response_templates (
 );
 CREATE INDEX IF NOT EXISTS idx_raiwall_templates_status ON raiwall_response_templates(status_code);
 
+CREATE TABLE IF NOT EXISTS raiwall_detector_config (
+    module TEXT PRIMARY KEY,
+    mode TEXT NOT NULL DEFAULT 'balance',
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS raiwall_app_semantic_policies (
+    app_id TEXT PRIMARY KEY,
+    policy TEXT NOT NULL DEFAULT '{}',
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+

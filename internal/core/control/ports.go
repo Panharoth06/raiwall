@@ -103,6 +103,14 @@ type ControlStore interface {
 	UpsertTemplate(ctx context.Context, tmpl TemplateRecord) error
 	DeleteTemplate(ctx context.Context, statusCode int) error
 
+	// Semantic Detector Matrix
+	ListDetectorConfig(ctx context.Context) ([]DetectorConfigRecord, error)
+	UpsertDetectorConfig(ctx context.Context, cfg DetectorConfigRecord) error
+	DeleteDetectorConfig(ctx context.Context, module string) error
+	ListAppSemanticPolicies(ctx context.Context) ([]AppSemanticPolicyRecord, error)
+	UpsertAppSemanticPolicy(ctx context.Context, rec AppSemanticPolicyRecord) error
+	DeleteAppSemanticPolicy(ctx context.Context, appID string) error
+
 	// Transactions & Lifecycle
 	WithTx(ctx context.Context, fn func(store ControlStore) error) error
 	Close() error

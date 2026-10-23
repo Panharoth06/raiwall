@@ -89,6 +89,22 @@ func OpenAPISpec() map[string]any {
 				"put":    map[string]any{"summary": "Update site configuration (admin only)"},
 				"delete": map[string]any{"summary": "Delete site configuration (admin only)"},
 			},
+			"/detector": map[string]any{
+				"get": map[string]any{
+					"summary": "List the 14 semantic detection modules with their operating modes and per-site overrides",
+				},
+			},
+			"/detector/modules/{module}": map[string]any{
+				"put": map[string]any{
+					"summary": "Update the global operating mode of a semantic module (admin only)",
+				},
+			},
+			"/detector/apps/{id}": map[string]any{
+				"get": map[string]any{"summary": "Get per-site semantic module overrides"},
+				"put": map[string]any{
+					"summary": "Replace per-site semantic module overrides (admin only)",
+				},
+			},
 			"/exceptions": map[string]any{
 				"get":  map[string]any{"summary": "List false-positive exception rules"},
 				"post": map[string]any{"summary": "Create an exception rule (admin only)"},

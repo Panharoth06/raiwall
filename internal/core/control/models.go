@@ -177,3 +177,16 @@ type TemplateRecord struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
+// DetectorConfigRecord represents a global semantic module operating mode.
+type DetectorConfigRecord struct {
+	Module    string    `json:"module"`
+	Mode      string    `json:"mode"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// AppSemanticPolicyRecord represents a per-application semantic module override set.
+type AppSemanticPolicyRecord struct {
+	AppID     string    `json:"app_id"`
+	Policy    string    `json:"policy"`
+	UpdatedAt time.Time `json:"updated_at"`
+}

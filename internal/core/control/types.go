@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Panharoth06/raiwall/internal/core/acl"
+	"github.com/Panharoth06/raiwall/internal/core/waf"
 )
 
 // RunMode represents the WAF and gateway operational protection mode.
@@ -172,18 +173,19 @@ type ProxySettings struct {
 
 // AppConfig represents configuration for a protected application domain.
 type AppConfig struct {
-	ID                  string            `json:"id"`
-	Name                string            `json:"name"`
-	Hostnames           []string          `json:"hostnames"`
-	Mode                RunMode           `json:"mode"`
-	Upstreams           []UpstreamTarget  `json:"upstreams"`
-	ForwardingRules     []ForwardingRule  `json:"forwarding_rules,omitempty"`
-	ProxySettings       *ProxySettings    `json:"proxy_settings,omitempty"`
-	BlockStatusCode     int               `json:"block_status_code,omitempty"`
-	BlockResponseBody   string            `json:"block_response_body,omitempty"`
-	OfflineStatusCode   int               `json:"offline_status_code,omitempty"`
-	OfflineResponseBody string            `json:"offline_response_body,omitempty"`
-	CustomHeaders       map[string]string `json:"custom_headers,omitempty"`
+	ID                  string                        `json:"id"`
+	Name                string                        `json:"name"`
+	Hostnames           []string                      `json:"hostnames"`
+	Mode                RunMode                       `json:"mode"`
+	Upstreams           []UpstreamTarget              `json:"upstreams"`
+	ForwardingRules     []ForwardingRule              `json:"forwarding_rules,omitempty"`
+	ProxySettings       *ProxySettings                `json:"proxy_settings,omitempty"`
+	SemanticPolicy      map[waf.Module]waf.ModuleMode `json:"semantic_policy,omitempty"`
+	BlockStatusCode     int                           `json:"block_status_code,omitempty"`
+	BlockResponseBody   string                        `json:"block_response_body,omitempty"`
+	OfflineStatusCode   int                           `json:"offline_status_code,omitempty"`
+	OfflineResponseBody string                        `json:"offline_response_body,omitempty"`
+	CustomHeaders       map[string]string             `json:"custom_headers,omitempty"`
 }
 
 // RatePolicySnapshot holds compiled rate limiting configuration for a host or global (*).
@@ -215,14 +217,15 @@ type BotConfigSnapshot struct {
 
 // ConfigSnapshot is an immutable snapshot of gateway configurations.
 type ConfigSnapshot struct {
-	Version      uint64                `json:"version"`
-	CreatedAt    time.Time             `json:"created_at"`
-	DefaultMode  RunMode               `json:"default_mode"`
-	Apps         map[string]*AppConfig `json:"apps"`
-	Exceptions   []*acl.ExceptionRule  `json:"exceptions,omitempty"`
-	ACLRules     []*acl.ACLRule        `json:"acl_rules,omitempty"`
-	RatePolicies []*RatePolicySnapshot `json:"rate_policies,omitempty"`
-	BotConfigs   []*BotConfigSnapshot  `json:"bot_configs,omitempty"`
+	Version          uint64                        `json:"version"`
+	CreatedAt        time.Time                     `json:"created_at"`
+	DefaultMode      RunMode                       `json:"default_mode"`
+	Apps             map[string]*AppConfig         `json:"apps"`
+	Exceptions       []*acl.ExceptionRule          `json:"exceptions,omitempty"`
+	ACLRules         []*acl.ACLRule                `json:"acl_rules,omitempty"`
+	RatePolicies     []*RatePolicySnapshot         `json:"rate_policies,omitempty"`
+	BotConfigs       []*BotConfigSnapshot          `json:"bot_configs,omitempty"`
+	SemanticDefaults map[waf.Module]waf.ModuleMode `json:"semantic_defaults,omitempty"`
 
 	hostToAppID map[string]string
 }
@@ -305,6 +308,25 @@ func (s *ConfigSnapshot) GetAppForHost(host string) (*AppConfig, bool) {
 		}
 	}
 	return nil, false
+}
+
+// SemanticMatrixFor resolves the effective SemanticMatrix for an application,
+// layering per-app overrides on top of the global defaults.
+// Missing entries revert to the production defaults (Balance).
+// An empty appID resolves the global defaults alone.
+func (s *ConfigSnapshot) SemanticMatrixFor(appID string) waf.SemanticMatrix {
+	if s == nil {
+		return waf.DefaultMatrix()
+	}
+
+	base := waf.DefaultMatrix().ApplyOverrides(s.SemanticDefaults)
+	if appID == "" {
+		return base
+	}
+	if app, ok := s.Apps[appID]; ok && app != nil && len(app.SemanticPolicy) > 0 {
+		return base.ApplyOverrides(app.SemanticPolicy)
+	}
+	return base
 }
 
 // GetRatePolicyForHost resolves a RatePolicySnapshot matching the incoming Host header, or falls back to wildcard (*).

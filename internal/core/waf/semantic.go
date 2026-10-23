@@ -53,8 +53,15 @@ type SemanticEngine struct {
 	cmdChop          *ast.CMDChop
 	xssChop          *ast.XSSChop
 	exceptionMatcher ExceptionMatcher
+	matrixSource     MatrixSource
 	maxParamSize     int
 	astTimeout       time.Duration
+}
+
+// auditFinding collects the first audit-level finding across all parameters so
+// it can be surfaced as an ActionAudit verdict when no blocking rule fires.
+type auditFinding struct {
+	verdict *Verdict
 }
 
 // SetExceptionEngine dynamically updates the ExceptionMatcher.
@@ -65,6 +72,15 @@ func (s *SemanticEngine) SetExceptionEngine(matcher ExceptionMatcher) {
 // ExceptionEngine returns the active ExceptionMatcher.
 func (s *SemanticEngine) ExceptionEngine() ExceptionMatcher {
 	return s.exceptionMatcher
+}
+
+// WithMatrixSource configures the per-application semantic matrix resolver.
+func WithMatrixSource(src MatrixSource) SemanticOption {
+	return func(s *SemanticEngine) {
+		if src != nil {
+			s.matrixSource = src
+		}
+	}
 }
 
 // NewSemanticEngine creates an initialized SemanticEngine with production defaults.
@@ -90,7 +106,87 @@ func (s *SemanticEngine) Name() string {
 	return "semantic"
 }
 
-// InspectRequest coordinates Stage 1 -> Stage 2 -> Stage 3 inspection across all parameters.
+// moduleForTriage maps a lexical triage classification to its semantic module.
+func moduleForTriage(triage TriageResult) Module {
+	switch triage {
+	case TriageSuspectSQLi:
+		return ModuleSQLInj
+	case TriageSuspectXSS:
+		return ModuleXSS
+	case TriageSuspectCmdI:
+		return ModuleCmdInj
+	case TriageSuspectTraversal:
+		return ModuleFileInclude
+	default:
+		return ""
+	}
+}
+
+// lexicalRuleID returns the canonical RuleID prefix for a triage classification.
+func lexicalRuleID(triage TriageResult) string {
+	switch triage {
+	case TriageSuspectSQLi:
+		return "SEMANTIC_SQLI"
+	case TriageSuspectXSS:
+		return "SEMANTIC_XSS"
+	case TriageSuspectCmdI:
+		return "SEMANTIC_CMDI"
+	case TriageSuspectTraversal:
+		return "SEMANTIC_TRAVERSAL"
+	default:
+		return ""
+	}
+}
+
+// lexicalBlockReason builds a deterministic human-readable block reason.
+func lexicalBlockReason(triage TriageResult, details, paramName, location string) string {
+	return fmt.Sprintf("%s detected in param %q (%s): %s", triageReasonLabel(triage), paramName, location, details)
+}
+
+func triageReasonLabel(triage TriageResult) string {
+	switch triage {
+	case TriageSuspectSQLi:
+		return "SQL injection"
+	case TriageSuspectXSS:
+		return "Cross-site scripting"
+	case TriageSuspectCmdI:
+		return "Command injection"
+	case TriageSuspectTraversal:
+		return "Path traversal / LFI"
+	default:
+		return "Threat"
+	}
+}
+
+// recordAudit stores the first audit-level finding. The verdict MUST already
+// reflect its final audit form (never ActionBlock).
+func (a *auditFinding) record(v *Verdict) {
+	if a == nil || a.verdict != nil || v == nil {
+		return
+	}
+	a.verdict = v
+}
+
+// downgradeToAudit converts a would-be block verdict into an audit-record verdict.
+func downgradeToAudit(v *Verdict) *Verdict {
+	if v == nil {
+		return nil
+	}
+	down := *v
+	down.Action = ActionAudit
+	return &down
+}
+
+// excepted is a nil-safe wrapper over the exception matcher.
+func (s *SemanticEngine) excepted(host, path, method, location, paramName, ruleID string) bool {
+	if s.exceptionMatcher == nil {
+		return false
+	}
+	return s.exceptionMatcher.Matches(host, path, method, location, paramName, ruleID)
+}
+
+// InspectRequest coordinates Stage 1 -> Stage 2 -> Stage 3 inspection across all parameters,
+// gated by the per-application SemanticMatrix (Disabled/Audit/Balance/Strict per module).
 func (s *SemanticEngine) InspectRequest(ctx *RequestContext) (*Verdict, error) {
 	if ctx == nil {
 		return VerdictAllow, nil
@@ -101,13 +197,16 @@ func (s *SemanticEngine) InspectRequest(ctx *RequestContext) (*Verdict, error) {
 		reqCtx = context.Background()
 	}
 
+	// Resolve the effective per-application semantic matrix (hot path: single atomic read).
+	matrix := matrixForApp(s.matrixSource, ctx.AppID)
+
 	// Stage 1: Extract all parameters (Path, Query, Headers, JSON/Form/Multipart Body)
 	params := normalizer.ExtractParameters(ctx.Path, ctx.Query, ctx.Headers, ctx.Body)
 	if len(params) == 0 {
 		return VerdictAllow, nil
 	}
 
-	var timeoutVerdict *Verdict
+	finding := &auditFinding{}
 
 	for _, param := range params {
 		if len(param.Value) == 0 {
@@ -115,7 +214,7 @@ func (s *SemanticEngine) InspectRequest(ctx *RequestContext) (*Verdict, error) {
 		}
 
 		// Exception Gate: check if this parameter is globally exempt from all rules (*)
-		if s.exceptionMatcher != nil && s.exceptionMatcher.Matches(ctx.Host, ctx.Path, ctx.Method, string(param.Location), param.Name, "*") {
+		if s.excepted(ctx.Host, ctx.Path, ctx.Method, string(param.Location), param.Name, "*") {
 			continue
 		}
 
@@ -131,36 +230,59 @@ func (s *SemanticEngine) InspectRequest(ctx *RequestContext) (*Verdict, error) {
 			continue
 		}
 
-		// Determine candidate RuleID for this threat
-		var targetRuleID string
-		switch triage {
-		case TriageSuspectSQLi:
-			targetRuleID = "SEMANTIC_SQLI"
-		case TriageSuspectCmdI:
-			targetRuleID = "SEMANTIC_CMDI"
-		case TriageSuspectXSS:
-			targetRuleID = "SEMANTIC_XSS"
-		case TriageSuspectTraversal:
-			targetRuleID = "SEMANTIC_TRAVERSAL"
+		module := moduleForTriage(triage)
+		mode := matrix.Mode(module)
+
+		// Matrix gating: Disabled modules skip inspection entirely;
+		// Audit modules record the detection without interrupting traffic.
+		switch mode {
+		case ModeDisabled:
+			continue
+		case ModeAudit:
+			finding.record(&Verdict{
+				Action:          ActionAudit,
+				RuleID:          lexicalRuleID(triage),
+				Reason:          lexicalBlockReason(triage, details, param.Name, string(param.Location)),
+				AttackCategory:  string(module),
+				MatchedToken:    details,
+				PayloadLocation: string(param.Location),
+			})
+			continue
 		}
 
+		targetRuleID := lexicalRuleID(triage)
+
 		// Exception Gate: skip if parameter is exempt from this threat category
-		if s.exceptionMatcher != nil && targetRuleID != "" {
-			if s.exceptionMatcher.Matches(ctx.Host, ctx.Path, ctx.Method, string(param.Location), param.Name, targetRuleID) {
-				continue
-			}
+		if s.excepted(ctx.Host, ctx.Path, ctx.Method, string(param.Location), param.Name, targetRuleID) {
+			continue
 		}
 
 		// Enforce parameter size cap: if > maxParamSize, rely on Stage 2 lexical triage
 		if len(normalized) > s.maxParamSize {
 			ruleID := "LEXICAL_" + triage.String()
-			if s.exceptionMatcher != nil && s.exceptionMatcher.Matches(ctx.Host, ctx.Path, ctx.Method, string(param.Location), param.Name, ruleID) {
+			if s.excepted(ctx.Host, ctx.Path, ctx.Method, string(param.Location), param.Name, ruleID) {
 				continue
 			}
 			return &Verdict{
-				Action: ActionBlock,
-				RuleID: ruleID,
-				Reason: fmt.Sprintf("Threat detected in oversized parameter %s (%s): %s", param.Name, param.Location, details),
+				Action:          ActionBlock,
+				RuleID:          ruleID,
+				Reason:          fmt.Sprintf("Threat detected in oversized parameter %s (%s): %s", param.Name, param.Location, details),
+				AttackCategory:  string(module),
+				MatchedToken:    details,
+				PayloadLocation: string(param.Location),
+			}, nil
+		}
+
+		// Strict modules enforce lower anomaly thresholds: block directly on the
+		// lexical triage signal without waiting for bounded AST confirmation.
+		if mode == ModeStrict {
+			return &Verdict{
+				Action:          ActionBlock,
+				RuleID:          targetRuleID,
+				Reason:          lexicalBlockReason(triage, details, param.Name, string(param.Location)),
+				AttackCategory:  string(module),
+				MatchedToken:    details,
+				PayloadLocation: string(param.Location),
 			}, nil
 		}
 
@@ -168,9 +290,12 @@ func (s *SemanticEngine) InspectRequest(ctx *RequestContext) (*Verdict, error) {
 		// Path Traversal / LFI is structural & deterministic
 		if triage == TriageSuspectTraversal {
 			return &Verdict{
-				Action: ActionBlock,
-				RuleID: targetRuleID,
-				Reason: fmt.Sprintf("Path traversal / LFI attack detected (%s) in param %q (%s)", details, param.Name, param.Location),
+				Action:          ActionBlock,
+				RuleID:          targetRuleID,
+				Reason:          lexicalBlockReason(triage, details, param.Name, string(param.Location)),
+				AttackCategory:  string(module),
+				MatchedToken:    details,
+				PayloadLocation: string(param.Location),
 			}, nil
 		}
 
@@ -193,31 +318,35 @@ func (s *SemanticEngine) InspectRequest(ctx *RequestContext) (*Verdict, error) {
 
 		if astVerdict != nil {
 			if astVerdict.Action == ast.ActionBlock {
-				if s.exceptionMatcher != nil && s.exceptionMatcher.Matches(ctx.Host, ctx.Path, ctx.Method, string(param.Location), param.Name, astVerdict.RuleID) {
+				if s.excepted(ctx.Host, ctx.Path, ctx.Method, string(param.Location), param.Name, astVerdict.RuleID) {
 					continue
 				}
 				return &Verdict{
-					Action: ActionBlock,
-					RuleID: astVerdict.RuleID,
-					Reason: fmt.Sprintf("%s (param %q in %s)", astVerdict.Reason, param.Name, param.Location),
+					Action:          ActionBlock,
+					RuleID:          astVerdict.RuleID,
+					Reason:          fmt.Sprintf("%s (param %q in %s)", astVerdict.Reason, param.Name, param.Location),
+					AttackCategory:  string(module),
+					MatchedToken:    details,
+					PayloadLocation: string(param.Location),
 				}, nil
 			} else if astVerdict.Action == ast.ActionAudit {
-				if s.exceptionMatcher != nil && s.exceptionMatcher.Matches(ctx.Host, ctx.Path, ctx.Method, string(param.Location), param.Name, astVerdict.RuleID) {
+				if s.excepted(ctx.Host, ctx.Path, ctx.Method, string(param.Location), param.Name, astVerdict.RuleID) {
 					continue
 				}
-				if timeoutVerdict == nil {
-					timeoutVerdict = &Verdict{
-						Action: ActionAudit,
-						RuleID: astVerdict.RuleID,
-						Reason: fmt.Sprintf("%s (param %q in %s)", astVerdict.Reason, param.Name, param.Location),
-					}
-				}
+				finding.record(&Verdict{
+					Action:          ActionAudit,
+					RuleID:          astVerdict.RuleID,
+					Reason:          fmt.Sprintf("%s (param %q in %s)", astVerdict.Reason, param.Name, param.Location),
+					AttackCategory:  string(module),
+					MatchedToken:    details,
+					PayloadLocation: string(param.Location),
+				})
 			}
 		}
 	}
 
-	if timeoutVerdict != nil {
-		return timeoutVerdict, nil
+	if finding.verdict != nil {
+		return finding.verdict, nil
 	}
 
 	return VerdictAllow, nil

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Panharoth06/raiwall/internal/core/acl"
+	"github.com/Panharoth06/raiwall/internal/core/waf"
 )
 
 // CompileSnapshot queries relational configuration entities and compiles
@@ -171,6 +172,44 @@ func CompileSnapshot(ctx context.Context, store ControlStore) (*ConfigSnapshot, 
 		})
 	}
 
+	// 6. Load Semantic Detector Matrix (global defaults + per-app overrides)
+	dbDetectorConfig, err := store.ListDetectorConfig(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load detector config: %w", err)
+	}
+	semanticDefaults := make(map[waf.Module]waf.ModuleMode, len(dbDetectorConfig))
+	for _, cfg := range dbDetectorConfig {
+		detector := waf.Module(cfg.Module)
+		if !waf.IsValidModule(detector) {
+			return nil, fmt.Errorf("unknown semantic module %q in detector config", cfg.Module)
+		}
+		mode, modeErr := waf.ParseModuleModeString(cfg.Mode)
+		if modeErr != nil {
+			return nil, fmt.Errorf("invalid mode %q for semantic module %q: %w", cfg.Mode, cfg.Module, modeErr)
+		}
+		semanticDefaults[detector] = mode
+	}
+
+	dbAppPolicies, err := store.ListAppSemanticPolicies(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load app semantic policies: %w", err)
+	}
+	appSemOverrides := make(map[string]map[waf.Module]waf.ModuleMode, len(dbAppPolicies))
+	for _, rec := range dbAppPolicies {
+		var overrides map[waf.Module]waf.ModuleMode
+		if rec.Policy != "" {
+			if err := json.Unmarshal([]byte(rec.Policy), &overrides); err != nil {
+				return nil, fmt.Errorf("invalid semantic policy JSON for app %q: %w", rec.AppID, err)
+			}
+		}
+		for module := range overrides {
+			if !waf.IsValidModule(module) {
+				return nil, fmt.Errorf("unknown semantic module %q in policy for app %q", module, rec.AppID)
+			}
+		}
+		appSemOverrides[rec.AppID] = overrides
+	}
+
 	// Determine next version or initial version 1
 	var version uint64 = 1
 	latest, err := store.GetLatestSnapshot(ctx)
@@ -183,6 +222,14 @@ func CompileSnapshot(ctx context.Context, store ControlStore) (*ConfigSnapshot, 
 	snap.ACLRules = aclRules
 	snap.RatePolicies = ratePolicies
 	snap.BotConfigs = botConfigs
+	snap.SemanticDefaults = semanticDefaults
+
+	// Join per-app semantic overrides (matrix step runs after apps are registered).
+	for appID, overrides := range appSemOverrides {
+		if app, ok := snap.Apps[appID]; ok && app != nil {
+			app.SemanticPolicy = overrides
+		}
+	}
 
 	// Run pre-flight validation
 	if err := ValidateSnapshot(snap); err != nil {

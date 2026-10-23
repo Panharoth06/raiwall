@@ -25,6 +25,9 @@ func (s *controlStmt) Query(args []driver.Value) (driver.Rows, error) {
 	if rows, handled := s.queryPhase7(st, q, args); handled {
 		return rows, nil
 	}
+	if rows, handled := s.queryMatrix(st, q, args); handled {
+		return rows, nil
+	}
 
 	return &driverMemoryRows{}, nil
 }
