@@ -27,6 +27,8 @@ type databaseState struct {
 	detectorConfig    map[string]string
 	appSemPolicies    map[string]string
 	innerRuleDisabled map[string]time.Time
+	identityUsers     map[string]*RaiwallIdentityUser
+	identityProviders map[string]*RaiwallIdentityProvider
 	migrations        map[int]string
 	nextVersion       int64
 }
@@ -50,6 +52,8 @@ func newDatabaseState(name string) *databaseState {
 		detectorConfig:    make(map[string]string),
 		appSemPolicies:    make(map[string]string),
 		innerRuleDisabled: make(map[string]time.Time),
+		identityUsers:     make(map[string]*RaiwallIdentityUser),
+		identityProviders: make(map[string]*RaiwallIdentityProvider),
 		migrations:        make(map[int]string),
 		nextVersion:       1,
 	}
@@ -123,6 +127,14 @@ func (s *databaseState) clone() *databaseState {
 	for k, v := range s.innerRuleDisabled {
 		cp.innerRuleDisabled[k] = v
 	}
+	for k, v := range s.identityUsers {
+		userCopy := *v
+		cp.identityUsers[k] = &userCopy
+	}
+	for k, v := range s.identityProviders {
+		provCopy := *v
+		cp.identityProviders[k] = &provCopy
+	}
 	for k, v := range s.migrations {
 		cp.migrations[k] = v
 	}
@@ -153,6 +165,8 @@ func (s *databaseState) applyFrom(src *databaseState) {
 	s.detectorConfig = src.detectorConfig
 	s.appSemPolicies = src.appSemPolicies
 	s.innerRuleDisabled = src.innerRuleDisabled
+	s.identityUsers = src.identityUsers
+	s.identityProviders = src.identityProviders
 	s.migrations = src.migrations
 }
 

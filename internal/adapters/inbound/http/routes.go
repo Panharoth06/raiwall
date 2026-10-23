@@ -52,6 +52,15 @@ func (s *Server) routes() {
 			api.Put("/inner-rules/{id}", s.handleUpdateInnerRule)
 			api.Put("/inner-rules/categories/{category}", s.handleUpdateInnerRuleCategory)
 
+			// Identity Directory (end-user accounts + external IdPs)
+			api.Get("/identity/users", s.handleListIdentityUsers)
+			api.Post("/identity/users", s.handleCreateIdentityUser)
+			api.Get("/identity/users/{id}", s.handleGetIdentityUser)
+			api.Put("/identity/users/{id}", s.handleUpdateIdentityUser)
+			api.Delete("/identity/users/{id}", s.handleDeleteIdentityUser)
+			api.Post("/identity/users/{id}/password-reset", s.handleResetIdentityUserPassword)
+			api.Post("/identity/users/{id}/totp-reset", s.handleResetIdentityUserTOTP)
+
 			// Sites (Apps) CRUD
 			api.Get("/sites", s.handleListSites)
 			api.Post("/sites", s.handleCreateSite)

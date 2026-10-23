@@ -109,6 +109,14 @@ type ControlStore interface {
 	ListDisabledInnerRules(ctx context.Context) ([]string, error)
 	SetInnerRuleDisabled(ctx context.Context, ruleID string, disabled bool) error
 	ClearDisabledInnerRules(ctx context.Context) error
+	ListIdentityUsers(ctx context.Context) ([]IdentityUserRecord, error)
+	GetIdentityUserByID(ctx context.Context, id string) (IdentityUserRecord, error)
+	GetIdentityUserByUsername(ctx context.Context, username string) (IdentityUserRecord, error)
+	UpsertIdentityUser(ctx context.Context, user IdentityUserRecord) error
+	DeleteIdentityUser(ctx context.Context, id string) error
+	ListIdentityProviders(ctx context.Context) ([]IdentityProviderRecord, error)
+	UpsertIdentityProvider(ctx context.Context, provider IdentityProviderRecord) error
+	DeleteIdentityProvider(ctx context.Context, id string) error
 	DeleteDetectorConfig(ctx context.Context, module string) error
 	ListAppSemanticPolicies(ctx context.Context) ([]AppSemanticPolicyRecord, error)
 	UpsertAppSemanticPolicy(ctx context.Context, rec AppSemanticPolicyRecord) error

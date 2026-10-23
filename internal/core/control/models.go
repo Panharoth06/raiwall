@@ -190,3 +190,32 @@ type AppSemanticPolicyRecord struct {
 	Policy    string    `json:"policy"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
+
+// IdentityUserRecord is an end-user directory account (separate from admin
+// console operators): bcrypt password, optional TOTP enrollment, and the
+// list of application IDs the account may reach through the auth gateway.
+type IdentityUserRecord struct {
+	ID           string    `json:"id"`
+	Username     string    `json:"username"`
+	PasswordHash string    `json:"password_hash"`
+	Email        string    `json:"email"`
+	DisplayName  string    `json:"display_name"`
+	TOTPSecret   string    `json:"totp_secret"`
+	TOTPEnabled  int64     `json:"totp_enabled"`
+	AppIDs       string    `json:"app_ids"` // JSON array of application IDs
+	Enabled      int64     `json:"enabled"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+
+// IdentityProviderRecord stores an external identity provider connector
+// configuration (OIDC, LDAP, or GitHub OAuth2).
+type IdentityProviderRecord struct {
+	ID        string    `json:"id"`
+	Type      string    `json:"type"` // "oidc" | "ldap" | "github"
+	Name      string    `json:"name"`
+	Config    string    `json:"config"` // provider-specific JSON payload
+	Enabled   int64     `json:"enabled"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
