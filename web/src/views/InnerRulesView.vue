@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { Loader2, Search, ShieldCheck } from 'lucide-vue-next';
 
 const rules = ref<InnerRule[]>([]);
@@ -174,31 +175,30 @@ onMounted(loadRules);
     </div>
 
     <!-- Rules table -->
-    <div v-else class="overflow-y-auto border border-border rounded-lg grow min-h-0">
-      <table class="w-full text-xs" data-testid="inner-rules-table">
-        <thead class="bg-muted/40 sticky top-0">
-          <tr class="text-left text-muted-foreground">
-            <th class="px-3 py-2 font-medium w-56">Signature</th>
-            <th class="px-3 py-2 font-medium">Detection</th>
-            <th class="px-3 py-2 font-medium w-28">Category</th>
-            <th class="px-3 py-2 font-medium w-24 text-right">Enabled</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr
+    <div v-else class="grow min-h-0 overflow-y-auto rounded-lg border border-border bg-card">
+      <Table data-testid="inner-rules-table" container-class="overflow-visible">
+        <TableHeader>
+          <TableRow>
+            <TableHead class="w-56">Signature</TableHead>
+            <TableHead>Detection</TableHead>
+            <TableHead class="w-28">Category</TableHead>
+            <TableHead class="w-24 text-right">Enabled</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          <TableRow
             v-for="rule in filteredRules"
             :key="rule.id"
-            class="border-t border-border hover:bg-muted/20"
             :data-testid="`rule-row-${rule.id}`"
           >
-            <td class="px-3 py-1.5">
+            <TableCell>
               <span class="font-mono text-[11px] text-primary">{{ rule.id }}</span>
-            </td>
-            <td class="px-3 py-1.5 text-foreground">{{ rule.name }}</td>
-            <td class="px-3 py-1.5">
+            </TableCell>
+            <TableCell class="text-foreground">{{ rule.name }}</TableCell>
+            <TableCell>
               <span class="font-mono text-[10px] text-muted-foreground">{{ rule.category }} ({{ categoryLabel(rule.category) }})</span>
-            </td>
-            <td class="px-3 py-1.5 text-right">
+            </TableCell>
+            <TableCell class="text-right">
               <div class="inline-flex items-center gap-2">
                 <Loader2 v-if="pending.has(rule.id)" class="w-3 h-3 animate-spin text-muted-foreground" />
                 <Switch
@@ -207,15 +207,15 @@ onMounted(loadRules);
                   @update:checked="(v) => toggleRule(rule, v)"
                 />
               </div>
-            </td>
-          </tr>
-          <tr v-if="filteredRules.length === 0">
-            <td colspan="4" class="px-3 py-6 text-center text-muted-foreground" data-testid="rules-empty">
+            </TableCell>
+          </TableRow>
+          <TableRow v-if="filteredRules.length === 0">
+            <TableCell colspan="4" class="py-6 text-center text-muted-foreground" data-testid="rules-empty">
               No signatures match the current filter.
-            </td>
-          </tr>
-        </tbody>
-      </table>
+            </TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
     </div>
   </div>
 </template>

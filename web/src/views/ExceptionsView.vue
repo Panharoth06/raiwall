@@ -150,16 +150,16 @@ const handleDelete = async (id: string) => {
         </Button>
       </div>
 
-      <Table v-else>
-        <TableHeader class="sticky top-0 z-10 bg-muted">
+      <Table v-else container-class="overflow-visible">
+        <TableHeader>
           <TableRow>
-            <TableHead class="font-mono text-[11px]">Host / Path</TableHead>
-            <TableHead class="font-mono text-[11px]">Method</TableHead>
-            <TableHead class="font-mono text-[11px]">Location</TableHead>
-            <TableHead class="font-mono text-[11px]">Parameter Name</TableHead>
-            <TableHead class="font-mono text-[11px]">Suppressed Threat</TableHead>
-            <TableHead class="font-mono text-[11px]">Reason</TableHead>
-            <TableHead class="font-mono text-[11px] text-right">Actions</TableHead>
+            <TableHead>Host / Path</TableHead>
+            <TableHead>Method</TableHead>
+            <TableHead>Location</TableHead>
+            <TableHead>Parameter Name</TableHead>
+            <TableHead>Suppressed Threat</TableHead>
+            <TableHead>Reason</TableHead>
+            <TableHead class="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>

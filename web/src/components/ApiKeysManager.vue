@@ -117,13 +117,13 @@ const handleDeleteKey = async (id: string) => {
       </div>
 
       <Table v-else>
-        <TableHeader class="bg-muted">
+        <TableHeader>
           <TableRow>
-            <TableHead class="font-mono text-[11px]">Key Name</TableHead>
-            <TableHead class="font-mono text-[11px]">Prefix</TableHead>
-            <TableHead class="font-mono text-[11px]">Role</TableHead>
-            <TableHead class="font-mono text-[11px]">Created</TableHead>
-            <TableHead class="font-mono text-[11px] text-right">Actions</TableHead>
+            <TableHead>Key Name</TableHead>
+            <TableHead>Prefix</TableHead>
+            <TableHead>Role</TableHead>
+            <TableHead>Created</TableHead>
+            <TableHead class="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>

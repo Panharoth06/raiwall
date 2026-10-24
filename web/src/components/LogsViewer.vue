@@ -24,6 +24,7 @@ import {
   SelectContent,
   SelectItem,
 } from '@/components/ui/select';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 
 const props = withDefaults(
   defineProps<{
@@ -310,33 +311,33 @@ function getPayloadOrQuery(ev: ForensicEvent): string {
 
     <!-- Logs Table -->
     <div class="flex-1 overflow-auto">
-      <table class="w-full text-left border-collapse text-xs">
-        <thead class="sticky top-0 bg-muted/60 text-muted-foreground font-semibold border-b border-border z-10 shadow-none">
-          <tr>
-            <th class="py-2.5 px-4">Time</th>
-            <th class="py-2.5 px-4">Action</th>
-            <th class="py-2.5 px-4">Method & Path</th>
-            <th class="py-2.5 px-4">Client IP & Geo</th>
-            <th class="py-2.5 px-4">Rule / Threat</th>
-            <th class="py-2.5 px-4">Latency</th>
-            <th class="py-2.5 px-4 text-right">Actions</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-border font-mono">
-          <tr
+      <Table container-class="overflow-visible">
+        <TableHeader>
+          <TableRow>
+            <TableHead>Time</TableHead>
+            <TableHead>Action</TableHead>
+            <TableHead>Method & Path</TableHead>
+            <TableHead>Client IP & Geo</TableHead>
+            <TableHead>Rule / Threat</TableHead>
+            <TableHead>Latency</TableHead>
+            <TableHead class="text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody class="font-mono tabular-nums">
+          <TableRow
             v-for="ev in filteredLogs"
             :key="ev.event_id"
             data-testid="log-row"
-            class="hover:bg-muted/40 transition-colors group cursor-pointer"
+            class="group cursor-pointer"
             @click="openModal(ev)"
           >
             <!-- Time -->
-            <td class="py-2.5 px-4 text-muted-foreground whitespace-nowrap">
+            <TableCell class="text-muted-foreground whitespace-nowrap">
               {{ new Date(ev.timestamp).toLocaleString() }}
-            </td>
+            </TableCell>
 
             <!-- Action Badge -->
-            <td class="py-2.5 px-4 whitespace-nowrap">
+            <TableCell class="whitespace-nowrap">
               <span
                 class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide uppercase border"
                 :class="getActionBadgeClass(ev.action)"
@@ -347,37 +348,37 @@ function getPayloadOrQuery(ev: ForensicEvent): string {
                 <Ban v-else-if="ev.action === 'ban'" class="w-2.5 h-2.5" />
                 {{ ev.action }}
               </span>
-            </td>
+            </TableCell>
 
             <!-- Method & Path -->
-            <td class="py-2.5 px-4 max-w-xs truncate text-foreground">
+            <TableCell class="max-w-xs truncate text-foreground">
               <span class="font-bold text-primary mr-1.5">{{ ev.method }}</span>
               <span :title="ev.path">{{ ev.path }}</span>
-            </td>
+            </TableCell>
 
             <!-- Client IP & Geo -->
-            <td class="py-2.5 px-4 whitespace-nowrap text-foreground">
+            <TableCell class="whitespace-nowrap text-foreground">
               <span>{{ ev.client_ip }}</span>
               <span v-if="ev.geo_data?.country" class="ml-1.5 text-muted-foreground text-[11px]">
                 [{{ ev.geo_data.country }}]
               </span>
-            </td>
+            </TableCell>
 
             <!-- Rule / Threat -->
-            <td class="py-2.5 px-4 whitespace-nowrap">
+            <TableCell class="whitespace-nowrap">
               <span v-if="ev.rule_id" class="text-warning font-semibold">
                 {{ ev.rule_id }}
               </span>
               <span v-else class="text-muted-foreground">-</span>
-            </td>
+            </TableCell>
 
             <!-- Latency -->
-            <td class="py-2.5 px-4 text-muted-foreground whitespace-nowrap">
+            <TableCell class="text-muted-foreground whitespace-nowrap">
               {{ formatLatency(ev.latency) }}
-            </td>
+            </TableCell>
 
             <!-- Action Buttons -->
-            <td class="py-2.5 px-4 text-right whitespace-nowrap" @click.stop>
+            <TableCell class="text-right whitespace-nowrap" @click.stop>
               <button
                 v-if="ev.action !== 'allow'"
                 type="button"
@@ -395,27 +396,27 @@ function getPayloadOrQuery(ev: ForensicEvent): string {
               >
                 Inspect
               </button>
-            </td>
-          </tr>
+            </TableCell>
+          </TableRow>
 
           <!-- Empty State -->
-          <tr v-if="!isLoading && filteredLogs.length === 0">
-            <td colspan="7" class="py-12 text-center text-muted-foreground font-sans">
+          <TableRow v-if="!isLoading && filteredLogs.length === 0">
+            <TableCell colspan="7" class="py-12 text-center font-sans text-muted-foreground">
               <Database class="w-8 h-8 mx-auto mb-2 text-muted-foreground/60 opacity-60" />
               <p class="text-sm font-medium">No forensic logs found</p>
               <p class="text-xs text-muted-foreground/80 mt-1">Logs stored in the database matching your criteria will appear here</p>
-            </td>
-          </tr>
+            </TableCell>
+          </TableRow>
 
           <!-- Loading State -->
-          <tr v-if="isLoading && filteredLogs.length === 0">
-            <td colspan="7" class="py-12 text-center text-muted-foreground font-sans">
+          <TableRow v-if="isLoading && filteredLogs.length === 0">
+            <TableCell colspan="7" class="py-12 text-center font-sans text-muted-foreground">
               <RotateCw class="w-8 h-8 mx-auto mb-2 text-primary animate-spin opacity-80" />
               <p class="text-sm font-medium">Querying forensic logs...</p>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+            </TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
     </div>
 
     <!-- Pagination Footer -->

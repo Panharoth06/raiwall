@@ -356,13 +356,13 @@ const goToSettings = () => {
     <div class="bg-card border border-border rounded-lg overflow-hidden shadow-none">
       <Table>
         <TableHeader>
-          <TableRow class="bg-muted/40 hover:bg-muted/40 border-b border-border">
-            <TableHead class="w-52 font-semibold">IP Addr</TableHead>
-            <TableHead class="w-48 font-semibold">Application</TableHead>
-            <TableHead class="min-w-[280px] font-semibold">Detail</TableHead>
-            <TableHead class="w-24 text-center font-semibold">Blocked</TableHead>
-            <TableHead class="w-44 font-semibold">Start At</TableHead>
-            <TableHead class="w-28 text-right font-semibold">Action</TableHead>
+          <TableRow>
+            <TableHead class="w-52">IP Addr</TableHead>
+            <TableHead class="w-48">Application</TableHead>
+            <TableHead class="min-w-[280px]">Detail</TableHead>
+            <TableHead class="w-24 text-center">Blocked</TableHead>
+            <TableHead class="w-44">Start At</TableHead>
+            <TableHead class="w-28 text-right">Action</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -389,11 +389,11 @@ const goToSettings = () => {
           <TableRow
             v-for="entry in filteredBans"
             :key="entry.key"
-            class="hover:bg-muted/40 transition-colors cursor-pointer group"
+            class="group cursor-pointer"
             @click="openDetail(entry)"
           >
             <!-- 1. IP Addr + Country + JA4 -->
-            <TableCell class="align-middle py-2.5">
+            <TableCell>
               <div class="flex items-center gap-2">
                 <span class="font-mono font-medium text-foreground text-xs">
                   {{ entry.client_ip || entry.key }}
@@ -411,7 +411,7 @@ const goToSettings = () => {
             </TableCell>
 
             <!-- 2. Application -->
-            <TableCell class="align-middle py-2.5">
+            <TableCell>
               <div class="flex items-center gap-1.5">
                 <Globe class="w-3.5 h-3.5 text-primary shrink-0" />
                 <span class="font-medium text-foreground text-xs truncate max-w-[140px]">
@@ -424,7 +424,7 @@ const goToSettings = () => {
             </TableCell>
 
             <!-- 3. Detail: Reason & Action -->
-            <TableCell class="align-middle py-2.5">
+            <TableCell>
               <div class="flex items-center gap-2">
                 <span
                   class="font-medium text-[11px] px-2 py-0.5 rounded border shrink-0"
@@ -446,19 +446,19 @@ const goToSettings = () => {
             </TableCell>
 
             <!-- 4. Blocked Hits -->
-            <TableCell class="align-middle py-2.5 text-center">
+            <TableCell class="text-center">
               <span class="font-mono font-semibold text-foreground text-xs tabular-nums">
                 {{ entry.blocked_count ?? 0 }}
               </span>
             </TableCell>
 
             <!-- 5. Start At -->
-            <TableCell class="align-middle py-2.5 font-mono text-[11px] text-muted-foreground tabular-nums">
+            <TableCell class="font-mono text-[11px] text-muted-foreground tabular-nums">
               {{ formatStartAt(entry.banned_at) }}
             </TableCell>
 
             <!-- 6. Action / Status -->
-            <TableCell class="align-middle py-2.5 text-right">
+            <TableCell class="text-right">
               <div class="flex items-center justify-end gap-1.5" @click.stop>
                 <span
                   role="button"
@@ -511,7 +511,7 @@ const goToSettings = () => {
         <DialogHeader>
           <div class="flex items-center gap-2 text-destructive mb-1">
             <AlertTriangle class="h-5 w-5" />
-            <DialogTitle class="text-sm font-semibold">Emergency Unblock All Clients?</DialogTitle>
+            <DialogTitle class="text-sm">Emergency Unblock All Clients?</DialogTitle>
           </div>
           <DialogDescription class="text-xs text-muted-foreground leading-relaxed">
             This operation will immediately flush all active client bans across the local node and publish an unblock broadcast to all cluster nodes. Malicious traffic will be re-evaluated from scratch.

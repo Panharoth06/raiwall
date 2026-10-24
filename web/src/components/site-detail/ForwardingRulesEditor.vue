@@ -4,6 +4,7 @@ import { api, type ForwardingRule, type Upstream, type Site } from '@/api/client
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { Switch } from '@/components/ui/switch';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
@@ -145,40 +146,40 @@ const activeCount = computed(() => rules.value.filter((r) => r.is_active).length
       <span>No path-prefix rules — all traffic flows to the default upstream pool</span>
     </div>
 
-    <div v-else class="border border-border rounded-lg overflow-auto bg-background">
-      <table class="w-full text-xs" data-testid="fwd-table">
-        <thead class="bg-muted/50">
-          <tr class="text-left text-[10px] uppercase tracking-wider text-muted-foreground">
-            <th class="px-3 py-2 font-medium">Prefix</th>
-            <th class="px-3 py-2 font-medium">Upstream Pool</th>
-            <th class="px-3 py-2 font-medium">Strip Prefix</th>
-            <th class="px-3 py-2 font-medium">Host Override</th>
-            <th class="px-3 py-2 font-medium">State</th>
-            <th class="px-3 py-2 font-medium text-right">Actions</th>
-          </tr>
-        </thead>
-        <tbody class="font-mono tabular-nums">
-          <tr v-for="(rule, i) in rules" :key="rule.id" class="border-t border-border hover:bg-muted/40" :data-testid="`fwd-row-${i}`">
-            <td class="px-3 py-1.5 font-medium">{{ rule.prefix }}</td>
-            <td class="px-3 py-1.5 text-muted-foreground">{{ upstreamSummary(rule) }}</td>
-            <td class="px-3 py-1.5">{{ rule.strip_prefix ? 'yes' : 'no' }}</td>
-            <td class="px-3 py-1.5">{{ rule.host_header_override || '—' }}</td>
-            <td class="px-3 py-1.5">
+    <div v-else class="overflow-auto rounded-lg border border-border bg-card">
+      <Table data-testid="fwd-table" container-class="overflow-visible">
+        <TableHeader>
+          <TableRow>
+            <TableHead>Prefix</TableHead>
+            <TableHead>Upstream Pool</TableHead>
+            <TableHead>Strip Prefix</TableHead>
+            <TableHead>Host Override</TableHead>
+            <TableHead>State</TableHead>
+            <TableHead class="text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody class="font-mono tabular-nums">
+          <TableRow v-for="(rule, i) in rules" :key="rule.id" :data-testid="`fwd-row-${i}`">
+            <TableCell class="font-medium">{{ rule.prefix }}</TableCell>
+            <TableCell class="text-muted-foreground">{{ upstreamSummary(rule) }}</TableCell>
+            <TableCell>{{ rule.strip_prefix ? 'yes' : 'no' }}</TableCell>
+            <TableCell>{{ rule.host_header_override || '—' }}</TableCell>
+            <TableCell>
               <Badge :variant="rule.is_active ? 'secondary' : 'outline'" class="text-[10px]">
                 {{ rule.is_active ? 'active' : 'paused' }}
               </Badge>
-            </td>
-            <td class="px-3 py-1.5 text-right whitespace-nowrap">
+            </TableCell>
+            <TableCell class="whitespace-nowrap text-right">
               <Button variant="ghost" size="sm" class="h-6 px-1.5" :data-testid="`fwd-edit-${i}`" @click="openEdit(rule)">
                 <Pencil class="w-3.5 h-3.5" />
               </Button>
               <Button variant="ghost" size="sm" class="h-6 px-1.5 text-destructive" :data-testid="`fwd-delete-${i}`" @click="removeRule(rule)">
                 <Trash2 class="w-3.5 h-3.5" />
               </Button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+            </TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
     </div>
 
     <Dialog :open="modalOpen" @update:open="(v: boolean) => (modalOpen = v)">

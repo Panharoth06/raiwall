@@ -4,6 +4,7 @@ import { api, type APIResource } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { Loader2, Radar, Search, Trash2 } from 'lucide-vue-next';
 
 const props = defineProps<{ siteId: string }>();
@@ -90,35 +91,35 @@ const lastSeen = (r: APIResource): string => {
       <span v-else>No traffic observed yet — endpoints appear as clients hit the site</span>
     </div>
 
-    <div v-else class="border border-border rounded-lg overflow-auto bg-background max-h-96">
-      <table class="w-full text-xs font-mono tabular-nums" data-testid="inventory-table">
-        <thead class="bg-muted/50 sticky top-0 font-sans">
-          <tr class="text-left text-[10px] uppercase tracking-wider text-muted-foreground">
-            <th class="px-3 py-2 font-medium">Method</th>
-            <th class="px-3 py-2 font-medium">Path Pattern</th>
-            <th class="px-3 py-2 font-medium">Content Type</th>
-            <th class="px-3 py-2 font-medium">Hits</th>
-            <th class="px-3 py-2 font-medium">Last Seen</th>
-            <th class="px-3 py-2 font-medium text-right">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="(resource, i) in filtered" :key="resource.id" class="border-t border-border hover:bg-muted/40" :data-testid="`inventory-row-${i}`">
-            <td class="px-3 py-1.5">
+    <div v-else class="max-h-96 overflow-auto rounded-lg border border-border bg-card">
+      <Table data-testid="inventory-table" container-class="overflow-visible">
+        <TableHeader>
+          <TableRow>
+            <TableHead>Method</TableHead>
+            <TableHead>Path Pattern</TableHead>
+            <TableHead>Content Type</TableHead>
+            <TableHead>Hits</TableHead>
+            <TableHead>Last Seen</TableHead>
+            <TableHead class="text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody class="font-mono tabular-nums">
+          <TableRow v-for="(resource, i) in filtered" :key="resource.id" :data-testid="`inventory-row-${i}`">
+            <TableCell>
               <Badge :variant="methodVariant(resource.method)" class="text-[10px]">{{ resource.method }}</Badge>
-            </td>
-            <td class="px-3 py-1.5 font-medium">{{ resource.path_pattern }}</td>
-            <td class="px-3 py-1.5 max-w-32 truncate text-muted-foreground" :title="resource.content_type">{{ resource.content_type || '—' }}</td>
-            <td class="px-3 py-1.5">{{ resource.hit_count }}</td>
-            <td class="px-3 py-1.5 text-muted-foreground">{{ lastSeen(resource) }}</td>
-            <td class="px-3 py-1.5 text-right">
+            </TableCell>
+            <TableCell class="font-medium">{{ resource.path_pattern }}</TableCell>
+            <TableCell class="max-w-32 truncate text-muted-foreground" :title="resource.content_type">{{ resource.content_type || '—' }}</TableCell>
+            <TableCell>{{ resource.hit_count }}</TableCell>
+            <TableCell class="text-muted-foreground">{{ lastSeen(resource) }}</TableCell>
+            <TableCell class="text-right">
               <Button variant="ghost" size="sm" class="h-6 px-1.5 text-destructive" :data-testid="`inventory-prune-${i}`" @click="prune(resource)">
                 <Trash2 class="w-3.5 h-3.5" />
               </Button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+            </TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
     </div>
   </div>
 </template>

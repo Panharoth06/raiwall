@@ -308,12 +308,12 @@ const handleSavePolicy = (updated: PolicySettings) => {
     <div class="bg-card border border-border rounded-lg overflow-hidden shadow-none">
       <Table>
         <TableHeader>
-          <TableRow class="bg-muted/40 hover:bg-muted/40 border-b border-border">
-            <TableHead class="w-56 font-semibold py-3 pl-4">Application</TableHead>
-            <TableHead class="w-36 text-center font-semibold py-3">Active Users Allowed</TableHead>
-            <TableHead class="w-32 text-center font-semibold py-3">Users Waiting</TableHead>
-            <TableHead class="w-36 text-center font-semibold py-3">Peak Waiting Users</TableHead>
-            <TableHead class="w-40 text-center font-semibold py-3">
+          <TableRow>
+            <TableHead class="w-56">Application</TableHead>
+            <TableHead class="w-36 text-center">Active Users Allowed</TableHead>
+            <TableHead class="w-32 text-center">Users Waiting</TableHead>
+            <TableHead class="w-36 text-center">Peak Waiting Users</TableHead>
+            <TableHead class="w-40 text-center">
               <div class="inline-flex items-center justify-center gap-1">
                 <span>Average Wait Time</span>
                 <TooltipProvider>
@@ -328,9 +328,9 @@ const handleSavePolicy = (updated: PolicySettings) => {
                 </TooltipProvider>
               </div>
             </TableHead>
-            <TableHead class="w-36 text-center font-semibold py-3">Client Bounce Rate</TableHead>
-            <TableHead class="w-32 text-center font-semibold py-3">Duration</TableHead>
-            <TableHead class="w-44 text-right font-semibold py-3 pr-4">Start At</TableHead>
+            <TableHead class="w-36 text-center">Client Bounce Rate</TableHead>
+            <TableHead class="w-32 text-center">Duration</TableHead>
+            <TableHead class="w-44 text-right">Start At</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -357,10 +357,9 @@ const handleSavePolicy = (updated: PolicySettings) => {
           <TableRow
             v-for="s in filteredSessions"
             :key="s.id"
-            class="hover:bg-muted/20 border-b border-border/60 transition-colors"
           >
             <!-- Application -->
-            <TableCell class="py-3 pl-4">
+            <TableCell class="pl-4">
               <div class="flex items-center gap-3">
                 <div class="h-8 w-8 rounded-full bg-muted/60 border border-border flex items-center justify-center shrink-0">
                   <Globe class="h-4 w-4 text-primary" />
@@ -382,37 +381,37 @@ const handleSavePolicy = (updated: PolicySettings) => {
             </TableCell>
 
             <!-- Active Users Allowed -->
-            <TableCell class="text-center font-mono tabular-nums text-xs text-foreground py-3">
+            <TableCell class="text-center font-mono tabular-nums text-xs text-foreground">
               {{ s.activeAllowed }}
             </TableCell>
 
             <!-- Total Users Waiting -->
-            <TableCell class="text-center font-mono tabular-nums text-xs text-foreground py-3">
+            <TableCell class="text-center font-mono tabular-nums text-xs text-foreground">
               {{ s.totalWaiting }}
             </TableCell>
 
             <!-- Peak Waiting Users -->
-            <TableCell class="text-center font-mono tabular-nums text-xs text-foreground py-3">
+            <TableCell class="text-center font-mono tabular-nums text-xs text-foreground">
               {{ s.peakWaiting }}
             </TableCell>
 
             <!-- Average Wait Time -->
-            <TableCell class="text-center font-mono tabular-nums text-xs text-foreground py-3">
+            <TableCell class="text-center font-mono tabular-nums text-xs text-foreground">
               {{ formatDuration(s.avgWaitSeconds) }}
             </TableCell>
 
             <!-- Client Bounce Rate -->
-            <TableCell class="text-center font-mono tabular-nums text-xs text-foreground py-3">
+            <TableCell class="text-center font-mono tabular-nums text-xs text-foreground">
               {{ s.bounceRate }} %
             </TableCell>
 
             <!-- Duration -->
-            <TableCell class="text-center font-mono tabular-nums text-xs text-foreground py-3">
+            <TableCell class="text-center font-mono tabular-nums text-xs text-foreground">
               {{ formatDuration(s.durationSeconds) }}
             </TableCell>
 
             <!-- Start At -->
-            <TableCell class="text-right font-mono tabular-nums text-xs text-muted-foreground py-3 pr-4">
+            <TableCell class="text-right font-mono tabular-nums text-xs text-muted-foreground">
               {{ s.startAt }}
             </TableCell>
           </TableRow>

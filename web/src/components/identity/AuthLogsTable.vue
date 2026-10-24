@@ -4,6 +4,7 @@ import { identityApi, type IdentityAuthEvent } from '@/api/identity';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { Loader2, RefreshCw, ScrollText, Search } from 'lucide-vue-next';
 
 const events = ref<IdentityAuthEvent[]>([]);
@@ -82,35 +83,35 @@ const timeOf = (e: IdentityAuthEvent): string => {
       <span v-else>No login attempts recorded yet</span>
     </div>
 
-    <div v-else class="border border-border rounded-lg overflow-auto flex-1 bg-background">
-      <table class="w-full text-xs font-mono tabular-nums" data-testid="authlog-table">
-        <thead class="bg-muted/50 sticky top-0 font-sans">
-          <tr class="text-left text-[10px] uppercase tracking-wider text-muted-foreground">
-            <th class="px-3 py-2 font-medium">Time</th>
-            <th class="px-3 py-2 font-medium">Account</th>
-            <th class="px-3 py-2 font-medium">Site</th>
-            <th class="px-3 py-2 font-medium">Method</th>
-            <th class="px-3 py-2 font-medium">Result</th>
-            <th class="px-3 py-2 font-medium">IP</th>
-            <th class="px-3 py-2 font-medium">Country</th>
-            <th class="px-3 py-2 font-medium">Detail</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="(e, i) in filtered" :key="`${e.username}-${e.result}-${e.created_at}`" class="border-t border-border hover:bg-muted/40" :data-testid="`authlog-row-${i}`">
-            <td class="px-3 py-1.5 whitespace-nowrap text-muted-foreground">{{ timeOf(e) }}</td>
-            <td class="px-3 py-1.5">{{ e.username }}</td>
-            <td class="px-3 py-1.5">{{ e.app_id || '—' }}</td>
-            <td class="px-3 py-1.5 text-muted-foreground">{{ e.method }}</td>
-            <td class="px-3 py-1.5">
+    <div v-else class="flex-1 overflow-auto rounded-lg border border-border bg-card">
+      <Table data-testid="authlog-table" container-class="overflow-visible">
+        <TableHeader>
+          <TableRow>
+            <TableHead>Time</TableHead>
+            <TableHead>Account</TableHead>
+            <TableHead>Site</TableHead>
+            <TableHead>Method</TableHead>
+            <TableHead>Result</TableHead>
+            <TableHead>IP</TableHead>
+            <TableHead>Country</TableHead>
+            <TableHead>Detail</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody class="font-mono tabular-nums">
+          <TableRow v-for="(e, i) in filtered" :key="`${e.username}-${e.result}-${e.created_at}`" :data-testid="`authlog-row-${i}`">
+            <TableCell class="whitespace-nowrap text-muted-foreground">{{ timeOf(e) }}</TableCell>
+            <TableCell>{{ e.username }}</TableCell>
+            <TableCell>{{ e.app_id || '—' }}</TableCell>
+            <TableCell class="text-muted-foreground">{{ e.method }}</TableCell>
+            <TableCell>
               <Badge :variant="resultVariant(e.result)" class="text-[10px]">{{ e.result }}</Badge>
-            </td>
-            <td class="px-3 py-1.5">{{ e.client_ip || '—' }}</td>
-            <td class="px-3 py-1.5">{{ e.country || '—' }}</td>
-            <td class="px-3 py-1.5 max-w-56 truncate text-muted-foreground" :title="e.detail">{{ e.detail || '—' }}</td>
-          </tr>
-        </tbody>
-      </table>
+            </TableCell>
+            <TableCell>{{ e.client_ip || '—' }}</TableCell>
+            <TableCell>{{ e.country || '—' }}</TableCell>
+            <TableCell class="max-w-56 truncate text-muted-foreground" :title="e.detail">{{ e.detail || '—' }}</TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
     </div>
   </div>
 </template>

@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { api, type BanEntry } from '@/api/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import {
   Dialog,
   DialogContent,
@@ -169,7 +170,7 @@ const handleConfirmUnblockAll = async () => {
     </div>
 
     <!-- Table Container -->
-    <div class="border border-border rounded-lg bg-card overflow-hidden">
+    <div class="overflow-hidden rounded-lg border border-border bg-card">
       <!-- Loading Skeleton -->
       <div v-if="loading && bans.length === 0" class="p-8 text-center text-muted-foreground text-xs">
         <Loader2 class="h-5 w-5 animate-spin mx-auto mb-2 text-primary" />
@@ -189,52 +190,51 @@ const handleConfirmUnblockAll = async () => {
       </div>
 
       <!-- Active Bans Table -->
-      <table v-else class="w-full text-xs text-left border-collapse">
-        <thead>
-          <tr class="border-b border-border bg-muted/40 text-muted-foreground text-xs uppercase tracking-wider">
-            <th class="py-2.5 px-3 font-semibold">Target Client</th>
-            <th class="py-2.5 px-3 font-semibold">Trigger Reason</th>
-            <th class="py-2.5 px-3 font-semibold">Banned At</th>
-            <th class="py-2.5 px-3 font-semibold">Time Remaining</th>
-            <th class="py-2.5 px-3 font-semibold text-right">Actions</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-border font-sans">
-          <tr
+      <Table v-else>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Target Client</TableHead>
+            <TableHead>Trigger Reason</TableHead>
+            <TableHead>Banned At</TableHead>
+            <TableHead>Time Remaining</TableHead>
+            <TableHead class="text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody class="font-sans">
+          <TableRow
             v-for="entry in filteredBans"
             :key="entry.key"
-            class="hover:bg-muted/20 transition-colors"
           >
             <!-- Target Client (IP + JA4) -->
-            <td class="py-2.5 px-3 font-mono">
+            <TableCell class="font-mono">
               <div class="font-semibold text-foreground text-xs">
                 {{ entry.client_ip || entry.key }}
               </div>
               <div v-if="entry.ja4" class="text-xs text-muted-foreground truncate max-w-xs mt-0.5">
                 JA4: {{ entry.ja4 }}
               </div>
-            </td>
+            </TableCell>
 
             <!-- Reason -->
-            <td class="py-2.5 px-3">
+            <TableCell>
               <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-mono bg-muted text-foreground border border-border">
                 <ShieldAlert class="h-3 w-3 text-destructive" />
                 {{ entry.reason }}
               </span>
-            </td>
+            </TableCell>
 
             <!-- Banned At -->
-            <td class="py-2.5 px-3 text-muted-foreground font-mono text-xs">
+            <TableCell class="text-muted-foreground font-mono text-xs">
               {{ new Date(entry.banned_at).toLocaleTimeString() }}
-            </td>
+            </TableCell>
 
             <!-- Remaining Duration -->
-            <td class="py-2.5 px-3 font-mono font-medium tabular-nums text-foreground text-xs">
+            <TableCell class="font-mono font-medium tabular-nums text-foreground text-xs">
               {{ formatCountdown(entry.remaining_seconds) }}
-            </td>
+            </TableCell>
 
             <!-- Actions -->
-            <td class="py-2.5 px-3 text-right">
+            <TableCell class="text-right">
               <Button
                 variant="outline"
                 size="sm"
@@ -245,10 +245,10 @@ const handleConfirmUnblockAll = async () => {
                 <Loader2 v-if="pendingReleaseKey === entry.key" class="h-3 w-3 animate-spin" />
                 <span v-else>Unblock</span>
               </Button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+            </TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
     </div>
 
     <!-- Emergency Unblock All Confirmation Modal -->

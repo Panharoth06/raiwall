@@ -85,14 +85,14 @@ const handleDelete = async (id: string) => {
         </Button>
       </div>
 
-      <Table v-else>
-        <TableHeader class="sticky top-0 z-10 bg-muted">
+      <Table v-else container-class="overflow-visible">
+        <TableHeader>
           <TableRow>
-            <TableHead class="font-mono text-[11px]">Priority</TableHead>
-            <TableHead class="font-mono text-[11px]">Rule Name</TableHead>
-            <TableHead class="font-mono text-[11px]">Boolean Expression</TableHead>
-            <TableHead class="font-mono text-[11px]">Action</TableHead>
-            <TableHead class="font-mono text-[11px] text-right">Actions</TableHead>
+            <TableHead>Priority</TableHead>
+            <TableHead>Rule Name</TableHead>
+            <TableHead>Boolean Expression</TableHead>
+            <TableHead>Action</TableHead>
+            <TableHead class="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>

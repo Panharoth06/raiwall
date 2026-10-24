@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue';
 import { semanticsApi, type DetectorModule, type ModuleMode } from '@/api/semantics';
 import { Badge } from '@/components/ui/badge';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import SemanticsModeSegment from '@/components/SemanticsModeSegment.vue';
 import SemanticsAppOverrides from '@/components/SemanticsAppOverrides.vue';
 import { Activity } from 'lucide-vue-next';
@@ -67,42 +68,41 @@ onMounted(loadMatrix);
     </div>
 
     <!-- Global matrix -->
-    <div v-else class="overflow-y-auto border border-border rounded-lg shrink-0 max-h-[52%]">
-      <table class="w-full text-xs" data-testid="module-matrix">
-        <thead class="bg-muted/40 sticky top-0">
-          <tr class="text-left text-muted-foreground">
-            <th class="px-3 py-2 font-medium">Module</th>
-            <th class="px-3 py-2 font-medium w-28">Category</th>
-            <th class="px-3 py-2 font-medium">Behavior</th>
-            <th class="px-3 py-2 font-medium w-72">Mode</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr
+    <div v-else class="max-h-[52%] shrink-0 overflow-y-auto rounded-lg border border-border bg-card">
+      <Table data-testid="module-matrix" container-class="overflow-visible">
+        <TableHeader>
+          <TableRow>
+            <TableHead>Module</TableHead>
+            <TableHead class="w-28">Category</TableHead>
+            <TableHead>Behavior</TableHead>
+            <TableHead class="w-72">Mode</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          <TableRow
             v-for="module in modules"
             :key="module.module"
-            class="border-t border-border hover:bg-muted/20"
             :data-testid="`module-row-${module.module}`"
           >
-            <td class="px-3 py-2 font-mono text-[11px] font-medium text-foreground">
-              {{ module.name }}
+            <TableCell class="font-medium">
+              <span class="font-mono text-[11px] text-foreground">{{ module.name }}</span>
               <span v-if="dirtyModules.has(module.module)" class="text-warning ml-1">●</span>
-            </td>
-            <td class="px-3 py-2">
+            </TableCell>
+            <TableCell>
               <Badge variant="secondary" class="font-mono text-[10px] tracking-normal">{{ module.category }}</Badge>
-            </td>
-            <td class="px-3 py-2 text-muted-foreground max-w-md truncate" :title="module.description">
+            </TableCell>
+            <TableCell class="max-w-md truncate text-muted-foreground" :title="module.description">
               {{ module.description }}
-            </td>
-            <td class="px-3 py-2">
+            </TableCell>
+            <TableCell>
               <SemanticsModeSegment
                 :model-value="module.mode"
                 @update:model-value="(mode) => handleModeChange(module, mode as ModuleMode)"
               />
-            </td>
-          </tr>
-        </tbody>
-      </table>
+            </TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
     </div>
 
     <!-- Per-site overrides -->

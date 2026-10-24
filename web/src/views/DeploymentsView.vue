@@ -139,13 +139,13 @@ const handleRollback = async () => {
           </div>
 
           <Table v-else>
-            <TableHeader class="bg-muted">
+            <TableHeader>
               <TableRow>
-                <TableHead class="font-mono text-[11px]">Version</TableHead>
-                <TableHead class="font-mono text-[11px]">Description / Commit</TableHead>
-                <TableHead class="font-mono text-[11px]">Author</TableHead>
-                <TableHead class="font-mono text-[11px]">Applied At</TableHead>
-                <TableHead class="font-mono text-[11px] text-right">Actions</TableHead>
+                <TableHead>Version</TableHead>
+                <TableHead>Description / Commit</TableHead>
+                <TableHead>Author</TableHead>
+                <TableHead>Applied At</TableHead>
+                <TableHead class="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

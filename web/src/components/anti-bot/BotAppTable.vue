@@ -79,11 +79,11 @@ const hiddenHosts = (row: BotAppRow) => Math.max(row.hostnames.length - 2, 0);
       <Table class="min-w-[680px]">
         <TableHeader>
           <TableRow>
-            <TableHead class="font-mono text-[11px]">Application</TableHead>
-            <TableHead class="font-mono text-[11px]">Hostnames</TableHead>
-            <TableHead class="font-mono text-[11px]">BOT Protect</TableHead>
-            <TableHead class="font-mono text-[11px]">PoW difficulty</TableHead>
-            <TableHead class="font-mono text-[11px] text-right">Actions</TableHead>
+            <TableHead>Application</TableHead>
+            <TableHead>Hostnames</TableHead>
+            <TableHead>BOT Protect</TableHead>
+            <TableHead>PoW difficulty</TableHead>
+            <TableHead class="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>

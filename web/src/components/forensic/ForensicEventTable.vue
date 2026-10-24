@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { CheckCircle2, ShieldAlert, AlertTriangle, Ban, Activity } from 'lucide-vue-next';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import type { ForensicEvent } from '@/types/telemetry';
 
 /** Dense granular forensic log table for live and historical events. */
@@ -35,30 +36,30 @@ function formatLatency(durNs: number): string {
 
 <template>
   <div class="flex-1 overflow-auto">
-    <table class="w-full text-left border-collapse text-xs">
-      <thead class="sticky top-0 bg-muted/60 text-muted-foreground font-semibold border-b border-border z-10">
-        <tr>
-          <th class="py-2.5 px-4">Time</th>
-          <th class="py-2.5 px-4">Action</th>
-          <th class="py-2.5 px-4">Method &amp; Path</th>
-          <th class="py-2.5 px-4">Client IP &amp; Geo</th>
-          <th class="py-2.5 px-4">Rule / Threat</th>
-          <th class="py-2.5 px-4">Latency</th>
-          <th class="py-2.5 px-4 text-right">Actions</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-border font-mono">
-        <tr
+    <Table container-class="overflow-visible">
+      <TableHeader>
+        <TableRow>
+          <TableHead>Time</TableHead>
+          <TableHead>Action</TableHead>
+          <TableHead>Method &amp; Path</TableHead>
+          <TableHead>Client IP &amp; Geo</TableHead>
+          <TableHead>Rule / Threat</TableHead>
+          <TableHead>Latency</TableHead>
+          <TableHead class="text-right">Actions</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody class="font-mono tabular-nums">
+        <TableRow
           v-for="ev in events"
           :key="ev.event_id"
           data-testid="event-row"
-          class="hover:bg-muted/40 transition-colors cursor-pointer"
+          class="cursor-pointer"
           @click="emit('inspect', ev)"
         >
-          <td class="py-2.5 px-4 text-muted-foreground whitespace-nowrap">
+          <TableCell class="whitespace-nowrap text-muted-foreground">
             {{ new Date(ev.timestamp).toLocaleTimeString() }}
-          </td>
-          <td class="py-2.5 px-4 whitespace-nowrap">
+          </TableCell>
+          <TableCell class="whitespace-nowrap">
             <span
               class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide uppercase border"
               :class="getActionBadgeClass(ev.action)"
@@ -69,25 +70,25 @@ function formatLatency(durNs: number): string {
               <Ban v-else-if="ev.action === 'ban'" class="w-2.5 h-2.5" />
               {{ ev.action }}
             </span>
-          </td>
-          <td class="py-2.5 px-4 max-w-xs truncate text-foreground">
+          </TableCell>
+          <TableCell class="max-w-xs truncate text-foreground">
             <span class="font-bold text-primary mr-1.5">{{ ev.method }}</span>
             <span :title="ev.path">{{ ev.path }}</span>
-          </td>
-          <td class="py-2.5 px-4 whitespace-nowrap text-foreground">
+          </TableCell>
+          <TableCell class="whitespace-nowrap text-foreground">
             <span>{{ ev.client_ip }}</span>
             <span v-if="ev.geo_data?.country" class="ml-1.5 text-muted-foreground text-[11px]">
               [{{ ev.geo_data.country }}]
             </span>
-          </td>
-          <td class="py-2.5 px-4 whitespace-nowrap">
+          </TableCell>
+          <TableCell class="whitespace-nowrap">
             <span v-if="ev.rule_id" class="text-warning font-semibold">{{ ev.rule_id }}</span>
             <span v-else class="text-muted-foreground">-</span>
-          </td>
-          <td class="py-2.5 px-4 text-muted-foreground whitespace-nowrap">
+          </TableCell>
+          <TableCell class="whitespace-nowrap text-muted-foreground">
             {{ formatLatency(ev.latency) }}
-          </td>
-          <td class="py-2.5 px-4 text-right whitespace-nowrap" @click.stop>
+          </TableCell>
+          <TableCell class="whitespace-nowrap text-right" @click.stop>
             <button
               v-if="ev.action !== 'allow'"
               type="button"
@@ -105,17 +106,17 @@ function formatLatency(durNs: number): string {
             >
               Inspect
             </button>
-          </td>
-        </tr>
+          </TableCell>
+        </TableRow>
 
-        <tr v-if="events.length === 0">
-          <td colspan="7" class="py-12 text-center text-muted-foreground font-sans">
+        <TableRow v-if="events.length === 0">
+          <TableCell colspan="7" class="py-12 text-center font-sans text-muted-foreground">
             <Activity class="w-8 h-8 mx-auto mb-2 text-muted-foreground/60 opacity-60 animate-pulse" />
             <p class="text-sm font-medium">Waiting for incoming telemetry events...</p>
             <p class="text-xs text-muted-foreground/80 mt-1">Events appear automatically via server-sent events</p>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+          </TableCell>
+        </TableRow>
+      </TableBody>
+    </Table>
   </div>
 </template>

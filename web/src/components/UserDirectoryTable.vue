@@ -6,6 +6,7 @@ import UserDialog, { type UserDialogResult } from '@/components/identity/UserDia
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { KeyRound, Loader2, Plus, Search, ShieldOff, Trash2, UserRound } from 'lucide-vue-next';
 
 const users = ref<IdentityUser[]>([]);
@@ -144,34 +145,34 @@ const removeUser = async (user: IdentityUser) => {
       <span v-else>Directory is empty — add the first account</span>
     </div>
 
-    <div v-else class="border border-border rounded-lg overflow-auto flex-1 bg-background">
-      <table class="w-full text-xs" data-testid="user-table">
-        <thead class="bg-muted/50 sticky top-0">
-          <tr class="text-left text-[10px] uppercase tracking-wider text-muted-foreground">
-            <th class="px-3 py-2 font-medium">Account</th>
-            <th class="px-3 py-2 font-medium">Email</th>
-            <th class="px-3 py-2 font-medium">Apps</th>
-            <th class="px-3 py-2 font-medium">2FA</th>
-            <th class="px-3 py-2 font-medium">Enabled</th>
-            <th class="px-3 py-2 font-medium text-right">Actions</th>
-          </tr>
-        </thead>
-        <tbody class="font-mono tabular-nums">
-          <tr v-for="(u, i) in filtered" :key="u.id" class="border-t border-border hover:bg-muted/40" :data-testid="`user-row-${i}`">
-            <td class="px-3 py-1.5">
+    <div v-else class="flex-1 overflow-auto rounded-lg border border-border bg-card">
+      <Table data-testid="user-table" container-class="overflow-visible">
+        <TableHeader>
+          <TableRow>
+            <TableHead>Account</TableHead>
+            <TableHead>Email</TableHead>
+            <TableHead>Apps</TableHead>
+            <TableHead>2FA</TableHead>
+            <TableHead>Enabled</TableHead>
+            <TableHead class="text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody class="font-mono tabular-nums">
+          <TableRow v-for="(u, i) in filtered" :key="u.id" :data-testid="`user-row-${i}`">
+            <TableCell>
               <span class="font-medium font-sans">{{ u.display_name || u.username }}</span>
               <span class="ml-2 text-muted-foreground text-[10px]">{{ u.username }}</span>
-            </td>
-            <td class="px-3 py-1.5 text-muted-foreground">{{ u.email || '—' }}</td>
-            <td class="px-3 py-1.5 max-w-40 truncate" :title="u.app_ids.map(siteName).join(', ')">
+            </TableCell>
+            <TableCell class="text-muted-foreground">{{ u.email || '—' }}</TableCell>
+            <TableCell class="max-w-40 truncate" :title="u.app_ids.map(siteName).join(', ')">
               {{ u.app_ids.map(siteName).join(', ') || '—' }}
-            </td>
-            <td class="px-3 py-1.5">
+            </TableCell>
+            <TableCell>
               <Badge :variant="u.totp_enrolled ? 'secondary' : 'outline'" class="text-[10px]" :data-testid="`user-totp-${i}`">
                 {{ u.totp_enrolled ? '2FA on' : '2FA off' }}
               </Badge>
-            </td>
-            <td class="px-3 py-1.5">
+            </TableCell>
+            <TableCell>
               <button
                 :data-testid="`user-toggle-${i}`"
                 class="text-[10px] font-sans px-2 py-0.5 rounded border"
@@ -181,8 +182,8 @@ const removeUser = async (user: IdentityUser) => {
               >
                 {{ u.enabled ? 'active' : 'locked' }}
               </button>
-            </td>
-            <td class="px-3 py-1.5 text-right whitespace-nowrap">
+            </TableCell>
+            <TableCell class="text-right whitespace-nowrap">
               <Button variant="ghost" size="sm" class="h-6 px-1.5" :data-testid="`user-edit-${i}`" @click="openEdit(u)">
                 <KeyRound class="w-3.5 h-3.5" />
               </Button>
@@ -192,10 +193,10 @@ const removeUser = async (user: IdentityUser) => {
               <Button variant="ghost" size="sm" class="h-6 px-1.5 text-destructive" :data-testid="`user-delete-${i}`" :disabled="pending.has(u.id)" @click="removeUser(u)">
                 <Trash2 class="w-3.5 h-3.5" />
               </Button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+            </TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
     </div>
 
     <UserDialog

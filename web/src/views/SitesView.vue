@@ -91,14 +91,14 @@ const handleDeleteSite = async (id: string) => {
         </Button>
       </div>
 
-      <Table v-else>
-        <TableHeader class="sticky top-0 z-10 bg-muted">
+      <Table v-else container-class="overflow-visible">
+        <TableHeader>
           <TableRow>
-            <TableHead class="font-mono text-[11px]">Application Site</TableHead>
-            <TableHead class="font-mono text-[11px]">Hostnames</TableHead>
-            <TableHead class="font-mono text-[11px]">Operational Mode</TableHead>
-            <TableHead class="font-mono text-[11px]">Upstream Targets</TableHead>
-            <TableHead class="font-mono text-[11px] text-right">Actions</TableHead>
+            <TableHead>Application Site</TableHead>
+            <TableHead>Hostnames</TableHead>
+            <TableHead>Operational Mode</TableHead>
+            <TableHead>Upstream Targets</TableHead>
+            <TableHead class="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>

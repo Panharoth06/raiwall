@@ -5,6 +5,7 @@ import { semanticsApi, type DetectorModule, type ModuleMode } from '@/api/semant
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import SemanticsModeSegment from '@/components/SemanticsModeSegment.vue';
 import { FileSliders, Loader2, Save } from 'lucide-vue-next';
 
@@ -122,26 +123,32 @@ onMounted(loadSites);
       <div v-if="loading" class="h-full flex items-center justify-center text-muted-foreground">
         <Loader2 class="w-4 h-4 animate-spin" />
       </div>
-      <table v-else class="w-full text-xs" data-testid="override-table">
-        <tbody>
-          <tr
+      <Table v-else data-testid="override-table" container-class="overflow-visible">
+        <TableHeader>
+          <TableRow>
+            <TableHead>Module</TableHead>
+            <TableHead class="w-32">Global</TableHead>
+            <TableHead class="w-80">Site Override</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          <TableRow
             v-for="module in props.modules"
             :key="module.module"
-            class="border-t border-border"
             :data-testid="`override-row-${module.module}`"
           >
-            <td class="px-3 py-1.5 font-mono text-[11px] text-foreground">{{ module.name }}</td>
-            <td class="px-3 py-1.5 text-[10px] text-muted-foreground w-32">global: {{ module.mode }}</td>
-            <td class="px-3 py-1.5 w-80">
+            <TableCell class="font-mono text-[11px] text-foreground">{{ module.name }}</TableCell>
+            <TableCell class="text-[10px] text-muted-foreground">global: {{ module.mode }}</TableCell>
+            <TableCell class="w-80">
               <SemanticsModeSegment
                 inherit
                 :model-value="overrides[module.module] || 'inherit'"
                 @update:model-value="(mode) => setOverride(module.module, mode)"
               />
-            </td>
-          </tr>
-        </tbody>
-      </table>
+            </TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
     </div>
 
     <!-- Panel footer -->
