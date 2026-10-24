@@ -6,11 +6,11 @@ import {
   type InnerRuleCategory,
 } from '@/api/semantics';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
+import { SearchInput } from '@/components/ui/search-input';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
-import { Loader2, Search, ShieldCheck } from 'lucide-vue-next';
+import { Loader2, ShieldCheck } from 'lucide-vue-next';
 
 const rules = ref<InnerRule[]>([]);
 const categories = ref<InnerRuleCategory[]>([]);
@@ -108,11 +108,12 @@ onMounted(loadRules);
     <!-- Toolbar -->
     <div class="flex items-center gap-2 shrink-0 flex-wrap">
       <div class="relative">
-        <Search class="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
-        <Input
+        <SearchInput
           v-model="search"
+          clearable
           placeholder="Search rule ID or name…"
-          class="h-7 w-56 pl-7 text-xs"
+          class="w-56"
+          input-class="h-7"
           data-testid="rule-search"
         />
       </div>

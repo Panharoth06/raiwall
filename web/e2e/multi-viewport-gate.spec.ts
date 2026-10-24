@@ -97,9 +97,9 @@ for (const vp of viewports) {
     test(`incident drill-down and forensic drawer work (${vp.name})`, async ({ page }) => {
       await login(page);
       await page.goto('#/attacks');
-      await page.waitForSelector('[data-testid="view-tab-incidents"]');
+      await page.waitForSelector('[data-testid="tab-incidents"]');
 
-      await page.locator('[data-testid="view-tab-incidents"]').click();
+      await page.locator('[data-testid="tab-incidents"]').click();
       const cards = page.locator('[data-testid="incident-card"]');
       await expect(cards.first()).toBeVisible({ timeout: 10000 });
 

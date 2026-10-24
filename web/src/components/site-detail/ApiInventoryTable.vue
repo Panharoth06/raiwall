@@ -3,9 +3,9 @@ import { ref, computed, onMounted } from 'vue';
 import { api, type APIResource } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { SearchInput } from '@/components/ui/search-input';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
-import { Loader2, Radar, Search, Trash2 } from 'lucide-vue-next';
+import { Loader2, Radar, Trash2 } from 'lucide-vue-next';
 
 const props = defineProps<{ siteId: string }>();
 
@@ -65,10 +65,13 @@ const lastSeen = (r: APIResource): string => {
 <template>
   <div class="space-y-3">
     <div class="flex items-center justify-between gap-2">
-      <div class="relative flex-1 max-w-60">
-        <Search class="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
-        <Input v-model="search" placeholder="Search endpoints…" class="pl-7 text-xs" data-testid="inventory-search" />
-      </div>
+      <SearchInput
+        v-model="search"
+        clearable
+        placeholder="Search endpoints…"
+        class="flex-1 max-w-60"
+        data-testid="inventory-search"
+      />
       <span class="text-xs text-muted-foreground" data-testid="inventory-summary">
         {{ resources.length }} auto-discovered endpoints — passive traffic catalog
       </span>

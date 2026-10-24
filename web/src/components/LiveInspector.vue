@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRoute, useRouter } from '@/router';
 import { useEventStream } from '@/composables/useEventStream';
 import { telemetryApi, type IncidentQueryParams } from '@/api/telemetry';
@@ -9,10 +9,11 @@ import IncidentCardList from './forensic/IncidentCardList.vue';
 import ForensicDrawer from './forensic/ForensicDrawer.vue';
 import InspectorToolbar from './forensic/InspectorToolbar.vue';
 
-type InspectorView = 'incidents' | 'logs';
+type InspectorView = 'events' | 'incidents';
 
 const props = withDefaults(
   defineProps<{
+    view?: InspectorView;
     initialFilter?: { action?: string; rule_id?: string; country?: string };
     maxEvents?: number;
     streamComposable?: ReturnType<typeof useEventStream>;
@@ -22,11 +23,13 @@ const props = withDefaults(
     ipGroupAdder?: (groupId: string, cidr: string, comment: string) => Promise<unknown>;
   }>(),
   {
+    view: 'events',
     maxEvents: 200,
   }
 );
 
 const emit = defineEmits<{
+  (e: 'update:view', view: InspectorView): void;
   (e: 'create-exception', draft: ExceptionDraft): void;
   (e: 'add-to-ipgroup', payload: { event: ForensicEvent; groupId: string }): void;
 }>();
@@ -39,7 +42,7 @@ const stream = props.streamComposable || useEventStream(props.initialFilter, pro
 const { events, isConnected } = stream;
 
 // View + filter state
-const activeView = ref<InspectorView>('logs');
+const activeView = computed<InspectorView>(() => props.view);
 const searchQuery = ref('');
 const hostFilter = ref('');
 const selectedAction = ref<string>('all');
@@ -65,7 +68,7 @@ onMounted(() => {
   const query = route.value?.query || {};
   if (query.ip) searchQuery.value = query.ip;
   if (query.host) hostFilter.value = query.host;
-  if (query.view === 'incidents') setView('incidents');
+  if (query.view === 'incidents') emit('update:view', 'incidents');
 });
 
 onUnmounted(() => {
@@ -95,12 +98,15 @@ const filteredEvents = computed(() =>
   })
 );
 
-function setView(view: InspectorView) {
-  activeView.value = view;
-  if (view === 'incidents' && !incidentsLoaded.value) {
-    void loadIncidents();
-  }
-}
+watch(
+  () => props.view,
+  (view) => {
+    if (view === 'incidents' && !incidentsLoaded.value) {
+      void loadIncidents();
+    }
+  },
+  { immediate: true }
+);
 
 async function loadIncidents() {
   incidentsLoading.value = true;
@@ -121,7 +127,7 @@ async function loadIncidents() {
 function openIncident(incident: Incident) {
   searchQuery.value = incident.client_ip;
   hostFilter.value = incident.host;
-  activeView.value = 'logs';
+  // The route drives the parent tab bar back to the live Events view.
   const query = new URLSearchParams({
     tab: 'events',
     ip: incident.client_ip,
@@ -207,7 +213,6 @@ function handleCreateException(ev: ForensicEvent) {
       :is-connected="isConnected"
       :event-count="filteredEvents.length"
       :incident-count="incidentsTotal"
-      @update:view="setView"
       @update:search-query="searchQuery = $event"
       @update:host-filter="hostFilter = $event"
       @update:selected-action="selectedAction = $event"

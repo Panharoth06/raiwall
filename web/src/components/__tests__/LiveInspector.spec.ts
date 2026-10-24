@@ -221,18 +221,19 @@ describe('LiveInspector.vue', () => {
     },
   ];
 
-  it('switches between aggregated EVENTS and granular LOGS views', async () => {
+  it('switches between aggregated incidents and granular events views', async () => {
     await router.navigate('/attacks');
     const stream = createMockStream();
     const incidentLoader = vi.fn().mockResolvedValue({ incidents: sampleIncidents, total_count: 2 });
 
     const wrapper = mount(LiveInspector, {
-      props: { streamComposable: stream as any, incidentLoader },
+      props: { streamComposable: stream as any, incidentLoader, view: 'events' },
     });
 
     expect(wrapper.findAll('[data-testid="event-row"]').length).toBe(2);
+    expect(incidentLoader).not.toHaveBeenCalled();
 
-    await wrapper.find('[data-testid="view-tab-incidents"]').trigger('click');
+    await wrapper.setProps({ view: 'incidents' });
     await flushPromises();
 
     expect(incidentLoader).toHaveBeenCalledTimes(1);
@@ -240,23 +241,29 @@ describe('LiveInspector.vue', () => {
     expect(wrapper.text()).toContain('SQL Injection');
     expect(wrapper.text()).toContain('12 events');
 
-    await wrapper.find('[data-testid="view-tab-logs"]').trigger('click');
+    await wrapper.setProps({ view: 'events' });
     expect(wrapper.findAll('[data-testid="event-row"]').length).toBe(2);
     wrapper.unmount();
   });
 
-  it('opens granular LOGS filtered by the clicked incident and syncs URL query', async () => {
+  it('opens granular events filtered by the clicked incident and syncs URL query', async () => {
     await router.navigate('/attacks');
     const stream = createMockStream();
     const incidentLoader = vi.fn().mockResolvedValue({ incidents: sampleIncidents, total_count: 2 });
 
     const wrapper = mount(LiveInspector, {
-      props: { streamComposable: stream as any, incidentLoader },
+      props: { streamComposable: stream as any, incidentLoader, view: 'incidents' },
     });
 
-    await wrapper.find('[data-testid="view-tab-incidents"]').trigger('click');
     await flushPromises();
     await wrapper.findAll('[data-testid="incident-card"]')[0].trigger('click');
+    await flushPromises();
+
+    expect(wrapper.emitted('update:view')).toBeUndefined();
+    expect(router.current.value.query.tab).toBe('events');
+
+    // The parent tab bar drives the view; simulate it switching back to events.
+    await wrapper.setProps({ view: 'events' });
     await flushPromises();
 
     expect(wrapper.findAll('[data-testid="event-row"]').length).toBe(1);

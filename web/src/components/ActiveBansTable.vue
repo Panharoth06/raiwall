@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { api, type BanEntry } from '@/api/client';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { SearchInput } from '@/components/ui/search-input';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import {
   Dialog,
@@ -15,7 +15,6 @@ import {
 import {
   ShieldAlert,
   ShieldCheck,
-  Search,
   RefreshCw,
   AlertTriangle,
   Loader2,
@@ -124,11 +123,10 @@ const handleConfirmUnblockAll = async () => {
     <!-- Action Bar -->
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div class="relative w-72">
-        <Search class="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-        <Input
+        <SearchInput
           v-model="searchQuery"
-          placeholder="Filter by IP, JA4 or reason..."
-          class="pl-8 h-8 text-xs font-mono"
+          clearable
+          placeholder="Filter by IP, JA4 or reason…"
         />
       </div>
 

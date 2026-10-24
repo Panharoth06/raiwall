@@ -4,7 +4,7 @@ import { useRouter } from '@/router';
 import { useConfigStore } from '@/stores/config';
 import { api, type BanEntry } from '@/api/client';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { SearchInput } from '@/components/ui/search-input';
 import {
   Select,
   SelectTrigger,
@@ -269,10 +269,12 @@ const goToSettings = () => {
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div class="flex flex-wrap items-center gap-2.5 flex-1 min-w-0">
         <!-- IP Filter -->
-        <Input
+        <SearchInput
           v-model="filterIp"
-          placeholder="IP Addr"
-          class="h-9 w-48 text-xs font-sans"
+          clearable
+          placeholder="Filter by IP address"
+          class="w-48"
+          input-class="h-9"
         />
 
         <!-- Application Selector -->

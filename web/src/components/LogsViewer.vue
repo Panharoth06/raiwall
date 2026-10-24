@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
 import {
-  Search,
   ShieldAlert,
   FileCode,
   ExternalLink,
@@ -25,6 +24,7 @@ import {
   SelectItem,
 } from '@/components/ui/select';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
+import { SearchInput } from '@/components/ui/search-input';
 
 const props = withDefaults(
   defineProps<{
@@ -235,17 +235,13 @@ function getPayloadOrQuery(ev: ForensicEvent): string {
 
       <!-- Controls: Search, Action Filter, Refresh -->
       <div class="flex items-center gap-2.5">
-        <!-- Search Input -->
-        <div class="relative">
-          <Search class="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-muted-foreground" />
-          <input
-            v-model="searchQuery"
-            type="text"
-            placeholder="Filter IP, Rule, Method, Country..."
-            data-testid="logs-search-input"
-            class="w-48 sm:w-64 pl-8 pr-3 py-1.5 text-xs bg-background border border-input rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring transition-all"
-          />
-        </div>
+        <SearchInput
+          v-model="searchQuery"
+          clearable
+          placeholder="Filter IP, Rule, Method, Country…"
+          data-testid="logs-search-input"
+          class="w-48 sm:w-64"
+        />
 
         <!-- Action Filter Select -->
         <div class="relative z-30">

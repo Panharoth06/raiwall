@@ -3,9 +3,9 @@ import { ref, onMounted, computed } from 'vue';
 import { identityApi, type IdentityAuthEvent } from '@/api/identity';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { SearchInput } from '@/components/ui/search-input';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
-import { Loader2, RefreshCw, ScrollText, Search } from 'lucide-vue-next';
+import { Loader2, RefreshCw, ScrollText } from 'lucide-vue-next';
 
 const events = ref<IdentityAuthEvent[]>([]);
 const loading = ref(true);
@@ -65,10 +65,13 @@ const timeOf = (e: IdentityAuthEvent): string => {
       </Button>
     </div>
 
-    <div class="relative shrink-0">
-      <Search class="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
-      <Input v-model="search" placeholder="Filter by username, app, host, IP…" class="pl-7 text-xs" data-testid="authlog-search" />
-    </div>
+    <SearchInput
+      v-model="search"
+      clearable
+      placeholder="Filter by username, app, host, IP…"
+      class="shrink-0 max-w-sm"
+      data-testid="authlog-search"
+    />
 
     <p v-if="error" class="text-xs text-destructive shrink-0" data-testid="authlog-error">{{ error }}</p>
 

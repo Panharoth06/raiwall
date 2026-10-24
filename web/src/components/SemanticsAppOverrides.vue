@@ -3,7 +3,7 @@ import { ref, computed, onMounted } from 'vue';
 import { api, type Site } from '@/api/client';
 import { semanticsApi, type DetectorModule, type ModuleMode } from '@/api/semantics';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { SearchInput } from '@/components/ui/search-input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import SemanticsModeSegment from '@/components/SemanticsModeSegment.vue';
@@ -88,15 +88,16 @@ onMounted(loadSites);
         Per-Site Overrides
       </div>
       <div class="flex items-center gap-2">
-        <Input
+        <SearchInput
           v-model="search"
+          clearable
           placeholder="Filter sites…"
-          class="h-7 w-44 text-xs"
+          class="w-44"
           data-testid="site-filter"
         />
         <select
           v-model="selectedAppID"
-          class="h-7 text-xs font-mono bg-card border border-border rounded-md px-2 text-foreground"
+          class="h-8 text-xs font-mono bg-card border border-border rounded-md px-2 text-foreground"
           data-testid="app-selector"
           @change="selectApp(($event.target as HTMLSelectElement).value)"
         >

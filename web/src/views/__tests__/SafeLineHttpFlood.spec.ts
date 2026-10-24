@@ -92,7 +92,7 @@ describe('SafeLine HTTP Flood Workflow', () => {
       await nextTick();
       await nextTick();
 
-      const ipInput = wrapper.find('input[placeholder="IP Addr"]');
+      const ipInput = wrapper.find('input[placeholder="Filter by IP address"]');
       expect(ipInput.exists()).toBe(true);
 
       await ipInput.setValue('159.89');

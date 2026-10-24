@@ -5,9 +5,9 @@ import { api } from '@/api/client';
 import UserDialog, { type UserDialogResult } from '@/components/identity/UserDialog.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { SearchInput } from '@/components/ui/search-input';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
-import { KeyRound, Loader2, Plus, Search, ShieldOff, Trash2, UserRound } from 'lucide-vue-next';
+import { KeyRound, Loader2, Plus, ShieldOff, Trash2, UserRound } from 'lucide-vue-next';
 
 const users = ref<IdentityUser[]>([]);
 const apps = ref<{ id: string; name: string }[]>([]);
@@ -121,10 +121,13 @@ const removeUser = async (user: IdentityUser) => {
 <template>
   <div class="flex flex-col h-full space-y-3">
     <div class="flex items-center justify-between gap-2 shrink-0">
-      <div class="relative flex-1 max-w-64">
-        <Search class="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
-        <Input v-model="search" placeholder="Search users…" class="pl-7 text-xs" data-testid="user-search" />
-      </div>
+      <SearchInput
+        v-model="search"
+        clearable
+        placeholder="Search users…"
+        class="flex-1 max-w-64"
+        data-testid="user-search"
+      />
       <span class="text-xs text-muted-foreground" data-testid="user-summary">{{ users.length }} / 5000 accounts</span>
       <Button size="sm" data-testid="user-add" @click="openCreate">
         <Plus class="w-3.5 h-3.5" />
