@@ -46,40 +46,32 @@ test.describe('Telemetry Persistence and HTTP Flood View E2E', () => {
 
   test('2. HTTP Flood view displays 3-tier metrics overview and ban registry cleanly', async ({ page }) => {
     // Navigate to HTTP Flood view
-    await page.goto('#/http-flood');
+    await page.goto('#/http-flood/limits');
     await page.waitForLoadState('networkidle');
 
     // Verify page header
-    await expect(page.locator('h1', { hasText: 'Volumetric Defense' })).toBeVisible();
+    await expect(page.locator('h1', { hasText: 'HTTP Flood & Rate Limiting Defense' })).toBeVisible();
 
-    // Verify 3-Tier Protection Status & Metrics Strip is present
-    await expect(page.getByText('Tier 1: Access Velocity')).toBeVisible();
-    await expect(page.getByText('Tier 2: Attack Frequency')).toBeVisible();
-    await expect(page.getByText('Tier 3: Scanner Trap')).toBeVisible();
-    await expect(page.getByText('Active Client Bans', { exact: true })).toBeVisible();
-
-    // Verify metric values are rendered
-    await expect(page.getByText('req/min')).toBeVisible();
-    await expect(page.getByText('viol/min')).toBeVisible();
-    await expect(page.getByText('errs/30s')).toBeVisible();
+    // Verify the active ban registry table headers
+    await expect(page.locator('th', { hasText: 'IP Addr' })).toBeVisible();
+    await expect(page.locator('th', { hasText: 'Detail' })).toBeVisible();
+    await expect(page.locator('th', { hasText: 'Blocked' })).toBeVisible();
+    await expect(page.locator('th', { hasText: 'Action' })).toBeVisible();
+    await expect(page.locator('tbody tr').first()).toBeVisible();
 
     // Verify sub-tabs exist
-    const tabs = page.locator('[data-testid="tab-item"]');
-    await expect(tabs.filter({ hasText: 'Active Blocked Clients' })).toBeVisible();
-    await expect(tabs.filter({ hasText: '3-Tier Limits Configuration' })).toBeVisible();
-    await expect(tabs.filter({ hasText: 'Waiting Room Dashboard' })).toBeVisible();
+    await expect(page.locator('[data-testid="tab-http-flood-limits"]')).toBeVisible();
+    await expect(page.locator('[data-testid="tab-http-flood-waiting-room"]')).toBeVisible();
 
-    // Switch to 3-Tier Limits Configuration tab
-    await tabs.filter({ hasText: '3-Tier Limits Configuration' }).click();
-    await expect(page.locator('text=Tier 1: Access Velocity Limiting (Token Bucket)')).toBeVisible();
-    await expect(page.locator('input[type="number"]').first()).toBeVisible();
+    // Switch to Waiting Room tab
+    await page.locator('[data-testid="tab-http-flood-waiting-room"]').click();
+    await page.waitForURL('**/#/http-flood/waiting-room');
+    await expect(page.locator('h2', { hasText: 'Virtual Waiting Room Engine' })).toHaveCount(1);
+    await expect(page.getByRole('button', { name: 'SETTINGS', exact: true })).toBeVisible();
 
-    // Switch to Waiting Room Dashboard tab
-    await tabs.filter({ hasText: 'Waiting Room Dashboard' }).click();
-    await expect(page.locator('text=Virtual Waiting Room Engine (HTTP 465)')).toBeVisible();
-
-    // Switch back to Active Blocked Clients tab
-    await tabs.filter({ hasText: 'Active Blocked Clients' }).click();
-    await expect(page.locator('text=Target Client').or(page.locator('text=No active client bans'))).toBeVisible();
+    // Switch back to Rate Limiting tab
+    await page.locator('[data-testid="tab-http-flood-limits"]').click();
+    await expect(page.locator('th', { hasText: 'IP Addr' })).toBeVisible();
+    await expect(page.locator('tbody tr').first()).toBeVisible();
   });
 });

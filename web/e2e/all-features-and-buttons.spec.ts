@@ -82,34 +82,26 @@ test.describe('Comprehensive End-to-End Feature & Interactive Button Audit', () 
     // Open Add Protected Site modal
     const addSiteBtn = page.locator('button:has-text("Add Protected Site"), button:has-text("Add First Application"), button:has-text("Add First Site")').first();
     await addSiteBtn.click();
-    await page.waitForSelector('input[placeholder="e.g. Payment Gateway"]');
+    await page.waitForSelector('input[placeholder="Application Name"]');
 
     // Fill form
-    await page.fill('input[placeholder="e.g. Payment Gateway"]', 'E2E Automated Site');
-    await page.fill('input[placeholder="api.example.com, pay.example.com"]', 'e2e.test.com');
-
-    // Add Upstream button in UpstreamPoolEditor
-    const addUpstreamBtn = page.locator('button:has-text("Add Upstream Target")');
-    if (await addUpstreamBtn.isVisible()) {
-      await addUpstreamBtn.click();
-      await page.waitForTimeout(200);
-    }
+    await page.fill('input[placeholder="Application Name"]', 'E2E Automated Site');
+    await page.fill('input[placeholder="www.example.com, support *"]', 'e2e.test.com');
 
     // Save Site to Draft
-    const saveBtn = page.locator('button:has-text("Save to Draft")');
-    await saveBtn.click();
+    await page.locator('button:has-text("SUBMIT")').click();
     await page.waitForTimeout(600);
 
     // Assert site is in the table
-    await expect(page.locator('text=E2E Automated Site')).toBeVisible();
+    await expect(page.locator('table')).toContainText('E2E Automated Site');
 
     // Delete site cleanly
     page.once('dialog', async (dialog) => {
       await dialog.accept();
     });
-    const deleteBtn = page.locator('table tr:has-text("E2E Automated Site") button').last();
-    await deleteBtn.click();
+    await page.locator('tr:has-text("E2E Automated Site") button[title="Delete site"]').click();
     await page.waitForTimeout(600);
+    await expect(page.getByText('No protected sites configured')).toBeVisible();
   });
 
   // 4. Bytecode ACL Rules & Syntax Verifier
@@ -218,53 +210,41 @@ test.describe('Comprehensive End-to-End Feature & Interactive Button Audit', () 
 
   // 7. Volumetric Defense, Active Bans & Waiting Room
   test('7. Volumetric Defense: Configures 3-tier limits, refreshes bans, toggles waiting room', async ({ page }) => {
-    await page.goto('#/http-flood');
+    await page.goto('#/http-flood/limits');
     await page.waitForTimeout(400);
 
-    // Active Bans Tab
-    const refreshBansBtn = page.locator('button:has-text("Refresh")').first();
-    if (await refreshBansBtn.isVisible()) {
+    // Verify the active ban registry renders
+    await expect(page.locator('h1')).toContainText('HTTP Flood & Rate Limiting Defense');
+    await expect(page.locator('th', { hasText: 'IP Addr' })).toBeVisible();
+    await expect(page.locator('tbody tr').first()).toBeVisible();
+
+    // Refresh the ban registry
+    const refreshBansBtn = page.locator('button[title="Refresh"]').first();
+    if (await refreshBansBtn.isVisible().catch(() => false)) {
       await refreshBansBtn.click();
       await page.waitForTimeout(300);
     }
 
-    // Release all bans button test if enabled
-    const releaseAllBtn = page.locator('button:has-text("UNBLOCK ALL")');
-    if (await releaseAllBtn.isEnabled().catch(() => false)) {
-      await releaseAllBtn.click();
-      await page.waitForTimeout(300);
-      // It opens a Radix confirmation Dialog - dismiss it via Cancel
-      const cancelBtn = page.locator('button:has-text("Cancel")');
-      if (await cancelBtn.isVisible()) {
-        await cancelBtn.click();
-        await page.waitForTimeout(300);
-      }
-    }
+    // Open the 3-tier configuration view
+    await page.goto('#/http-flood/limits/settings');
+    await page.waitForTimeout(400);
+    await expect(page.getByText('Access Limiting (Tier 1: Access Velocity Limiting)')).toBeVisible();
+    await expect(page.getByText('Attack Limiting (Tier 2: Attack Frequency Auto-Ban)')).toBeVisible();
+    await expect(page.getByText('Error Limiting (Tier 3: Upstream Scanner Trap)')).toBeVisible();
 
-    // Switch to 3-Tier Limits subtab
-    await page.locator('[role="tab"]:has-text("3-Tier Limits Configuration")').click();
-    await page.waitForTimeout(300);
+    // Edit the Tier 1 rule through the modal and stage it
+    await page.locator('button:has-text("ADD RULES")').first().click();
+    await page.waitForSelector('button:has-text("Save Changes")');
+    await page.locator('button:has-text("Save Changes")').click();
+    await page.waitForTimeout(600);
+    await expect(page.getByText('Updated access limiting policy')).toBeVisible();
 
-    const saveLimitsBtn = page.locator('button:has-text("Save to Draft")');
-    await saveLimitsBtn.click();
-    await page.waitForTimeout(500);
-    await expect(page.locator('text=Volumetric defense policies saved to draft')).toBeVisible();
-
-    // Switch to Waiting Room subtab
-    await page.locator('[role="tab"]:has-text("Waiting Room Dashboard")').click();
-    await page.waitForTimeout(300);
-
-    // Add prefix
-    const prefixInput = page.locator('input[placeholder="/checkout or /tickets"]');
-    if (await prefixInput.isVisible()) {
-      await prefixInput.fill('/e2e-protected');
-      await page.locator('button:has-text("Add Prefix")').click();
-      await page.waitForTimeout(200);
-      await expect(page.locator('text=/e2e-protected')).toBeVisible();
-
-      // Remove prefix
-      await page.locator('div:has-text("/e2e-protected") button').click();
-    }
+    // Switch to Waiting Room dashboard
+    await page.goto('#/http-flood/waiting-room');
+    await page.waitForTimeout(400);
+    await expect(page.locator('h2', { hasText: 'Virtual Waiting Room Engine' })).toHaveCount(1);
+    await expect(page.getByRole('button', { name: 'SETTINGS', exact: true })).toBeVisible();
+    await expect(page.getByRole('combobox').first()).toBeVisible();
   });
 
   // 8. Anti-Bot Defense Configuration

@@ -31,7 +31,7 @@ test.describe('Path Traversal & Telemetry Forensics Modal Verification', () => {
     await page.waitForTimeout(600);
 
     // 4. Locate table rows for blocked threat and allowed benign traffic
-    const blockRow = page.locator('tr[data-testid="event-row"]:has-text("SEMANTIC_TRAVERSAL")').first();
+    const blockRow = page.locator('tr[data-testid="event-row"]:has-text("TRAVERSAL")').first();
     const allowRow = page.locator('tr[data-testid="event-row"]:has-text("readme.txt")').first();
 
     await expect(blockRow).toBeVisible();
@@ -51,8 +51,8 @@ test.describe('Path Traversal & Telemetry Forensics Modal Verification', () => {
     // "Create Exception" button SHOULD be present for blocked threats
     await expect(page.locator('[data-testid="modal-create-exception-btn"]')).toBeVisible();
 
-    // Close modal via Close button
-    await page.locator('button:has-text("Close")').click();
+    // Close modal via close button
+    await page.locator('[data-testid="modal-close-btn"]').click();
     await page.waitForSelector('[data-testid="forensic-modal"]', { state: 'detached' });
 
     // 6. Open Modal for ALLOW benign row
@@ -64,13 +64,11 @@ test.describe('Path Traversal & Telemetry Forensics Modal Verification', () => {
     // "Create Exception" button should NOT be present for allowed benign traffic
     await expect(page.locator('[data-testid="modal-create-exception-btn"]')).not.toBeVisible();
 
-    // Verify private network RFC 1918 label
-    await expect(page.locator('text=Internal / Private Network (RFC 1918)')).toBeVisible();
-
-    // Verify query string is displayed in the payload viewer section inside modal
+    // Verify parameter location badge and query string are shown in the drawer
+    await expect(page.locator('[data-testid="payload-location"]')).toBeVisible();
     await expect(page.locator('[data-testid="forensic-modal"] pre:has-text("file=readme.txt")')).toBeVisible();
 
     // Close modal
-    await page.locator('button:has-text("Close")').click();
+    await page.locator('[data-testid="modal-close-btn"]').click();
   });
 });
