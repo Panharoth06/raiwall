@@ -69,9 +69,9 @@ func (s *telemetryDriverStmt) filterRows(args []driver.Value) []*telemetryDBRow 
 	argIdx := 0
 
 	var (
-		startTime, endTime                time.Time
-		clientIP, action, ruleID, country string
-		severity, eventID                 string
+		startTime, endTime             time.Time
+		clientIP, host, action, ruleID string
+		country, severity, eventID     string
 	)
 
 	for _, cond := range conditions {
@@ -93,6 +93,9 @@ func (s *telemetryDriverStmt) filterRows(args []driver.Value) []*telemetryDBRow 
 			argIdx++
 		} else if strings.Contains(c, "client_ip =") && argIdx < len(args) {
 			clientIP = fmt.Sprint(args[argIdx])
+			argIdx++
+		} else if strings.Contains(c, "host =") && argIdx < len(args) {
+			host = fmt.Sprint(args[argIdx])
 			argIdx++
 		} else if strings.Contains(c, "action =") && argIdx < len(args) {
 			action = fmt.Sprint(args[argIdx])
@@ -120,6 +123,9 @@ func (s *telemetryDriverStmt) filterRows(args []driver.Value) []*telemetryDBRow 
 			continue
 		}
 		if clientIP != "" && r.ClientIP != clientIP {
+			continue
+		}
+		if host != "" && r.Host != host {
 			continue
 		}
 		if action != "" && r.Action != action {

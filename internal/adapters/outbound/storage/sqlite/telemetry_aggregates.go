@@ -183,7 +183,11 @@ func (s *TelemetryStore) GetAggregatedIncidents(ctx context.Context, params tele
 			MAX(timestamp) as max_ts,
 			COUNT(*) as total_events,
 			SUM(CASE WHEN action IN ('block', 'ban') THEN 1 ELSE 0 END) as total_blocked,
-			MAX(severity) as max_severity,
+			CASE MAX(CASE severity
+				WHEN 'critical' THEN 5 WHEN 'high' THEN 4 WHEN 'medium' THEN 3
+				WHEN 'low' THEN 2 WHEN 'info' THEN 1 ELSE 0 END)
+				WHEN 5 THEN 'critical' WHEN 4 THEN 'high' WHEN 3 THEN 'medium'
+				WHEN 2 THEN 'low' WHEN 1 THEN 'info' ELSE '' END as max_severity,
 			MAX(rule_id) as top_rule,
 			COALESCE(MAX(attack_category), '') as category,
 			COALESCE(MAX(country), '') as country

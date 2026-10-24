@@ -13,6 +13,13 @@ func (s *telemetryDriverStmt) Query(args []driver.Value) (driver.Rows, error) {
 
 	q := s.query
 
+	if isIncidentQuery(q) {
+		if strings.Contains(q, "SELECT COUNT(*)") {
+			return s.countIncidentGroups(args), nil
+		}
+		return s.queryIncidentGroups(args), nil
+	}
+
 	if strings.Contains(q, "SELECT COUNT(*)") && !strings.Contains(q, "COALESCE") {
 		filtered := s.filterRows(args)
 		return &telemetrySimpleRows{
@@ -206,4 +213,3 @@ func (s *telemetryDriverStmt) Query(args []driver.Value) (driver.Rows, error) {
 
 	return &telemetrySimpleRows{columns: cols, rows: rows}, nil
 }
-

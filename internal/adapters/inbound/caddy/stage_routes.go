@@ -12,21 +12,9 @@ import (
 // Returns true if the request was handled internally and requires no further processing.
 func (m *Middleware) serveInternalRoutes(w http.ResponseWriter, r *http.Request) bool {
 	// Internal WAF routes: Metrics & Telemetry API
-	if r.URL.Path == "/.raiwall/metrics" ||
-		r.URL.Path == "/metrics" ||
-		r.URL.Path == "/.raiwall/api/events" ||
-		r.URL.Path == "/.raiwall/api/events/stats" ||
-		r.URL.Path == "/.raiwall/api/events/stream" ||
-		r.URL.Path == "/api/v1/telemetry/events" ||
-		r.URL.Path == "/api/v1/telemetry/events/stats" ||
-		r.URL.Path == "/api/v1/telemetry/events/stream" ||
-		r.URL.Path == "/.raiwall/api/v1/telemetry/events" ||
-		r.URL.Path == "/.raiwall/api/v1/telemetry/events/stats" ||
-		r.URL.Path == "/.raiwall/api/v1/telemetry/events/stream" {
-		if m.telemetryAPI != nil {
-			m.telemetryAPI.ServeHTTP(w, r)
-			return true
-		}
+	if m.telemetryAPI != nil && isTelemetryPath(r.URL.Path) {
+		m.telemetryAPI.ServeHTTP(w, r)
+		return true
 	}
 
 	// Internal WAF routes: Control Plane REST API, OpenAPI Docs & MCP
@@ -48,4 +36,22 @@ func (m *Middleware) serveInternalRoutes(w http.ResponseWriter, r *http.Request)
 	}
 
 	return false
+}
+
+// isTelemetryPath reports whether a request targets the telemetry/metrics API surface.
+func isTelemetryPath(p string) bool {
+	switch p {
+	case "/.raiwall/metrics", "/metrics",
+		"/.raiwall/api/events", "/api/v1/telemetry/events", "/.raiwall/api/v1/telemetry/events",
+		"/.raiwall/api/events/stats", "/api/v1/telemetry/events/stats", "/.raiwall/api/v1/telemetry/events/stats",
+		"/.raiwall/api/events/stream", "/api/v1/telemetry/events/stream", "/.raiwall/api/v1/telemetry/events/stream",
+		"/.raiwall/api/incidents", "/api/v1/telemetry/incidents", "/.raiwall/api/v1/telemetry/incidents":
+		return true
+	}
+	if !strings.HasSuffix(p, "/curl") {
+		return false
+	}
+	return strings.HasPrefix(p, "/.raiwall/api/events/") ||
+		strings.HasPrefix(p, "/api/v1/telemetry/events/") ||
+		strings.HasPrefix(p, "/.raiwall/api/v1/telemetry/events/")
 }
