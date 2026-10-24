@@ -193,7 +193,7 @@ func TestEndToEndEnterpriseSuite(t *testing.T) {
 
 		err := f.mw.ServeHTTP(recUnauth, reqUnauth, f.defaultNext)
 		require.NoError(t, err)
-		assert.True(t, recUnauth.Code == http.StatusFound || recUnauth.Code == http.StatusUnauthorized)
+		assert.True(t, recUnauth.Code == auth.ChallengeStatusCode || recUnauth.Code == http.StatusUnauthorized)
 
 		// Authenticated request with session cookie succeeds and passes identity
 		cookie, err := f.sessionMgr.CreateSessionCookie(&auth.UserIdentity{

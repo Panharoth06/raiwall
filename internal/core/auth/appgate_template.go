@@ -5,15 +5,27 @@ import (
 	"strings"
 )
 
+// SSOButton describes one external provider link on the portal.
+type SSOButton struct {
+	Name  string
+	Label string
+}
+
+// ssoButton is the template-facing alias for SSOButton.
+type ssoButton = SSOButton
+
 // challengeTemplateData drives the zero-trust HTTP 467 login portal.
 type challengeTemplateData struct {
-	AppID      string
-	Host       string
-	Target     string
-	ClientIP   string
-	ErrorMsg   string
-	LoginPath  string
-	TOTPNeeded bool
+	AppID        string
+	Host         string
+	Target       string
+	ClientIP     string
+	ErrorMsg     string
+	LoginPath    string
+	SSOPath      string
+	SSOProviders []ssoButton
+	HasPassword  bool
+	TOTPNeeded   bool
 }
 
 // renderChallengeTemplate streams the zero-CDN dark-mode pre-app auth portal.
@@ -64,6 +76,13 @@ func renderChallengeTemplate(d challengeTemplateData) string {
     border-radius: 6px; padding: 10px; font-size: 14px; font-weight: 600; cursor: pointer;
   }
   button:hover { background: #388bfd; }
+  button.sso { background: #21262d; border: 1px solid #30363d; margin-top: 10px; }
+  button.sso:hover { background: #30363d; }
+  .divider {
+    display: flex; align-items: center; gap: 10px; margin-top: 20px;
+    font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #6e7681;
+  }
+  .divider::before, .divider::after { content: ""; flex: 1; border-top: 1px solid #30363d; }
   .error-banner {
     background: rgba(248,81,73,0.12); border: 1px solid rgba(248,81,73,0.4);
     color: #f85149; border-radius: 6px; padding: 9px 11px; font-size: 13px; margin-top: 16px;
@@ -79,8 +98,18 @@ func renderChallengeTemplate(d challengeTemplateData) string {
     <span class="code-badge">HTTP 467</span>
   </div>
   <h1>Authentication required</h1>
-  <p class="meta">Host <code>` + d.Host + `</code> requires verified credentials.<br>
-     Challenge applies to site <code>` + d.AppID + `</code> · client ` + d.ClientIP + `.</p>
+  <p class="meta">Host <code>` + d.Host + `</code> requires verified credentials.`)
+	if d.AppID != "" {
+		b.WriteString(`<br>
+     Challenge applies to site <code>` + d.AppID + `</code> · client ` + d.ClientIP + `.`)
+	} else {
+		b.WriteString(`<br>
+     Client ` + d.ClientIP + `.`)
+	}
+	b.WriteString(`</p>`)
+
+	if d.HasPassword {
+		b.WriteString(`
   <form method="POST" action="` + d.LoginPath + `">
     <input type="hidden" name="redirect" value="` + d.Target + `">
     <label for="username">Username</label>
@@ -92,6 +121,21 @@ func renderChallengeTemplate(d challengeTemplateData) string {
            placeholder="6-digit code · skip if not enrolled" maxlength="8">
     <button type="submit">Verify and continue</button>
   </form>`)
+	}
+
+	if len(d.SSOProviders) > 0 {
+		b.WriteString(`
+  <div class="divider"><span>or continue with</span></div>`)
+		for _, provider := range d.SSOProviders {
+			b.WriteString(`
+  <form method="POST" action="` + d.SSOPath + `">
+    <input type="hidden" name="provider" value="` + provider.Name + `">
+    <input type="hidden" name="redirect" value="` + d.Target + `">
+    <button class="sso" type="submit">Continue with ` + provider.Label + `</button>
+  </form>`)
+		}
+	}
+
 	if d.ErrorMsg != "" {
 		b.WriteString(fmt.Sprintf("\n  <div class=\"error-banner\">%s</div>", d.ErrorMsg))
 	}

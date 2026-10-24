@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Panharoth06/raiwall/internal/core/auth"
 	"github.com/Panharoth06/raiwall/internal/core/bot"
 	"github.com/Panharoth06/raiwall/internal/core/control"
 	"github.com/Panharoth06/raiwall/internal/core/telemetry"
@@ -59,6 +60,12 @@ func (m *Middleware) handleChallengeVerify(w http.ResponseWriter, r *http.Reques
 func (m *Middleware) evaluateBotMitigation(w http.ResponseWriter, r *http.Request, clientIP net.IP, ja4 string, currentMode control.RunMode, startTime time.Time) (bool, error) {
 	botDefenseMode := strings.ToLower(m.BotDefense)
 	if botDefenseMode == "" || botDefenseMode == "off" || botDefenseMode == "disabled" {
+		return false, nil
+	}
+
+	// The identity portal (login, SSO callback, logout) must never be gated by
+	// an interactive PoW challenge: bots and humans both need to reach it.
+	if auth.IsAppAuthEndpoint(r.URL.Path) {
 		return false, nil
 	}
 

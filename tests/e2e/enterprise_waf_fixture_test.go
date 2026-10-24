@@ -35,7 +35,7 @@ type enterpriseTestFixture struct {
 	banManager  *rate.BanManager
 	waitingRoom *rate.WaitingRoomManager
 	ipGroupMgr  *acl.IPGroupManager
-	authGateway *auth.AuthGateway
+	authGateway *auth.AppAuthGate
 	sessionMgr  *auth.SessionManager
 	defaultNext *e2eNextHandler
 }
@@ -98,19 +98,13 @@ func setupEnterpriseFixture(t *testing.T) *enterpriseTestFixture {
 	ipMgr := acl.NewIPGroupManager(acl.NewBARTTable())
 	mw.SetIPGroupManager(ipMgr)
 
-	sessMgr := auth.NewSessionManager(auth.SessionConfig{
-		Secret:     []byte("e2e-enterprise-auth-cookie-secret-32b"),
-		CookieName: "sl_jwt_session",
-		TTL:        24 * time.Hour,
-	})
-	authGw := auth.NewAuthGateway(auth.GatewayConfig{
-		SessionMgr: sessMgr,
-		BypassPaths: []string{
+	authGate := auth.NewAppAuthGate("e2e-enterprise-auth-cookie-secret-32b", nil, nil,
+		auth.WithBypassPaths(
 			"/catalog*", "/search*", "/exec*", "/files*", "/admin*", "/.git*",
 			"/api/*", "/public*", "/queue-target*", "/healthz*", "/submit*",
-		},
-	})
-	mw.SetAuthGateway(authGw)
+		),
+	)
+	mw.SetGlobalAuthGate(authGate)
 
 	return &enterpriseTestFixture{
 		mw:          mw,
@@ -119,8 +113,8 @@ func setupEnterpriseFixture(t *testing.T) *enterpriseTestFixture {
 		banManager:  banMgr,
 		waitingRoom: wm,
 		ipGroupMgr:  ipMgr,
-		authGateway: authGw,
-		sessionMgr:  sessMgr,
+		authGateway: authGate,
+		sessionMgr:  authGate.SessionManager(),
 		defaultNext: &e2eNextHandler{handler: backendMux},
 	}
 }

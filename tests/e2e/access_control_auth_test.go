@@ -17,19 +17,18 @@ import (
 func TestEndToEndAccessControl_AuthAndSessions(t *testing.T) {
 	f := setupAccessControlFixture(t)
 
-	// Scenario 5: Pre-Application Auth Gateway Redirection & 401
-	t.Run("Pre-App Auth Redirection & API 401", func(t *testing.T) {
+	// Scenario 5: Pre-Application Auth Gateway (HTTP 467 portal) & API 401
+	t.Run("Pre-App Auth Portal & API 401", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "http://example.com/private/dashboard", nil)
 		rec := httptest.NewRecorder()
 		if err := f.mw.ServeHTTP(rec, req, f.next); err != nil {
 			t.Fatalf("ServeHTTP error: %v", err)
 		}
-		if rec.Code != http.StatusFound {
-			t.Errorf("expected browser redirect (302), got %d", rec.Code)
+		if rec.Code != auth.ChallengeStatusCode {
+			t.Errorf("expected browser HTTP 467 portal, got %d", rec.Code)
 		}
-		loc := rec.Header().Get("Location")
-		if !strings.HasPrefix(loc, "/.raiwall/auth/login") {
-			t.Errorf("expected redirect to /.raiwall/auth/login, got %q", loc)
+		if !strings.Contains(rec.Body.String(), auth.AppAuthLoginPath) {
+			t.Errorf("expected portal form to target %s, got body %q", auth.AppAuthLoginPath, rec.Body.String())
 		}
 
 		req2 := httptest.NewRequest(http.MethodGet, "http://example.com/api/private/metrics", nil)

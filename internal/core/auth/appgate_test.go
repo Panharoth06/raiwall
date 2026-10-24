@@ -320,3 +320,152 @@ func TestChallengeTemplateForm(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, string(raw), AppAuthLoginPath)
 }
+
+// TestAppAuthGate_SimpleUserLogin proves Caddyfile-style local users share the
+// same portal and clearance cookie as directory users.
+func TestAppAuthGate_SimpleUserLogin(t *testing.T) {
+	simple := NewSimpleAuth(SimpleUser{
+		Username:     "legacy",
+		PasswordHash: "legacy-pass",
+		Email:        "legacy@corp.example",
+		Roles:        []string{"ops"},
+	})
+	gate := NewAppAuthGate("0123456789abcdef0123456789abcdef",
+		nil, nil, WithSimpleAuth(simple))
+
+	form := url.Values{"username": {"legacy"}, "password": {"legacy-pass"}, "redirect": {"/portal"}}
+	req := httptest.NewRequest(http.MethodPost, "http://app.example.com"+AppAuthLoginPath, strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	gate.HandleLogin(rec, req, "", "203.0.113.7", "US")
+
+	require.Equal(t, http.StatusFound, rec.Code, rec.Body.String())
+	require.Equal(t, "/portal", rec.Header().Get("Location"))
+	cookies := rec.Result().Cookies()
+	require.Len(t, cookies, 1)
+	require.Equal(t, AppAuthCookieName, cookies[0].Name)
+
+	cleared := httptest.NewRequest(http.MethodGet, "http://app.example.com/portal", nil)
+	cleared.AddCookie(cookies[0])
+	identity := gate.Claims(cleared)
+	require.NotNil(t, identity)
+	require.Equal(t, "legacy", identity.Subject)
+	require.Equal(t, "legacy@corp.example", cleared.Header.Get(HeaderAuthEmail))
+}
+
+// TestAppAuthGate_GlobalModeAllowsDirectoryUserWithoutAppBinding proves the
+// portal-wide mode skips per-app membership checks.
+func TestAppAuthGate_GlobalModeAllowsDirectoryUserWithoutAppBinding(t *testing.T) {
+	hash, err := HashPassword("GlobalPass123!")
+	require.NoError(t, err)
+	store := &fakeGateStore{users: map[string]*AppLoginUser{
+		"global": {Username: "global", PasswordHash: hash, Enabled: true},
+	}}
+	gate := NewAppAuthGate("0123456789abcdef0123456789abcdef", store, nil)
+
+	form := url.Values{"username": {"global"}, "password": {"GlobalPass123!"}, "redirect": {"/"}}
+	req := httptest.NewRequest(http.MethodPost, "http://portal.example.com"+AppAuthLoginPath, strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	gate.HandleLogin(rec, req, "", "", "")
+
+	require.Equal(t, http.StatusFound, rec.Code, rec.Body.String())
+}
+
+// TestPathBypassed_SiblingPrefixSecurity prevents prefix-adjacent bypasses.
+func TestPathBypassed_SiblingPrefixSecurity(t *testing.T) {
+	bypass := []string{"/public/*", "/healthz"}
+	allowed := []string{"/public", "/public/", "/public/resource", "/healthz"}
+	for _, path := range allowed {
+		require.True(t, PathBypassed(path, bypass), "expected %q to bypass", path)
+	}
+	denied := []string{"/public-admin", "/publicity", "/public_secrets", "/healthz-extended"}
+	for _, path := range denied {
+		require.False(t, PathBypassed(path, bypass), "SECURITY: %q must not bypass", path)
+	}
+}
+
+// TestAppAuthGate_OpenRedirectProtection keeps external redirect targets out.
+func TestAppAuthGate_OpenRedirectProtection(t *testing.T) {
+	simple := NewSimpleAuth(SimpleUser{Username: "alice", PasswordHash: "secretpass"})
+	gate := NewAppAuthGate("0123456789abcdef0123456789abcdef",
+		nil, nil, WithSimpleAuth(simple))
+
+	targets := []string{
+		"javascript:alert(1)",
+		"//evil.com/phish",
+		"/\\evil.com/phish",
+		"\\evil.com",
+		"http://evil.com",
+		"https://evil.com",
+		"data:text/html,<script>alert(1)</script>",
+	}
+	for _, target := range targets {
+		form := url.Values{"username": {"alice"}, "password": {"secretpass"}, "redirect": {target}}
+		req := httptest.NewRequest(http.MethodPost, "http://app.example.com"+AppAuthLoginPath, strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		rec := httptest.NewRecorder()
+		gate.HandleLogin(rec, req, "app-1", "", "")
+
+		require.Equal(t, http.StatusFound, rec.Code, rec.Body.String())
+		require.Equal(t, "/", rec.Header().Get("Location"), "unsafe target %q", target)
+	}
+}
+
+// TestAppAuthGate_SSORedirectFlow proves code-flow providers render a button,
+// receive a one-time state, and issue clearance after exchange.
+func TestAppAuthGate_SSORedirectFlow(t *testing.T) {
+	client := NewMockOIDCClient(OIDCConfig{
+		IssuerURL:   "https://idp.mock",
+		ClientID:    "mock-client",
+		RedirectURL: "https://app.example.com" + AppAuthCallbackPath,
+	}, func(_ context.Context, code string) (*UserIdentity, error) {
+		require.Equal(t, "mock-code", code)
+		return &UserIdentity{Subject: "oidc:bob", Email: "bob@idp.mock", Provider: "oidc"}, nil
+	}).SetName("SSO")
+
+	gate := NewAppAuthGate("0123456789abcdef0123456789abcdef", nil, nil,
+		WithIdentityProviders(client))
+	require.Len(t, gate.SSOButtons(), 1)
+
+	startForm := url.Values{"provider": {"SSO"}, "redirect": {"/dashboard"}}
+	start := httptest.NewRequest(http.MethodPost, "http://app.example.com"+AppAuthSSOPath, strings.NewReader(startForm.Encode()))
+	start.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	startRec := httptest.NewRecorder()
+	gate.HandleSSOStart(startRec, start, "app-1")
+	require.Equal(t, http.StatusFound, startRec.Code)
+
+	location, err := url.Parse(startRec.Header().Get("Location"))
+	require.NoError(t, err)
+	state := location.Query().Get("state")
+	require.NotEmpty(t, state)
+
+	callback := httptest.NewRequest(http.MethodGet,
+		"http://app.example.com"+AppAuthCallbackPath+"?code=mock-code&state="+url.QueryEscape(state), nil)
+	callbackRec := httptest.NewRecorder()
+	gate.HandleSSOCallback(callbackRec, callback)
+
+	require.Equal(t, http.StatusFound, callbackRec.Code, callbackRec.Body.String())
+	require.Equal(t, "/dashboard", callbackRec.Header().Get("Location"))
+	cookies := callbackRec.Result().Cookies()
+	require.Len(t, cookies, 1)
+	require.Equal(t, AppAuthCookieName, cookies[0].Name)
+
+	// State is single-use.
+	replay := httptest.NewRecorder()
+	gate.HandleSSOCallback(replay, callback)
+	require.Equal(t, http.StatusBadRequest, replay.Code)
+}
+
+// TestAppAuthGate_SSOStateExpiry rejects stale redirect states.
+func TestAppAuthGate_SSOStateExpiry(t *testing.T) {
+	gate := NewAppAuthGate("0123456789abcdef0123456789abcdef", nil, nil)
+	state := gate.newSSOState(pendingSSO{Provider: "SSO", Target: "/"})
+	gate.states.Store(state, pendingSSO{
+		Provider:  "SSO",
+		Target:    "/",
+		CreatedAt: time.Now().Add(-time.Hour),
+	})
+	_, ok := gate.consumeSSOState(state)
+	require.False(t, ok)
+}

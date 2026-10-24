@@ -55,25 +55,6 @@ func NewSimpleProvider(name string, sa *SimpleAuth) IdentityProvider {
 	return &simpleProvider{name: name, auth: sa}
 }
 
-// oidcProvider adapts OIDCClient.
-type oidcProvider struct {
-	name   string
-	client *OIDCClient
-}
-
-func (p *oidcProvider) Type() string { return ProviderTypeOIDC }
-func (p *oidcProvider) Name() string { return p.name }
-
-func (p *oidcProvider) Authenticate(context.Context, string, string) (*UserIdentity, error) {
-	return nil, errCodeFlowUnsupported
-}
-
-func (p *oidcProvider) AuthCodeURL(state string) string { return p.client.AuthCodeURL(state) }
-
-func (p *oidcProvider) ExchangeCode(ctx context.Context, code string) (*UserIdentity, error) {
-	return p.client.Exchange(ctx, code)
-}
-
 // IdentityProviderSpec is the persisted provider directive: type + instance
 // label + backend-specific JSON payload (raiwall_identity_providers row).
 type IdentityProviderSpec struct {
@@ -100,7 +81,7 @@ func NewIdentityProvider(spec IdentityProviderSpec, simple *SimpleAuth) (Identit
 		if err != nil {
 			return nil, fmt.Errorf("init oidc client: %w", err)
 		}
-		return &oidcProvider{name: spec.Name, client: client}, nil
+		return client.SetName(spec.Name), nil
 	case ProviderTypeLDAP:
 		var cfg LDAPConfig
 		if err := json.Unmarshal([]byte(spec.ConfigJSON), &cfg); err != nil {

@@ -9,15 +9,14 @@ import (
 	"net/http/httptest"
 	"sync"
 	"testing"
-	"time"
 
-	caddyv2 "github.com/caddyserver/caddy/v2"
 	"github.com/Panharoth06/raiwall/internal/adapters/inbound/caddy"
 	"github.com/Panharoth06/raiwall/internal/adapters/outbound/geoip"
 	"github.com/Panharoth06/raiwall/internal/core/acl"
 	"github.com/Panharoth06/raiwall/internal/core/auth"
 	"github.com/Panharoth06/raiwall/internal/core/control"
 	"github.com/Panharoth06/raiwall/internal/core/waf"
+	caddyv2 "github.com/caddyserver/caddy/v2"
 )
 
 type accessControlFixture struct {
@@ -97,7 +96,6 @@ func setupAccessControlFixture(t *testing.T) *accessControlFixture {
 	}
 
 	sessionSecret := "testing-e2e-session-secret-32-bytes!"
-	sessionMgr := auth.NewSessionManager(sessionSecret, auth.WithCookieTTL(2*time.Hour))
 	simpleAuth := auth.NewSimpleAuth(auth.SimpleUser{
 		Username:     "alice",
 		PasswordHash: "secretpass123",
@@ -105,11 +103,11 @@ func setupAccessControlFixture(t *testing.T) *accessControlFixture {
 		Name:         "Alice Smith",
 		Roles:        []string{"admin", "developer"},
 	})
-	authGateway := auth.NewAuthGateway(auth.GatewayConfig{
-		SimpleAuth:  simpleAuth,
-		SessionMgr:  sessionMgr,
-		BypassPaths: []string{"/public/*", "/search", "/healthz", "/legacy*"},
-	})
+	authGate := auth.NewAppAuthGate(sessionSecret, nil, nil,
+		auth.WithSimpleAuth(simpleAuth),
+		auth.WithBypassPaths("/public/*", "/search", "/healthz", "/legacy*"),
+	)
+	sessionMgr := authGate.SessionManager()
 
 	semEngine := waf.NewSemanticEngine(waf.WithExceptionEngine(exEngine))
 
@@ -128,7 +126,7 @@ func setupAccessControlFixture(t *testing.T) *accessControlFixture {
 	mw.SetBARTTable(bartTable)
 	mw.SetGeoIPReader(geoReader)
 	mw.SetACLEngine(aclEngine)
-	mw.SetAuthGateway(authGateway)
+	mw.SetGlobalAuthGate(authGate)
 	mw.SetEngine(semEngine)
 
 	return &accessControlFixture{

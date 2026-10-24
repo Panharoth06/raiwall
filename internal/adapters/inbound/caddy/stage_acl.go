@@ -24,16 +24,10 @@ func (m *Middleware) evaluateAccessControl(
 	currentMode control.RunMode,
 	startTime time.Time,
 ) (bypassWAF bool, handled bool, err error) {
-	// Pre-Application Authentication Gateway
-	if m.authGateway != nil {
-		_, ok := m.authGateway.AuthenticateRequest(w, r)
-		if !ok {
-			return false, true, nil
-		}
-	} else if appCfg == nil || !appCfg.AuthEnabled {
-		// Zero-Trust: strip untrusted client-supplied identity headers.
-		// App-gate-managed sites were already sanitized + injected at the
-		// per-app gate stage (11b).
+	// Pre-Application Authentication is enforced by the shared HTTP 467 gate
+	// earlier in the pipeline. Sites without any auth authority still strip
+	// untrusted client-supplied identity headers.
+	if (appCfg == nil || !appCfg.AuthEnabled) && m.globalAuthGate == nil {
 		auth.StripAuthHeaders(r.Header)
 	}
 

@@ -183,7 +183,11 @@ type Middleware struct {
 	ipGroupMgr      *acl.IPGroupManager
 	geoIPReader     acl.GeoIPReader
 	aclEngine       *acl.ACLEngine
-	authGateway     *auth.AuthGateway
+	// globalAuthGate is the portal-wide gate built from the Caddyfile `auth`
+	// block; it shares the HTTP 467 portal with per-site gates.
+	globalAuthGate  *auth.AppAuthGate
+	globalAuthOIDC  *auth.OIDCClient
+	globalAuthUsers *auth.SimpleAuth
 	appAuthGate     *auth.AppAuthGate
 	// appAuthGateMu guards the cached gate across concurrent pipeline
 	// requests; appAuthGateSecret tracks the snapshot secret the gate was

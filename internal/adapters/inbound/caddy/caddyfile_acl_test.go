@@ -123,8 +123,8 @@ func TestUnmarshalCaddyfile_Domain5AccessControl(t *testing.T) {
 	if m.ACLEngine() == nil {
 		t.Fatal("expected ACLEngine to be provisioned")
 	}
-	if m.AuthGateway() == nil {
-		t.Fatal("expected AuthGateway to be provisioned")
+	if m.GlobalAuthGate() == nil {
+		t.Fatal("expected GlobalAuthGate to be provisioned")
 	}
 }
 
@@ -240,8 +240,8 @@ func TestUnmarshalCaddyfile_AccessControlAndAuth(t *testing.T) {
 	if m.ACLEngine() == nil {
 		t.Fatal("expected ACLEngine to be provisioned")
 	}
-	if m.AuthGateway() == nil {
-		t.Fatal("expected AuthGateway to be provisioned")
+	if m.GlobalAuthGate() == nil {
+		t.Fatal("expected GlobalAuthGate to be provisioned")
 	}
 	if m.GeoIPReader() == nil {
 		t.Fatal("expected GeoIPReader to be provisioned")

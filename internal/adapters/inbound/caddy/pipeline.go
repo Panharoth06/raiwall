@@ -196,8 +196,8 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 		return err
 	}
 
-	// 11b. Per-App Zero-Trust Auth Gate (HTTP 467 challenge & clearance)
-	if handledGate, err := m.evaluateAppAuthGate(w, r, clientIP, appCfg); handledGate {
+	// 11b. Zero-Trust Auth Gate (HTTP 467 portal: per-site or portal-wide)
+	if handledGate, err := m.evaluateAuthGate(w, r, clientIP, appCfg); handledGate {
 		return err
 	}
 

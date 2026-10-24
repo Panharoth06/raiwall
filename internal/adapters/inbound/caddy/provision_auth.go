@@ -8,45 +8,43 @@ import (
 	"go.uber.org/zap"
 )
 
+// provisionAuth compiles the Caddyfile `auth` block into the shared HTTP 467
+// portal backends (local users + OIDC). The legacy AuthGateway login page is
+// retired; the portal is the single browser login surface.
 func (m *Middleware) provisionAuth(ctx caddy.Context) error {
-	if m.authGateway == nil && m.AuthConfig != nil {
-		gwCfg := auth.GatewayConfig{
-			BypassPaths: m.AuthConfig.BypassPaths,
-		}
-		if len(m.AuthConfig.Users) > 0 || m.AuthConfig.Provider == "simple" || m.AuthConfig.Provider == "dual" {
-			gwCfg.SimpleAuth = auth.NewSimpleAuth(m.AuthConfig.Users...)
-		}
-		var sessionOpts []auth.SessionOption
-		if m.AuthConfig.SessionCookie != "" {
-			sessionOpts = append(sessionOpts, auth.WithCookieName(m.AuthConfig.SessionCookie))
-		}
-		if m.AuthConfig.SessionTTL > 0 {
-			sessionOpts = append(sessionOpts, auth.WithCookieTTL(time.Duration(m.AuthConfig.SessionTTL)))
-		}
-		if m.AuthConfig.SessionSecure != nil {
-			sessionOpts = append(sessionOpts, auth.WithCookieSecure(*m.AuthConfig.SessionSecure))
-		}
-		gwCfg.SessionMgr = auth.NewSessionManager(m.AuthConfig.SessionSecret, sessionOpts...)
+	if m.AuthConfig == nil {
+		return nil
+	}
 
-		if m.AuthConfig.IssuerURL != "" && (m.AuthConfig.Provider == "oidc" || m.AuthConfig.Provider == "dual") {
-			oidcCfg := auth.OIDCConfig{
-				IssuerURL:    m.AuthConfig.IssuerURL,
-				ClientID:     m.AuthConfig.ClientID,
-				ClientSecret: m.AuthConfig.ClientSecret,
-				RedirectURL:  m.AuthConfig.RedirectURL,
-				Scopes:       m.AuthConfig.Scopes,
+	cfg := m.AuthConfig
+	if len(cfg.Users) > 0 || cfg.Provider == "simple" || cfg.Provider == "dual" {
+		m.globalAuthUsers = auth.NewSimpleAuth(cfg.Users...)
+	}
+
+	if cfg.IssuerURL != "" && (cfg.Provider == "oidc" || cfg.Provider == "dual") {
+		oidcClient, err := auth.NewOIDCClient(ctx, auth.OIDCConfig{
+			IssuerURL:    cfg.IssuerURL,
+			ClientID:     cfg.ClientID,
+			ClientSecret: cfg.ClientSecret,
+			RedirectURL:  cfg.RedirectURL,
+			Scopes:       cfg.Scopes,
+		})
+		if err != nil {
+			if m.logger != nil {
+				m.logger.Warn("Failed to initialize OIDC client during provision", zap.Error(err))
 			}
-			oidcClient, err := auth.NewOIDCClient(ctx, oidcCfg)
-			if err != nil {
-				if m.logger != nil {
-					m.logger.Warn("Failed to initialize OIDC client during provision", zap.Error(err))
-				}
-			} else {
-				gwCfg.OIDCClient = oidcClient
-			}
+		} else {
+			m.globalAuthOIDC = oidcClient.SetName("SSO")
 		}
-		m.authGateway = auth.NewAuthGateway(gwCfg)
 	}
 
 	return nil
+}
+
+// authSessionTTL returns the configured portal cookie lifetime.
+func (m *Middleware) authSessionTTL() time.Duration {
+	if m.AuthConfig != nil && m.AuthConfig.SessionTTL > 0 {
+		return time.Duration(m.AuthConfig.SessionTTL)
+	}
+	return 0
 }

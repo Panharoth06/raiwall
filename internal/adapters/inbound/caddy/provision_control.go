@@ -90,6 +90,9 @@ func (m *Middleware) provisionControl(_ caddy.Context) error {
 		m.syncIPGroupsWithStore(m.controlStore, m.ipGroupMgr)
 	}
 
+	// Compile the portal-wide gate once the control store is available.
+	m.buildGlobalAuthGate()
+
 	return nil
 }
 

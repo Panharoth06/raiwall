@@ -16,12 +16,12 @@ import (
 
 // OIDCConfig configures OpenID Connect Single Sign-On.
 type OIDCConfig struct {
-	IssuerURL     string   `json:"issuer_url"`
-	ClientID      string   `json:"client_id"`
-	ClientSecret  string   `json:"client_secret"`
-	RedirectURL   string   `json:"redirect_url"`
-	Scopes        []string `json:"scopes,omitempty"`
-	InsecureSkip  bool     `json:"insecure_skip,omitempty"`
+	IssuerURL    string   `json:"issuer_url"`
+	ClientID     string   `json:"client_id"`
+	ClientSecret string   `json:"client_secret"`
+	RedirectURL  string   `json:"redirect_url"`
+	Scopes       []string `json:"scopes,omitempty"`
+	InsecureSkip bool     `json:"insecure_skip,omitempty"`
 }
 
 type stateEntry struct {
@@ -32,6 +32,7 @@ type stateEntry struct {
 // OIDCClient handles OpenID Connect discovery, redirect generation, and code exchange.
 type OIDCClient struct {
 	cfg          OIDCConfig
+	displayName  string
 	provider     *oidc.Provider
 	oauth2Config *oauth2.Config
 	verifier     *oidc.IDTokenVerifier
@@ -79,6 +80,7 @@ func NewOIDCClient(ctx context.Context, cfg OIDCConfig) (*OIDCClient, error) {
 
 	return &OIDCClient{
 		cfg:          cfg,
+		displayName:  "SSO",
 		provider:     provider,
 		oauth2Config: oauthConfig,
 		verifier:     verifier,
@@ -105,9 +107,34 @@ func NewMockOIDCClient(cfg OIDCConfig, exchangeFn func(ctx context.Context, code
 
 	return &OIDCClient{
 		cfg:          cfg,
+		displayName:  "SSO",
 		oauth2Config: oauthConfig,
 		mockExchange: exchangeFn,
 	}
+}
+
+// Type implements IdentityProvider.
+func (c *OIDCClient) Type() string { return ProviderTypeOIDC }
+
+// Name implements IdentityProvider.
+func (c *OIDCClient) Name() string { return c.displayName }
+
+// SetName sets the operator-facing provider label.
+func (c *OIDCClient) SetName(name string) *OIDCClient {
+	if name != "" {
+		c.displayName = name
+	}
+	return c
+}
+
+// Authenticate implements IdentityProvider; OIDC is a redirect flow only.
+func (c *OIDCClient) Authenticate(context.Context, string, string) (*UserIdentity, error) {
+	return nil, errCodeFlowUnsupported
+}
+
+// ExchangeCode implements CodeIdentityProvider.
+func (c *OIDCClient) ExchangeCode(ctx context.Context, code string) (*UserIdentity, error) {
+	return c.Exchange(ctx, code)
 }
 
 // pruneExpiredStates removes state tokens older than 10 minutes.

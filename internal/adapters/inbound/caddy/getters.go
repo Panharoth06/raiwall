@@ -96,14 +96,15 @@ func (m *Middleware) ACLEngine() *acl.ACLEngine {
 	return m.aclEngine
 }
 
-// SetAuthGateway sets the active AuthGateway.
-func (m *Middleware) SetAuthGateway(ag *auth.AuthGateway) {
-	m.authGateway = ag
+// SetGlobalAuthGate sets the portal-wide HTTP 467 gate built from the
+// Caddyfile auth block (also used by integration fixtures).
+func (m *Middleware) SetGlobalAuthGate(g *auth.AppAuthGate) {
+	m.globalAuthGate = g
 }
 
-// AuthGateway returns the active AuthGateway.
-func (m *Middleware) AuthGateway() *auth.AuthGateway {
-	return m.authGateway
+// GlobalAuthGate returns the portal-wide HTTP 467 gate.
+func (m *Middleware) GlobalAuthGate() *auth.AppAuthGate {
+	return m.globalAuthGate
 }
 
 // SetBanManager sets the active BanManager.
