@@ -27,7 +27,50 @@ export interface ForensicEvent {
   truncated_payload?: string;
   latency: number;
   status_code: number;
+  /** Exact request location of the malicious parameter (URLPATH, QUERY, HEADER, BODY, COOKIE). */
+  payload_location?: string;
+  /** Isolated malicious syntax token that triggered the verdict. */
+  matched_token?: string;
+  /** Attack classification category (SQL Injection, XSS, ...). */
+  attack_category?: string;
+  /** Raw upstream response headers captured for forensic replay. */
+  response_headers?: Record<string, string[]>;
+  /** Base64-encoded raw upstream response body. */
+  response_body?: string;
 }
+
+/** Aggregated incident cluster: events sharing client_ip + host within a 5-minute window. */
+export interface Incident {
+  id: string;
+  client_ip: string;
+  host: string;
+  start_time: string;
+  end_time: string;
+  total_events: number;
+  total_blocked: number;
+  category: string;
+  max_severity: SeverityType | '';
+  top_rule_id: string;
+  country?: string;
+  sample_event?: ForensicEvent;
+}
+
+export interface IncidentQueryResult {
+  incidents: Incident[];
+  total_count: number;
+}
+
+/** Minimal named IP group representation used by forensic triage actions. */
+export interface IPGroupOption {
+  id: string;
+  name: string;
+  description?: string;
+  type?: string;
+  entry_count?: number;
+}
+
+/** Copy-to-clipboard lifecycle shared by the forensic drawer and its host. */
+export type CurlState = 'idle' | 'loading' | 'copied' | 'error';
 
 export interface TopCount {
   key: string;

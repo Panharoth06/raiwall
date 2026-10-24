@@ -1,8 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { mount, flushPromises } from '@vue/test-utils';
 import { ref } from 'vue';
 import LiveInspector from '@/components/LiveInspector.vue';
-import type { ForensicEvent } from '@/types/telemetry';
+import { router } from '@/router';
+import type { ForensicEvent, Incident } from '@/types/telemetry';
 
 describe('LiveInspector.vue', () => {
   const sampleEvents: ForensicEvent[] = [
@@ -190,5 +191,131 @@ describe('LiveInspector.vue', () => {
       param: '*',
       rule_id: 'SEMANTIC_SQLI',
     });
+  });
+
+  const sampleIncidents: Incident[] = [
+    {
+      id: 'inc-1',
+      client_ip: '192.168.1.10',
+      host: 'example.com',
+      start_time: '2026-10-19T10:00:00Z',
+      end_time: '2026-10-19T10:04:30Z',
+      total_events: 12,
+      total_blocked: 9,
+      category: 'SQL Injection',
+      max_severity: 'high',
+      top_rule_id: 'SEMANTIC_SQLI',
+      country: 'US',
+    },
+    {
+      id: 'inc-2',
+      client_ip: '198.51.100.7',
+      host: 'admin.example.com',
+      start_time: '2026-10-19T09:10:00Z',
+      end_time: '2026-10-19T09:11:00Z',
+      total_events: 3,
+      total_blocked: 3,
+      category: 'XSS',
+      max_severity: 'medium',
+      top_rule_id: 'SEMANTIC_XSS',
+    },
+  ];
+
+  it('switches between aggregated EVENTS and granular LOGS views', async () => {
+    await router.navigate('/attacks');
+    const stream = createMockStream();
+    const incidentLoader = vi.fn().mockResolvedValue({ incidents: sampleIncidents, total_count: 2 });
+
+    const wrapper = mount(LiveInspector, {
+      props: { streamComposable: stream as any, incidentLoader },
+    });
+
+    expect(wrapper.findAll('[data-testid="event-row"]').length).toBe(2);
+
+    await wrapper.find('[data-testid="view-tab-incidents"]').trigger('click');
+    await flushPromises();
+
+    expect(incidentLoader).toHaveBeenCalledTimes(1);
+    expect(wrapper.findAll('[data-testid="incident-card"]').length).toBe(2);
+    expect(wrapper.text()).toContain('SQL Injection');
+    expect(wrapper.text()).toContain('12 events');
+
+    await wrapper.find('[data-testid="view-tab-logs"]').trigger('click');
+    expect(wrapper.findAll('[data-testid="event-row"]').length).toBe(2);
+    wrapper.unmount();
+  });
+
+  it('opens granular LOGS filtered by the clicked incident and syncs URL query', async () => {
+    await router.navigate('/attacks');
+    const stream = createMockStream();
+    const incidentLoader = vi.fn().mockResolvedValue({ incidents: sampleIncidents, total_count: 2 });
+
+    const wrapper = mount(LiveInspector, {
+      props: { streamComposable: stream as any, incidentLoader },
+    });
+
+    await wrapper.find('[data-testid="view-tab-incidents"]').trigger('click');
+    await flushPromises();
+    await wrapper.findAll('[data-testid="incident-card"]')[0].trigger('click');
+    await flushPromises();
+
+    expect(wrapper.findAll('[data-testid="event-row"]').length).toBe(1);
+    expect(wrapper.text()).toContain('192.168.1.10');
+    expect(wrapper.text()).not.toContain('10.0.0.5');
+
+    const chip = wrapper.find('[data-testid="host-filter-chip"]');
+    expect(chip.exists()).toBe(true);
+    expect(chip.text()).toContain('example.com');
+
+    expect(router.current.value.query.ip).toBe('192.168.1.10');
+    expect(router.current.value.query.host).toBe('example.com');
+    wrapper.unmount();
+  });
+
+  it('copies a generated cURL command from the forensic drawer', async () => {
+    await router.navigate('/attacks');
+    const stream = createMockStream();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+
+    const curlLoader = vi.fn().mockResolvedValue({ curl: "curl -X POST 'http://example.com/api/v1/login'" });
+    const ipGroupLoader = vi.fn().mockResolvedValue([]);
+
+    const wrapper = mount(LiveInspector, {
+      props: { streamComposable: stream as any, curlLoader, ipGroupLoader },
+    });
+
+    await wrapper.find('[data-testid="event-row"]').trigger('click');
+    await flushPromises();
+    await wrapper.find('[data-testid="copy-curl-btn"]').trigger('click');
+    await flushPromises();
+
+    expect(curlLoader).toHaveBeenCalledWith('evt-1');
+    expect(writeText).toHaveBeenCalledWith("curl -X POST 'http://example.com/api/v1/login'");
+    expect(wrapper.find('[data-testid="copy-curl-btn"]').text()).toContain('Copied');
+    wrapper.unmount();
+  });
+
+  it('adds the offending client IP to a named IP group from the drawer', async () => {
+    await router.navigate('/attacks');
+    const stream = createMockStream();
+    const ipGroupLoader = vi.fn().mockResolvedValue([{ id: 'grp-mal', name: 'malicious_ips' }]);
+    const ipGroupAdder = vi.fn().mockResolvedValue({});
+
+    const wrapper = mount(LiveInspector, {
+      props: { streamComposable: stream as any, ipGroupLoader, ipGroupAdder },
+    });
+
+    await wrapper.find('[data-testid="event-row"]').trigger('click');
+    await flushPromises();
+    await wrapper.find('[data-testid="add-to-ipgroup-btn"]').trigger('click');
+    await flushPromises();
+
+    expect(ipGroupAdder).toHaveBeenCalledWith('grp-mal', '192.168.1.10', expect.stringContaining('SEMANTIC_SQLI'));
+    expect(wrapper.text()).toContain('Added 192.168.1.10 to malicious_ips');
+    expect(wrapper.emitted('add-to-ipgroup')?.[0]).toEqual([
+      { event: expect.objectContaining({ event_id: 'evt-1' }), groupId: 'grp-mal' },
+    ]);
+    wrapper.unmount();
   });
 });

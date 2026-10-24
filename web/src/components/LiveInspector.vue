@@ -1,31 +1,25 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import {
-  Search,
-  ShieldAlert,
-  FileCode,
-  ExternalLink,
-  X,
-  CheckCircle2,
-  AlertTriangle,
-  Ban,
-  Activity,
-} from 'lucide-vue-next';
+import { useRoute, useRouter } from '@/router';
 import { useEventStream } from '@/composables/useEventStream';
-import type { ForensicEvent, ExceptionDraft } from '@/types/telemetry';
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from '@/components/ui/select';
+import { telemetryApi, type IncidentQueryParams } from '@/api/telemetry';
+import type { ForensicEvent, ExceptionDraft, Incident, IPGroupOption, CurlState } from '@/types/telemetry';
+import ForensicEventTable from './forensic/ForensicEventTable.vue';
+import IncidentCardList from './forensic/IncidentCardList.vue';
+import ForensicDrawer from './forensic/ForensicDrawer.vue';
+import InspectorToolbar from './forensic/InspectorToolbar.vue';
+
+type InspectorView = 'incidents' | 'logs';
 
 const props = withDefaults(
   defineProps<{
     initialFilter?: { action?: string; rule_id?: string; country?: string };
     maxEvents?: number;
     streamComposable?: ReturnType<typeof useEventStream>;
+    incidentLoader?: (params: IncidentQueryParams) => Promise<{ incidents: Incident[]; total_count: number }>;
+    curlLoader?: (eventId: string) => Promise<{ curl: string }>;
+    ipGroupLoader?: () => Promise<IPGroupOption[]>;
+    ipGroupAdder?: (groupId: string, cidr: string, comment: string) => Promise<unknown>;
   }>(),
   {
     maxEvents: 200,
@@ -34,16 +28,44 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   (e: 'create-exception', draft: ExceptionDraft): void;
+  (e: 'add-to-ipgroup', payload: { event: ForensicEvent; groupId: string }): void;
 }>();
+
+const route = useRoute();
+const router = useRouter();
 
 // Use injected or default event stream composable
 const stream = props.streamComposable || useEventStream(props.initialFilter, props.maxEvents);
-const { events, isConnected, isPaused, pause, resume, clear } = stream;
+const { events, isConnected } = stream;
+
+// View + filter state
+const activeView = ref<InspectorView>('logs');
+const searchQuery = ref('');
+const hostFilter = ref('');
+const selectedAction = ref<string>('all');
+const activeEvent = ref<ForensicEvent | null>(null);
+
+// Incident clustering state
+const incidents = ref<Incident[]>([]);
+const incidentsTotal = ref(0);
+const incidentsLoading = ref(false);
+const incidentsError = ref<string | null>(null);
+const incidentsLoaded = ref(false);
+
+// Drawer action state
+const curlState = ref<CurlState>('idle');
+const ipGroups = ref<IPGroupOption[]>([]);
+const groupsLoaded = ref(false);
+const groupStatus = ref('');
 
 onMounted(() => {
   if (!props.streamComposable) {
     stream.connect();
   }
+  const query = route.value?.query || {};
+  if (query.ip) searchQuery.value = query.ip;
+  if (query.host) hostFilter.value = query.host;
+  if (query.view === 'incidents') setView('incidents');
 });
 
 onUnmounted(() => {
@@ -52,64 +74,108 @@ onUnmounted(() => {
   }
 });
 
-// Search and filter state
-const searchQuery = ref('');
-const selectedAction = ref<string>('all');
-const activeEvent = ref<ForensicEvent | null>(null);
-
-const filteredEvents = computed(() => {
-  return events.value.filter((ev) => {
+const filteredEvents = computed(() =>
+  events.value.filter((ev) => {
     if (selectedAction.value !== 'all' && ev.action !== selectedAction.value) {
+      return false;
+    }
+    if (hostFilter.value && ev.host !== hostFilter.value) {
       return false;
     }
     if (!searchQuery.value) return true;
     const q = searchQuery.value.toLowerCase();
     return (
       ev.client_ip.toLowerCase().includes(q) ||
+      ev.host?.toLowerCase().includes(q) ||
       (ev.rule_id && ev.rule_id.toLowerCase().includes(q)) ||
       ev.method.toLowerCase().includes(q) ||
       ev.path.toLowerCase().includes(q) ||
       (ev.geo_data?.country && ev.geo_data.country.toLowerCase().includes(q))
     );
+  })
+);
+
+function setView(view: InspectorView) {
+  activeView.value = view;
+  if (view === 'incidents' && !incidentsLoaded.value) {
+    void loadIncidents();
+  }
+}
+
+async function loadIncidents() {
+  incidentsLoading.value = true;
+  incidentsError.value = null;
+  try {
+    const loader = props.incidentLoader ?? telemetryApi.listIncidents;
+    const res = await loader({ limit: 50 });
+    incidents.value = res?.incidents ?? [];
+    incidentsTotal.value = res?.total_count ?? incidents.value.length;
+    incidentsLoaded.value = true;
+  } catch (err) {
+    incidentsError.value = err instanceof Error ? err.message : 'Incident aggregation request failed';
+  } finally {
+    incidentsLoading.value = false;
+  }
+}
+
+function openIncident(incident: Incident) {
+  searchQuery.value = incident.client_ip;
+  hostFilter.value = incident.host;
+  activeView.value = 'logs';
+  const query = new URLSearchParams({
+    tab: 'events',
+    ip: incident.client_ip,
+    host: incident.host,
   });
-});
-
-function getActionBadgeClass(action: string): string {
-  switch (action) {
-    case 'allow':
-      return 'bg-success/10 text-success border-success/30';
-    case 'block':
-      return 'bg-threat/10 text-threat border-threat/30';
-    case 'challenge':
-      return 'bg-warning/10 text-warning border-warning/30';
-    case 'ban':
-      return 'bg-threat/20 text-threat border-threat/40';
-    default:
-      return 'bg-muted text-muted-foreground border-border';
-  }
+  void router.push(`/attacks?${query.toString()}`);
 }
 
-function getSeverityBadgeClass(sev: string): string {
-  switch (sev) {
-    case 'critical':
-    case 'high':
-      return 'text-threat bg-threat/10';
-    case 'medium':
-      return 'text-warning bg-warning/10';
-    case 'low':
-    case 'info':
-      return 'text-info bg-info/10';
-    default:
-      return 'text-muted-foreground bg-muted';
-  }
-}
-
-function openModal(ev: ForensicEvent) {
+function openDrawer(ev: ForensicEvent) {
   activeEvent.value = ev;
+  curlState.value = 'idle';
+  groupStatus.value = '';
+  if (!groupsLoaded.value) {
+    void loadIPGroups();
+  }
 }
 
-function closeModal() {
+function closeDrawer() {
   activeEvent.value = null;
+}
+
+async function loadIPGroups() {
+  try {
+    const loader = props.ipGroupLoader ?? telemetryApi.listIPGroups;
+    ipGroups.value = await loader();
+    groupsLoaded.value = true;
+  } catch {
+    groupStatus.value = 'IP groups unavailable';
+  }
+}
+
+async function handleAddToIPGroup(payload: { event: ForensicEvent; groupId: string }) {
+  const group = ipGroups.value.find((g) => g.id === payload.groupId);
+  const adder = props.ipGroupAdder ?? telemetryApi.addIPGroupEntry;
+  groupStatus.value = 'Adding...';
+  try {
+    await adder(payload.groupId, payload.event.client_ip, `Forensic triage: ${payload.event.rule_id || 'WAF verdict'}`);
+    groupStatus.value = `Added ${payload.event.client_ip} to ${group?.name ?? 'group'}`;
+    emit('add-to-ipgroup', payload);
+  } catch (err) {
+    groupStatus.value = err instanceof Error ? `Add failed: ${err.message}` : 'Add failed';
+  }
+}
+
+async function handleCopyCurl(ev: ForensicEvent) {
+  curlState.value = 'loading';
+  try {
+    const loader = props.curlLoader ?? telemetryApi.getEventCurl;
+    const res = await loader(ev.event_id);
+    await navigator.clipboard.writeText(res.curl);
+    curlState.value = 'copied';
+  } catch {
+    curlState.value = 'error';
+  }
 }
 
 function handleCreateException(ev: ForensicEvent) {
@@ -118,360 +184,63 @@ function handleCreateException(ev: ForensicEvent) {
     host: ev.host || '*',
     path: cleanPath,
     method: ev.method,
-    location: ev.method === 'GET' ? 'query' : 'body',
+    location: ev.payload_location
+      ? ev.payload_location.toLowerCase()
+      : ev.method === 'GET'
+        ? 'query'
+        : 'body',
     param: '*',
     rule_id: ev.rule_id || '*',
   };
   emit('create-exception', draft);
-  closeModal();
-}
-
-function formatLatency(durNs: number): string {
-  const ms = durNs / 1000000;
-  return ms < 1 ? `${(ms * 1000).toFixed(0)}µs` : `${ms.toFixed(1)}ms`;
-}
-
-function isPrivateIP(ip: string): boolean {
-  if (!ip) return false;
-  return (
-    ip === '127.0.0.1' ||
-    ip === '::1' ||
-    ip === 'localhost' ||
-    ip.startsWith('192.168.') ||
-    ip.startsWith('10.') ||
-    ip.startsWith('172.16.') ||
-    ip.startsWith('172.17.') ||
-    ip.startsWith('172.18.') ||
-    ip.startsWith('172.19.') ||
-    ip.startsWith('172.20.') ||
-    ip.startsWith('172.21.') ||
-    ip.startsWith('172.22.') ||
-    ip.startsWith('172.23.') ||
-    ip.startsWith('172.24.') ||
-    ip.startsWith('172.25.') ||
-    ip.startsWith('172.26.') ||
-    ip.startsWith('172.27.') ||
-    ip.startsWith('172.28.') ||
-    ip.startsWith('172.29.') ||
-    ip.startsWith('172.30.') ||
-    ip.startsWith('172.31.')
-  );
-}
-
-function getPayloadOrQuery(ev: ForensicEvent): string {
-  if (ev.truncated_payload && ev.truncated_payload.trim() !== '') {
-    return ev.truncated_payload;
-  }
-  if (ev.path && ev.path.includes('?')) {
-    const qs = ev.path.slice(ev.path.indexOf('?') + 1);
-    try {
-      return decodeURIComponent(qs);
-    } catch {
-      return qs;
-    }
-  }
-  return '(No payload or query parameters)';
+  closeDrawer();
 }
 </script>
 
 <template>
-  <div class="flex flex-col h-full bg-card text-card-foreground rounded-xl border border-border shadow-none overflow-hidden font-sans">
-    <!-- Header Controls Toolbar -->
-    <div class="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 border-b border-border bg-card/90 backdrop-blur-md relative z-20">
-      <!-- Connection & Title (green dot removed) -->
-      <div class="flex items-center gap-3">
-        <span
-          data-testid="status-text"
-          class="text-xs font-semibold tracking-wider uppercase text-muted-foreground"
-        >
-          {{ isConnected ? 'Live Telemetry' : 'Disconnected' }}
-        </span>
-        <span class="text-xs text-muted-foreground/60">|</span>
-        <span class="text-xs text-muted-foreground font-mono">
-          {{ filteredEvents.length }} events
-        </span>
-      </div>
+  <div class="flex flex-col h-full bg-card text-card-foreground rounded-xl border border-border overflow-hidden font-sans">
+    <InspectorToolbar
+      :view="activeView"
+      :search-query="searchQuery"
+      :host-filter="hostFilter"
+      :selected-action="selectedAction"
+      :is-connected="isConnected"
+      :event-count="filteredEvents.length"
+      :incident-count="incidentsTotal"
+      @update:view="setView"
+      @update:search-query="searchQuery = $event"
+      @update:host-filter="hostFilter = $event"
+      @update:selected-action="selectedAction = $event"
+      @refresh-incidents="loadIncidents"
+    />
 
-      <!-- Controls: Filter, Search -->
-      <div class="flex items-center gap-2.5">
-        <!-- Search Input -->
-        <div class="relative">
-          <Search class="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-muted-foreground" />
-          <input
-            v-model="searchQuery"
-            type="text"
-            placeholder="Filter IP, Rule, Method, Country..."
-            data-testid="live-search-input"
-            class="w-48 sm:w-64 pl-8 pr-3 py-1.5 text-xs bg-background border border-input rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring transition-all"
-          />
-        </div>
+    <!-- Active view -->
+    <IncidentCardList
+      v-if="activeView === 'incidents'"
+      :incidents="incidents"
+      :loading="incidentsLoading"
+      :error="incidentsError"
+      @open="openIncident"
+      @refresh="loadIncidents"
+    />
+    <ForensicEventTable
+      v-else
+      :events="filteredEvents"
+      @inspect="openDrawer"
+      @create-exception="handleCreateException"
+    />
 
-        <!-- Action Filter Select Component Dropdown -->
-        <div class="relative z-30">
-          <Select v-model="selectedAction">
-            <SelectTrigger class="h-8 w-32 border-input bg-background text-foreground text-xs">
-              <SelectValue placeholder="All Actions" />
-            </SelectTrigger>
-            <SelectContent class="border-border bg-popover text-popover-foreground z-50">
-              <SelectItem value="all">All Actions</SelectItem>
-              <SelectItem value="allow">Allow</SelectItem>
-              <SelectItem value="block">Block</SelectItem>
-              <SelectItem value="challenge">Challenge</SelectItem>
-              <SelectItem value="ban">Ban</SelectItem>
-            </SelectContent>
-          </Select>
-          <select
-            v-model="selectedAction"
-            data-testid="action-filter-select"
-            class="sr-only"
-            tabindex="-1"
-            aria-hidden="true"
-          >
-            <option value="all">All Actions</option>
-            <option value="allow">Allow</option>
-            <option value="block">Block</option>
-            <option value="challenge">Challenge</option>
-            <option value="ban">Ban</option>
-          </select>
-        </div>
-      </div>
-    </div>
-
-    <!-- Live Event Table -->
-    <div class="flex-1 overflow-auto">
-      <table class="w-full text-left border-collapse text-xs">
-        <thead class="sticky top-0 bg-muted/60 text-muted-foreground font-semibold border-b border-border z-10 shadow-none">
-          <tr>
-            <th class="py-2.5 px-4">Time</th>
-            <th class="py-2.5 px-4">Action</th>
-            <th class="py-2.5 px-4">Method & Path</th>
-            <th class="py-2.5 px-4">Client IP & Geo</th>
-            <th class="py-2.5 px-4">Rule / Threat</th>
-            <th class="py-2.5 px-4">Latency</th>
-            <th class="py-2.5 px-4 text-right">Actions</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-border font-mono">
-          <tr
-            v-for="ev in filteredEvents"
-            :key="ev.event_id"
-            data-testid="event-row"
-            class="hover:bg-muted/40 transition-colors group cursor-pointer"
-            @click="openModal(ev)"
-          >
-            <!-- Time -->
-            <td class="py-2.5 px-4 text-muted-foreground whitespace-nowrap">
-              {{ new Date(ev.timestamp).toLocaleTimeString() }}
-            </td>
-
-            <!-- Action Badge -->
-            <td class="py-2.5 px-4 whitespace-nowrap">
-              <span
-                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide uppercase border"
-                :class="getActionBadgeClass(ev.action)"
-              >
-                <CheckCircle2 v-if="ev.action === 'allow'" class="w-2.5 h-2.5" />
-                <ShieldAlert v-else-if="ev.action === 'block'" class="w-2.5 h-2.5" />
-                <AlertTriangle v-else-if="ev.action === 'challenge'" class="w-2.5 h-2.5" />
-                <Ban v-else-if="ev.action === 'ban'" class="w-2.5 h-2.5" />
-                {{ ev.action }}
-              </span>
-            </td>
-
-            <!-- Method & Path -->
-            <td class="py-2.5 px-4 max-w-xs truncate text-foreground">
-              <span class="font-bold text-primary mr-1.5">{{ ev.method }}</span>
-              <span :title="ev.path">{{ ev.path }}</span>
-            </td>
-
-            <!-- Client IP & Geo -->
-            <td class="py-2.5 px-4 whitespace-nowrap text-foreground">
-              <span>{{ ev.client_ip }}</span>
-              <span v-if="ev.geo_data?.country" class="ml-1.5 text-muted-foreground text-[11px]">
-                [{{ ev.geo_data.country }}]
-              </span>
-            </td>
-
-            <!-- Rule / Threat -->
-            <td class="py-2.5 px-4 whitespace-nowrap">
-              <span v-if="ev.rule_id" class="text-warning font-semibold">
-                {{ ev.rule_id }}
-              </span>
-              <span v-else class="text-muted-foreground">-</span>
-            </td>
-
-            <!-- Latency -->
-            <td class="py-2.5 px-4 text-muted-foreground whitespace-nowrap">
-              {{ formatLatency(ev.latency) }}
-            </td>
-
-            <!-- Action Buttons -->
-            <td class="py-2.5 px-4 text-right whitespace-nowrap" @click.stop>
-              <button
-                v-if="ev.action !== 'allow'"
-                type="button"
-                data-testid="create-exception-quick-btn"
-                @click="handleCreateException(ev)"
-                class="px-2 py-1 text-[11px] font-medium text-primary hover:text-primary-foreground bg-primary/10 hover:bg-primary border border-primary/30 rounded transition-all mr-2 shadow-none cursor-pointer"
-                title="Create 1-Click Rule Exception"
-              >
-                Exception
-              </button>
-              <button
-                type="button"
-                @click="openModal(ev)"
-                class="px-2 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground bg-muted hover:bg-muted/80 border border-border rounded transition-all cursor-pointer"
-              >
-                Inspect
-              </button>
-            </td>
-          </tr>
-
-          <!-- Empty State -->
-          <tr v-if="filteredEvents.length === 0">
-            <td colspan="7" class="py-12 text-center text-muted-foreground font-sans">
-              <Activity class="w-8 h-8 mx-auto mb-2 text-muted-foreground/60 opacity-60 animate-pulse" />
-              <p class="text-sm font-medium">Waiting for incoming telemetry events...</p>
-              <p class="text-xs text-muted-foreground/80 mt-1">Events will appear automatically via Server-Sent Events</p>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <!-- Forensic Detail Modal -->
-    <div
+    <!-- Full-height forensic drawer -->
+    <ForensicDrawer
       v-if="activeEvent"
-      data-testid="forensic-modal"
-      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-    >
-      <div class="w-full max-w-3xl max-h-[85vh] flex flex-col bg-popover border border-border rounded-xl shadow-none overflow-hidden font-sans text-popover-foreground">
-        <!-- Modal Header -->
-        <div class="flex items-center justify-between px-6 py-4 border-b border-border bg-card">
-          <div class="flex items-center gap-3">
-            <div class="p-2 rounded-lg bg-muted border border-border text-foreground">
-              <FileCode class="w-5 h-5 text-muted-foreground" />
-            </div>
-            <div>
-              <h3 class="text-sm font-bold text-foreground flex items-center gap-2">
-                <span>{{ activeEvent.action === 'allow' ? 'Traffic Telemetry Context' : 'Forensic Incident Context' }}</span>
-                <span
-                  class="px-2 py-0.5 rounded text-[10px] font-semibold uppercase border"
-                  :class="getActionBadgeClass(activeEvent.action)"
-                >
-                  {{ activeEvent.action }}
-                </span>
-              </h3>
-              <p class="text-xs text-muted-foreground font-mono mt-0.5">
-                ID: {{ activeEvent.event_id }} • {{ new Date(activeEvent.timestamp).toISOString() }}
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            data-testid="modal-close-btn"
-            @click="closeModal"
-            class="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors cursor-pointer"
-          >
-            <X class="w-5 h-5" />
-          </button>
-        </div>
-
-        <!-- Modal Body Content -->
-        <div class="flex-1 overflow-y-auto p-6 space-y-5 text-xs font-mono bg-popover text-popover-foreground">
-          <!-- Request & Client Summary Grid -->
-          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 font-sans">
-            <div class="p-3 bg-muted/40 border border-border rounded-lg">
-              <span class="text-[10px] text-muted-foreground uppercase tracking-wider block mb-1">Target Host</span>
-              <span class="font-mono text-foreground truncate block">{{ activeEvent.host }}</span>
-            </div>
-            <div class="p-3 bg-muted/40 border border-border rounded-lg">
-              <span class="text-[10px] text-muted-foreground uppercase tracking-wider block mb-1">Client IP</span>
-              <span class="font-mono text-foreground block">{{ activeEvent.client_ip }}</span>
-            </div>
-            <div class="p-3 bg-muted/40 border border-border rounded-lg">
-              <span class="text-[10px] text-muted-foreground uppercase tracking-wider block mb-1">Rule ID</span>
-              <span class="font-mono text-warning font-semibold block truncate">
-                {{ activeEvent.rule_id || 'NONE' }}
-              </span>
-            </div>
-            <div class="p-3 bg-muted/40 border border-border rounded-lg">
-              <span class="text-[10px] text-muted-foreground uppercase tracking-wider block mb-1">Latency</span>
-              <span class="font-mono text-foreground block">{{ formatLatency(activeEvent.latency) }}</span>
-            </div>
-          </div>
-
-          <!-- JA4 Fingerprint & GeoData -->
-          <div class="p-3.5 bg-muted/30 border border-border rounded-lg space-y-1.5">
-            <div v-if="activeEvent.ja4" class="flex items-center gap-2">
-              <span class="text-muted-foreground">JA4 Fingerprint:</span>
-              <span class="text-foreground font-semibold">{{ activeEvent.ja4 }}</span>
-            </div>
-            <div v-if="activeEvent.geo_data" class="flex items-center gap-2">
-              <span class="text-muted-foreground">Geo Intelligence:</span>
-              <span class="text-foreground">
-                {{ activeEvent.geo_data.country || (isPrivateIP(activeEvent.client_ip) ? 'Internal / Private Network (RFC 1918)' : 'Unknown / Unresolved') }}
-                {{ activeEvent.geo_data.city ? ', ' + activeEvent.geo_data.city : '' }}
-                {{ activeEvent.geo_data.asn ? ' (AS' + activeEvent.geo_data.asn + ')' : '' }}
-              </span>
-            </div>
-          </div>
-
-          <!-- Sanitized Headers -->
-          <div>
-            <h4 class="text-xs font-semibold text-foreground uppercase tracking-wider font-sans mb-2 flex items-center justify-between">
-              <span>Sanitized Request Headers</span>
-              <span class="text-[10px] text-muted-foreground font-normal">PII/PCI-DSS masked</span>
-            </h4>
-            <div class="p-3.5 bg-muted/60 border border-border rounded-lg overflow-x-auto max-h-48 text-foreground font-mono text-xs">
-              <pre>{{ JSON.stringify(activeEvent.headers || {}, null, 2) }}</pre>
-            </div>
-          </div>
-
-          <!-- Sanitized Raw Payload / Query Snippet -->
-          <div>
-            <h4 class="text-xs font-semibold text-foreground uppercase tracking-wider font-sans mb-2 flex items-center justify-between">
-              <span>{{ activeEvent.method === 'GET' ? 'Inspected Query & URI Parameters' : 'Payload Snippet' }}</span>
-              <span class="text-[10px] text-muted-foreground font-normal">Clamped to 2 KB cap</span>
-            </h4>
-            <div class="p-3.5 bg-muted/60 border border-border rounded-lg overflow-x-auto max-h-48 text-foreground font-mono text-xs">
-              <pre>{{ getPayloadOrQuery(activeEvent) }}</pre>
-            </div>
-          </div>
-        </div>
-
-        <!-- Modal Footer Actions -->
-        <div class="flex items-center justify-between px-6 py-3.5 border-t border-border bg-card font-sans">
-          <div class="text-xs text-muted-foreground">
-            <span v-if="activeEvent.action === 'allow'" class="text-success flex items-center gap-1.5 font-medium">
-              <CheckCircle2 class="w-3.5 h-3.5 text-success" />
-              <span>Request verified benign and allowed. No false-positive rule exception required.</span>
-            </span>
-            <span v-else>
-              Clicking Create Exception pre-populates bypass criteria in Access Control
-            </span>
-          </div>
-          <div class="flex items-center gap-2">
-            <button
-              type="button"
-              @click="closeModal"
-              class="px-4 py-2 text-xs font-medium text-foreground hover:bg-muted rounded-lg border border-border transition-colors cursor-pointer"
-            >
-              Close
-            </button>
-            <button
-              v-if="activeEvent.action !== 'allow'"
-              type="button"
-              data-testid="modal-create-exception-btn"
-              @click="handleCreateException(activeEvent)"
-              class="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-primary-foreground bg-primary hover:bg-primary/90 active:brightness-95 rounded-lg shadow-none transition-colors cursor-pointer"
-            >
-              <ExternalLink class="w-3.5 h-3.5" />
-              <span>Create Exception</span>
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+      :event="activeEvent"
+      :curl-state="curlState"
+      :groups="ipGroups"
+      :group-status="groupStatus"
+      @close="closeDrawer"
+      @copy-curl="handleCopyCurl"
+      @create-exception="handleCreateException(activeEvent)"
+      @add-to-ipgroup="handleAddToIPGroup"
+    />
   </div>
 </template>
