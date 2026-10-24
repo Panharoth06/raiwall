@@ -248,45 +248,107 @@ test.describe('Comprehensive End-to-End Feature & Interactive Button Audit', () 
   });
 
   // 8. Anti-Bot Defense Configuration
-  test('8. Anti-Bot Defense: stages challenge policy and manages a host override', async ({ page }) => {
-    await page.goto('#/anti-bot');
-    await page.waitForTimeout(400);
+  test('8. Anti-Bot Defense: configures application-scoped BOT Protect', async ({ page }) => {
+    const auth = { Authorization: `Basic ${Buffer.from('admin:admin').toString('base64')}` };
+    const hosts = ['e2e-bot.example.com', 'edge.e2e-bot.example.com'];
+    let createdSiteId: string | null = null;
 
-    await expect(page.locator('h1')).toContainText('Anti-Bot Defense');
+    // The application flow needs at least one protected site. Create a temporary one when the
+    // environment has no applications, then remove it after the assertion run.
+    const sitesResponse = await page.request.get('/.raiwall/api/v1/sites', { headers: auth });
+    const sites = sitesResponse.ok() ? await sitesResponse.json() : [];
+    if (!Array.isArray(sites) || sites.length === 0) {
+      const created = await page.request.post('/.raiwall/api/v1/sites', {
+        headers: auth,
+        data: { name: 'E2E Bot App', hostnames: hosts, mode: 'defense', upstreams: [] },
+      });
+      if (created.ok()) {
+        createdSiteId = (await created.json()).id;
+        await page.reload();
+        if (await page.locator('input[type="password"]').isVisible().catch(() => false)) {
+          await page.fill('input[placeholder="Username"]', 'admin');
+          await page.fill('input[type="password"]', 'admin');
+          await page.click('button[type="submit"]');
+          await page.waitForTimeout(600);
+        }
+      }
+    }
 
-    // Stage the global challenge policy
-    await page.locator('[data-testid="pow-enabled"]').click();
-    await page.locator('[data-testid="difficulty-preset-100000"]').click();
-    await page.locator('[data-testid="save-bot-policy"]').click();
-    await expect(page.locator('[data-testid="bot-notice"]')).toContainText('staged to the config draft');
+    try {
+      await page.goto('#/anti-bot');
+      await page.waitForTimeout(400);
 
-    // Add a per-host override
-    await page.locator('[data-testid="bot-add-host"]').click();
-    await page.waitForSelector('[data-testid="bot-host-input"]');
-    await page.fill('[data-testid="bot-host-input"]', 'e2e-bot.example.com');
-    await page.locator('[data-testid="bot-difficulty-input"] input').fill('30000');
-    await page.fill('[data-testid="bot-traps-input"]', '/trap/e2e');
-    await page.locator('[data-testid="bot-save-host"]').click();
+      await expect(page.locator('h1')).toContainText('Anti-Bot Defense');
+      await expect(page.locator('[data-testid="bot-app-table"]')).toBeVisible();
+      await expect(page.locator('[data-testid="bot-global-row"]')).toBeVisible();
+      await expect(page.locator('[data-testid="bot-activity-card"]')).toBeVisible();
 
-    const row = page.locator('[data-testid="bot-host-row"]').filter({ hasText: 'e2e-bot.example.com' });
-    await expect(row).toBeVisible();
-    await expect(row).toContainText('/trap/e2e');
+      const dialog = page.locator('[data-testid="bot-protect-dialog"]');
 
-    // Edit the override difficulty
-    await row.locator('[data-testid="bot-edit-host"]').click();
-    await page.waitForSelector('[data-testid="bot-host-input"]');
-    await page.locator('[data-testid="bot-difficulty-input"] input').fill('40000');
-    await page.locator('[data-testid="bot-save-host"]').click();
-    await expect(row).toContainText('40,000');
+      // Global fallback policy
+      await page.locator('[data-testid="bot-configure-global"]').click();
+      await expect(dialog).toBeVisible();
+      if (!(await page.locator('[data-testid="bot-difficulty-slider"]').isVisible())) {
+        await page.locator('[data-testid="bot-challenge-toggle"]').click();
+      }
+      await page.locator('[data-testid="bot-difficulty-preset-100000"]').click();
+      await page.locator('[data-testid="bot-save-protect"]').click();
+      await expect(page.locator('[data-testid="bot-notice"]')).toContainText('BOT Protect saved');
 
-    // Pause the override
-    await row.locator('[data-testid="bot-toggle-host"]').click();
-    await expect(row).toContainText('Paused');
+      // Application-scoped policy
+      const appRow = page.locator('[data-testid="bot-app-row"]').first();
+      await expect(appRow).toBeVisible();
+      const applicationName = (await appRow.locator('td').first().innerText()).trim();
+      await appRow.locator('[data-testid="bot-configure-app"]').click();
+      await expect(dialog).toBeVisible();
+      await expect(dialog).toContainText(applicationName);
 
-    // Delete the override
-    page.once('dialog', (dialog) => dialog.accept());
-    await row.locator('[data-testid="bot-delete-host"]').click();
-    await expect(page.locator('[data-testid="bot-host-row"]')).toHaveCount(0);
+      const trapsInput = page.locator('[data-testid="bot-traps-input"]');
+      if (!(await trapsInput.isVisible())) {
+        await page.locator('[data-testid="bot-trap-toggle"]').click();
+      }
+      await trapsInput.fill('/trap/e2e');
+      await page.locator('[data-testid="bot-save-protect"]').click();
+      await expect(page.locator('[data-testid="bot-notice"]')).toContainText('BOT Protect saved');
+      await expect(appRow.locator('[data-testid="bot-row-status"]')).toContainText('On');
+
+      // Remove the override and confirm the global policy applies again.
+      await appRow.locator('[data-testid="bot-configure-app"]').click();
+      await expect(page.locator('[data-testid="bot-reset-policy"]')).toBeVisible();
+      await page.locator('[data-testid="bot-reset-policy"]').click();
+      await expect(page.locator('[data-testid="bot-notice"]')).toContainText('override removed');
+      await expect(appRow.locator('[data-testid="bot-row-status"]')).toContainText(
+        'Inherits global'
+      );
+
+      // Applications table entry point opens the same application-scoped dialog.
+      await page.goto('#/sites');
+      const siteRow = page.locator('tr').filter({ hasText: applicationName }).first();
+      await siteRow.locator('[data-testid="site-bot-protect"]').click();
+      await expect(page.locator('[data-testid="bot-protect-dialog"]')).toBeVisible();
+      await expect(page.locator('[data-testid="bot-protect-dialog"]')).toContainText(
+        applicationName
+      );
+      await page.locator('[data-testid="bot-cancel-protect"]').click();
+      await expect(page.locator('[data-testid="bot-protect-dialog"]')).toHaveCount(0);
+    } finally {
+      const configsResponse = await page.request.get('/.raiwall/api/v1/policies/bot', {
+        headers: auth,
+      });
+      if (configsResponse.ok()) {
+        const configs = (await configsResponse.json()) as Array<{ id: string; host: string }>;
+        for (const config of configs) {
+          if (hosts.includes(config.host)) {
+            await page.request.delete(`/.raiwall/api/v1/policies/bot/${config.id}`, {
+              headers: auth,
+            });
+          }
+        }
+      }
+      if (createdSiteId) {
+        await page.request.delete(`/.raiwall/api/v1/sites/${createdSiteId}`, { headers: auth });
+      }
+    }
   });
 
   // 9. Deployments & Staged Snapshot Apply

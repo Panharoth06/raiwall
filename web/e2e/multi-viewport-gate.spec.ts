@@ -70,24 +70,27 @@ for (const vp of viewports) {
       }
     });
 
-    test(`anti-bot policy and override dialog remain usable (${vp.name})`, async ({ page }) => {
+    test(`anti-bot application policy and BOT Protect dialog remain usable (${vp.name})`, async ({ page }) => {
       await login(page);
       await page.goto('#/anti-bot');
 
-      await expect(page.locator('[data-testid="bot-policy-card"]')).toBeVisible();
-      await expect(page.locator('[data-testid="bot-host-card"]')).toBeVisible();
+      await expect(page.locator('[data-testid="bot-app-table"]')).toBeVisible();
       await expect(page.locator('[data-testid="bot-activity-card"]')).toBeVisible();
       await expectNoHorizontalOverflow(page);
 
-      await page.locator('[data-testid="bot-add-host"]').click();
-      const dialog = page.locator('[data-testid="bot-host-dialog"]');
+      await page.locator(
+        vp.width >= 1024
+          ? '[data-testid="bot-configure-global"]'
+          : '[data-testid="bot-configure-global-mobile"]'
+      ).click();
+      const dialog = page.locator('[data-testid="bot-protect-dialog"]');
       await expect(dialog).toBeVisible();
 
       const box = await dialog.boundingBox();
       expect(box).not.toBeNull();
       expect(box!.width).toBeLessThanOrEqual(vp.width);
 
-      await page.locator('[data-testid="bot-cancel-host"]').click();
+      await page.locator('[data-testid="bot-cancel-protect"]').click();
       await expect(dialog).toHaveCount(0);
     });
 

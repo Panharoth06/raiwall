@@ -1,35 +1,21 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { computed, onMounted, ref } from 'vue';
+import { useRoute } from '@/router';
 import { useConfigStore } from '@/stores/config';
-import type { PolicySettings } from '@/api/client';
-import type { BotConfig, BotConfigDraft } from '@/api/bot';
+import type { BotConfig } from '@/api/bot';
+import type { BotPolicyDraft, BotPolicyTarget } from '@/composables/useAntiBot';
 import { useAntiBot } from '@/composables/useAntiBot';
-import BotPolicyCard from '@/components/anti-bot/BotPolicyCard.vue';
-import BotHostTable from '@/components/anti-bot/BotHostTable.vue';
-import BotHostDialog from '@/components/anti-bot/BotHostDialog.vue';
+import BotAppTable from '@/components/anti-bot/BotAppTable.vue';
+import BotProtectDialog from '@/components/anti-bot/BotProtectDialog.vue';
 import ChallengeActivity from '@/components/anti-bot/ChallengeActivity.vue';
+import type { BotAppRow } from '@/components/anti-bot/types';
 import { Badge } from '@/components/ui/badge';
 import { Bot, CheckCircle2, AlertTriangle } from 'lucide-vue-next';
 
-/** Fallback used only when the policy store has not loaded yet. Mirrors server defaults. */
-const FALLBACK_POLICY: PolicySettings = {
-  tier1_rate: 100,
-  tier1_burst: 200,
-  tier2_threshold: 10,
-  tier2_ban_seconds: 3600,
-  tier3_threshold: 25,
-  tier3_ban_seconds: 7200,
-  bot_defense_mode: 'defense',
-  pow_difficulty: 50_000,
-  honeypot_enabled: true,
-  waiting_room_enabled: false,
-  waiting_room_max_concurrent: 1000,
-  waiting_room_paths: [],
-};
-
+const route = useRoute();
 const configStore = useConfigStore();
 const {
-  hostOverrides,
+  globalConfig,
   configsLoading,
   configsError,
   recentChallenges,
@@ -39,22 +25,24 @@ const {
   uniqueJA4,
   activityLoading,
   activityError,
-  load,
+  resolvePolicy,
+  buildRows,
   loadConfigs,
   loadActivity,
-  createConfig,
-  updateConfig,
-  removeConfig,
-  toggleConfig,
+  savePolicy,
+  resetPolicy,
 } = useAntiBot();
 
-const form = reactive({
-  powEnabled: true,
-  difficulty: 50_000,
-  honeypot: true,
-});
+const rows = computed<BotAppRow[]>(() => buildRows(configStore.sites ?? []));
 
-const savingPolicy = ref(false);
+const dialogOpen = ref(false);
+const dialogTarget = ref<BotPolicyTarget | null>(null);
+const dialogConfig = ref<BotConfig | null>(null);
+const dialogInherited = ref(false);
+const dialogCustom = ref(false);
+const dialogSaving = ref(false);
+const dialogError = ref('');
+
 const notice = ref<{ kind: 'success' | 'error'; text: string } | null>(null);
 let noticeTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -70,67 +58,45 @@ function errorText(err: unknown) {
   return err instanceof Error && err.message ? err.message : 'Unexpected request failure.';
 }
 
-function syncPolicy(policies: PolicySettings | null) {
-  if (!policies) return;
-  form.powEnabled =
-    policies.bot_defense_mode === 'defense' || policies.bot_defense_mode === 'challenge';
-  form.difficulty = policies.pow_difficulty || FALLBACK_POLICY.pow_difficulty;
-  form.honeypot = policies.honeypot_enabled;
-}
-
-watch(() => configStore.policies, syncPolicy, { immediate: true, deep: true });
-
-async function savePolicy() {
-  savingPolicy.value = true;
-  try {
-    const base = configStore.policies ?? FALLBACK_POLICY;
-    await configStore.savePolicies({
-      ...base,
-      bot_defense_mode: form.powEnabled ? 'defense' : 'audit',
-      pow_difficulty: form.difficulty,
-      honeypot_enabled: form.honeypot,
-    });
-    pushNotice('success', 'Bot policy staged to the config draft. Deploy to activate.');
-  } catch (err) {
-    pushNotice('error', `Policy save failed: ${errorText(err)}`);
-  } finally {
-    savingPolicy.value = false;
+function openProtect(row: BotAppRow) {
+  if (!row.global && row.hostnames.length === 0) {
+    pushNotice('error', 'Add a hostname to this application before configuring BOT Protect.');
+    return;
   }
-}
 
-// Per-host override dialog
-const dialogOpen = ref(false);
-const editingConfig = ref<BotConfig | null>(null);
-const dialogSaving = ref(false);
-const dialogError = ref('');
-
-const hostSuggestions = computed(() =>
-  (configStore.sites ?? []).flatMap((site) => site.hostnames ?? []).filter((host) => host !== '*')
-);
-
-function openAddOverride() {
-  editingConfig.value = null;
   dialogError.value = '';
+  dialogTarget.value = {
+    name: row.name,
+    hostnames: row.hostnames,
+    global: row.global,
+  };
+
+  if (row.global) {
+    dialogConfig.value = globalConfig.value;
+    dialogInherited.value = false;
+    dialogCustom.value = false;
+  } else {
+    const resolved = resolvePolicy(row.hostnames);
+    dialogConfig.value = resolved.config;
+    dialogInherited.value = resolved.inherited;
+    dialogCustom.value = resolved.custom;
+  }
+
   dialogOpen.value = true;
 }
 
-function openEditOverride(config: BotConfig) {
-  editingConfig.value = config;
-  dialogError.value = '';
-  dialogOpen.value = true;
-}
-
-async function saveOverride(draft: BotConfigDraft) {
+async function handleSave(draft: BotPolicyDraft) {
+  if (!dialogTarget.value) return;
+  const target = dialogTarget.value;
   dialogSaving.value = true;
   dialogError.value = '';
   try {
-    if (editingConfig.value) {
-      await updateConfig(editingConfig.value.id, draft);
-    } else {
-      await createConfig(draft);
-    }
+    await savePolicy(target, draft);
     dialogOpen.value = false;
-    pushNotice('success', `Override saved for ${draft.host}.`);
+    const scope = target.global
+      ? 'all unconfigured hosts'
+      : `${target.name} (${target.hostnames.length} hostname${target.hostnames.length === 1 ? '' : 's'})`;
+    pushNotice('success', `BOT Protect saved for ${scope}. Compile the draft to activate.`);
   } catch (err) {
     dialogError.value = errorText(err);
   } finally {
@@ -138,25 +104,38 @@ async function saveOverride(draft: BotConfigDraft) {
   }
 }
 
-async function deleteOverride(config: BotConfig) {
-  if (!confirm(`Delete the bot override for ${config.host}?`)) return;
+async function handleReset() {
+  if (!dialogTarget.value) return;
+  const target = dialogTarget.value;
+  dialogSaving.value = true;
+  dialogError.value = '';
   try {
-    await removeConfig(config.id);
-    pushNotice('success', `Override removed for ${config.host}.`);
+    await resetPolicy(target.hostnames);
+    dialogOpen.value = false;
+    pushNotice('success', `BOT Protect override removed for ${target.name}.`);
   } catch (err) {
-    pushNotice('error', `Delete failed: ${errorText(err)}`);
+    dialogError.value = errorText(err);
+  } finally {
+    dialogSaving.value = false;
   }
 }
 
-async function toggleOverride(config: BotConfig) {
-  try {
-    await toggleConfig(config);
-  } catch (err) {
-    pushNotice('error', `Update failed: ${errorText(err)}`);
+function openFromQuery() {
+  const siteId = route.value?.query?.app;
+  if (!siteId) return;
+  const row = rows.value.find((item) => item.id === siteId);
+  if (row) openProtect(row);
+  // Consume the deep-link parameter without triggering another hash navigation.
+  if (typeof window !== 'undefined' && window.location.hash.includes('?')) {
+    window.history.replaceState(null, '', '#/anti-bot');
   }
 }
 
-onMounted(load);
+onMounted(async () => {
+  void loadActivity();
+  await loadConfigs();
+  openFromQuery();
+});
 </script>
 
 <template>
@@ -168,11 +147,13 @@ onMounted(load);
           <span>Anti-Bot Defense</span>
         </h1>
         <p class="text-sm text-muted-foreground mt-1 leading-relaxed">
-          JA4 fingerprint verification, stateless SHA-256 proof-of-work, and crawler traps for
-          browser routes.
+          Configure BOT Protect per application: proof-of-work challenges, crawler traps, and 24h
+          challenge telemetry.
         </p>
       </div>
-      <Badge variant="outline" class="font-mono text-[10px] uppercase">JA4 · SHA-256 PoW</Badge>
+      <Badge variant="outline" class="font-mono text-[10px] uppercase">
+        Application-scoped · PoW · JA4
+      </Badge>
     </div>
 
     <div
@@ -191,28 +172,14 @@ onMounted(load);
       <span class="min-w-0 break-words">{{ notice.text }}</span>
     </div>
 
-    <div class="flex-1 min-h-0 overflow-y-auto space-y-4 pr-1">
-      <BotPolicyCard
-        :pow-enabled="form.powEnabled"
-        :difficulty="form.difficulty"
-        :honeypot="form.honeypot"
-        :saving="savingPolicy"
-        @update:pow-enabled="form.powEnabled = $event"
-        @update:difficulty="form.difficulty = $event"
-        @update:honeypot="form.honeypot = $event"
-        @save="savePolicy"
-      />
-
+    <div class="flex-1 min-h-0 overflow-y-auto pr-1">
       <div class="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
         <div class="xl:col-span-2 min-w-0">
-          <BotHostTable
-            :configs="hostOverrides"
+          <BotAppTable
+            :rows="rows"
             :loading="configsLoading"
             :error="configsError"
-            @add="openAddOverride"
-            @edit="openEditOverride"
-            @remove="deleteOverride"
-            @toggle="toggleOverride"
+            @configure="openProtect"
             @retry="loadConfigs"
           />
         </div>
@@ -232,14 +199,17 @@ onMounted(load);
       </div>
     </div>
 
-    <BotHostDialog
+    <BotProtectDialog
       :open="dialogOpen"
-      :config="editingConfig"
-      :suggestions="hostSuggestions"
+      :target="dialogTarget"
+      :config="dialogConfig"
+      :inherited="dialogInherited"
+      :custom="dialogCustom"
       :saving="dialogSaving"
       :error="dialogError"
       @close="dialogOpen = false"
-      @save="saveOverride"
+      @save="handleSave"
+      @reset="handleReset"
     />
   </div>
 </template>

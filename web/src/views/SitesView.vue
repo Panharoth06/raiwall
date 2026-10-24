@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
+import { useRouter } from '@/router';
 import { useConfigStore } from '@/stores/config';
 import type { Site } from '@/api/client';
 import SiteDialog from '@/components/SiteDialog.vue';
@@ -13,8 +14,9 @@ import {
   TableRow,
   TableCell,
 } from '@/components/ui/table';
-import { Plus, Globe, Edit2, Trash2, ShieldCheck, Eye, PowerOff, Server } from 'lucide-vue-next';
+import { Plus, Globe, Edit2, Trash2, ShieldCheck, Eye, PowerOff, Server, Bot } from 'lucide-vue-next';
 
+const router = useRouter();
 const configStore = useConfigStore();
 
 const dialogOpen = ref(false);
@@ -36,6 +38,10 @@ const handleSaveSite = async (siteData: Partial<Site>) => {
   } else {
     await configStore.createSite(siteData);
   }
+};
+
+const openBotProtect = (site: Site) => {
+  void router.push(`/anti-bot?app=${encodeURIComponent(site.id)}`);
 };
 
 const handleDeleteSite = async (id: string) => {
@@ -143,6 +149,16 @@ const handleDeleteSite = async (id: string) => {
               </span>
             </TableCell>
             <TableCell class="text-right space-x-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                @click="openBotProtect(site)"
+                title="BOT Protect"
+                data-testid="site-bot-protect"
+                class="h-7 w-7 text-muted-foreground hover:text-foreground"
+              >
+                <Bot class="w-3.5 h-3.5" />
+              </Button>
               <Button
                 variant="ghost"
                 size="icon"
