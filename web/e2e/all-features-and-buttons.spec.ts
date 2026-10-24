@@ -191,13 +191,13 @@ test.describe('Comprehensive End-to-End Feature & Interactive Button Audit', () 
     await page.goto('#/rules');
     await page.waitForTimeout(400);
 
-    // Subtabs: Exceptions Gate, ACL Bytecode Rules, Defense Policies
+    // Subtabs: Exceptions Gate, ACL Bytecode Rules, Rate Limits
     const aclsTab = page.locator('[role="tab"]:has-text("ACL Bytecode Rules")');
     await aclsTab.click();
     await page.waitForTimeout(300);
     expect(await page.locator('[role="tab"]:has-text("Exceptions Gate")').isVisible()).toBe(true);
 
-    const policiesTab = page.locator('[role="tab"]:has-text("Defense Policies")');
+    const policiesTab = page.locator('[role="tab"]:has-text("Rate Limits")');
     await policiesTab.click();
     await page.waitForTimeout(300);
     expect(await page.locator('[role="tab"]:has-text("Exceptions Gate")').isVisible()).toBe(true);
@@ -248,17 +248,45 @@ test.describe('Comprehensive End-to-End Feature & Interactive Button Audit', () 
   });
 
   // 8. Anti-Bot Defense Configuration
-  test('8. Anti-Bot Defense: Updates Altcha PoW difficulty and saves policies', async ({ page }) => {
+  test('8. Anti-Bot Defense: stages challenge policy and manages a host override', async ({ page }) => {
     await page.goto('#/anti-bot');
     await page.waitForTimeout(400);
 
-    const difficultyInput = page.locator('input[type="number"]').first();
-    await difficultyInput.fill('25000');
+    await expect(page.locator('h1')).toContainText('Anti-Bot Defense');
 
-    const saveBtn = page.locator('button:has-text("Save Policies to Draft")');
-    await saveBtn.click();
-    await page.waitForTimeout(500);
-    await expect(page.locator('text=Saved to draft')).toBeVisible();
+    // Stage the global challenge policy
+    await page.locator('[data-testid="pow-enabled"]').click();
+    await page.locator('[data-testid="difficulty-preset-100000"]').click();
+    await page.locator('[data-testid="save-bot-policy"]').click();
+    await expect(page.locator('[data-testid="bot-notice"]')).toContainText('staged to the config draft');
+
+    // Add a per-host override
+    await page.locator('[data-testid="bot-add-host"]').click();
+    await page.waitForSelector('[data-testid="bot-host-input"]');
+    await page.fill('[data-testid="bot-host-input"]', 'e2e-bot.example.com');
+    await page.locator('[data-testid="bot-difficulty-input"] input').fill('30000');
+    await page.fill('[data-testid="bot-traps-input"]', '/trap/e2e');
+    await page.locator('[data-testid="bot-save-host"]').click();
+
+    const row = page.locator('[data-testid="bot-host-row"]').filter({ hasText: 'e2e-bot.example.com' });
+    await expect(row).toBeVisible();
+    await expect(row).toContainText('/trap/e2e');
+
+    // Edit the override difficulty
+    await row.locator('[data-testid="bot-edit-host"]').click();
+    await page.waitForSelector('[data-testid="bot-host-input"]');
+    await page.locator('[data-testid="bot-difficulty-input"] input').fill('40000');
+    await page.locator('[data-testid="bot-save-host"]').click();
+    await expect(row).toContainText('40,000');
+
+    // Pause the override
+    await row.locator('[data-testid="bot-toggle-host"]').click();
+    await expect(row).toContainText('Paused');
+
+    // Delete the override
+    page.once('dialog', (dialog) => dialog.accept());
+    await row.locator('[data-testid="bot-delete-host"]').click();
+    await expect(page.locator('[data-testid="bot-host-row"]')).toHaveCount(0);
   });
 
   // 9. Deployments & Staged Snapshot Apply

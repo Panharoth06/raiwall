@@ -28,7 +28,7 @@ describe('RulesView.vue', () => {
         stubs: {
           ExceptionsView: { template: '<div data-testid="exceptions-subview">Exceptions SubView</div>' },
           ACLsView: { template: '<div data-testid="acls-subview">ACLs SubView</div>' },
-          PoliciesView: { template: '<div data-testid="policies-subview">Policies SubView</div>' },
+          RateLimitingSettings: { template: '<div data-testid="policies-subview">Policies SubView</div>' },
         },
       },
     });
@@ -37,7 +37,7 @@ describe('RulesView.vue', () => {
     expect(tabItems.length).toBe(3);
     expect(tabItems[0].text()).toContain('Exceptions Gate');
     expect(tabItems[1].text()).toContain('ACL Bytecode Rules');
-    expect(tabItems[2].text()).toContain('Defense Policies');
+    expect(tabItems[2].text()).toContain('Rate Limits');
 
     expect(wrapper.find('[data-testid="exceptions-subview"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="acls-subview"]').exists()).toBe(false);
@@ -53,7 +53,7 @@ describe('RulesView.vue', () => {
         stubs: {
           ExceptionsView: { template: '<div data-testid="exceptions-subview">Exceptions SubView</div>' },
           ACLsView: { template: '<div data-testid="acls-subview">ACLs SubView</div>' },
-          PoliciesView: { template: '<div data-testid="policies-subview">Policies SubView</div>' },
+          RateLimitingSettings: { template: '<div data-testid="policies-subview">Policies SubView</div>' },
         },
       },
     });
@@ -68,7 +68,7 @@ describe('RulesView.vue', () => {
     expect(wrapper.find('[data-testid="acls-subview"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="policies-subview"]').exists()).toBe(false);
 
-    // Click Defense Policies tab
+    // Click Rate Limits tab
     await tabItems[2].trigger('click');
     await nextTick();
 

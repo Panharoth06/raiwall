@@ -3,7 +3,7 @@ import { ref, watch } from 'vue';
 import { useRoute, useRouter } from '@/router';
 import ExceptionsView from './ExceptionsView.vue';
 import ACLsView from './ACLsView.vue';
-import PoliciesView from './PoliciesView.vue';
+import RateLimitingSettings from '@/components/http-flood/RateLimitingSettings.vue';
 import { Shield, FileCode, Sliders } from 'lucide-vue-next';
 import { Tabs, type Tab } from '@/components/ui/tabs';
 
@@ -46,7 +46,7 @@ watch(
 const tabs: (Tab & { id: RuleSubTab })[] = [
   { id: 'exceptions', label: 'Exceptions Gate', icon: Shield, description: 'Parameter-level false-positive bypasses' },
   { id: 'acls', label: 'ACL Bytecode Rules', icon: FileCode, description: 'Sub-15ns expr-lang boolean ACLs' },
-  { id: 'policies', label: 'Defense Policies', icon: Sliders, description: 'Rate limiting & PoW bot defense' },
+  { id: 'policies', label: 'Rate Limits', icon: Sliders, description: 'Three-tier velocity, attack, and scanner limits' },
 ];
 
 const handleTabChange = (tabId: string) => {
@@ -70,7 +70,7 @@ const handleTabChange = (tabId: string) => {
     <div class="flex-1 min-h-0 overflow-y-auto pr-1">
       <ExceptionsView v-if="activeTab === 'exceptions'" />
       <ACLsView v-else-if="activeTab === 'acls'" />
-      <PoliciesView v-else-if="activeTab === 'policies'" />
+      <RateLimitingSettings v-else-if="activeTab === 'policies'" />
     </div>
   </div>
 </template>

@@ -231,7 +231,7 @@ import SitesView from '@/views/SitesView.vue';
 import SiteDetailView from '@/views/SiteDetailView.vue';
 import ExceptionsView from '@/views/ExceptionsView.vue';
 import ACLsView from '@/views/ACLsView.vue';
-import PoliciesView from '@/views/PoliciesView.vue';
+import AntiBotView from '@/views/AntiBotView.vue';
 import HttpFloodView from '@/views/HttpFloodView.vue';
 import SettingsView from '@/views/SettingsView.vue';
 import DeploymentsView from '@/views/DeploymentsView.vue';
@@ -264,7 +264,7 @@ export const router = createSimpleRouter([
   { path: '/auth-gateway/users', name: 'auth-gateway-users', component: AuthGatewayView },
   { path: '/auth-gateway/sso', name: 'auth-gateway-sso', component: AuthGatewayView },
   { path: '/auth-gateway/idp', name: 'auth-gateway-idp', component: AuthGatewayView },
-  { path: '/anti-bot', name: 'anti-bot', component: PoliciesView },
+  { path: '/anti-bot', name: 'anti-bot', component: AntiBotView },
   { path: '/block-pages', name: 'block-pages', component: BlockPagesView },
   { path: '/templates', name: 'templates', component: BlockPagesView },
   { path: '/auth', name: 'auth', component: SettingsView },

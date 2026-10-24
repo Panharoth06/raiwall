@@ -20,6 +20,8 @@ import {
   Moon,
   ChevronRight,
   FileCode,
+  Menu,
+  X,
 } from 'lucide-vue-next';
 import { useTheme } from '@/composables/useTheme';
 
@@ -97,6 +99,7 @@ const navItems: NavItem[] = [
 ];
 
 const expandedMenus = ref<Record<string, boolean>>({});
+const mobileNavOpen = ref(false);
 
 const isExpanded = (path: string): boolean => {
   if (expandedMenus.value[path] !== undefined) {
@@ -145,10 +148,12 @@ const isItemActive = (path: string): boolean => {
 const isTopologyActive = computed(() => currentPath.value.startsWith('/topology') || currentPath.value.startsWith('/command-center'));
 
 const navigateTo = (path: string) => {
+  mobileNavOpen.value = false;
   router.push(path);
 };
 
 const handleLogout = async () => {
+  mobileNavOpen.value = false;
   await authStore.logout();
   router.push('/login');
 };
@@ -156,10 +161,19 @@ const handleLogout = async () => {
 
 <template>
   <div class="h-full w-full overflow-hidden bg-background text-foreground flex font-sans">
+    <!-- Mobile sidebar backdrop -->
+    <div
+      v-if="mobileNavOpen"
+      class="fixed inset-0 z-30 bg-black/50 lg:hidden"
+      aria-hidden="true"
+      @click="mobileNavOpen = false"
+    />
+
     <!-- Persistent Left Sidebar with Command Center Theme -->
     <aside
       data-testid="nav-rail"
-      class="w-60 h-full bg-card border-r border-border flex flex-col flex-shrink-0 select-none overflow-hidden"
+      class="fixed inset-y-0 left-0 z-40 w-60 h-full bg-card border-r border-border flex flex-col flex-shrink-0 select-none overflow-hidden transition-transform duration-150 lg:static lg:translate-x-0"
+      :class="mobileNavOpen ? 'translate-x-0' : '-translate-x-full'"
     >
       <!-- Brand Header with Crisp High-Resolution PNG Logo -->
       <div class="h-14 px-4 border-b border-border flex items-center justify-between flex-shrink-0">
@@ -172,6 +186,15 @@ const handleLogout = async () => {
           />
           <span class="font-bold text-foreground text-base tracking-tight block">Raiwall</span>
         </div>
+        <button
+          type="button"
+          data-testid="nav-mobile-close"
+          class="lg:hidden flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+          aria-label="Close navigation"
+          @click="mobileNavOpen = false"
+        >
+          <X class="w-4 h-4" />
+        </button>
       </div>
 
       <!-- Operations / Command Center Quick Access -->
@@ -321,6 +344,17 @@ const handleLogout = async () => {
       <!-- Top Action Bar -->
       <header class="h-14 bg-card border-b border-border px-5 flex items-center justify-between flex-shrink-0">
         <div class="flex items-center gap-3">
+          <button
+            type="button"
+            data-testid="nav-mobile-toggle"
+            class="lg:hidden flex items-center justify-center w-8 h-8 rounded-md border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+            :aria-label="mobileNavOpen ? 'Close navigation' : 'Open navigation'"
+            :aria-expanded="mobileNavOpen"
+            @click="mobileNavOpen = !mobileNavOpen"
+          >
+            <X v-if="mobileNavOpen" class="w-4 h-4" />
+            <Menu v-else class="w-4 h-4" />
+          </button>
           <!-- Staged Deployment Alert Banner -->
           <button
             v-if="configStore.hasDraftChanges"

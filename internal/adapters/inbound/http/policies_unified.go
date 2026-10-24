@@ -60,8 +60,7 @@ func (s *Server) handleGetUnifiedPolicies(w http.ResponseWriter, r *http.Request
 		}
 	}
 
-	if len(botConfigs) > 0 {
-		bc := botConfigs[0]
+	if bc := globalBotConfig(botConfigs); bc != nil {
 		resp.PowDifficulty = int(bc.PowDifficulty)
 		if bc.PowEnabled == 1 {
 			resp.BotDefenseMode = "defense"
@@ -156,10 +155,10 @@ func (s *Server) handleUpdateUnifiedPolicies(w http.ResponseWriter, r *http.Requ
 	}
 	trapsJSON, _ := json.Marshal(traps)
 
-	if len(botConfigs) > 0 {
+	if global := globalBotConfig(botConfigs); global != nil {
 		_ = s.store.UpdateBotConfig(ctx, control.BotConfig{
-			ID:            botConfigs[0].ID,
-			Host:          botConfigs[0].Host,
+			ID:            global.ID,
+			Host:          global.Host,
 			PowEnabled:    powEnabled,
 			PowDifficulty: int64(req.PowDifficulty),
 			TrapUrls:      string(trapsJSON),
@@ -180,6 +179,17 @@ func (s *Server) handleUpdateUnifiedPolicies(w http.ResponseWriter, r *http.Requ
 	}
 
 	respondJSON(w, http.StatusOK, req)
+}
+
+// globalBotConfig returns the wildcard bot policy. Global edits must never
+// overwrite a per-host override that happens to be first in the list.
+func globalBotConfig(configs []control.BotConfig) *control.BotConfig {
+	for i := range configs {
+		if configs[i].Host == "*" {
+			return &configs[i]
+		}
+	}
+	return nil
 }
 
 // ReleaseBanRequest represents a request to unblock an IP or ban key.

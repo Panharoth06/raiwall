@@ -42,6 +42,22 @@ for (const vp of viewports) {
     test(`renders every control-plane view without overflow (${vp.name})`, async ({ page }) => {
       await login(page);
 
+      if (vp.width < 1024) {
+        // The sidebar becomes an off-canvas drawer on tablet and mobile.
+        const rail = page.locator('[data-testid="nav-rail"]');
+        await page.locator('[data-testid="nav-mobile-toggle"]').click();
+        await page.waitForTimeout(250);
+        const openBox = await rail.boundingBox();
+        expect(openBox).not.toBeNull();
+        expect(openBox!.x).toBeGreaterThanOrEqual(0);
+
+        await page.locator('[data-testid="nav-mobile-close"]').click();
+        await page.waitForTimeout(250);
+        const closedBox = await rail.boundingBox();
+        expect(closedBox).not.toBeNull();
+        expect(closedBox!.x + closedBox!.width).toBeLessThanOrEqual(1);
+      }
+
       for (const route of routes) {
         await page.goto(`#${route}`);
         await page.waitForTimeout(250);
@@ -52,6 +68,27 @@ for (const vp of viewports) {
         expect(bodyText).not.toContain('Internal Server Error');
         expect(bodyText).not.toContain('Cannot read properties');
       }
+    });
+
+    test(`anti-bot policy and override dialog remain usable (${vp.name})`, async ({ page }) => {
+      await login(page);
+      await page.goto('#/anti-bot');
+
+      await expect(page.locator('[data-testid="bot-policy-card"]')).toBeVisible();
+      await expect(page.locator('[data-testid="bot-host-card"]')).toBeVisible();
+      await expect(page.locator('[data-testid="bot-activity-card"]')).toBeVisible();
+      await expectNoHorizontalOverflow(page);
+
+      await page.locator('[data-testid="bot-add-host"]').click();
+      const dialog = page.locator('[data-testid="bot-host-dialog"]');
+      await expect(dialog).toBeVisible();
+
+      const box = await dialog.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.width).toBeLessThanOrEqual(vp.width);
+
+      await page.locator('[data-testid="bot-cancel-host"]').click();
+      await expect(dialog).toHaveCount(0);
     });
 
     test(`incident drill-down and forensic drawer work (${vp.name})`, async ({ page }) => {
