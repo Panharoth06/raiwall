@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Panharoth06/raiwall/internal/core/bot"
@@ -147,6 +148,36 @@ func extractHeadersMap(h http.Header) map[string]string {
 		if len(v) > 0 {
 			res[k] = v[0]
 		}
+	}
+	return res
+}
+
+// normalizePayloadLocation maps WAF verdict surfaces to the canonical forensic location enum.
+func normalizePayloadLocation(location string) string {
+	switch strings.ToLower(location) {
+	case "query":
+		return "QUERY"
+	case "body":
+		return "BODY"
+	case "path":
+		return "URLPATH"
+	case "cookie":
+		return "COOKIE"
+	case "":
+		return ""
+	default:
+		return "HEADER"
+	}
+}
+
+// cloneHeaderMap deep-copies a multi-value header map for forensic response capture.
+func cloneHeaderMap(h http.Header) map[string][]string {
+	if len(h) == 0 {
+		return nil
+	}
+	res := make(map[string][]string, len(h))
+	for k, v := range h {
+		res[k] = append([]string(nil), v...)
 	}
 	return res
 }

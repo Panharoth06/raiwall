@@ -140,6 +140,10 @@ func (m *Middleware) forwardAndInspectResponse(
 	action := "allow"
 	severity := "info"
 	ruleID := ""
+	location, token, category := "", "", ""
+	if verdict != nil {
+		location, token, category = verdict.PayloadLocation, verdict.MatchedToken, verdict.AttackCategory
+	}
 	if verdict != nil && verdict.Action == waf.ActionBlock && currentMode == control.ModeAudit {
 		action = "audit"
 		severity = "medium"
@@ -161,6 +165,10 @@ func (m *Middleware) forwardAndInspectResponse(
 		TruncatedPayload: string(bodyBytes),
 		Latency:          time.Since(startTime),
 		StatusCode:       interceptor.StatusCode(),
+		PayloadLocation:  normalizePayloadLocation(location),
+		MatchedToken:     token,
+		AttackCategory:   category,
+		ResponseHeaders:  cloneHeaderMap(interceptor.Header()),
 	})
 
 	return nextErr

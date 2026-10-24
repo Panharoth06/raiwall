@@ -144,6 +144,11 @@ func (m *Middleware) inspectWAFRequest(
 				TruncatedPayload: string(bodyBytes),
 				Latency:          time.Since(startTime),
 				StatusCode:       statusCode,
+				PayloadLocation:  normalizePayloadLocation(verdict.PayloadLocation),
+				MatchedToken:     verdict.MatchedToken,
+				AttackCategory:   verdict.AttackCategory,
+				ResponseHeaders:  map[string][]string{"Content-Type": {"text/html; charset=utf-8"}},
+				ResponseBody:     []byte(rendered),
 			})
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 			w.Header().Set("X-Raiwall-Event-ID", eventID)
