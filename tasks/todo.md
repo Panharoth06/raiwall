@@ -454,15 +454,15 @@
 **Description:** Enhance `web/src/router/index.ts` so that `SimpleRouter` fully supports hash-based URL query strings (e.g. `#/attacks?ip=1.2.3.4&tab=log`) and route parameters. Parse search parameters using `URLSearchParams` and expose reactive `query` and `params` in `useRoute()`. Update `web/src/App.vue` to render `LoginView` when on `#/login` and `DashboardLayout` wrapping `<RouterView />` for authenticated routes, deconstructing the hardcoded `WafCommandCenter` fallback.
 
 **Acceptance criteria:**
-- [ ] `SimpleRouter` parses hash paths containing query parameters (e.g. `#/attacks?tab=log&ip=10.0.0.1`) without breaking route matching.
-- [ ] `useRoute().value.query` returns a reactive key-value map of current URL query parameters.
-- [ ] `useRoute().value.params` correctly captures dynamic route parameters (e.g. `/sites/:id`).
-- [ ] `web/src/App.vue` mounts `<RouterView />` inside `DashboardLayout.vue`.
-- [ ] All 53 existing Vitest tests continue to pass.
+- [x] `SimpleRouter` parses hash paths containing query parameters (e.g. `#/attacks?tab=log&ip=10.0.0.1`) without breaking route matching.
+- [x] `useRoute().value.query` returns a reactive key-value map of current URL query parameters.
+- [x] `useRoute().value.params` correctly captures dynamic route parameters (e.g. `/sites/:id`).
+- [x] `web/src/App.vue` mounts `<RouterView />` inside `DashboardLayout.vue`.
+- [x] All 53 existing Vitest tests continue to pass.
 
 **Verification:**
-- [ ] Tests pass: `cd web && pnpm test`
-- [ ] Build succeeds: `cd web && pnpm build`
+- [x] Tests pass: `cd web && pnpm test`
+- [x] Build succeeds: `cd web && pnpm build`
 
 **Dependencies:** None
 **Files likely touched:**
@@ -486,15 +486,15 @@
 Plus dedicated `/topology` link to access Raiwall's 3D Globe / Sankey operations center. Include active route highlighting, tenant selector, active snapshot version badge, and staged deployment alert banner.
 
 **Acceptance criteria:**
-- [ ] Left navigation drawer renders the 8 core SafeLine functional domains plus Topology.
-- [ ] Active route is visually highlighted with blue accent styling.
-- [ ] Top bar displays active configuration version badge (`v{{ version }}` LIVE) and staged changes indicator.
-- [ ] Navigation transitions smoothly update the `<slot />` content.
-- [ ] Vitest component tests verify sidebar navigation rendering and route active states.
+- [x] Left navigation drawer renders the 8 core SafeLine functional domains plus Topology.
+- [x] Active route is visually highlighted with blue accent styling.
+- [x] Top bar displays active configuration version badge (`v{{ version }}` LIVE) and staged changes indicator.
+- [x] Navigation transitions smoothly update the `<slot />` content.
+- [x] Vitest component tests verify sidebar navigation rendering and route active states.
 
 **Verification:**
-- [ ] Tests pass: `cd web && pnpm test -- DashboardLayout`
-- [ ] Build succeeds: `cd web && pnpm build`
+- [x] Tests pass: `cd web && pnpm test -- DashboardLayout`
+- [x] Build succeeds: `cd web && pnpm build`
 
 **Dependencies:** Task 73
 **Files likely touched:**
@@ -505,8 +505,8 @@ Plus dedicated `/topology` link to access Raiwall's 3D Globe / Sankey operations
 ---
 
 ### Checkpoint 1: Frontend Foundation
-- [ ] `SimpleRouter` preserves URL query parameters during navigation.
-- [ ] `DashboardLayout.vue` successfully hosts child view pages with persistent navigation.
+- [x] `SimpleRouter` preserves URL query parameters during navigation.
+- [x] `DashboardLayout.vue` successfully hosts child view pages with persistent navigation.
 
 ---
 
@@ -516,15 +516,15 @@ Plus dedicated `/topology` link to access Raiwall's 3D Globe / Sankey operations
 **Description:** Extend `pkg/telemetry/event.go` and `pkg/telemetry/sqlite.go` to support incident-level grouping and enhanced parameter-level diagnostics. Store exact parameter location (`URLPATH`, `QUERY`, `HEADER`, `BODY`, `COOKIE`), isolated malicious syntax token, attack classification category, and both raw request and response headers/bodies. Implement an incident aggregation query grouping events by `client_ip + host + time_window` (sliding 5 minutes).
 
 **Acceptance criteria:**
-- [ ] `ForensicEvent` struct updated with `PayloadLocation`, `MatchedToken`, `AttackCategory`, `ResponseHeaders`, and `ResponseBody`.
-- [ ] SQLite telemetry schema updated with compound index on `(client_ip, host, timestamp)`.
-- [ ] `GetAggregatedIncidents` query groups events occurring within a sliding 5-minute window.
-- [ ] Endpoint `GET /api/v1/telemetry/incidents` returns paginated incident records with total request count and duration.
-- [ ] Unit tests verify incident aggregation queries and parameter location serialization.
+- [x] `ForensicEvent` struct updated with `PayloadLocation`, `MatchedToken`, `AttackCategory`, `ResponseHeaders`, and `ResponseBody`.
+- [x] SQLite telemetry schema updated with compound index on `(client_ip, host, timestamp)`.
+- [x] `GetAggregatedIncidents` query groups events occurring within a sliding 5-minute window.
+- [x] Endpoint `GET /api/v1/telemetry/incidents` returns paginated incident records with total request count and duration.
+- [x] Unit tests verify incident aggregation queries and parameter location serialization.
 
 **Verification:**
-- [ ] Tests pass: `go test -v -race ./pkg/telemetry/...`
-- [ ] Build succeeds: `go build ./pkg/telemetry/...`
+- [x] Tests pass: `go test -v -race ./pkg/telemetry/...`
+- [x] Build succeeds: `go build ./pkg/telemetry/...`
 
 **Dependencies:** None
 **Files likely touched:**
@@ -540,14 +540,14 @@ Plus dedicated `/topology` link to access Raiwall's 3D Globe / Sankey operations
 **Description:** Implement `pkg/telemetry/curl.go` and expose `GET /api/v1/telemetry/events/{id}/curl`. Generate an executable, drop-in `curl` command string matching the captured HTTP request, complete with method, URL, headers, cookies, and escaped request body for offline terminal triage by security analysts.
 
 **Acceptance criteria:**
-- [ ] cURL generator correctly formats headers (`-H 'Header: Value'`), method (`-X POST`), and escaped body (`--data-raw '...'`).
-- [ ] Cookie headers are correctly serialized into `-H 'Cookie: ...'` or `-b '...'`.
-- [ ] API endpoint returns `{ "curl": "curl -X ..." }` for valid event UUID.
-- [ ] Unit tests verify cURL generation across GET, POST (JSON, form-urlencoded, multipart), and header edge cases.
+- [x] cURL generator correctly formats headers (`-H 'Header: Value'`), method (`-X POST`), and escaped body (`--data-raw '...'`).
+- [x] Cookie headers are correctly serialized into `-H 'Cookie: ...'` or `-b '...'`.
+- [x] API endpoint returns `{ "curl": "curl -X ..." }` for valid event UUID.
+- [x] Unit tests verify cURL generation across GET, POST (JSON, form-urlencoded, multipart), and header edge cases.
 
 **Verification:**
-- [ ] Tests pass: `go test -v -race ./pkg/telemetry/...`
-- [ ] Build succeeds: `go build ./pkg/telemetry/...`
+- [x] Tests pass: `go test -v -race ./pkg/telemetry/...`
+- [x] Build succeeds: `go build ./pkg/telemetry/...`
 
 **Dependencies:** Task 75
 **Files likely touched:**
@@ -562,17 +562,17 @@ Plus dedicated `/topology` link to access Raiwall's 3D Globe / Sankey operations
 **Description:** Refactor `web/src/components/LiveInspector.vue` to introduce SafeLine's dual-tab model: **Aggregated Incidents (`EVENTS`)** and **Granular Logs (`LOGS`)**. Clicking an incident card switches to `LOGS` with URL query parameters pre-populated (`?ip=...&host=...`). Implement full-height `ForensicDrawer.vue` featuring: parameter location badge, highlighted malicious token, JA4 verification link, dual tab raw viewer (`REQUEST` with `UTF-8`/`GBK` encoding selector and `RESPONSE`), **"Copy as cURL"** button, and in-place **"Add to IP Group"** / **"Create Exception"** buttons.
 
 **Acceptance criteria:**
-- [ ] LiveInspector provides toggleable `EVENTS` (incident cards) and `LOGS` (raw requests) tabs.
-- [ ] Clicking an incident card populates URL query parameters and switches to logs view.
-- [ ] Drawer displays exact parameter location and highlights the malicious syntax token.
-- [ ] Drawer provides REQUEST and RESPONSE tabs with character encoding switcher (`UTF-8` vs `GBK`).
-- [ ] "Copy as cURL" copies ready-to-run curl command to clipboard.
-- [ ] Buttons to trigger "Add to IP Group" and "Create Exception" without leaving drawer.
-- [ ] Vitest unit tests verify tab switching, cURL copying, and drawer actions.
+- [x] LiveInspector provides toggleable `EVENTS` (incident cards) and `LOGS` (raw requests) tabs.
+- [x] Clicking an incident card populates URL query parameters and switches to logs view.
+- [x] Drawer displays exact parameter location and highlights the malicious syntax token.
+- [x] Drawer provides REQUEST and RESPONSE tabs with character encoding switcher (`UTF-8` vs `GBK`).
+- [x] "Copy as cURL" copies ready-to-run curl command to clipboard.
+- [x] Buttons to trigger "Add to IP Group" and "Create Exception" without leaving drawer.
+- [x] Vitest unit tests verify tab switching, cURL copying, and drawer actions.
 
 **Verification:**
-- [ ] Tests pass: `cd web && pnpm test -- LiveInspector`
-- [ ] Build succeeds: `cd web && pnpm build`
+- [x] Tests pass: `cd web && pnpm test -- LiveInspector`
+- [x] Build succeeds: `cd web && pnpm build`
 
 **Dependencies:** Tasks 73, 75, 76
 **Files likely touched:**
@@ -585,8 +585,8 @@ Plus dedicated `/topology` link to access Raiwall's 3D Globe / Sankey operations
 ---
 
 ### Checkpoint 2: Forensic Triage
-- [ ] Incident-level grouping and rich parameter diagnostics verified end-to-end.
-- [ ] Dual-tab inspection drawer, cURL copying, and encoding selector verified in browser.
+- [x] Incident-level grouping and rich parameter diagnostics verified end-to-end.
+- [x] Dual-tab inspection drawer, cURL copying, and encoding selector verified in browser.
 
 ---
 
@@ -596,15 +596,15 @@ Plus dedicated `/topology` link to access Raiwall's 3D Globe / Sankey operations
 **Description:** Implement `pkg/engine/matrix.go` and `pkg/engine/types.go` defining the full **14 SafeLine Semantic Modules**: SQL Inj, XSS, File Upload, File Include, CMD Inj, Java Code Inj, Java Deserialization, PHP Deserialization, PHP Code Inj, ASP Code Inj, SSTI, CSRF, SSRF, and Mal HTTP. Implement 4 operating modes per module: `Disabled` (0), `Audit` (1), `Balance` (2), `Strict` (3). Implement per-site semantic override resolution in `pkg/config/types.go` and snapshot compiler.
 
 **Acceptance criteria:**
-- [ ] Define 14 semantic modules with independent mode enums in `pkg/engine/types.go`.
-- [ ] Sensitivity thresholds: `Strict` enforces lower anomaly thresholds; `Balance` applies heuristics to avoid false positives; `Audit` logs without blocking; `Disabled` skips inspection.
-- [ ] `AppConfig` supports per-site semantic overrides inheriting from global defaults.
-- [ ] REST API endpoints `GET /api/v1/detector` and `POST /api/v1/detector` update global and per-site modes.
-- [ ] Unit tests verify mode resolution and sensitivity thresholds.
+- [x] Define 14 semantic modules with independent mode enums in `pkg/engine/types.go`.
+- [x] Sensitivity thresholds: `Strict` enforces lower anomaly thresholds; `Balance` applies heuristics to avoid false positives; `Audit` logs without blocking; `Disabled` skips inspection.
+- [x] `AppConfig` supports per-site semantic overrides inheriting from global defaults.
+- [x] REST API endpoints `GET /api/v1/detector` and `POST /api/v1/detector` update global and per-site modes.
+- [x] Unit tests verify mode resolution and sensitivity thresholds.
 
 **Verification:**
-- [ ] Tests pass: `go test -v -race ./pkg/engine/...`
-- [ ] Build succeeds: `go build ./pkg/engine/...`
+- [x] Tests pass: `go test -v -race ./pkg/engine/...`
+- [x] Build succeeds: `go build ./pkg/engine/...`
 
 **Dependencies:** None
 **Files likely touched:**
@@ -626,13 +626,13 @@ Plus dedicated `/topology` link to access Raiwall's 3D Globe / Sankey operations
 5. **SSTI**: Server-Side Template Injection syntax for Jinja2, Twig, Freemarker (`{{7*7}}`, `${7*7}`).
 
 **Acceptance criteria:**
-- [ ] Detectors evaluate normalized tokens with sub-microsecond lexical heuristics.
-- [ ] Unit tests verify detection of Java OGNL, Fastjson, PHP `eval`, and Jinja2 SSTI payloads.
-- [ ] Benign mathematical expressions and template strings are permitted in `Balance` mode.
+- [x] Detectors evaluate normalized tokens with sub-microsecond lexical heuristics.
+- [x] Unit tests verify detection of Java OGNL, Fastjson, PHP `eval`, and Jinja2 SSTI payloads.
+- [x] Benign mathematical expressions and template strings are permitted in `Balance` mode.
 
 **Verification:**
-- [ ] Tests pass: `go test -v -race ./pkg/engine/...`
-- [ ] Build succeeds: `go build ./pkg/engine/...`
+- [x] Tests pass: `go test -v -race ./pkg/engine/...`
+- [x] Build succeeds: `go build ./pkg/engine/...`
 
 **Dependencies:** Task 78
 **Files likely touched:**
@@ -652,12 +652,12 @@ Plus dedicated `/topology` link to access Raiwall's 3D Globe / Sankey operations
 5. **Mal HTTP**: HTTP Request Smuggling markers (duplicate `Content-Length`, conflicting `Transfer-Encoding: chunked`).
 
 **Acceptance criteria:**
-- [ ] Detectors block webshell uploads, directory traversal, and cloud metadata SSRF attempts.
-- [ ] Unit tests verify LFI/RFI traversal, SSRF IP blocking, and request smuggling detection.
+- [x] Detectors block webshell uploads, directory traversal, and cloud metadata SSRF attempts.
+- [x] Unit tests verify LFI/RFI traversal, SSRF IP blocking, and request smuggling detection.
 
 **Verification:**
-- [ ] Tests pass: `go test -v -race ./pkg/engine/...`
-- [ ] Build succeeds: `go build ./pkg/engine/...`
+- [x] Tests pass: `go test -v -race ./pkg/engine/...`
+- [x] Build succeeds: `go build ./pkg/engine/...`
 
 **Dependencies:** Task 78
 **Files likely touched:**
@@ -672,14 +672,14 @@ Plus dedicated `/topology` link to access Raiwall's 3D Globe / Sankey operations
 **Description:** Implement `pkg/engine/cve/` virtual patching engine housing a curated library of **193 CVE signatures** (e.g. Log4j JNDI CVE-2021-44228, Apache Shiro bypass, Spring4Shell, Ghostscript RCE, Git config disclosure `.git/config`, Vite file read CVE-2025-31125, MongoDB injection). Optimize evaluation using fast path method and URI prefix indexing. Support per-rule enable/disable toggles and category grouping.
 
 **Acceptance criteria:**
-- [ ] Embed compressed 193 CVE signature database in `pkg/engine/cve/rules.json`.
-- [ ] Build fast lookup index by HTTP method and URI prefix to ensure sub-microsecond evaluation.
-- [ ] Support per-rule enable/disable toggles and category grouping.
-- [ ] Unit tests verify Log4j, Shiro, Spring4Shell, and `.git/config` exploit attempts are blocked.
+- [x] Embed compressed 193 CVE signature database in `pkg/engine/cve/rules.json`.
+- [x] Build fast lookup index by HTTP method and URI prefix to ensure sub-microsecond evaluation.
+- [x] Support per-rule enable/disable toggles and category grouping.
+- [x] Unit tests verify Log4j, Shiro, Spring4Shell, and `.git/config` exploit attempts are blocked.
 
 **Verification:**
-- [ ] Tests pass: `go test -v -race ./pkg/engine/cve/...`
-- [ ] Build succeeds: `go build ./pkg/engine/cve/...`
+- [x] Tests pass: `go test -v -race ./pkg/engine/cve/...`
+- [x] Build succeeds: `go build ./pkg/engine/cve/...`
 
 **Dependencies:** Tasks 78, 79, 80
 **Files likely touched:**
@@ -695,15 +695,15 @@ Plus dedicated `/topology` link to access Raiwall's 3D Globe / Sankey operations
 **Description:** Implement `web/src/views/SemanticsView.vue` and `web/src/views/InnerRulesView.vue`. Provide an interactive 14-module matrix where operators can toggle policy modes (`Disabled`, `Audit`, `Balance`, `Strict`) globally or per application. Build the Enhanced Rules view listing all 193 CVE virtual patches with search, category filters, rule ID tags, and batch enable/disable switches.
 
 **Acceptance criteria:**
-- [ ] Grid view displaying all 14 semantic modules with 4-way mode radio buttons.
-- [ ] Application selector dropdown allowing site-specific override configuration.
-- [ ] Inner rules table displaying 193 CVE rules with search, status toggles, and CVE tags.
-- [ ] Batch toggle actions (e.g. "Enable All RCE Rules", "Disable All").
-- [ ] Vitest unit tests verify mode changes and rule toggle mutations.
+- [x] Grid view displaying all 14 semantic modules with 4-way mode radio buttons.
+- [x] Application selector dropdown allowing site-specific override configuration.
+- [x] Inner rules table displaying 193 CVE rules with search, status toggles, and CVE tags.
+- [x] Batch toggle actions (e.g. "Enable All RCE Rules", "Disable All").
+- [x] Vitest unit tests verify mode changes and rule toggle mutations.
 
 **Verification:**
-- [ ] Tests pass: `cd web && pnpm test -- Semantics`
-- [ ] Build succeeds: `cd web && pnpm build`
+- [x] Tests pass: `cd web && pnpm test -- Semantics`
+- [x] Build succeeds: `cd web && pnpm build`
 
 **Dependencies:** Tasks 74, 78, 81
 **Files likely touched:**
@@ -716,8 +716,8 @@ Plus dedicated `/topology` link to access Raiwall's 3D Globe / Sankey operations
 ---
 
 ### Checkpoint 3: Threat Detection & Virtual Patching
-- [ ] 14 semantic modules and 193 CVE rules verified blocking exploits in unit tests.
-- [ ] Matrix UI and inner rules management verified in frontend tests.
+- [x] 14 semantic modules and 193 CVE rules verified blocking exploits in unit tests.
+- [x] Matrix UI and inner rules management verified in frontend tests.
 
 ---
 
@@ -727,14 +727,14 @@ Plus dedicated `/topology` link to access Raiwall's 3D Globe / Sankey operations
 **Description:** Wire `UpstreamPool` from [`pkg/proxy/upstream.go`](file:///Users/macbook/Code/raiwall/pkg/proxy/upstream.go) directly into [`pkg/proxy/middleware.go`](file:///Users/macbook/Code/raiwall/pkg/proxy/middleware.go) to support dynamic proxying and **Path-Prefix Forwarding Rules** (`/sites/detail?tab=forwardingRule`). When an `AppConfig` has custom `upstreams` or `forwarding_rules` defined in snapshot, route matching requests to the designated backend target with longest prefix matching, path stripping, and host header override before falling back to `next.ServeHTTP`. Update SQLite schema and `driver.go` with `raiwall_forwarding_rules`.
 
 **Acceptance criteria:**
-- [ ] Add `ForwardingRule` struct (`Prefix`, `Upstreams`, `StripPrefix`, `HostHeaderOverride`, `Comment`, `IsActive`) to `pkg/config/types.go`.
-- [ ] Update SQLite schema, `sqlc` queries, and in-memory `driver.go` with `raiwall_forwarding_rules`.
-- [ ] Middleware dispatches requests to dynamic `UpstreamPool` matching longest prefix before default app upstreams.
-- [ ] Unit and integration tests verify path routing, prefix stripping, and host header overrides.
+- [x] Add `ForwardingRule` struct (`Prefix`, `Upstreams`, `StripPrefix`, `HostHeaderOverride`, `Comment`, `IsActive`) to `pkg/config/types.go`.
+- [x] Update SQLite schema, `sqlc` queries, and in-memory `driver.go` with `raiwall_forwarding_rules`.
+- [x] Middleware dispatches requests to dynamic `UpstreamPool` matching longest prefix before default app upstreams.
+- [x] Unit and integration tests verify path routing, prefix stripping, and host header overrides.
 
 **Verification:**
-- [ ] Tests pass: `go test -v -race ./pkg/proxy/...`
-- [ ] Build succeeds: `go build ./pkg/proxy/...`
+- [x] Tests pass: `go test -v -race ./pkg/proxy/...`
+- [x] Build succeeds: `go build ./pkg/proxy/...`
 
 **Dependencies:** None
 **Files likely touched:**
@@ -751,15 +751,15 @@ Plus dedicated `/topology` link to access Raiwall's 3D Globe / Sankey operations
 **Description:** Implement granular per-site proxy tuning in `AppConfig`: client IP extraction source (`socket`, `xff`, custom header), X-Forwarded-For rewrite/sanitization toggle, HSTS header injection, SSE streaming toggle (disables proxy buffering for Server-Sent Events / LLM AI streams), Gzip/Brotli compression switches, IPv6 socket listen toggle, and automatic HTTP-to-HTTPS 301 redirection.
 
 **Acceptance criteria:**
-- [ ] Extend `AppConfig` with `ProxySettings` struct covering all 7 configuration options.
-- [ ] Middleware enforces XFF rewriting (stripping outer untrusted client headers).
-- [ ] Middleware injects HSTS headers on HTTPS responses when enabled.
-- [ ] Proxy disables response buffering for SSE when enabled.
-- [ ] Unit tests verify header rewrite, HSTS injection, and HTTP->HTTPS redirection.
+- [x] Extend `AppConfig` with `ProxySettings` struct covering all 7 configuration options.
+- [x] Middleware enforces XFF rewriting (stripping outer untrusted client headers).
+- [x] Middleware injects HSTS headers on HTTPS responses when enabled.
+- [x] Proxy disables response buffering for SSE when enabled.
+- [x] Unit tests verify header rewrite, HSTS injection, and HTTP->HTTPS redirection.
 
 **Verification:**
-- [ ] Tests pass: `go test -v -race ./pkg/proxy/...`
-- [ ] Build succeeds: `go build ./pkg/proxy/...`
+- [x] Tests pass: `go test -v -race ./pkg/proxy/...`
+- [x] Build succeeds: `go build ./pkg/proxy/...`
 
 **Dependencies:** Task 83
 **Files likely touched:**
@@ -775,15 +775,15 @@ Plus dedicated `/topology` link to access Raiwall's 3D Globe / Sankey operations
 **Description:** Implement `pkg/proxy/discovery.go` passive API cataloger. When enabled, sample clean transit traffic and record unique API endpoints (HTTP method, normalized URI path template, detected Content-Type, 24-hour request counter, and last seen timestamp) into SQLite table `raiwall_api_resources` (with `driver.go` support). Provide API endpoints for querying and pruning discovered shadow APIs.
 
 **Acceptance criteria:**
-- [ ] Asynchronous sampling ring buffer captures clean request paths and methods.
-- [ ] Normalizer collapses numeric and UUID path parameters into template variables (e.g. `/users/123` → `/users/{id}`).
-- [ ] Periodic flush persists discovered endpoints to SQLite with 24-hour hit counters.
-- [ ] REST API endpoints support `GET /api/v1/sites/{id}/resources` and `DELETE /api/v1/sites/{id}/resources/{resource_id}`.
-- [ ] Unit tests verify path normalization, async logging, and pruning.
+- [x] Asynchronous sampling ring buffer captures clean request paths and methods.
+- [x] Normalizer collapses numeric and UUID path parameters into template variables (e.g. `/users/123` → `/users/{id}`).
+- [x] Periodic flush persists discovered endpoints to SQLite with 24-hour hit counters.
+- [x] REST API endpoints support `GET /api/v1/sites/{id}/resources` and `DELETE /api/v1/sites/{id}/resources/{resource_id}`.
+- [x] Unit tests verify path normalization, async logging, and pruning.
 
 **Verification:**
-- [ ] Tests pass: `go test -v -race ./pkg/proxy/...`
-- [ ] Build succeeds: `go build ./pkg/proxy/...`
+- [x] Tests pass: `go test -v -race ./pkg/proxy/...`
+- [x] Build succeeds: `go build ./pkg/proxy/...`
 
 **Dependencies:** Task 83
 **Files likely touched:**
@@ -804,15 +804,15 @@ Plus dedicated `/topology` link to access Raiwall's 3D Globe / Sankey operations
 4. `Routings / API Inventory`: auto-discovered API catalog with search, access counts, and prune actions.
 
 **Acceptance criteria:**
-- [ ] Application detail view renders 4 tabs matching SafeLine's site detail UX.
-- [ ] Forwarding rules tab allows adding/editing/deleting path prefixes with upstream target assignment.
-- [ ] Advanced settings tab provides intuitive toggles for XFF, HSTS, SSE, and compression.
-- [ ] Routings tab lists auto-discovered APIs with request counters and delete action.
-- [ ] Vitest unit tests verify site detail tab navigation and form submissions.
+- [x] Application detail view renders 4 tabs matching SafeLine's site detail UX.
+- [x] Forwarding rules tab allows adding/editing/deleting path prefixes with upstream target assignment.
+- [x] Advanced settings tab provides intuitive toggles for XFF, HSTS, SSE, and compression.
+- [x] Routings tab lists auto-discovered APIs with request counters and delete action.
+- [x] Vitest unit tests verify site detail tab navigation and form submissions.
 
 **Verification:**
-- [ ] Tests pass: `cd web && pnpm test -- SiteDetail`
-- [ ] Build succeeds: `cd web && pnpm build`
+- [x] Tests pass: `cd web && pnpm test -- SiteDetail`
+- [x] Build succeeds: `cd web && pnpm build`
 
 **Dependencies:** Tasks 74, 83, 84, 85
 **Files likely touched:**
@@ -826,8 +826,8 @@ Plus dedicated `/topology` link to access Raiwall's 3D Globe / Sankey operations
 ---
 
 ### Checkpoint 4: Application Gateway & Microservices
-- [ ] Dynamic proxying, sub-path routing, and API auto-discovery verified in Go tests.
-- [ ] 4-tab Site Detail UI verified in Vitest component tests.
+- [x] Dynamic proxying, sub-path routing, and API auto-discovery verified in Go tests.
+- [x] 4-tab Site Detail UI verified in Vitest component tests.
 
 ---
 
@@ -918,15 +918,15 @@ Plus dedicated `/topology` link to access Raiwall's 3D Globe / Sankey operations
 **Description:** Implement `pkg/auth/user_store.go` and database schema tables `raiwall_identity_users` in `pkg/control/db/schema.sql` (and `driver.go`). Provide an enterprise identity directory supporting up to 5,000 end-users (separate from admin console operators) with username, password hashing (bcrypt), email, assigned application permissions, and 2FA TOTP secret generation/validation (`pquerna/otp`). Provide REST API CRUD endpoints.
 
 **Acceptance criteria:**
-- [ ] SQLite schema stores `raiwall_identity_users` with password hash, TOTP secret, enabled state, and assigned app IDs.
-- [ ] In-memory `driver.go` supports `raiwall_identity_users` table queries.
-- [ ] 2FA TOTP validator verifies 6-digit codes against stored secret.
-- [ ] REST API CRUD endpoints for user accounts, password reset, and TOTP reset.
-- [ ] Unit tests cover local user creation, login validation, and TOTP verification.
+- [x] SQLite schema stores `raiwall_identity_users` with password hash, TOTP secret, enabled state, and assigned app IDs.
+- [x] In-memory `driver.go` supports `raiwall_identity_users` table queries.
+- [x] 2FA TOTP validator verifies 6-digit codes against stored secret.
+- [x] REST API CRUD endpoints for user accounts, password reset, and TOTP reset.
+- [x] Unit tests cover local user creation, login validation, and TOTP verification.
 
 **Verification:**
-- [ ] Tests pass: `go test -v -race ./pkg/auth/... ./pkg/control/db/...`
-- [ ] Build succeeds: `go build ./pkg/auth/...`
+- [x] Tests pass: `go test -v -race ./pkg/auth/... ./pkg/control/db/...`
+- [x] Build succeeds: `go build ./pkg/auth/...`
 
 **Dependencies:** None
 **Files likely touched:**
@@ -944,15 +944,15 @@ Plus dedicated `/topology` link to access Raiwall's 3D Globe / Sankey operations
 **Description:** Expand `pkg/auth/` with external enterprise IdP connectors: LDAP/Active Directory (`go-ldap/ldap/v3`) and GitHub OAuth2, complementing the existing `OIDCClient`. Implement unified `IdentityProvider` interface allowing authentication via local directory, OIDC, LDAP, or GitHub. Store IdP configurations in `raiwall_identity_providers`.
 
 **Acceptance criteria:**
-- [ ] Unified `IdentityProvider` interface implemented by Local, OIDC, LDAP, and GitHub providers.
-- [ ] LDAP connector authenticates users against Active Directory / OpenLDAP via Bind DN.
-- [ ] GitHub connector exchanges OAuth2 code for verified GitHub user profile.
-- [ ] SQLite schema and `driver.go` store provider connection parameters.
-- [ ] Unit tests verify mock LDAP authentication and GitHub token exchange.
+- [x] Unified `IdentityProvider` interface implemented by Local, OIDC, LDAP, and GitHub providers.
+- [x] LDAP connector authenticates users against Active Directory / OpenLDAP via Bind DN.
+- [x] GitHub connector exchanges OAuth2 code for verified GitHub user profile.
+- [x] SQLite schema and `driver.go` store provider connection parameters.
+- [x] Unit tests verify mock LDAP authentication and GitHub token exchange.
 
 **Verification:**
-- [ ] Tests pass: `go test -v -race ./pkg/auth/...`
-- [ ] Build succeeds: `go build ./pkg/auth/...`
+- [x] Tests pass: `go test -v -race ./pkg/auth/...`
+- [x] Build succeeds: `go build ./pkg/auth/...`
 
 **Dependencies:** Task 90
 **Files likely touched:**
@@ -970,15 +970,15 @@ Plus dedicated `/topology` link to access Raiwall's 3D Globe / Sankey operations
 **Description:** Wire per-site Pre-Application Authentication into [`pkg/proxy/middleware.go`](file:///Users/macbook/Code/raiwall/pkg/proxy/middleware.go). When `AppConfig.AuthEnabled: true`, unauthenticated browser requests are intercepted and return **HTTP 467** serving the branded login portal. Upon successful login + 2FA, issue encrypted HMAC clearance session cookie (`sl_jwt_session`) valid across all authorized sites (Unified SSO). Ensure API fast-paths (`Authorization: Bearer`, `/api/*`) bypass the challenge.
 
 **Acceptance criteria:**
-- [ ] `AppConfig` extended with `AuthEnabled` boolean and `AuthBypassPaths []string`.
-- [ ] Unauthenticated browser requests targeting protected sites return **HTTP 467** with login UI.
-- [ ] API routes and Bearer tokens bypass interactive HTTP 467 challenge transparently.
-- [ ] Successful authentication issues signed clearance cookie and redirects back to destination.
-- [ ] Unit and integration tests verify HTTP 467 interception, cookie clearance, and API bypass.
+- [x] `AppConfig` extended with `AuthEnabled` boolean and `AuthBypassPaths []string`.
+- [x] Unauthenticated browser requests targeting protected sites return **HTTP 467** with login UI.
+- [x] API routes and Bearer tokens bypass interactive HTTP 467 challenge transparently.
+- [x] Successful authentication issues signed clearance cookie and redirects back to destination.
+- [x] Unit and integration tests verify HTTP 467 interception, cookie clearance, and API bypass.
 
 **Verification:**
-- [ ] Tests pass: `go test -v -race ./pkg/proxy/... ./pkg/auth/...`
-- [ ] Build succeeds: `go build ./pkg/proxy/...`
+- [x] Tests pass: `go test -v -race ./pkg/proxy/... ./pkg/auth/...`
+- [x] Build succeeds: `go build ./pkg/proxy/...`
 
 **Dependencies:** Tasks 90, 91
 **Files likely touched:**
@@ -999,14 +999,14 @@ Plus dedicated `/topology` link to access Raiwall's 3D Globe / Sankey operations
 4. `Login Configuration`: credentials branding editor and IdP connector forms (OIDC, LDAP, GitHub OAuth).
 
 **Acceptance criteria:**
-- [ ] User directory table supports search, user creation, app assignment, and TOTP reset.
-- [ ] SSO tab allows toggling unified portal across selected domains.
-- [ ] IdP configuration forms validate connection parameters.
-- [ ] Vitest tests verify user creation, TOTP reset dialog, and IdP form validation.
+- [x] User directory table supports search, user creation, app assignment, and TOTP reset.
+- [x] SSO tab allows toggling unified portal across selected domains.
+- [x] IdP configuration forms validate connection parameters.
+- [x] Vitest tests verify user creation, TOTP reset dialog, and IdP form validation.
 
 **Verification:**
-- [ ] Tests pass: `cd web && pnpm test -- AuthGateway`
-- [ ] Build succeeds: `cd web && pnpm build`
+- [x] Tests pass: `cd web && pnpm test -- AuthGateway`
+- [x] Build succeeds: `cd web && pnpm build`
 
 **Dependencies:** Tasks 74, 90, 91, 92
 **Files likely touched:**
@@ -1019,8 +1019,8 @@ Plus dedicated `/topology` link to access Raiwall's 3D Globe / Sankey operations
 ---
 
 ### Checkpoint 6: Zero-Trust Identity Gateway
-- [ ] 5,000 user directory, 2FA TOTP, and HTTP 467 auth challenge gate verified in Go.
-- [ ] Auth management console verified in Vitest tests.
+- [x] 5,000 user directory, 2FA TOTP, and HTTP 467 auth challenge gate verified in Go.
+- [x] Auth management console verified in Vitest tests.
 
 ---
 
