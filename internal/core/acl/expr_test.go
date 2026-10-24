@@ -281,4 +281,3 @@ func TestACLEngine_InOperatorCompatibility(t *testing.T) {
 		t.Errorf("expected POST method to match rule")
 	}
 }
-

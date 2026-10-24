@@ -81,13 +81,13 @@ func BenchmarkExceptionEngine_Match(b *testing.B) {
 			RuleID:     "SEMANTIC_XSS",
 		},
 		{
-			ID:         "EX_3",
-			Host:       "*.example.com",
-			PathRegex:  `^/search/.*$`,
-			Method:     "GET",
-			Location:   "query",
-			ParamName:  "q",
-			RuleID:     "*",
+			ID:        "EX_3",
+			Host:      "*.example.com",
+			PathRegex: `^/search/.*$`,
+			Method:    "GET",
+			Location:  "query",
+			ParamName: "q",
+			RuleID:    "*",
 		},
 	}
 

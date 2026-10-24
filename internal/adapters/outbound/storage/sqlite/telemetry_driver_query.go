@@ -29,7 +29,9 @@ func (s *telemetryDriverStmt) Query(args []driver.Value) (driver.Rows, error) {
 	}
 
 	if strings.Contains(q, "COALESCE(SUM(CASE WHEN action IN ('block', 'ban')") {
-		var total, blocked int64
+		var total, blocked, pageViews, status4xx, status4xxBlocked, status5xx int64
+		uniqueIPs := make(map[string]bool)
+		blockedIPs := make(map[string]bool)
 		start, end := s.extractTimeBounds(args)
 		for _, r := range s.conn.db.ordered {
 			if !start.IsZero() && r.Timestamp.Before(start) {
@@ -39,13 +41,31 @@ func (s *telemetryDriverStmt) Query(args []driver.Value) (driver.Rows, error) {
 				continue
 			}
 			total++
+			if r.ClientIP != "" {
+				uniqueIPs[r.ClientIP] = true
+			}
 			if r.Action == "block" || r.Action == "ban" {
 				blocked++
+				if r.ClientIP != "" {
+					blockedIPs[r.ClientIP] = true
+				}
+			}
+			if r.Method == "GET" && (r.StatusCode < 400 || r.StatusCode == 0) {
+				pageViews++
+			}
+			if r.StatusCode >= 400 && r.StatusCode < 500 {
+				status4xx++
+			}
+			if (r.StatusCode >= 400 && r.StatusCode < 500 && (r.Action == "block" || r.Action == "ban")) || r.StatusCode == 403 {
+				status4xxBlocked++
+			}
+			if r.StatusCode >= 500 {
+				status5xx++
 			}
 		}
 		return &telemetrySimpleRows{
-			columns: []string{"total", "blocked"},
-			rows:    [][]driver.Value{{total, blocked}},
+			columns: []string{"total", "blocked", "page_views", "unique_ips", "blocked_ips", "status_4xx", "status_4xx_blocked", "status_5xx"},
+			rows:    [][]driver.Value{{total, blocked, pageViews, int64(len(uniqueIPs)), int64(len(blockedIPs)), status4xx, status4xxBlocked, status5xx}},
 		}, nil
 	}
 
@@ -95,6 +115,23 @@ func (s *telemetryDriverStmt) Query(args []driver.Value) (driver.Rows, error) {
 			}
 			if r.ClientIP != "" {
 				counts[r.ClientIP]++
+			}
+		}
+		return s.buildTopCounts(counts), nil
+	}
+
+	if strings.Contains(q, "GROUP BY attack_category") {
+		counts := make(map[string]int64)
+		start, end := s.extractTimeBounds(args)
+		for _, r := range s.conn.db.ordered {
+			if !start.IsZero() && r.Timestamp.Before(start) {
+				continue
+			}
+			if !end.IsZero() && r.Timestamp.After(end) {
+				continue
+			}
+			if r.AttackCategory != "" {
+				counts[r.AttackCategory]++
 			}
 		}
 		return s.buildTopCounts(counts), nil

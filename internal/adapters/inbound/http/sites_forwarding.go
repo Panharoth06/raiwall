@@ -12,16 +12,16 @@ import (
 
 // ForwardingRuleDTO represents path prefix routing to custom backends.
 type ForwardingRuleDTO struct {
-	ID                 string                  `json:"id"`
-	AppID              string                  `json:"app_id"`
-	Prefix             string                  `json:"prefix"`
+	ID                 string                   `json:"id"`
+	AppID              string                   `json:"app_id"`
+	Prefix             string                   `json:"prefix"`
 	Upstreams          []control.UpstreamTarget `json:"upstreams"`
-	StripPrefix        bool                    `json:"strip_prefix"`
-	HostHeaderOverride string                  `json:"host_header_override"`
-	Comment            string                  `json:"comment"`
-	IsActive           bool                    `json:"is_active"`
-	CreatedAt          time.Time               `json:"created_at"`
-	UpdatedAt          time.Time               `json:"updated_at"`
+	StripPrefix        bool                     `json:"strip_prefix"`
+	HostHeaderOverride string                   `json:"host_header_override"`
+	Comment            string                   `json:"comment"`
+	IsActive           bool                     `json:"is_active"`
+	CreatedAt          time.Time                `json:"created_at"`
+	UpdatedAt          time.Time                `json:"updated_at"`
 }
 
 // APIResourceDTO represents auto-discovered endpoint metadata.

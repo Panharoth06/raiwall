@@ -6,9 +6,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	caddyv2 "github.com/caddyserver/caddy/v2"
 	"github.com/Panharoth06/raiwall/internal/core/acl"
 	"github.com/Panharoth06/raiwall/internal/core/control"
+	caddyv2 "github.com/caddyserver/caddy/v2"
 )
 
 func TestMiddleware_ACLEngine_ServeHTTP(t *testing.T) {

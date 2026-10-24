@@ -6,10 +6,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	caddyv2 "github.com/caddyserver/caddy/v2"
 	"github.com/Panharoth06/raiwall/internal/core/acl"
 	"github.com/Panharoth06/raiwall/internal/core/control"
 	"github.com/Panharoth06/raiwall/internal/core/waf"
+	caddyv2 "github.com/caddyserver/caddy/v2"
 )
 
 func TestMiddleware_ExceptionEngine_ServeHTTP(t *testing.T) {

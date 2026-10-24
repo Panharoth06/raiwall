@@ -10,7 +10,7 @@ import (
 )
 
 // QueryAggregates computes summary metrics and top aggregations across a time interval.
-func (s *TelemetryStore) QueryAggregates(ctx context.Context, start, end time.Time) (*telemetry.AggregateStats, error) {
+func (s *TelemetryStore) QueryAggregates(ctx context.Context, start, end time.Time, filter ...telemetry.AggregateFilter) (*telemetry.AggregateStats, error) {
 	if start.IsZero() {
 		start = time.Now().Add(-24 * time.Hour)
 	}
@@ -22,35 +22,90 @@ func (s *TelemetryStore) QueryAggregates(ctx context.Context, start, end time.Ti
 	endStr := end.UTC().Format(time.RFC3339Nano)
 
 	stats := &telemetry.AggregateStats{
-		TimeBuckets:  make([]telemetry.TimeBucketCount, 0),
-		TopCountries: make([]telemetry.TopCount, 0),
-		TopRules:     make([]telemetry.TopCount, 0),
-		TopIPs:       make([]telemetry.TopCount, 0),
+		TimeBuckets:   make([]telemetry.TimeBucketCount, 0),
+		TopCountries:  make([]telemetry.TopCount, 0),
+		TopRules:      make([]telemetry.TopCount, 0),
+		TopIPs:        make([]telemetry.TopCount, 0),
+		TopCategories: make([]telemetry.TopCount, 0),
 	}
 
-	totalQuery := `
+	whereClause := "timestamp >= ? AND timestamp <= ?"
+	args := []interface{}{startStr, endStr}
+
+	if len(filter) > 0 {
+		if filter[0].Host != "" {
+			whereClause += " AND host = ?"
+			args = append(args, filter[0].Host)
+		}
+		if filter[0].Country != "" {
+			whereClause += " AND country = ?"
+			args = append(args, filter[0].Country)
+		}
+	}
+
+	totalQuery := fmt.Sprintf(`
 		SELECT COUNT(*),
-		       COALESCE(SUM(CASE WHEN action IN ('block', 'ban') THEN 1 ELSE 0 END), 0)
+		       COALESCE(SUM(CASE WHEN action IN ('block', 'ban') THEN 1 ELSE 0 END), 0),
+		       COALESCE(SUM(CASE WHEN (method = 'GET' OR method = '') AND (status_code < 400 OR status_code IS NULL OR status_code = 0) AND action NOT IN ('block', 'ban') THEN 1 ELSE 0 END), 0),
+		       COUNT(DISTINCT NULLIF(client_ip, '')),
+		       COALESCE(COUNT(DISTINCT CASE WHEN action IN ('block', 'ban') THEN NULLIF(client_ip, '') END), 0),
+		       COALESCE(SUM(CASE WHEN (status_code >= 400 AND status_code < 500) OR action IN ('block', 'ban') THEN 1 ELSE 0 END), 0),
+		       COALESCE(SUM(CASE WHEN action IN ('block', 'ban') OR status_code = 403 THEN 1 ELSE 0 END), 0),
+		       COALESCE(SUM(CASE WHEN status_code >= 500 THEN 1 ELSE 0 END), 0)
 		FROM forensic_events
-		WHERE timestamp >= ? AND timestamp <= ?
-	`
-	if err := s.db.QueryRowContext(ctx, totalQuery, startStr, endStr).Scan(&stats.TotalRequests, &stats.TotalBlocked); err != nil {
+		WHERE %s
+	`, whereClause)
+
+	if err := s.db.QueryRowContext(ctx, totalQuery, args...).Scan(
+		&stats.TotalRequests,
+		&stats.TotalBlocked,
+		&stats.PageViews,
+		&stats.UniqueIPs,
+		&stats.BlockedIPs,
+		&stats.Status4xx,
+		&stats.Status4xxBlocked,
+		&stats.Status5xx,
+	); err != nil {
 		return nil, fmt.Errorf("query totals: %w", err)
 	}
 
+	if stats.TotalRequests > 0 && stats.PageViews == 0 && stats.TotalBlocked < stats.TotalRequests {
+		stats.PageViews = stats.TotalRequests - stats.TotalBlocked
+	}
+	stats.UniqueVisitors = stats.UniqueIPs
+	if stats.UniqueVisitors == 0 && stats.TotalRequests > 0 {
+		stats.UniqueVisitors = 1
+		stats.UniqueIPs = 1
+	}
 	if stats.TotalRequests > 0 {
 		stats.BlockRatio = float64(stats.TotalBlocked) / float64(stats.TotalRequests)
+		stats.Status4xxRate = float64(stats.Status4xx) / float64(stats.TotalRequests)
+		stats.Status4xxBlockRate = float64(stats.Status4xxBlocked) / float64(stats.TotalRequests)
+		stats.Status5xxRate = float64(stats.Status5xx) / float64(stats.TotalRequests)
 	}
 
-	countryQuery := `
+	// Calculate live QPS in last 10 seconds
+	qpsStartStr := time.Now().Add(-10 * time.Second).UTC().Format(time.RFC3339Nano)
+	qpsQuery := fmt.Sprintf(`
+		SELECT COUNT(*)
+		FROM forensic_events
+		WHERE timestamp >= ? AND timestamp <= ? %s
+	`, strings.TrimPrefix(whereClause, "timestamp >= ? AND timestamp <= ?"))
+	qpsArgs := append([]interface{}{qpsStartStr, time.Now().UTC().Format(time.RFC3339Nano)}, args[2:]...)
+	var recentCount int64
+	if err := s.db.QueryRowContext(ctx, qpsQuery, qpsArgs...).Scan(&recentCount); err == nil {
+		stats.QPS = float64(recentCount) / 10.0
+	}
+
+	countryQuery := fmt.Sprintf(`
 		SELECT country, COUNT(*) as cnt
 		FROM forensic_events
-		WHERE timestamp >= ? AND timestamp <= ? AND country != ''
+		WHERE %s AND country != ''
 		GROUP BY country
 		ORDER BY cnt DESC
 		LIMIT 10
-	`
-	if cRows, err := s.db.QueryContext(ctx, countryQuery, startStr, endStr); err == nil {
+	`, whereClause)
+	if cRows, err := s.db.QueryContext(ctx, countryQuery, args...); err == nil {
 		defer cRows.Close()
 		for cRows.Next() {
 			var tc telemetry.TopCount
@@ -60,15 +115,15 @@ func (s *TelemetryStore) QueryAggregates(ctx context.Context, start, end time.Ti
 		}
 	}
 
-	ruleQuery := `
+	ruleQuery := fmt.Sprintf(`
 		SELECT rule_id, COUNT(*) as cnt
 		FROM forensic_events
-		WHERE timestamp >= ? AND timestamp <= ? AND rule_id != ''
+		WHERE %s AND rule_id != ''
 		GROUP BY rule_id
 		ORDER BY cnt DESC
 		LIMIT 10
-	`
-	if rRows, err := s.db.QueryContext(ctx, ruleQuery, startStr, endStr); err == nil {
+	`, whereClause)
+	if rRows, err := s.db.QueryContext(ctx, ruleQuery, args...); err == nil {
 		defer rRows.Close()
 		for rRows.Next() {
 			var tc telemetry.TopCount
@@ -78,15 +133,15 @@ func (s *TelemetryStore) QueryAggregates(ctx context.Context, start, end time.Ti
 		}
 	}
 
-	ipQuery := `
+	ipQuery := fmt.Sprintf(`
 		SELECT client_ip, COUNT(*) as cnt
 		FROM forensic_events
-		WHERE timestamp >= ? AND timestamp <= ? AND client_ip != ''
+		WHERE %s AND client_ip != ''
 		GROUP BY client_ip
 		ORDER BY cnt DESC
 		LIMIT 10
-	`
-	if ipRows, err := s.db.QueryContext(ctx, ipQuery, startStr, endStr); err == nil {
+	`, whereClause)
+	if ipRows, err := s.db.QueryContext(ctx, ipQuery, args...); err == nil {
 		defer ipRows.Close()
 		for ipRows.Next() {
 			var tc telemetry.TopCount
@@ -96,16 +151,43 @@ func (s *TelemetryStore) QueryAggregates(ctx context.Context, start, end time.Ti
 		}
 	}
 
-	bucketQuery := `
-		SELECT strftime('%Y-%m-%dT%H:00:00Z', timestamp) as bucket,
+	catQuery := fmt.Sprintf(`
+		SELECT attack_category, COUNT(*) as cnt
+		FROM forensic_events
+		WHERE %s AND attack_category != ''
+		GROUP BY attack_category
+		ORDER BY cnt DESC
+		LIMIT 10
+	`, whereClause)
+	if catRows, err := s.db.QueryContext(ctx, catQuery, args...); err == nil {
+		defer catRows.Close()
+		for catRows.Next() {
+			var tc telemetry.TopCount
+			if err := catRows.Scan(&tc.Key, &tc.Count); err == nil {
+				stats.TopCategories = append(stats.TopCategories, tc)
+			}
+		}
+	}
+
+	// Adaptive bucket format based on window duration
+	bucketFormat := "%Y-%m-%dT%H:00:00Z"
+	duration := end.Sub(start)
+	if duration <= 2*time.Hour {
+		bucketFormat = "%Y-%m-%dT%H:%M:00Z"
+	} else if duration > 48*time.Hour {
+		bucketFormat = "%Y-%m-%dT00:00:00Z"
+	}
+
+	bucketQuery := fmt.Sprintf(`
+		SELECT strftime('%s', timestamp) as bucket,
 		       COUNT(*) as total,
 		       SUM(CASE WHEN action IN ('block', 'ban') THEN 1 ELSE 0 END) as blocked
 		FROM forensic_events
-		WHERE timestamp >= ? AND timestamp <= ?
+		WHERE %s
 		GROUP BY bucket
 		ORDER BY bucket ASC
-	`
-	if bRows, err := s.db.QueryContext(ctx, bucketQuery, startStr, endStr); err == nil {
+	`, bucketFormat, whereClause)
+	if bRows, err := s.db.QueryContext(ctx, bucketQuery, args...); err == nil {
 		defer bRows.Close()
 		for bRows.Next() {
 			var (

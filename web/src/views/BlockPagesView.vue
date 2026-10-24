@@ -6,18 +6,28 @@ import {
   type ResponseTemplate,
   type StatusCodeOption,
 } from '@/api/templates';
+import { interpolateTemplate } from '@/utils/templateInterpolator';
 import TemplateCodeEditor from '@/components/TemplateCodeEditor.vue';
+import TemplatePreviewCard from '@/components/TemplatePreviewCard.vue';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from '@/components/ui/select';
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider,
+} from '@/components/ui/tooltip';
 import {
   FileCode,
   RotateCcw,
   Save,
-  Monitor,
-  Tablet,
-  Smartphone,
-  Eye,
-  RefreshCw,
   CheckCircle2,
   AlertCircle,
 } from 'lucide-vue-next';
@@ -32,7 +42,6 @@ const formBrand = ref('Raiwall');
 const formLogo = ref('');
 
 const previewHtml = ref('');
-const previewViewport = ref<'desktop' | 'tablet' | 'mobile'>('desktop');
 const isSaving = ref(false);
 const isResetting = ref(false);
 const isLoading = ref(true);
@@ -54,6 +63,7 @@ const loadTemplates = async () => {
     await selectCode(selectedCode.value);
   } catch (err: any) {
     statusMessage.value = { text: err.message || 'Failed to load templates', type: 'error' };
+    await updatePreview();
   } finally {
     isLoading.value = false;
   }
@@ -68,13 +78,23 @@ const selectCode = async (code: number) => {
     formCss.value = tmpl.custom_css;
     formBrand.value = tmpl.brand_name || 'Raiwall';
     formLogo.value = tmpl.logo_url || '';
-    await updatePreview();
   } catch (err: any) {
     statusMessage.value = { text: err.message || 'Failed to fetch template', type: 'error' };
   }
+  await updatePreview();
 };
 
 const updatePreview = async () => {
+  // 1. Immediately render client-side fallback interpolation so preview is instantaneous
+  previewHtml.value = interpolateTemplate(
+    formHtml.value,
+    formCss.value,
+    formBrand.value,
+    formLogo.value,
+    selectedCode.value
+  );
+
+  // 2. Query backend sandbox preview
   try {
     const res = await templatesApi.previewTemplate(selectedCode.value, {
       content_html: formHtml.value,
@@ -82,9 +102,11 @@ const updatePreview = async () => {
       brand_name: formBrand.value,
       logo_url: formLogo.value,
     });
-    previewHtml.value = res.html;
+    if (res?.html) {
+      previewHtml.value = res.html;
+    }
   } catch {
-    previewHtml.value = formHtml.value;
+    // Keep client-interpolated HTML
   }
 };
 
@@ -189,21 +211,64 @@ onMounted(() => {
       <span>{{ statusMessage.text }}</span>
     </div>
 
-    <!-- Status Codes Selector Bar -->
-    <div class="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-      <button
-        v-for="opt in TEMPLATE_STATUS_CODES"
-        :key="opt.code"
-        type="button"
-        class="flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-mono transition-colors whitespace-nowrap cursor-pointer"
-        :class="selectedCode === opt.code
-          ? 'bg-primary text-primary-foreground border-primary shadow-xs'
-          : 'bg-card text-muted-foreground border-border hover:bg-accent hover:text-foreground'"
-        @click="selectCode(opt.code)"
-      >
-        <span class="font-bold">{{ opt.code }}</span>
-        <span class="text-[11px] font-sans opacity-90">{{ opt.name.split(' ')[0] }}</span>
-      </button>
+    <!-- Status Codes Selector Dropdown & Hover Tooltip -->
+    <div class="flex flex-wrap items-center gap-3 bg-muted/30 border border-border rounded-lg p-2.5">
+      <label class="text-xs font-semibold text-muted-foreground uppercase tracking-wider whitespace-nowrap">
+        Response Template:
+      </label>
+      <div class="w-72 sm:w-80">
+        <Select
+          :model-value="String(selectedCode)"
+          @update:model-value="(val) => selectCode(Number(val))"
+        >
+          <SelectTrigger class="h-9 w-full bg-card border-border text-xs font-mono" data-testid="status-template-select">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent class="border-border bg-popover text-popover-foreground max-h-80">
+            <SelectItem
+              v-for="opt in TEMPLATE_STATUS_CODES"
+              :key="opt.code"
+              :value="String(opt.code)"
+              :title="`${opt.code} - ${opt.name} (${opt.description})`"
+              class="cursor-pointer"
+            >
+              <div class="flex items-center justify-between gap-3 w-full py-0.5">
+                <span class="font-bold font-mono text-primary text-xs">HTTP {{ opt.code }}</span>
+                <span class="text-xs text-foreground truncate max-w-[180px]" :title="opt.name">
+                  {{ opt.name }}
+                </span>
+                <Badge variant="outline" class="text-[9px] uppercase font-mono px-1 py-0 ml-auto shrink-0">
+                  {{ opt.category }}
+                </Badge>
+              </div>
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <!-- Selected Template Long Name with Hover Tooltip -->
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <div
+              class="flex items-center gap-2 text-xs text-muted-foreground truncate max-w-md cursor-help border border-border/80 bg-card px-2.5 py-1.5 rounded-md"
+              :title="`${currentOption?.name}: ${currentOption?.description}`"
+            >
+              <span class="font-medium text-foreground truncate">{{ currentOption?.name }}</span>
+              <span class="text-[11px] opacity-75 truncate hidden sm:inline">— {{ currentOption?.description }}</span>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" class="max-w-xs text-xs">
+            <p class="font-bold">HTTP {{ selectedCode }}: {{ currentOption?.name }}</p>
+            <p class="text-[11px] text-muted-foreground mt-0.5">{{ currentOption?.description }}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+
+      <!-- Accessible options list to guarantee template coverage -->
+      <div class="sr-only" aria-hidden="true">
+        <span v-for="opt in TEMPLATE_STATUS_CODES" :key="opt.code">{{ opt.code }} {{ opt.name }}</span>
+      </div>
     </div>
 
     <!-- Main Workspace: Split Editor & Live Preview -->
@@ -231,71 +296,10 @@ onMounted(() => {
       </div>
 
       <!-- Live Preview Column -->
-      <div class="bg-card border border-border rounded-xl p-4 shadow-xs flex flex-col space-y-3">
-        <div class="flex items-center justify-between border-b border-border pb-3">
-          <div class="flex items-center gap-2">
-            <Eye class="w-4 h-4 text-primary" />
-            <span class="text-xs font-semibold text-foreground">Live Sandboxed Preview</span>
-          </div>
-
-          <!-- Viewport Toggle Buttons -->
-          <div class="flex items-center gap-1 bg-muted p-0.5 rounded-md border border-border">
-            <button
-              type="button"
-              class="p-1 rounded text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-              :class="{ 'bg-background text-foreground shadow-xs': previewViewport === 'desktop' }"
-              title="Desktop (100%)"
-              @click="previewViewport = 'desktop'"
-            >
-              <Monitor class="w-3.5 h-3.5" />
-            </button>
-            <button
-              type="button"
-              class="p-1 rounded text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-              :class="{ 'bg-background text-foreground shadow-xs': previewViewport === 'tablet' }"
-              title="Tablet (768px)"
-              @click="previewViewport = 'tablet'"
-            >
-              <Tablet class="w-3.5 h-3.5" />
-            </button>
-            <button
-              type="button"
-              class="p-1 rounded text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-              :class="{ 'bg-background text-foreground shadow-xs': previewViewport === 'mobile' }"
-              title="Mobile (375px)"
-              @click="previewViewport = 'mobile'"
-            >
-              <Smartphone class="w-3.5 h-3.5" />
-            </button>
-            <button
-              type="button"
-              class="p-1 rounded text-muted-foreground hover:text-foreground transition-colors cursor-pointer ml-1"
-              title="Force Refresh"
-              @click="updatePreview"
-            >
-              <RefreshCw class="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-
-        <!-- Sandboxed iframe container -->
-        <div class="w-full flex justify-center bg-muted/40 border border-border rounded-lg overflow-hidden min-h-[500px] p-2">
-          <div
-            class="transition-all duration-200 shadow-sm bg-background border border-border rounded overflow-hidden"
-            :style="{
-              width: previewViewport === 'mobile' ? '375px' : previewViewport === 'tablet' ? '768px' : '100%',
-              height: '520px',
-            }"
-          >
-            <iframe
-              :srcdoc="previewHtml"
-              sandbox="allow-same-origin"
-              class="w-full h-full border-none"
-              title="Response Template Preview"
-            />
-          </div>
-        </div>
-      </div>
+      <TemplatePreviewCard
+        :preview-html="previewHtml"
+        @refresh="updatePreview"
+      />
     </div>
   </div>
 </template>

@@ -155,10 +155,10 @@ func TestSanitizeCreditCardsPCI(t *testing.T) {
 
 	// Valid Luhn test card numbers
 	cards := []string{
-		"4242424242424242",       // Visa plain
-		"4242-4242-4242-4242",    // Visa dashed
-		"5555 5555 5555 4444",    // Mastercard spaced
-		"3782-822463-10005",      // Amex dashed
+		"4242424242424242",    // Visa plain
+		"4242-4242-4242-4242", // Visa dashed
+		"5555 5555 5555 4444", // Mastercard spaced
+		"3782-822463-10005",   // Amex dashed
 	}
 
 	for _, card := range cards {
@@ -245,4 +245,3 @@ func TestHardContextTruncationCap_UTF8Boundary(t *testing.T) {
 		t.Fatalf("truncated payload contains invalid UTF-8 byte sequences: %q", event.TruncatedPayload)
 	}
 }
-

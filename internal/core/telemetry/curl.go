@@ -60,7 +60,7 @@ func GenerateCurlCommand(e *ForensicEvent) string {
 	return strings.Join(parts, " ")
 }
 
-// escapeSingleQuote escapes single quotes for safe shell execution in single-quoted strings: ' -> '\''
+// escapeSingleQuote escapes single quotes for safe shell execution in single-quoted strings: ' -> '\”
 func escapeSingleQuote(s string) string {
 	return strings.ReplaceAll(s, "'", `'\''`)
 }

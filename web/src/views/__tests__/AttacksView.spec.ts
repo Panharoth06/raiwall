@@ -40,7 +40,7 @@ beforeEach(() => {
 });
 
 describe('AttacksView.vue', () => {
-  it('renders Tabs with 3 options: Events, Incidents and Logs, defaulting to Events', () => {
+  it('renders Tabs with 2 options: Events and Logs, defaulting to Events', () => {
     const wrapper = mount(AttacksView, {
       global: {
         stubs: {
@@ -51,10 +51,9 @@ describe('AttacksView.vue', () => {
     });
 
     const tabItems = wrapper.findAll('[data-testid^="tab-"]').filter((el) => el.attributes('role') === 'tab');
-    expect(tabItems.length).toBe(3);
+    expect(tabItems.length).toBe(2);
     expect(tabItems[0].text()).toContain('Events');
-    expect(tabItems[1].text()).toContain('Incidents');
-    expect(tabItems[2].text()).toContain('Logs');
+    expect(tabItems[1].text()).toContain('Logs');
 
     expect(wrapper.find('[data-testid="live-inspector-stub"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="logs-viewer-stub"]').exists()).toBe(false);
@@ -77,24 +76,7 @@ describe('AttacksView.vue', () => {
     expect(wrapper.find('[data-testid="live-inspector-stub"]').exists()).toBe(false);
   });
 
-  it('switches to the Incidents tab without leaving the live inspector', async () => {
-    const wrapper = mount(AttacksView, {
-      global: {
-        stubs: {
-          LiveInspector: { template: '<div data-testid="live-inspector-stub">Live Inspector</div>' },
-          LogsViewer: { template: '<div data-testid="logs-viewer-stub">Logs Viewer</div>' },
-        },
-      },
-    });
-
-    await wrapper.find('[data-testid="tab-incidents"]').trigger('click');
-
-    expect(mockPush).toHaveBeenCalledWith('/attacks?tab=incidents');
-    expect(wrapper.find('[data-testid="live-inspector-stub"]').exists()).toBe(true);
-    expect(wrapper.find('[data-testid="logs-viewer-stub"]').exists()).toBe(false);
-  });
-
-  it('initializes with the Incidents tab for legacy ?view=incidents links', () => {
+  it('initializes with Events tab for legacy ?view=incidents links', () => {
     mockRoute.value.query = { view: 'incidents' };
 
     const wrapper = mount(AttacksView, {
@@ -107,7 +89,7 @@ describe('AttacksView.vue', () => {
     });
 
     expect(wrapper.find('[data-testid="live-inspector-stub"]').exists()).toBe(true);
-    expect(wrapper.find('[data-testid="tab-incidents"]').attributes('aria-selected')).toBe('true');
+    expect(wrapper.find('[data-testid="tab-events"]').attributes('aria-selected')).toBe('true');
   });
 
   it('initializes with Logs tab when query parameter tab=logs is present', () => {

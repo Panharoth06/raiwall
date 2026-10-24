@@ -1,24 +1,40 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { useConfigStore } from '@/stores/config';
 import type { ACLRule } from '@/api/client';
-import ACLExprEditor from '@/components/ACLExprEditor.vue';
+import AllowDenyTable from '@/components/acl/AllowDenyTable.vue';
+import AllowDenyModal from '@/components/acl/AllowDenyModal.vue';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableHead,
-  TableRow,
-  TableCell,
-} from '@/components/ui/table';
-import { Plus, FileCode, Edit2, Trash2, Ban, CheckCircle, ArrowRightCircle } from 'lucide-vue-next';
+import { Plus, ShieldCheck } from 'lucide-vue-next';
+
+type AllowDenyTab = 'whitelist' | 'blacklist';
 
 const configStore = useConfigStore();
+const activeTab = ref<AllowDenyTab>('whitelist');
 
 const editorOpen = ref(false);
 const editingRule = ref<ACLRule | null>(null);
+
+const whitelistRules = computed(() =>
+  configStore.acls
+    .filter((r) => r.action === 'allow')
+    .sort((a, b) => a.priority - b.priority)
+);
+
+const blacklistRules = computed(() =>
+  configStore.acls
+    .filter((r) => r.action === 'block' || r.action === 'redirect')
+    .sort((a, b) => a.priority - b.priority)
+);
+
+const currentRules = computed(() =>
+  activeTab.value === 'whitelist' ? whitelistRules.value : blacklistRules.value
+);
+
+const existingPriorities = computed(() =>
+  configStore.acls.map((r) => r.priority)
+);
 
 const openAddRule = () => {
   editingRule.value = null;
@@ -39,128 +55,121 @@ const handleSaveRule = async (ruleData: Partial<ACLRule>) => {
 };
 
 const handleDelete = async (id: string) => {
-  if (confirm('Delete this ACL rule?')) {
+  if (confirm('Delete this rule?')) {
     await configStore.deleteACL(id);
   }
+};
+
+const handleToggleStatus = async (rule: ACLRule) => {
+  await configStore.updateACL(rule.id, {
+    enabled: !rule.enabled,
+  });
+};
+
+const handleMoveUp = async (rule: ACLRule, index: number) => {
+  if (index <= 0) return;
+  const list = currentRules.value;
+  const prevRule = list[index - 1];
+  const temp = rule.priority;
+  const newPriority = prevRule.priority > 0 ? prevRule.priority : 1;
+  const prevNewPriority = temp > newPriority ? temp : newPriority + 10;
+
+  await configStore.updateACL(rule.id, { priority: newPriority - 1 });
+  await configStore.updateACL(prevRule.id, { priority: prevNewPriority });
+};
+
+const handleMoveDown = async (rule: ACLRule, index: number) => {
+  const list = currentRules.value;
+  if (index >= list.length - 1) return;
+  const nextRule = list[index + 1];
+  const nextPriority = nextRule.priority;
+  await configStore.updateACL(rule.id, { priority: nextPriority + 1 });
 };
 </script>
 
 <template>
-  <div class="h-full flex flex-col space-y-4 p-6 bg-card text-card-foreground rounded-xl border border-border shadow-none font-sans overflow-hidden">
-    <!-- Header -->
-    <div class="flex items-center justify-between shrink-0">
-      <div>
+  <div class="h-full flex flex-col space-y-4 p-6 bg-card text-card-foreground rounded-xl border border-border font-sans overflow-hidden">
+    <!-- Standard View Header -->
+    <div class="flex flex-wrap items-start justify-between gap-3 shrink-0">
+      <div class="min-w-0">
         <h1 class="text-sm font-semibold uppercase tracking-wider text-foreground flex items-center gap-2">
-          <FileCode class="w-4 h-4 text-muted-foreground" />
-          <span>Bytecode ACL Rules (expr-lang)</span>
+          <ShieldCheck class="w-4 h-4 text-muted-foreground" />
+          <span>Allow & Deny Rules</span>
         </h1>
-        <p class="text-sm text-muted-foreground mt-1 leading-relaxed">
-          High-performance compiled boolean rules evaluated in sub-15ns before deep inspection.
+        <p class="text-xs text-muted-foreground mt-1 leading-relaxed">
+          Configure multi-condition whitelist bypasses and blacklist block rules evaluated in sub-15ns bytecode.
         </p>
       </div>
 
-      <Button
-        @click="openAddRule"
-        class="gap-1.5"
-      >
-        <Plus class="w-3.5 h-3.5" />
-        <span>New ACL Rule</span>
-      </Button>
-    </div>
-
-    <!-- ACLs Table Container -->
-    <div class="flex-1 min-h-0 bg-card border border-border rounded-lg overflow-y-auto">
-      <div v-if="configStore.acls.length === 0" class="p-12 text-center">
-        <FileCode class="w-10 h-10 text-muted-foreground mx-auto mb-3" />
-        <h3 class="text-xs font-semibold uppercase tracking-wider text-foreground">No custom ACL rules configured</h3>
-        <p class="text-sm text-muted-foreground mt-1 mb-4 leading-relaxed">
-          Add boolean access control rules to block, allow, or redirect traffic based on client IPs, headers, or paths.
-        </p>
+      <div class="flex items-center gap-3">
+        <Badge variant="outline" class="font-mono text-[10px] uppercase">
+          Bytecode Engine · expr-lang · CIDR
+        </Badge>
         <Button
           @click="openAddRule"
-          class="gap-1.5"
+          class="gap-1.5 text-xs h-9 px-4 font-semibold uppercase tracking-wider bg-primary text-primary-foreground hover:bg-primary/90"
         >
           <Plus class="w-3.5 h-3.5" />
-          <span>Add First ACL Rule</span>
+          <span>ADD RULES</span>
         </Button>
       </div>
-
-      <Table v-else container-class="overflow-visible">
-        <TableHeader>
-          <TableRow>
-            <TableHead>Priority</TableHead>
-            <TableHead>Rule Name</TableHead>
-            <TableHead>Boolean Expression</TableHead>
-            <TableHead>Action</TableHead>
-            <TableHead class="text-right">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          <TableRow v-for="rule in configStore.acls" :key="rule.id">
-            <TableCell class="font-mono text-muted-foreground font-semibold text-[11px]">
-              #{{ rule.priority }}
-            </TableCell>
-            <TableCell class="font-medium text-foreground">
-              {{ rule.name }}
-            </TableCell>
-            <TableCell class="font-mono text-primary text-[11px] truncate max-w-md">
-              {{ rule.expression }}
-            </TableCell>
-            <TableCell>
-              <Badge
-                v-if="rule.action === 'block'"
-                variant="threat"
-                class="gap-1 font-mono uppercase"
-              >
-                <Ban class="w-3 h-3 text-threat" />
-                <span>Block (403)</span>
-              </Badge>
-              <Badge
-                v-else-if="rule.action === 'allow'"
-                variant="success"
-                class="gap-1 font-mono uppercase"
-              >
-                <CheckCircle class="w-3 h-3 text-success" />
-                <span>Allow</span>
-              </Badge>
-              <Badge
-                v-else
-                variant="warning"
-                class="gap-1 font-mono uppercase"
-              >
-                <ArrowRightCircle class="w-3 h-3 text-warning" />
-                <span>Redirect</span>
-              </Badge>
-            </TableCell>
-            <TableCell class="text-right space-x-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                @click="openEditRule(rule)"
-                title="Edit rule"
-                class="h-7 w-7 text-muted-foreground hover:text-foreground"
-              >
-                <Edit2 class="w-3.5 h-3.5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                @click="handleDelete(rule.id)"
-                title="Delete rule"
-                class="h-7 w-7 text-muted-foreground hover:text-threat"
-              >
-                <Trash2 class="w-3.5 h-3.5" />
-              </Button>
-            </TableCell>
-          </TableRow>
-        </TableBody>
-      </Table>
     </div>
 
-    <!-- ACL Editor Modal -->
-    <ACLExprEditor
+    <!-- Whitelist / Blacklist Selector Tabs -->
+    <div class="flex items-center gap-2 shrink-0 border-b border-border pb-2">
+      <button
+        type="button"
+        @click="activeTab = 'whitelist'"
+        :class="[
+          'px-4 py-1.5 text-xs font-semibold rounded-md uppercase tracking-wider transition-all cursor-pointer',
+          activeTab === 'whitelist'
+            ? 'bg-primary/15 text-primary border border-primary/40'
+            : 'text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-transparent'
+        ]"
+      >
+        <span>WHITELIST</span>
+        <span class="ml-1.5 font-mono text-[10px] opacity-80 tabular-nums">
+          ({{ whitelistRules.length }})
+        </span>
+      </button>
+
+      <button
+        type="button"
+        @click="activeTab = 'blacklist'"
+        :class="[
+          'px-4 py-1.5 text-xs font-semibold rounded-md uppercase tracking-wider transition-all cursor-pointer',
+          activeTab === 'blacklist'
+            ? 'bg-threat/15 text-threat border border-threat/40'
+            : 'text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-transparent'
+        ]"
+      >
+        <span>BLACKLIST</span>
+        <span class="ml-1.5 font-mono text-[10px] opacity-80 tabular-nums">
+          ({{ blacklistRules.length }})
+        </span>
+      </button>
+    </div>
+
+    <!-- Active Table View -->
+    <div class="flex-1 min-h-0 overflow-hidden">
+      <AllowDenyTable
+        :rules="currentRules"
+        :active-tab="activeTab === 'whitelist' ? 'allow' : 'block'"
+        @edit="openEditRule"
+        @delete="handleDelete"
+        @toggle-status="handleToggleStatus"
+        @move-up="handleMoveUp"
+        @move-down="handleMoveDown"
+        @add-rule="openAddRule"
+      />
+    </div>
+
+    <!-- SafeLine-style Add/Edit Modal Dialog -->
+    <AllowDenyModal
       :open="editorOpen"
       :rule="editingRule"
+      :default-action="activeTab === 'whitelist' ? 'allow' : 'block'"
+      :existing-priorities="existingPriorities"
       @close="editorOpen = false"
       @save="handleSaveRule"
     />

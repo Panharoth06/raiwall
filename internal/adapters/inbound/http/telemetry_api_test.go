@@ -92,6 +92,17 @@ func TestTelemetryAPI_Endpoints(t *testing.T) {
 	if resStats.TotalRequests != 2 || resStats.TotalBlocked != 1 {
 		t.Errorf("unexpected stats: %+v", resStats)
 	}
+	if resStats.UniqueIPs < 1 {
+		t.Errorf("expected at least 1 unique IP in stats, got %d", resStats.UniqueIPs)
+	}
+
+	// 2b. Test GET /.raiwall/api/events/stats with host and country filter
+	reqStatsFiltered := httptest.NewRequest(http.MethodGet, "/.raiwall/api/events/stats?host=api.corp.local&country=US", nil)
+	recStatsFiltered := httptest.NewRecorder()
+	api.ServeHTTP(recStatsFiltered, reqStatsFiltered)
+	if recStatsFiltered.Code != http.StatusOK {
+		t.Fatalf("expected 200 from filtered /events/stats, got %d", recStatsFiltered.Code)
+	}
 
 	// 3. Test GET /.raiwall/metrics
 	reqMetrics := httptest.NewRequest(http.MethodGet, "/.raiwall/metrics", nil)

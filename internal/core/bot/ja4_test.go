@@ -55,9 +55,9 @@ func TestContextJA4(t *testing.T) {
 
 func TestExtractJA4(t *testing.T) {
 	tests := []struct {
-		name       string
-		setupReq   func() *http.Request
-		wantJA4    string
+		name     string
+		setupReq func() *http.Request
+		wantJA4  string
 	}{
 		{
 			name: "nil request",

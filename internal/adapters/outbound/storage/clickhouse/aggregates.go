@@ -10,7 +10,7 @@ import (
 )
 
 // QueryAggregates computes summary metrics and top distributions in ClickHouse.
-func (s *ClickHouseStore) QueryAggregates(ctx context.Context, start, end time.Time) (*telemetry.AggregateStats, error) {
+func (s *ClickHouseStore) QueryAggregates(ctx context.Context, start, end time.Time, filter ...telemetry.AggregateFilter) (*telemetry.AggregateStats, error) {
 	if start.IsZero() {
 		start = time.Now().Add(-24 * time.Hour)
 	}
@@ -22,10 +22,11 @@ func (s *ClickHouseStore) QueryAggregates(ctx context.Context, start, end time.T
 	endStr := end.UTC().Format("2006-01-02 15:04:05.000")
 
 	stats := &telemetry.AggregateStats{
-		TimeBuckets:  make([]telemetry.TimeBucketCount, 0),
-		TopCountries: make([]telemetry.TopCount, 0),
-		TopRules:     make([]telemetry.TopCount, 0),
-		TopIPs:       make([]telemetry.TopCount, 0),
+		TimeBuckets:   make([]telemetry.TimeBucketCount, 0),
+		TopCountries:  make([]telemetry.TopCount, 0),
+		TopRules:      make([]telemetry.TopCount, 0),
+		TopIPs:        make([]telemetry.TopCount, 0),
+		TopCategories: make([]telemetry.TopCount, 0),
 	}
 
 	totalSQL := fmt.Sprintf(`

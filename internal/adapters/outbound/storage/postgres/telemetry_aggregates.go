@@ -10,7 +10,7 @@ import (
 )
 
 // QueryAggregates computes summary metrics and top aggregations across a time interval using PostgreSQL.
-func (s *TelemetryStore) QueryAggregates(ctx context.Context, start, end time.Time) (*telemetry.AggregateStats, error) {
+func (s *TelemetryStore) QueryAggregates(ctx context.Context, start, end time.Time, filter ...telemetry.AggregateFilter) (*telemetry.AggregateStats, error) {
 	if start.IsZero() {
 		start = time.Now().Add(-24 * time.Hour)
 	}
@@ -22,10 +22,11 @@ func (s *TelemetryStore) QueryAggregates(ctx context.Context, start, end time.Ti
 	endUTC := end.UTC()
 
 	stats := &telemetry.AggregateStats{
-		TimeBuckets:  make([]telemetry.TimeBucketCount, 0),
-		TopCountries: make([]telemetry.TopCount, 0),
-		TopRules:     make([]telemetry.TopCount, 0),
-		TopIPs:       make([]telemetry.TopCount, 0),
+		TimeBuckets:   make([]telemetry.TimeBucketCount, 0),
+		TopCountries:  make([]telemetry.TopCount, 0),
+		TopRules:      make([]telemetry.TopCount, 0),
+		TopIPs:        make([]telemetry.TopCount, 0),
+		TopCategories: make([]telemetry.TopCount, 0),
 	}
 
 	totalQuery := `

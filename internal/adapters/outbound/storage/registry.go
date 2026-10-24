@@ -242,4 +242,3 @@ func (r *Registry) Close() error {
 	}
 	return nil
 }
-

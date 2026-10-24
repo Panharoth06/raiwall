@@ -48,7 +48,7 @@ func (r IPGroupRef) Contains(ipStr string) bool {
 type IPGroupManager struct {
 	mu      sync.RWMutex
 	table   *BARTTable
-	groups  map[string]*IPGroup      // Keyed by ID and Name
+	groups  map[string]*IPGroup        // Keyed by ID and Name
 	entries map[string][]*IPGroupEntry // Keyed by Group ID
 }
 
@@ -160,7 +160,6 @@ func (m *IPGroupManager) GetGroup(nameOrID string) (*IPGroup, bool) {
 	grp, ok := m.groups[nameOrID]
 	return grp, ok
 }
-
 
 // ListGroups returns all registered IP groups.
 func (m *IPGroupManager) ListGroups() []*IPGroup {

@@ -13,7 +13,7 @@ import (
 type ExceptionRule struct {
 	ID          string `json:"id"`
 	Description string `json:"description,omitempty"`
-	Host        string `json:"host,omitempty"`       // Exact, wildcard "*.domain.com", "*", or empty
+	Host        string `json:"host,omitempty"`        // Exact, wildcard "*.domain.com", "*", or empty
 	PathRegex   string `json:"path_regex,omitempty"`  // Path regex pattern
 	PathPrefix  string `json:"path_prefix,omitempty"` // Path prefix pattern (faster alternative)
 	Method      string `json:"method,omitempty"`      // HTTP method (GET, POST, "*", or empty)

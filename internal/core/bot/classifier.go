@@ -11,14 +11,14 @@ import (
 
 // BotVerdict contains classification results for a client connection.
 type BotVerdict struct {
-	IsBot       bool           `json:"is_bot"`
-	IsSpoofed   bool           `json:"is_spoofed"`
-	BotCategory BotCategory    `json:"bot_category"`
-	Confidence  float64        `json:"confidence"`
+	IsBot       bool        `json:"is_bot"`
+	IsSpoofed   bool        `json:"is_spoofed"`
+	BotCategory BotCategory `json:"bot_category"`
+	Confidence  float64     `json:"confidence"`
 	Action      waf.Action  `json:"action"`
-	StatusCode  int            `json:"status_code,omitempty"`
-	Reason      string         `json:"reason,omitempty"`
-	ToolName    string         `json:"tool_name,omitempty"`
+	StatusCode  int         `json:"status_code,omitempty"`
+	Reason      string      `json:"reason,omitempty"`
+	ToolName    string      `json:"tool_name,omitempty"`
 }
 
 // BotClassifier inspects incoming client requests and JA4 fingerprints

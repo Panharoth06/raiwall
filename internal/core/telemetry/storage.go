@@ -39,15 +39,33 @@ type TimeBucketCount struct {
 	Block  int64     `json:"block"`
 }
 
+// AggregateFilter defines criteria for filtering summary metrics and top aggregations.
+type AggregateFilter struct {
+	Host    string `json:"host,omitempty"`
+	Country string `json:"country,omitempty"`
+}
+
 // AggregateStats provides summary analytics across a time window.
 type AggregateStats struct {
-	TotalRequests int64             `json:"total_requests"`
-	TotalBlocked  int64             `json:"total_blocked"`
-	BlockRatio    float64           `json:"block_ratio"`
-	TimeBuckets   []TimeBucketCount `json:"time_buckets"`
-	TopCountries  []TopCount        `json:"top_countries"`
-	TopRules      []TopCount        `json:"top_rules"`
-	TopIPs        []TopCount        `json:"top_ips"`
+	TotalRequests      int64             `json:"total_requests"`
+	TotalBlocked       int64             `json:"total_blocked"`
+	BlockRatio         float64           `json:"block_ratio"`
+	PageViews          int64             `json:"page_views"`
+	UniqueVisitors     int64             `json:"unique_visitors"`
+	UniqueIPs          int64             `json:"unique_ips"`
+	BlockedIPs         int64             `json:"blocked_ips"`
+	Status4xx          int64             `json:"status_4xx"`
+	Status4xxRate      float64           `json:"status_4xx_rate"`
+	Status4xxBlocked   int64             `json:"status_4xx_blocked"`
+	Status4xxBlockRate float64           `json:"status_4xx_blocked_rate"`
+	Status5xx          int64             `json:"status_5xx"`
+	Status5xxRate      float64           `json:"status_5xx_rate"`
+	QPS                float64           `json:"qps"`
+	TimeBuckets        []TimeBucketCount `json:"time_buckets"`
+	TopCountries       []TopCount        `json:"top_countries"`
+	TopRules           []TopCount        `json:"top_rules"`
+	TopIPs             []TopCount        `json:"top_ips"`
+	TopCategories      []TopCount        `json:"top_categories"`
 }
 
 // Incident aggregates multiple forensic events occurring within a sliding 5-minute time window for a client IP and target host.
@@ -91,7 +109,7 @@ type ForensicStore interface {
 	Query(ctx context.Context, params QueryParams) (*QueryResult, error)
 
 	// QueryAggregates computes high-level threat metrics, top entities, and time buckets.
-	QueryAggregates(ctx context.Context, start, end time.Time) (*AggregateStats, error)
+	QueryAggregates(ctx context.Context, start, end time.Time, filter ...AggregateFilter) (*AggregateStats, error)
 
 	// GetAggregatedIncidents aggregates forensic events into 5-minute incident clusters.
 	GetAggregatedIncidents(ctx context.Context, params IncidentQueryParams) (*IncidentQueryResult, error)

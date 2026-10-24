@@ -1,5 +1,12 @@
 import { request } from './client';
-import type { IncidentQueryResult, IPGroupOption } from '@/types/telemetry';
+import type { IncidentQueryResult, IPGroupOption, AggregateStats } from '@/types/telemetry';
+
+export interface StatsQueryParams {
+  start_time?: string;
+  end_time?: string;
+  host?: string;
+  country?: string;
+}
 
 export interface IncidentQueryParams {
   start_time?: string;
@@ -16,6 +23,16 @@ export interface CurlExport {
 
 /** Forensic triage endpoints: incident clustering, cURL replay and IP group mutation. */
 export const telemetryApi = {
+  getStats: (params: StatsQueryParams = {}) => {
+    const q = new URLSearchParams();
+    if (params.start_time) q.set('start_time', params.start_time);
+    if (params.end_time) q.set('end_time', params.end_time);
+    if (params.host) q.set('host', params.host);
+    if (params.country) q.set('country', params.country);
+    const qs = q.toString();
+    return request<AggregateStats>(`/telemetry/events/stats${qs ? '?' + qs : ''}`);
+  },
+
   listIncidents: (params: IncidentQueryParams = {}) => {
     const q = new URLSearchParams();
     if (params.start_time) q.set('start_time', params.start_time);

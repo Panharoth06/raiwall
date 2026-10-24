@@ -310,13 +310,13 @@ function getPayloadOrQuery(ev: ForensicEvent): string {
       <Table container-class="overflow-visible">
         <TableHeader>
           <TableRow>
-            <TableHead>Time</TableHead>
-            <TableHead>Action</TableHead>
-            <TableHead>Method & Path</TableHead>
-            <TableHead>Client IP & Geo</TableHead>
-            <TableHead>Rule / Threat</TableHead>
-            <TableHead>Latency</TableHead>
-            <TableHead class="text-right">Actions</TableHead>
+            <TableHead class="w-32">Time</TableHead>
+            <TableHead class="w-28">Action</TableHead>
+            <TableHead>Method &amp; Path</TableHead>
+            <TableHead class="w-44">Client IP &amp; Geo</TableHead>
+            <TableHead class="w-36">Rule / Threat</TableHead>
+            <TableHead class="w-24">Latency</TableHead>
+            <TableHead class="w-40 text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody class="font-mono tabular-nums">
@@ -397,18 +397,22 @@ function getPayloadOrQuery(ev: ForensicEvent): string {
 
           <!-- Empty State -->
           <TableRow v-if="!isLoading && filteredLogs.length === 0">
-            <TableCell colspan="7" class="py-12 text-center font-sans text-muted-foreground">
-              <Database class="w-8 h-8 mx-auto mb-2 text-muted-foreground/60 opacity-60" />
-              <p class="text-sm font-medium">No forensic logs found</p>
-              <p class="text-xs text-muted-foreground/80 mt-1">Logs stored in the database matching your criteria will appear here</p>
+            <TableCell colspan="7" class="h-80 text-center font-sans text-muted-foreground">
+              <div class="h-full flex flex-col items-center justify-center p-8">
+                <Database class="w-8 h-8 mx-auto mb-2 text-muted-foreground/60 opacity-60" />
+                <p class="text-sm font-medium">No forensic logs found</p>
+                <p class="text-xs text-muted-foreground/80 mt-1">Logs stored in the database matching your criteria will appear here</p>
+              </div>
             </TableCell>
           </TableRow>
 
           <!-- Loading State -->
           <TableRow v-if="isLoading && filteredLogs.length === 0">
-            <TableCell colspan="7" class="py-12 text-center font-sans text-muted-foreground">
-              <RotateCw class="w-8 h-8 mx-auto mb-2 text-primary animate-spin opacity-80" />
-              <p class="text-sm font-medium">Querying forensic logs...</p>
+            <TableCell colspan="7" class="h-80 text-center font-sans text-muted-foreground">
+              <div class="h-full flex flex-col items-center justify-center p-8">
+                <RotateCw class="w-8 h-8 mx-auto mb-2 text-primary animate-spin opacity-80" />
+                <p class="text-sm font-medium">Querying forensic logs...</p>
+              </div>
             </TableCell>
           </TableRow>
         </TableBody>

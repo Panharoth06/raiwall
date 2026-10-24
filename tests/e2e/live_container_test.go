@@ -242,4 +242,3 @@ func TestEnterpriseEndToEnd_AllEndpointsAndThreats(t *testing.T) {
 	recReset := execRequest(http.MethodPost, "/.raiwall/api/v1/templates/403/reset", "", authHeaders)
 	assert.Equal(t, http.StatusOK, recReset.Code)
 }
-

@@ -30,10 +30,10 @@ Typography defines the technical personality of Raiwall:
 ### 3.1 Role Partitioning
 1. **Primary Interface Face (`font-sans`):** High-clarity geometric technical sans (`Google Sans`, `-apple-system`, `BlinkMacSystemFont`, `Segoe UI`, `Roboto`).
    - Headings: `font-semibold tracking-tight` (dense and authoritative).
-   - Eyebrows & Metadata Labels: `text-[10px] font-semibold uppercase tracking-wider text-muted-foreground`.
-   - Body & Controls: `text-xs font-normal text-foreground`.
+   - Eyebrows & Metadata Labels: `text-xs font-semibold uppercase tracking-wider text-muted-foreground` (strict 12px floor).
+   - Body & Controls: `text-sm font-normal text-foreground` (14px default body and interactive controls).
 2. **Technical Utility & Data Face (`font-mono`):** High-readability monospace (`JetBrains Mono`, `Fira Code`, `ui-monospace`, `monospace`).
-   - **MANDATORY:** Every IPv4/IPv6 address, CIDR prefix, port number, JA4 fingerprint, HTTP method (`GET`, `POST`), HTTP status code (`200`, `403`, `468`), latency metric (`12 µs`), and query payload MUST use `font-mono tabular-nums`.
+   - **MANDATORY:** Every IPv4/IPv6 address, CIDR prefix, port number, JA4 fingerprint, HTTP method (`GET`, `POST`), HTTP status code (`200`, `403`, `468`), latency metric (`12 µs`), and query payload MUST use `font-mono tabular-nums text-xs`.
    - Prevents jitter during real-time SSE telemetry updates.
 
 ---

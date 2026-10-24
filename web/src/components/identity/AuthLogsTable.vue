@@ -75,15 +75,15 @@ const timeOf = (e: IdentityAuthEvent): string => {
 
     <p v-if="error" class="text-xs text-destructive shrink-0" data-testid="authlog-error">{{ error }}</p>
 
-    <div v-if="loading" class="flex items-center justify-center py-16 space-x-2 text-xs text-muted-foreground" data-testid="authlog-loading">
+    <div v-if="loading" class="flex-1 min-h-[300px] flex items-center justify-center space-x-2 text-xs text-muted-foreground" data-testid="authlog-loading">
       <Loader2 class="w-4 h-4 animate-spin" />
       <span>Loading authentication log…</span>
     </div>
 
-    <div v-else-if="filtered.length === 0" class="flex flex-col items-center justify-center py-16 space-y-2 text-xs text-muted-foreground" data-testid="authlog-empty">
-      <ScrollText class="w-5 h-5" />
-      <span v-if="search">No events match the filter</span>
-      <span v-else>No login attempts recorded yet</span>
+    <div v-else-if="filtered.length === 0" class="flex-1 min-h-[300px] flex flex-col items-center justify-center space-y-2 text-xs text-muted-foreground text-center" data-testid="authlog-empty">
+      <ScrollText class="w-6 h-6 text-muted-foreground/60 mb-1" />
+      <span v-if="search" class="font-medium">No events match the filter</span>
+      <span v-else class="font-medium">No login attempts recorded yet</span>
     </div>
 
     <div v-else class="flex-1 overflow-auto rounded-lg border border-border bg-card">

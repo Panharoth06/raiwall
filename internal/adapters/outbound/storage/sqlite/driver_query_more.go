@@ -146,7 +146,7 @@ func (s *controlStmt) queryMore(st *databaseState, q string, args []driver.Value
 		}
 		return &driverMemoryRows{
 			columns: []string{"version", "snapshot_data", "author", "description", "created_at"},
-			data: rows,
+			data:    rows,
 		}, true
 	}
 

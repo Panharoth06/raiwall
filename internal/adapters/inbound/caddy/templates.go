@@ -92,4 +92,3 @@ func (m *Middleware) renderBlockResponse(statusCode int, eventID, clientIP, host
 	}
 	return defaultBlockHTML
 }
-

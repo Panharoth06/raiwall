@@ -87,10 +87,22 @@ export interface AggregateStats {
   total_requests: number;
   total_blocked: number;
   block_ratio: number;
+  page_views?: number;
+  unique_visitors?: number;
+  unique_ips?: number;
+  blocked_ips?: number;
+  status_4xx?: number;
+  status_4xx_rate?: number;
+  status_4xx_blocked?: number;
+  status_4xx_blocked_rate?: number;
+  status_5xx?: number;
+  status_5xx_rate?: number;
+  qps?: number;
   time_buckets: TimeBucketCount[];
   top_countries: TopCount[];
   top_rules: TopCount[];
   top_ips: TopCount[];
+  top_categories?: TopCount[];
 }
 
 export interface ExceptionDraft {

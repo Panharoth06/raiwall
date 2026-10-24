@@ -11,9 +11,9 @@ import (
 	"sync"
 	"testing"
 
-	caddyv2 "github.com/caddyserver/caddy/v2"
 	"github.com/Panharoth06/raiwall/internal/adapters/inbound/caddy"
 	"github.com/Panharoth06/raiwall/internal/core/control"
+	caddyv2 "github.com/caddyserver/caddy/v2"
 )
 
 func TestEndToEndSemanticWAF(t *testing.T) {
@@ -287,7 +287,7 @@ func TestEndToEndSemanticWAF(t *testing.T) {
 			go func(idx int) {
 				defer wg.Done()
 				var req *http.Request
-				expectBlock := (idx % 2 == 0)
+				expectBlock := (idx%2 == 0)
 
 				if expectBlock {
 					req = httptest.NewRequest("GET", "http://example.com/search?q=1'%20OR%20'1'='1", nil)

@@ -106,14 +106,14 @@ const configSummary = (provider: IdentityProvider): string => {
 
     <p v-if="error" class="text-xs text-destructive shrink-0" data-testid="idp-error">{{ error }}</p>
 
-    <div v-if="loading" class="flex items-center justify-center py-16 space-x-2 text-xs text-muted-foreground" data-testid="idp-loading">
+    <div v-if="loading" class="flex-1 min-h-[300px] flex items-center justify-center space-x-2 text-xs text-muted-foreground" data-testid="idp-loading">
       <Loader2 class="w-4 h-4 animate-spin" />
       <span>Loading connectors…</span>
     </div>
 
-    <div v-else-if="providers.length === 0" class="flex flex-col items-center justify-center py-16 space-y-2 text-xs text-muted-foreground" data-testid="idp-empty">
-      <PlugZap class="w-5 h-5" />
-      <span>No external directory connected — the built-in account directory serves logins</span>
+    <div v-else-if="providers.length === 0" class="flex-1 min-h-[300px] flex flex-col items-center justify-center space-y-2 text-xs text-muted-foreground text-center" data-testid="idp-empty">
+      <PlugZap class="w-6 h-6 text-muted-foreground/60 mb-1" />
+      <span class="font-medium">No external directory connected — the built-in account directory serves logins</span>
       <span class="text-[10px]">OIDC, LDAP (ldap:// / ldaps://), and GitHub OAuth2 are supported</span>
     </div>
 

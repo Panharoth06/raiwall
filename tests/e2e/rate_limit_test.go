@@ -13,11 +13,11 @@ import (
 	"testing"
 	"time"
 
-	caddyv2 "github.com/caddyserver/caddy/v2"
 	"github.com/Panharoth06/raiwall/internal/adapters/inbound/caddy"
 	"github.com/Panharoth06/raiwall/internal/core/bot"
 	"github.com/Panharoth06/raiwall/internal/core/control"
 	"github.com/Panharoth06/raiwall/internal/core/rate"
+	caddyv2 "github.com/caddyserver/caddy/v2"
 )
 
 type rateLimitFixture struct {

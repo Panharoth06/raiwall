@@ -39,13 +39,13 @@ function formatLatency(durNs: number): string {
     <Table container-class="overflow-visible">
       <TableHeader>
         <TableRow>
-          <TableHead>Time</TableHead>
-          <TableHead>Action</TableHead>
+          <TableHead class="w-32">Time</TableHead>
+          <TableHead class="w-28">Action</TableHead>
           <TableHead>Method &amp; Path</TableHead>
-          <TableHead>Client IP &amp; Geo</TableHead>
-          <TableHead>Rule / Threat</TableHead>
-          <TableHead>Latency</TableHead>
-          <TableHead class="text-right">Actions</TableHead>
+          <TableHead class="w-44">Client IP &amp; Geo</TableHead>
+          <TableHead class="w-36">Rule / Threat</TableHead>
+          <TableHead class="w-24">Latency</TableHead>
+          <TableHead class="w-40 text-right">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody class="font-mono tabular-nums">
@@ -110,10 +110,12 @@ function formatLatency(durNs: number): string {
         </TableRow>
 
         <TableRow v-if="events.length === 0">
-          <TableCell colspan="7" class="py-12 text-center font-sans text-muted-foreground">
-            <Activity class="w-8 h-8 mx-auto mb-2 text-muted-foreground/60 opacity-60 animate-pulse" />
-            <p class="text-sm font-medium">Waiting for incoming telemetry events...</p>
-            <p class="text-xs text-muted-foreground/80 mt-1">Events appear automatically via server-sent events</p>
+          <TableCell colspan="7" class="h-80 text-center font-sans text-muted-foreground">
+            <div class="h-full flex flex-col items-center justify-center p-8">
+              <Activity class="w-8 h-8 mx-auto mb-2 text-muted-foreground/60 opacity-60 animate-pulse" />
+              <p class="text-sm font-medium">Waiting for incoming telemetry events...</p>
+              <p class="text-xs text-muted-foreground/80 mt-1">Events appear automatically via server-sent events</p>
+            </div>
           </TableCell>
         </TableRow>
       </TableBody>

@@ -116,7 +116,6 @@ func (s *Server) IPGroupManager() *acl.IPGroupManager {
 	return s.ipGroupMgr
 }
 
-
 // SetTemplateManager sets the active TemplateManager.
 func (s *Server) SetTemplateManager(mgr *templates.TemplateManager) {
 	s.templateMgr = mgr

@@ -336,19 +336,23 @@ const handleSavePolicy = (updated: PolicySettings) => {
         <TableBody>
           <!-- Loading Skeleton -->
           <TableRow v-if="loading && sessions.length === 0">
-            <TableCell colspan="8" class="py-12 text-center text-muted-foreground">
-              <Loader2 class="h-6 w-6 animate-spin mx-auto mb-2 text-primary" />
-              <span class="text-xs">Loading waiting room surge records...</span>
+            <TableCell colspan="8" class="h-64 text-center text-muted-foreground">
+              <div class="h-full flex flex-col items-center justify-center p-8">
+                <Loader2 class="h-6 w-6 animate-spin mx-auto mb-2 text-primary" />
+                <span class="text-xs">Loading waiting room surge records...</span>
+              </div>
             </TableCell>
           </TableRow>
 
           <!-- Empty State -->
           <TableRow v-else-if="filteredSessions.length === 0">
-            <TableCell colspan="8" class="py-12 text-center">
-              <Layers class="h-8 w-8 mx-auto mb-2 text-muted-foreground/40" />
-              <div class="text-xs font-semibold text-foreground">No waiting room surge sessions recorded</div>
-              <div class="text-[11px] text-muted-foreground mt-0.5">
-                No application traffic currently exceeds virtual waiting room capacity limits.
+            <TableCell colspan="8" class="h-64 text-center">
+              <div class="h-full flex flex-col items-center justify-center p-8">
+                <Layers class="h-8 w-8 mx-auto mb-2 text-muted-foreground/40" />
+                <div class="text-xs font-semibold text-foreground">No waiting room surge sessions recorded</div>
+                <div class="text-[11px] text-muted-foreground mt-0.5">
+                  No application traffic currently exceeds virtual waiting room capacity limits.
+                </div>
               </div>
             </TableCell>
           </TableRow>

@@ -10,11 +10,11 @@ func TestRouteClassifier(t *testing.T) {
 	classifier := NewRouteClassifier(nil)
 
 	tests := []struct {
-		name         string
-		path         string
-		headers      map[string]string
-		wantRoute    RouteType
-		wantBypass   bool
+		name       string
+		path       string
+		headers    map[string]string
+		wantRoute  RouteType
+		wantBypass bool
 	}{
 		{
 			name:       "API Path Prefix /api/v1/users",

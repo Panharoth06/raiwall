@@ -4,6 +4,13 @@ import { X, FileCode, ExternalLink, ClipboardCopy, ShieldAlert, CheckCircle2 } f
 import type { ForensicEvent, IPGroupOption, CurlState } from '@/types/telemetry';
 import HighlightedCode from './HighlightedCode.vue';
 import IpGroupPicker from './IpGroupPicker.vue';
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from '@/components/ui/select';
 
 /** Full-height forensic drawer for a single captured event. */
 const props = defineProps<{
@@ -227,15 +234,20 @@ function convertCharset(text: string, charset: 'utf-8' | 'gbk'): string {
                 Response
               </button>
             </div>
-            <select
-              v-if="tab === 'request'"
-              v-model="encoding"
-              data-testid="encoding-select"
-              class="h-7 px-1.5 text-[11px] bg-background border border-input rounded text-foreground"
-            >
-              <option value="utf-8">UTF-8</option>
-              <option value="gbk">GBK</option>
-            </select>
+            <div v-if="tab === 'request'" class="relative">
+              <Select v-model="encoding">
+                <SelectTrigger
+                  data-testid="encoding-select"
+                  class="h-7 w-20 px-2 text-[11px] bg-background border-input text-foreground font-mono"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent class="border-border bg-popover text-popover-foreground">
+                  <SelectItem value="utf-8" class="text-xs font-mono">UTF-8</SelectItem>
+                  <SelectItem value="gbk" class="text-xs font-mono">GBK</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <span v-else class="text-[11px] text-muted-foreground font-mono">HTTP {{ event.status_code }}</span>
           </div>
 

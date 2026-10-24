@@ -9,8 +9,8 @@ import (
 
 // ConfigDiffItem describes an individual configuration entity difference.
 type ConfigDiffItem struct {
-	Type    string `json:"type"`    // site, exception, acl, policy
-	Action  string `json:"action"`  // added, modified, deleted
+	Type    string `json:"type"`   // site, exception, acl, policy
+	Action  string `json:"action"` // added, modified, deleted
 	Name    string `json:"name"`
 	Details string `json:"details"`
 }

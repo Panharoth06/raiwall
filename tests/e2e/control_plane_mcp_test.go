@@ -16,10 +16,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/bcrypt"
 
-	caddyv2 "github.com/caddyserver/caddy/v2"
 	"github.com/Panharoth06/raiwall/internal/adapters/inbound/caddy"
 	"github.com/Panharoth06/raiwall/internal/adapters/inbound/mcp"
 	"github.com/Panharoth06/raiwall/internal/core/control"
+	caddyv2 "github.com/caddyserver/caddy/v2"
 )
 
 func TestControlPlane_E2E_ProxyMiddlewareAndMCP(t *testing.T) {

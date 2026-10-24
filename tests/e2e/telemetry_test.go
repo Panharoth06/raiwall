@@ -13,12 +13,12 @@ import (
 	"testing"
 	"time"
 
-	caddyv2 "github.com/caddyserver/caddy/v2"
 	"github.com/Panharoth06/raiwall/internal/adapters/inbound/caddy"
 	api "github.com/Panharoth06/raiwall/internal/adapters/inbound/http"
 	"github.com/Panharoth06/raiwall/internal/adapters/outbound/alerts"
 	"github.com/Panharoth06/raiwall/internal/core/control"
 	"github.com/Panharoth06/raiwall/internal/core/telemetry"
+	caddyv2 "github.com/caddyserver/caddy/v2"
 )
 
 func TestEndToEndTelemetry(t *testing.T) {

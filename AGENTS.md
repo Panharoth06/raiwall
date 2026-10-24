@@ -268,6 +268,13 @@ raiwall/
 8. **Anti-AI Slop & Enterprise Ergonomics**: Strictly avoid generic, decorative, or bloated 'AI slop' interfaces. Prioritize high information density (compact tables with monospaced tabular figures over decorative card grids), strict color restraint (90%+ neutral grayscale, no rainbow badges, no multi-colored icon chips, no colored card borders), solid surfaces (no purple/cyan neon gradients, no glow shadows, no glassmorphism blur), mandatory 6-state coverage (loading skeletons, actionable empty states, error with retry, string truncation safety, disabled/pending states, keyboard focus), snappy transitions (≤ 150ms), and direct technical copywriting with zero marketing fluff. Refer to `.agents/rules/anti-ui-slop.md` for full directives and the pre-merge finish gate checklist.
 9. **Distinctive Frontend Craft & Subject Grounding**: Never generate generic SaaS dashboard templates. Ground every view in network telemetry and radar instrumentation vernacular. Choose one signature element per view (e.g. 3D Attack Globe, syntax-highlighted forensic drawer, real-time `expr` bytecode validator) and keep all surrounding areas quiet and disciplined. Use dual-typography hierarchy (`font-sans` for interface hierarchy, `font-mono tabular-nums` for IPs, ports, CIDRs, latencies, and JA4 hashes). Use active-voice deterministic verbs on all controls and toasts. Refer to `.agents/rules/frontend-design.md` for full principles and the two-pass review framework.
 10. **Strict Component Modularity & File Size Limits**: Never code many lines into a single file. Keep `.vue` and `.ts` files concise (target ≤ 200–250 lines, hard ceiling of 350 lines). Aggressively extract complex views into separate subcomponents (`*Table.vue`, `*Modal.vue`, `*Drawer.vue`, `*FilterBar.vue`) and extract reactive state/logic into dedicated composables (`use*.ts`).
+11. **Strict Frontend Discipline (The 6 Cardinal Commandments)**:
+    - **Use Existing Components First**: Always reuse primitives from `web/src/components/ui/`. If missing, scaffold the official shadcn-vue primitive into `web/src/components/ui/` first rather than inventing custom markup.
+    - **Never Use Native Browser Default Components**: Strictly ban `<select>`, `<input type="checkbox">`, `<input type="radio">`, `<input type="date">`, raw `<button>`, `window.confirm()`, `window.alert()`, `window.prompt()`, and native `title="..."` tooltips.
+    - **Strict Typography Floor (text-xs / 12px)**: Never use sub-12px micro-text (`text-[10px]`, `text-[11px]`, etc.) for any badge, label, timestamp, or table cell. Default body and controls to `text-sm` (14px).
+    - **Global App Consistency**: Follow standardized blueprints for page headers, table filter bars, modals, and unified semantic status badge tokens (`threat`, `success`, `warning`, `info`, `muted`).
+    - **Zero Mock Data & Zero Dead Buttons**: Zero tolerance for hardcoded dummy data arrays in production code (`web/src/{views,components,stores}`). Every button must perform a real action; no dead buttons (`@click=""`, `@click="() => {}"`, or `console.log`).
+    - **Strict Backend API Parity (Zero Red Flags)**: Never display frontend controls, cards, or metrics without an active, verified Go backend Huma OpenAPI endpoint. Refer to [`.agents/rules/frontend-discipline.md`](.agents/rules/frontend-discipline.md) for full specification and audit gates.
 
 ### General
 
@@ -300,6 +307,7 @@ raiwall/
 | Unit / Component | Vitest + Vue Test Utils | `npm run test:unit` |
 | E2E | Playwright | `npm run test:e2e` |
 | Lint | ESLint + Prettier | `npm run lint` |
+| Discipline Scan | Frontend Discipline Checker | `npm run lint:discipline` |
 
 ### Full E2E & Docker Testing (Mandatory Post-Implementation Gate)
 

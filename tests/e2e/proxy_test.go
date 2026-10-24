@@ -15,10 +15,10 @@ import (
 	"testing"
 	"time"
 
-	caddyv2 "github.com/caddyserver/caddy/v2"
 	"github.com/Panharoth06/raiwall/internal/adapters/inbound/caddy"
 	"github.com/Panharoth06/raiwall/internal/core/control"
 	"github.com/Panharoth06/raiwall/internal/core/waf"
+	caddyv2 "github.com/caddyserver/caddy/v2"
 )
 
 // pipeHijackResponseWriter connects an http.ResponseWriter to a net.Pipe for testing hijacking.

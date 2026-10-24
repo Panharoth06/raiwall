@@ -81,6 +81,10 @@ export interface ACLRule {
   redirect_url?: string;
   priority: number;
   enabled: boolean;
+  is_active?: boolean;
+  continue_inspection?: boolean;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface BanEntry {

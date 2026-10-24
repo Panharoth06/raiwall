@@ -96,7 +96,7 @@ const handleInsertTag = (tag: string) => {
     </div>
 
     <!-- Code Editor Controls & Area -->
-    <div class="flex flex-col flex-1 min-h-[360px] border border-border rounded-lg overflow-hidden bg-background">
+    <div class="flex flex-col flex-1 min-h-[420px] border border-border rounded-lg overflow-hidden bg-background">
       <!-- Editor Mode Tabs -->
       <div class="flex items-center justify-between px-3 py-2 border-b border-border bg-muted/30">
         <div class="flex items-center gap-1.5">
@@ -125,13 +125,13 @@ const handleInsertTag = (tag: string) => {
       </div>
 
       <!-- Editor Textarea -->
-      <div class="flex-1 relative">
+      <div class="flex-1 relative min-h-[380px]">
         <textarea
           v-if="activeTab === 'html'"
           :value="contentHtml"
           spellcheck="false"
           placeholder="<!DOCTYPE html>..."
-          class="w-full h-full p-3 font-mono text-xs leading-relaxed bg-background text-foreground resize-none border-none focus:outline-none focus:ring-0"
+          class="absolute inset-0 w-full h-full p-3 font-mono text-xs leading-relaxed bg-background text-foreground resize-none border-none focus:outline-none focus:ring-0 overflow-auto"
           @input="emit('update:contentHtml', ($event.target as HTMLTextAreaElement).value)"
         />
         <textarea
@@ -139,7 +139,7 @@ const handleInsertTag = (tag: string) => {
           :value="customCss"
           spellcheck="false"
           placeholder=":root { ... }"
-          class="w-full h-full p-3 font-mono text-xs leading-relaxed bg-background text-foreground resize-none border-none focus:outline-none focus:ring-0"
+          class="absolute inset-0 w-full h-full p-3 font-mono text-xs leading-relaxed bg-background text-foreground resize-none border-none focus:outline-none focus:ring-0 overflow-auto"
           @input="emit('update:customCss', ($event.target as HTMLTextAreaElement).value)"
         />
       </div>

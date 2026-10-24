@@ -88,4 +88,3 @@ func TestMiddleware_OfflineModeTemplateRendering(t *testing.T) {
 	assert.Contains(t, body, "HTTP 466")
 	assert.NotEmpty(t, rec.Header().Get("X-Raiwall-Event-ID"))
 }
-

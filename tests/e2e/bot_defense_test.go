@@ -14,11 +14,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/altcha-org/altcha-lib-go"
-	caddyv2 "github.com/caddyserver/caddy/v2"
 	"github.com/Panharoth06/raiwall/internal/adapters/inbound/caddy"
 	"github.com/Panharoth06/raiwall/internal/core/bot"
 	"github.com/Panharoth06/raiwall/internal/core/control"
+	"github.com/altcha-org/altcha-lib-go"
+	caddyv2 "github.com/caddyserver/caddy/v2"
 )
 
 func TestEndToEndBotDefense(t *testing.T) {

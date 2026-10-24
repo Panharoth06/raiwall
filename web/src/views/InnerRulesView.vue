@@ -211,8 +211,11 @@ onMounted(loadRules);
             </TableCell>
           </TableRow>
           <TableRow v-if="filteredRules.length === 0">
-            <TableCell colspan="4" class="py-6 text-center text-muted-foreground" data-testid="rules-empty">
-              No signatures match the current filter.
+            <TableCell colspan="4" class="h-64 text-center text-muted-foreground" data-testid="rules-empty">
+              <div class="h-full flex flex-col items-center justify-center p-8">
+                <ShieldCheck class="w-8 h-8 text-muted-foreground/40 mb-2" />
+                <span class="text-xs font-medium">No signatures match the current filter.</span>
+              </div>
             </TableCell>
           </TableRow>
         </TableBody>

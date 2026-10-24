@@ -15,14 +15,14 @@ import (
 
 // IPGroupDTO represents a named IP group transfer object.
 type IPGroupDTO struct {
-	ID          string               `json:"id"`
-	Name        string               `json:"name"`
-	Description string               `json:"description"`
-	Type        string               `json:"type"`
-	EntryCount  int                  `json:"entry_count"`
-	Entries     []IPGroupEntryDTO    `json:"entries,omitempty"`
-	CreatedAt   time.Time            `json:"created_at"`
-	UpdatedAt   time.Time            `json:"updated_at"`
+	ID          string            `json:"id"`
+	Name        string            `json:"name"`
+	Description string            `json:"description"`
+	Type        string            `json:"type"`
+	EntryCount  int               `json:"entry_count"`
+	Entries     []IPGroupEntryDTO `json:"entries,omitempty"`
+	CreatedAt   time.Time         `json:"created_at"`
+	UpdatedAt   time.Time         `json:"updated_at"`
 }
 
 // IPGroupEntryDTO represents a single CIDR entry in a group.

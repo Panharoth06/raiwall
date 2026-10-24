@@ -189,7 +189,7 @@ type telemetryDriverStmt struct {
 	query string
 }
 
-func (s *telemetryDriverStmt) Close() error { return nil }
+func (s *telemetryDriverStmt) Close() error  { return nil }
 func (s *telemetryDriverStmt) NumInput() int { return -1 }
 
 type telemetrySimpleRows struct {

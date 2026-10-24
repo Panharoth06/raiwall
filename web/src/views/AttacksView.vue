@@ -3,23 +3,21 @@ import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from '@/router';
 import LiveInspector from '@/components/LiveInspector.vue';
 import LogsViewer from '@/components/LogsViewer.vue';
-import { Radio, Layers, ScrollText } from 'lucide-vue-next';
+import { Radio, ScrollText } from 'lucide-vue-next';
 import { Tabs, type Tab } from '@/components/ui/tabs';
 import type { ExceptionDraft } from '@/types/telemetry';
 
-type AttackSubTab = 'events' | 'incidents' | 'logs';
+type AttackSubTab = 'events' | 'logs';
 
 const route = useRoute();
 const router = useRouter();
 
 const isSubTab = (tab: unknown): tab is AttackSubTab =>
-  tab === 'events' || tab === 'incidents' || tab === 'logs';
+  tab === 'events' || tab === 'logs';
 
 const getInitialTab = (): AttackSubTab => {
   const query = route.value?.query;
   if (isSubTab(query?.tab)) return query.tab;
-  // Legacy deep links used ?view=incidents inside the Events tab.
-  if (query?.view === 'incidents') return 'incidents';
   return 'events';
 };
 
@@ -43,13 +41,6 @@ const tabs: (Tab & { id: AttackSubTab })[] = [
     testId: 'tab-events',
   },
   {
-    id: 'incidents',
-    label: 'Incidents',
-    icon: Layers,
-    description: 'Attack bursts clustered by client IP, host and 5-minute window',
-    testId: 'tab-incidents',
-  },
-  {
     id: 'logs',
     label: 'Logs',
     icon: ScrollText,
@@ -57,10 +48,6 @@ const tabs: (Tab & { id: AttackSubTab })[] = [
     testId: 'tab-logs',
   },
 ];
-
-const inspectorView = computed<'events' | 'incidents'>(() =>
-  activeTab.value === 'incidents' ? 'incidents' : 'events'
-);
 
 function handleTabChange(tabId: string) {
   if (!isSubTab(tabId)) return;
@@ -87,7 +74,7 @@ function handleCreateException(draft: ExceptionDraft) {
 
 <template>
   <div class="h-full w-full flex flex-col space-y-4 font-sans">
-    <!-- Sub-tab switcher: Events, Incidents and Logs -->
+    <!-- Sub-tab switcher: Events and Logs -->
     <div class="border-b border-border pb-1.5 shrink-0">
       <Tabs
         :tabs="tabs"
@@ -99,8 +86,8 @@ function handleCreateException(draft: ExceptionDraft) {
     <!-- Active View -->
     <div class="flex-1 min-h-0">
       <LiveInspector
-        v-if="activeTab !== 'logs'"
-        :view="inspectorView"
+        v-if="activeTab === 'events'"
+        view="events"
         @update:view="handleTabChange"
         @create-exception="handleCreateException"
       />

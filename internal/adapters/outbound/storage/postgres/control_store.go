@@ -5,8 +5,8 @@ import (
 	"database/sql"
 	"fmt"
 
-	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/Panharoth06/raiwall/internal/core/control"
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 // DBTX abstracts database operations between *sql.DB and *sql.Tx.

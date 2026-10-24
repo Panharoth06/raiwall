@@ -72,14 +72,14 @@ const saveRow = async (row: SiteRow) => {
 
     <p v-if="error" class="text-xs text-destructive shrink-0" data-testid="sso-error">{{ error }}</p>
 
-    <div v-if="loading" class="flex items-center justify-center py-16 space-x-2 text-xs text-muted-foreground" data-testid="sso-loading">
+    <div v-if="loading" class="flex-1 min-h-[300px] flex items-center justify-center space-x-2 text-xs text-muted-foreground" data-testid="sso-loading">
       <Loader2 class="w-4 h-4 animate-spin" />
       <span>Loading sites…</span>
     </div>
 
-    <div v-else-if="rows.length === 0" class="flex flex-col items-center justify-center py-16 space-y-2 text-xs text-muted-foreground" data-testid="sso-empty">
-      <Globe class="w-5 h-5" />
-      <span>No sites registered — gate enforcement is configured per site</span>
+    <div v-else-if="rows.length === 0" class="flex-1 min-h-[300px] flex flex-col items-center justify-center space-y-2 text-xs text-muted-foreground text-center" data-testid="sso-empty">
+      <Globe class="w-6 h-6 text-muted-foreground/60 mb-1" />
+      <span class="font-medium">No sites registered — gate enforcement is configured per site</span>
     </div>
 
     <div v-else class="space-y-2 overflow-auto flex-1">

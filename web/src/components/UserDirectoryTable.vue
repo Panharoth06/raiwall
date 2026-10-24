@@ -137,15 +137,15 @@ const removeUser = async (user: IdentityUser) => {
 
     <p v-if="error" class="text-xs text-destructive shrink-0" data-testid="user-error">{{ error }}</p>
 
-    <div v-if="loading" class="flex items-center justify-center py-16 space-x-2 text-xs text-muted-foreground" data-testid="user-loading">
+    <div v-if="loading" class="flex-1 min-h-[300px] flex items-center justify-center space-x-2 text-xs text-muted-foreground" data-testid="user-loading">
       <Loader2 class="w-4 h-4 animate-spin" />
       <span>Loading directory…</span>
     </div>
 
-    <div v-else-if="filtered.length === 0" class="flex flex-col items-center justify-center py-16 space-y-2 text-xs text-muted-foreground" data-testid="user-empty">
-      <UserRound class="w-5 h-5" />
-      <span v-if="search">No users match the search</span>
-      <span v-else>Directory is empty — add the first account</span>
+    <div v-else-if="filtered.length === 0" class="flex-1 min-h-[300px] flex flex-col items-center justify-center space-y-2 text-xs text-muted-foreground text-center" data-testid="user-empty">
+      <UserRound class="w-6 h-6 text-muted-foreground/60 mb-1" />
+      <span v-if="search" class="font-medium">No users match the search</span>
+      <span v-else class="font-medium">Directory is empty — add the first account</span>
     </div>
 
     <div v-else class="flex-1 overflow-auto rounded-lg border border-border bg-card">

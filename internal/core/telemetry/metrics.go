@@ -10,13 +10,13 @@ import (
 
 // Metrics holds Prometheus metric collectors for Raiwall WAF telemetry.
 type Metrics struct {
-	registry               *prometheus.Registry
-	RequestsTotal          *prometheus.CounterVec
-	BlockedTotal           *prometheus.CounterVec
-	RequestDuration        *prometheus.HistogramVec
-	TelemetryDroppedTotal  prometheus.Counter
-	ActiveConnections      prometheus.Gauge
-	BannedIPsTotal         prometheus.Gauge
+	registry              *prometheus.Registry
+	RequestsTotal         *prometheus.CounterVec
+	BlockedTotal          *prometheus.CounterVec
+	RequestDuration       *prometheus.HistogramVec
+	TelemetryDroppedTotal prometheus.Counter
+	ActiveConnections     prometheus.Gauge
+	BannedIPsTotal        prometheus.Gauge
 }
 
 // DefaultMetrics is the global default metrics instance registered on the default prometheus registry.

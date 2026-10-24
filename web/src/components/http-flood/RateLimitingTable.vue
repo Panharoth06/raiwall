@@ -370,19 +370,23 @@ const goToSettings = () => {
         <TableBody>
           <!-- Loading Skeleton -->
           <TableRow v-if="loading && bans.length === 0">
-            <TableCell colspan="6" class="py-12 text-center text-muted-foreground">
-              <Loader2 class="h-6 w-6 animate-spin mx-auto mb-2 text-primary" />
-              <span class="text-xs">Loading active rate limit records...</span>
+            <TableCell colspan="6" class="h-64 text-center text-muted-foreground">
+              <div class="h-full flex flex-col items-center justify-center p-8">
+                <Loader2 class="h-6 w-6 animate-spin mx-auto mb-2 text-primary" />
+                <span class="text-xs">Loading active rate limit records...</span>
+              </div>
             </TableCell>
           </TableRow>
 
           <!-- Empty State -->
           <TableRow v-else-if="filteredBans.length === 0">
-            <TableCell colspan="6" class="py-12 text-center">
-              <ShieldOff class="h-8 w-8 mx-auto mb-2 text-muted-foreground/40" />
-              <div class="text-xs font-semibold text-foreground">No active client bans</div>
-              <div class="text-[11px] text-muted-foreground mt-0.5">
-                No IP addresses currently exceed access velocity, attack threshold, or scanner limits.
+            <TableCell colspan="6" class="h-64 text-center">
+              <div class="h-full flex flex-col items-center justify-center p-8">
+                <ShieldOff class="h-8 w-8 mx-auto mb-2 text-muted-foreground/40" />
+                <div class="text-xs font-semibold text-foreground">No active client bans</div>
+                <div class="text-[11px] text-muted-foreground mt-0.5">
+                  No IP addresses currently exceed access velocity, attack threshold, or scanner limits.
+                </div>
               </div>
             </TableCell>
           </TableRow>

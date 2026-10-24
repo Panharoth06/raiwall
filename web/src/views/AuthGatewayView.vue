@@ -6,6 +6,7 @@ import UserDirectoryTable from '@/components/UserDirectoryTable.vue';
 import SsoPortalPanel from '@/components/identity/SsoPortalPanel.vue';
 import IdPListPanel from '@/components/identity/IdPListPanel.vue';
 import { Tabs, type Tab } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
 import { KeyRound, Lock, MonitorDot, ScrollText, Users } from 'lucide-vue-next';
 
 type AuthTab = 'logs' | 'users' | 'sso' | 'idp';
@@ -65,14 +66,19 @@ const handleTabChange = (tabId: string) => {
 
 <template>
   <div class="h-full flex flex-col space-y-4 p-6 bg-card text-card-foreground rounded-xl border border-border shadow-none font-sans overflow-hidden">
-    <div class="shrink-0">
-      <h1 class="text-sm font-semibold uppercase tracking-wider text-foreground flex items-center gap-2">
-        <Lock class="w-4 h-4 text-muted-foreground" />
-        <span>Auth Gateway</span>
-      </h1>
-      <p class="text-sm text-muted-foreground mt-1 leading-relaxed">
-        Unified directory identity for protected sites — HTTP 467 portal, app bindings, 2FA, and external IdPs.
-      </p>
+    <div class="flex flex-wrap items-start justify-between gap-3 shrink-0">
+      <div class="min-w-0">
+        <h1 class="text-sm font-semibold uppercase tracking-wider text-foreground flex items-center gap-2">
+          <Lock class="w-4 h-4 text-muted-foreground" />
+          <span>Auth Gateway</span>
+        </h1>
+        <p class="text-xs text-muted-foreground mt-1 leading-relaxed">
+          Unified directory identity for protected sites — HTTP 467 portal, app bindings, 2FA, and external IdPs.
+        </p>
+      </div>
+      <Badge variant="outline" class="font-mono text-[10px] uppercase">
+        Pre-App Auth · OIDC · MFA · RBAC
+      </Badge>
     </div>
 
     <div class="border-b border-border pb-1.5 shrink-0">

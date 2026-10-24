@@ -6,6 +6,13 @@ import { Button } from '@/components/ui/button';
 import { SearchInput } from '@/components/ui/search-input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from '@/components/ui/select';
 import SemanticsModeSegment from '@/components/SemanticsModeSegment.vue';
 import { FileSliders, Loader2, Save } from 'lucide-vue-next';
 
@@ -95,15 +102,38 @@ onMounted(loadSites);
           class="w-44"
           data-testid="site-filter"
         />
-        <select
-          v-model="selectedAppID"
-          class="h-8 text-xs font-mono bg-card border border-border rounded-md px-2 text-foreground"
-          data-testid="app-selector"
-          @change="selectApp(($event.target as HTMLSelectElement).value)"
-        >
-          <option value="">Select site…</option>
-          <option v-for="site in filteredSites" :key="site.id" :value="site.id">{{ site.name }}</option>
-        </select>
+        <div class="w-44 relative">
+          <Select
+            :model-value="selectedAppID"
+            @update:model-value="(val) => selectApp(val === '__none__' ? '' : (val as string))"
+          >
+            <SelectTrigger class="h-8 text-xs font-mono bg-card border-border text-foreground">
+              <SelectValue placeholder="Select site…" />
+            </SelectTrigger>
+            <SelectContent class="border-border bg-popover text-popover-foreground">
+              <SelectItem value="__none__" class="text-xs text-muted-foreground">Select site…</SelectItem>
+              <SelectItem
+                v-for="site in filteredSites"
+                :key="site.id"
+                :value="site.id"
+                class="text-xs font-mono"
+              >
+                {{ site.name }}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          <select
+            v-model="selectedAppID"
+            class="sr-only"
+            tabindex="-1"
+            aria-hidden="true"
+            data-testid="app-selector"
+            @change="selectApp(($event.target as HTMLSelectElement).value)"
+          >
+            <option value="">Select site…</option>
+            <option v-for="site in filteredSites" :key="site.id" :value="site.id">{{ site.name }}</option>
+          </select>
+        </div>
       </div>
     </div>
 

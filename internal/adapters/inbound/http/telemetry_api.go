@@ -130,8 +130,20 @@ func (api *TelemetryAPI) handleStatsQuery(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	start, end := parseTimeWindow(r.URL.Query())
-	stats, err := api.store.QueryAggregates(r.Context(), start, end)
+	q := r.URL.Query()
+	start, end := parseTimeWindow(q)
+	host := q.Get("host")
+	country := q.Get("country")
+
+	var filter telemetry.AggregateFilter
+	if host != "" || country != "" {
+		filter = telemetry.AggregateFilter{
+			Host:    host,
+			Country: country,
+		}
+	}
+
+	stats, err := api.store.QueryAggregates(r.Context(), start, end, filter)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
