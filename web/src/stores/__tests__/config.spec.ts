@@ -62,6 +62,18 @@ describe('config store', () => {
       active_version: 1,
       channel: 'raiwall:cluster',
     });
+    vi.spyOn(api, 'listCertificates').mockResolvedValue([
+      {
+        id: 'cert-1',
+        name: 'primary',
+        domains: ['api.example.com'],
+        source: 'self_signed',
+        auto_renew: true,
+        status: 'valid',
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z',
+      },
+    ]);
 
     const store = useConfigStore();
     await store.loadAll();
@@ -71,6 +83,8 @@ describe('config store', () => {
     expect(store.hasDraftChanges).toBe(true);
     expect(store.diffs.length).toBe(1);
     expect(store.activeVersion).toBe(1);
+    expect(store.certificates.length).toBe(1);
+    expect(store.certificates[0].name).toBe('primary');
   });
 
   it('creates a site and updates draft diffs', async () => {
@@ -101,5 +115,36 @@ describe('config store', () => {
     expect(created.name).toBe('New Site');
     expect(store.sites.length).toBe(1);
     expect(store.hasDraftChanges).toBe(true);
+  });
+
+  it('tracks certificate lifecycle in state', async () => {
+    const record = {
+      id: 'cert-1',
+      name: 'primary',
+      domains: ['app.example.com'],
+      source: 'self_signed' as const,
+      auto_renew: true,
+      status: 'valid' as const,
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+    };
+    vi.spyOn(api, 'createCertificate').mockResolvedValue(record);
+    vi.spyOn(api, 'renewCertificate').mockResolvedValue({ ...record, not_after: '2027-01-01T00:00:00Z' });
+    vi.spyOn(api, 'deleteCertificate').mockResolvedValue(undefined);
+    vi.spyOn(api, 'getDraftDiff').mockResolvedValue({ has_changes: false, diffs: [] });
+
+    const store = useConfigStore();
+    await store.createCertificate({
+      name: 'primary',
+      domains: ['app.example.com'],
+      source: 'self_signed',
+    });
+    expect(store.certificates).toHaveLength(1);
+
+    await store.renewCertificate('cert-1');
+    expect(store.certificates[0].not_after).toBe('2027-01-01T00:00:00Z');
+
+    await store.deleteCertificate('cert-1');
+    expect(store.certificates).toHaveLength(0);
   });
 });

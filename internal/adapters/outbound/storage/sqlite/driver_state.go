@@ -12,6 +12,7 @@ type databaseState struct {
 	mu                sync.RWMutex
 	name              string
 	apps              map[string]*RaiwallApp
+	certificates      map[string]*RaiwallCertificate
 	exceptions        map[string]*RaiwallException
 	aclRules          map[string]*RaiwallAclRule
 	ratePolicies      map[string]*RaiwallRatePolicy
@@ -39,6 +40,7 @@ func newDatabaseState(name string) *databaseState {
 	return &databaseState{
 		name:              name,
 		apps:              make(map[string]*RaiwallApp),
+		certificates:      make(map[string]*RaiwallCertificate),
 		exceptions:        make(map[string]*RaiwallException),
 		aclRules:          make(map[string]*RaiwallAclRule),
 		ratePolicies:      make(map[string]*RaiwallRatePolicy),
@@ -72,6 +74,10 @@ func (s *databaseState) clone() *databaseState {
 	for k, v := range s.apps {
 		val := *v
 		cp.apps[k] = &val
+	}
+	for k, v := range s.certificates {
+		certCopy := *v
+		cp.certificates[k] = &certCopy
 	}
 	for k, v := range s.exceptions {
 		val := *v
@@ -160,6 +166,7 @@ func (s *databaseState) applyFrom(src *databaseState) {
 
 	s.nextVersion = src.nextVersion
 	s.apps = src.apps
+	s.certificates = src.certificates
 	s.exceptions = src.exceptions
 	s.aclRules = src.aclRules
 	s.ratePolicies = src.ratePolicies

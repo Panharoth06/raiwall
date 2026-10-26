@@ -41,6 +41,9 @@ func (s *controlStmt) Exec(args []driver.Value) (driver.Result, error) {
 	if res, handled := s.execAuthGate(st, q, args); handled {
 		return res, nil
 	}
+	if res, handled := s.execCertificates(st, q, args); handled {
+		return res, nil
+	}
 
 	return driver.RowsAffected(0), nil
 }
@@ -62,14 +65,23 @@ func (s *controlStmt) execCore(st *databaseState, q string, args []driver.Value)
 			ProxySettings:       toStringVal(args[10]),
 			AuthEnabled:         toInt64Val(args[11]),
 			AuthBypassPaths:     toStringVal(args[12]),
-			CreatedAt:           toTime(args[13]),
-			UpdatedAt:           toTime(args[14]),
+			Description:         toStringVal(args[13]),
+			Ports:               toStringVal(args[14]),
+			SslMode:             toStringVal(args[15]),
+			CertificateID:       toStringVal(args[16]),
+			RoutingType:         toStringVal(args[17]),
+			DocumentRoot:        toStringVal(args[18]),
+			RedirectUrl:         toStringVal(args[19]),
+			RedirectStatus:      toInt64Val(args[20]),
+			LoadBalancing:       toStringVal(args[21]),
+			CreatedAt:           toTime(args[22]),
+			UpdatedAt:           toTime(args[23]),
 		}
 		st.apps[app.ID] = app
 		return driver.RowsAffected(1), true
 	}
 	if strings.Contains(q, "UPDATE raiwall_apps SET") {
-		id := toStringVal(args[13])
+		id := toStringVal(args[22])
 		if app, ok := st.apps[id]; ok {
 			app.Name = toStringVal(args[0])
 			app.Hostnames = toStringVal(args[1])
@@ -83,7 +95,16 @@ func (s *controlStmt) execCore(st *databaseState, q string, args []driver.Value)
 			app.ProxySettings = toStringVal(args[9])
 			app.AuthEnabled = toInt64Val(args[10])
 			app.AuthBypassPaths = toStringVal(args[11])
-			app.UpdatedAt = toTime(args[12])
+			app.Description = toStringVal(args[12])
+			app.Ports = toStringVal(args[13])
+			app.SslMode = toStringVal(args[14])
+			app.CertificateID = toStringVal(args[15])
+			app.RoutingType = toStringVal(args[16])
+			app.DocumentRoot = toStringVal(args[17])
+			app.RedirectUrl = toStringVal(args[18])
+			app.RedirectStatus = toInt64Val(args[19])
+			app.LoadBalancing = toStringVal(args[20])
+			app.UpdatedAt = toTime(args[21])
 			return driver.RowsAffected(1), true
 		}
 		return driver.RowsAffected(0), true

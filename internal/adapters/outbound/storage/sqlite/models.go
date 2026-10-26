@@ -58,8 +58,35 @@ type RaiwallApp struct {
 	ProxySettings       string
 	AuthEnabled         int64
 	AuthBypassPaths     string
+	Description         string
+	Ports               string
+	SslMode             string
+	CertificateID       string
+	RoutingType         string
+	DocumentRoot        string
+	RedirectUrl         string
+	RedirectStatus      int64
+	LoadBalancing       string
 	CreatedAt           time.Time
 	UpdatedAt           time.Time
+}
+
+type RaiwallCertificate struct {
+	ID                string
+	Name              string
+	Domains           string
+	Source            string
+	CertPem           string
+	EncryptedKeyPem   string
+	FingerprintSha256 string
+	Issuer            string
+	NotBefore         time.Time
+	NotAfter          time.Time
+	AutoRenew         int64
+	AcmeStaging       int64
+	LastError         string
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
 }
 
 type RaiwallBotConfig struct {

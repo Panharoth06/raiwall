@@ -8,10 +8,13 @@ import {
   type PolicySettings,
   type ConfigDiffItem,
   type ConfigHistoryItem,
+  type ManagedCertificate,
+  type CertificatePayload,
 } from '@/api/client';
 
 export const useConfigStore = defineStore('config', () => {
   const sites = ref<Site[]>([]);
+  const certificates = ref<ManagedCertificate[]>([]);
   const exceptions = ref<ExceptionRule[]>([]);
   const acls = ref<ACLRule[]>([]);
   const policies = ref<PolicySettings | null>(null);
@@ -29,7 +32,7 @@ export const useConfigStore = defineStore('config', () => {
     loading.value = true;
     error.value = null;
     try {
-      const [sitesData, exceptionsData, aclsData, policiesData, diffData, historyData, clusterData] =
+      const [sitesData, exceptionsData, aclsData, policiesData, diffData, historyData, clusterData, certData] =
         await Promise.allSettled([
           api.listSites(),
           api.listExceptions(),
@@ -38,6 +41,7 @@ export const useConfigStore = defineStore('config', () => {
           api.getDraftDiff(),
           api.getConfigHistory(),
           api.getClusterStatus(),
+          api.listCertificates(),
         ]);
 
       if (sitesData.status === 'fulfilled') sites.value = sitesData.value;
@@ -47,6 +51,7 @@ export const useConfigStore = defineStore('config', () => {
       if (diffData.status === 'fulfilled') diffs.value = diffData.value.diffs;
       if (historyData.status === 'fulfilled') history.value = historyData.value;
       if (clusterData.status === 'fulfilled') cluster.value = clusterData.value;
+      if (certData.status === 'fulfilled') certificates.value = certData.value;
     } catch (err: unknown) {
       error.value = err instanceof Error ? err.message : 'Failed to load configuration';
     } finally {
@@ -129,6 +134,40 @@ export const useConfigStore = defineStore('config', () => {
     return updated;
   }
 
+  // TLS certificates
+  async function loadCertificates() {
+    certificates.value = await api.listCertificates();
+    return certificates.value;
+  }
+
+  async function createCertificate(payload: CertificatePayload) {
+    const created = await api.createCertificate(payload);
+    certificates.value.push(created);
+    await refreshDiff();
+    return created;
+  }
+
+  async function updateCertificate(id: string, payload: Partial<CertificatePayload>) {
+    const updated = await api.updateCertificate(id, payload);
+    const idx = certificates.value.findIndex((c) => c.id === id);
+    if (idx !== -1) certificates.value[idx] = updated;
+    return updated;
+  }
+
+  async function deleteCertificate(id: string) {
+    await api.deleteCertificate(id);
+    certificates.value = certificates.value.filter((c) => c.id !== id);
+    return certificates.value;
+  }
+
+  async function renewCertificate(id: string) {
+    const renewed = await api.renewCertificate(id);
+    const idx = certificates.value.findIndex((c) => c.id === id);
+    if (idx !== -1) certificates.value[idx] = renewed;
+    await refreshDiff();
+    return renewed;
+  }
+
   // Deploy & Rollback
   async function applyDraft(author: string, description: string) {
     const result = await api.applyConfig({ author, description });
@@ -144,6 +183,7 @@ export const useConfigStore = defineStore('config', () => {
 
   return {
     sites,
+    certificates,
     exceptions,
     acls,
     policies,
@@ -159,6 +199,11 @@ export const useConfigStore = defineStore('config', () => {
     createSite,
     updateSite,
     deleteSite,
+    loadCertificates,
+    createCertificate,
+    updateCertificate,
+    deleteCertificate,
+    renewCertificate,
     createException,
     deleteException,
     createACL,

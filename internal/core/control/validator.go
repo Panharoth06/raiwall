@@ -3,6 +3,7 @@ package control
 import (
 	"fmt"
 	"net"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -118,6 +119,9 @@ func ValidateSnapshot(snap *ConfigSnapshot) error {
 				})
 			}
 		}
+
+		// Validate routing and TLS metadata.
+		errs = append(errs, validateAppRouting(app)...)
 
 		// Validate Upstreams
 		for idx, up := range app.Upstreams {
@@ -333,6 +337,51 @@ func ValidateSnapshot(snap *ConfigSnapshot) error {
 		return &ValidationErrors{Errors: errs}
 	}
 	return nil
+}
+
+// validateAppRouting validates port metadata, TLS mode, routing strategy, and
+// the fields each routing strategy depends on.
+func validateAppRouting(app *AppConfig) []ValidationError {
+	var errs []ValidationError
+	add := func(field, reason string) {
+		errs = append(errs, ValidationError{Entity: "App", ID: app.ID, Field: field, Reason: reason})
+	}
+
+	if _, err := NormalizeRoutingType(app.RoutingType); err != nil {
+		add("routing_type", err.Error())
+	}
+	if _, err := NormalizeSSLMode(app.SSLMode); err != nil {
+		add("ssl_mode", err.Error())
+	}
+	if _, err := NormalizeLoadBalancing(app.LoadBalancing); err != nil {
+		add("load_balancing", err.Error())
+	}
+	if _, err := NormalizePorts(app.Ports); err != nil {
+		add("ports", err.Error())
+	}
+	if HasHTTPSPort(app.Ports) && (app.SSLMode == "" || app.SSLMode == SSLModeNone) {
+		add("ssl_mode", "an https listening port requires ssl_mode 'auto' or 'manual'")
+	}
+	if app.SSLMode == SSLModeManual && strings.TrimSpace(app.CertificateID) == "" {
+		add("certificate_id", "ssl_mode 'manual' requires a certificate_id")
+	}
+
+	switch app.RoutingType {
+	case RoutingStatic:
+		if strings.TrimSpace(app.DocumentRoot) == "" {
+			add("document_root", "static routing requires a document root")
+		} else if !filepath.IsAbs(app.DocumentRoot) {
+			add("document_root", "document root must be an absolute path")
+		}
+	case RoutingRedirect:
+		if !IsValidRedirectTarget(app.RedirectURL) {
+			add("redirect_url", "redirect routing requires an absolute http(s) URL or a site-relative path")
+		}
+		if !IsValidRedirectStatus(app.RedirectStatus) {
+			add("redirect_status", fmt.Sprintf("unsupported redirect status %d (expected 301, 302, 307, or 308)", app.RedirectStatus))
+		}
+	}
+	return errs
 }
 
 func isValidDialAddress(addr string) bool {

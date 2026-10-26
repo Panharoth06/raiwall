@@ -192,6 +192,23 @@ type AppConfig struct {
 	AuthEnabled bool `json:"auth_enabled,omitempty"`
 	// AuthBypassPaths lists path prefixes served without clearance.
 	AuthBypassPaths []string `json:"auth_bypass_paths,omitempty"`
+	// Description is an operator-facing note shown in the dashboard.
+	Description string `json:"description,omitempty"`
+	// Ports is declarative listener metadata (validation + HTTP→HTTPS upgrades).
+	Ports []ListeningPort `json:"ports,omitempty"`
+	// SSLMode selects how TLS material is resolved for this app's hostnames.
+	SSLMode string `json:"ssl_mode,omitempty"`
+	// CertificateID references a managed certificate when SSLMode is "manual".
+	CertificateID string `json:"certificate_id,omitempty"`
+	// RoutingType selects proxy, static, or redirect handling.
+	RoutingType string `json:"routing_type,omitempty"`
+	// DocumentRoot is the filesystem root for static routing.
+	DocumentRoot string `json:"document_root,omitempty"`
+	// RedirectURL and RedirectStatus configure redirect routing.
+	RedirectURL    string `json:"redirect_url,omitempty"`
+	RedirectStatus int    `json:"redirect_status,omitempty"`
+	// LoadBalancing selects the upstream selection policy.
+	LoadBalancing string `json:"load_balancing,omitempty"`
 }
 
 // RatePolicySnapshot holds compiled rate limiting configuration for a host or global (*).

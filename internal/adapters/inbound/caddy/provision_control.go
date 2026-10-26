@@ -2,7 +2,9 @@ package caddy
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/Panharoth06/raiwall/internal/adapters/inbound/http"
@@ -11,11 +13,14 @@ import (
 	"github.com/Panharoth06/raiwall/internal/core/control"
 	"github.com/Panharoth06/raiwall/internal/core/control/templates"
 	"github.com/caddyserver/caddy/v2"
+	"github.com/caddyserver/caddy/v2/modules/caddytls"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
 
-func (m *Middleware) provisionControl(_ caddy.Context) error {
+var certDeployHookOnce sync.Once
+
+func (m *Middleware) provisionControl(ctx caddy.Context) error {
 	if m.controlStore == nil {
 		if m.storageRegistry != nil {
 			store, err := m.storageRegistry.ControlStore(context.Background())
@@ -61,6 +66,10 @@ func (m *Middleware) provisionControl(_ caddy.Context) error {
 		if _, err := m.resolveAppAuthSecret(context.Background()); err != nil && m.logger != nil {
 			m.logger.Warn("failed to bootstrap app auth session secret", zap.Error(err))
 		}
+		// Restore the last committed snapshot so applications keep routing
+		// across restarts without requiring an operator to re-apply.
+		m.restoreActiveSnapshot()
+		m.installCertificateProvider(ctx)
 	}
 
 	if m.controlAPI != nil {
@@ -94,6 +103,63 @@ func (m *Middleware) provisionControl(_ caddy.Context) error {
 	m.buildGlobalAuthGate()
 
 	return nil
+}
+
+// restoreActiveSnapshot loads the newest committed snapshot into the data plane
+// on startup so routing survives process restarts.
+func (m *Middleware) restoreActiveSnapshot() {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	record, err := m.controlStore.GetLatestSnapshot(ctx)
+	if err != nil || record.SnapshotData == "" {
+		return
+	}
+	var snap control.ConfigSnapshot
+	if err := json.Unmarshal([]byte(record.SnapshotData), &snap); err != nil {
+		if m.logger != nil {
+			m.logger.Warn("failed to parse stored configuration snapshot", zap.Error(err))
+		}
+		return
+	}
+	snap.RebuildIndex()
+	control.SetActiveSnapshot(&snap)
+	if m.logger != nil {
+		m.logger.Info("restored active configuration snapshot", zap.Int64("version", record.Version))
+	}
+}
+
+// installCertificateProvider wires dynamic SNI certificate resolution and
+// post-deploy reconciliation into the data plane.
+func (m *Middleware) installCertificateProvider(ctx caddy.Context) {
+	tlsApp := tlsAppFromContext(ctx)
+
+	provider, err := NewCertificateProvider(m.controlStore, tlsApp, m.logger)
+	if err != nil {
+		if m.logger != nil {
+			m.logger.Warn("failed to initialize certificate provider", zap.Error(err))
+		}
+		return
+	}
+	currentCertProvider.Store(provider)
+
+	if err := provider.Reload(context.Background()); err != nil && m.logger != nil {
+		m.logger.Warn("failed to load managed certificates", zap.Error(err))
+	}
+
+	certDeployHookOnce.Do(func() {
+		control.RegisterDeployHook(func(_ context.Context, _ *control.ConfigSnapshot) {
+			if p := CurrentCertificateProvider(); p != nil {
+				go p.Reconcile(context.Background())
+			}
+		})
+	})
+	go provider.Reconcile(context.Background())
+
+	if m.controlAPI != nil {
+		m.controlAPI.SetCertificateReloader(provider.Reload)
+		m.controlAPI.SetCertificateReconciler(provider.Reconcile)
+	}
 }
 
 func (m *Middleware) ensureInitialAdminUser(store control.ControlStore) {
@@ -177,4 +243,20 @@ func (m *Middleware) syncIPGroupsWithStore(store control.ControlStore, mgr *acl.
 			}
 		}
 	}
+}
+
+// tlsAppFromContext returns the provisioning TLS app, tolerating partially
+// initialized contexts (tests provision the module directly).
+func tlsAppFromContext(ctx caddy.Context) (app *caddytls.TLS) {
+	defer func() {
+		if recover() != nil {
+			app = nil
+		}
+	}()
+	if tlsModule, err := ctx.App("tls"); err == nil {
+		if typed, ok := tlsModule.(*caddytls.TLS); ok {
+			return typed
+		}
+	}
+	return nil
 }

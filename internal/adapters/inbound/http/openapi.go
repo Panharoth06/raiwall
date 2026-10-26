@@ -89,6 +89,35 @@ func OpenAPISpec() map[string]any {
 				"put":    map[string]any{"summary": "Update site configuration (admin only)"},
 				"delete": map[string]any{"summary": "Delete site configuration (admin only)"},
 			},
+			"/certificates": map[string]any{
+				"get": map[string]any{
+					"summary": "List managed TLS certificates (private keys are never returned)",
+				},
+				"post": map[string]any{
+					"summary": "Create a managed certificate: upload PEM, generate self-signed, or request ACME (admin only)",
+					"responses": map[string]any{
+						"201": map[string]any{"description": "Certificate created"},
+						"400": map[string]any{"description": "Invalid PEM, key mismatch, expired certificate, or invalid domains"},
+					},
+				},
+			},
+			"/certificates/{id}": map[string]any{
+				"get":    map[string]any{"summary": "Get certificate metadata by ID"},
+				"put":    map[string]any{"summary": "Update certificate name, domains, or auto-renew (admin only)"},
+				"delete": map[string]any{"summary": "Delete an unused certificate (admin only)"},
+			},
+			"/certificates/{id}/renew": map[string]any{
+				"post": map[string]any{
+					"summary": "Regenerate a self-signed certificate or re-trigger ACME issuance (admin only)",
+					"responses": map[string]any{
+						"200": map[string]any{"description": "Renewal started"},
+						"400": map[string]any{"description": "Uploaded certificates must be re-uploaded"},
+					},
+				},
+			},
+			"/certificates/{id}/download": map[string]any{
+				"get": map[string]any{"summary": "Download the public certificate chain as PEM"},
+			},
 			"/detector": map[string]any{
 				"get": map[string]any{
 					"summary": "List the 14 semantic detection modules with their operating modes and per-site overrides",

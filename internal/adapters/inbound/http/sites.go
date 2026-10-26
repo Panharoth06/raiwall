@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"time"
 
@@ -9,26 +10,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
-
-// SiteDTO represents application domain configuration.
-type SiteDTO struct {
-	ID                  string                   `json:"id"`
-	Name                string                   `json:"name"`
-	Hostnames           []string                 `json:"hostnames"`
-	Mode                string                   `json:"mode"`
-	Upstreams           []control.UpstreamTarget `json:"upstreams"`
-	ForwardingRules     []control.ForwardingRule `json:"forwarding_rules,omitempty"`
-	ProxySettings       *control.ProxySettings   `json:"proxy_settings,omitempty"`
-	BlockStatusCode     int                      `json:"block_status_code"`
-	BlockResponseBody   string                   `json:"block_response_body"`
-	OfflineStatusCode   int                      `json:"offline_status_code"`
-	OfflineResponseBody string                   `json:"offline_response_body"`
-	CustomHeaders       map[string]string        `json:"custom_headers"`
-	AuthEnabled         bool                     `json:"auth_enabled,omitempty"`
-	AuthBypassPaths     []string                 `json:"auth_bypass_paths,omitempty"`
-	CreatedAt           time.Time                `json:"created_at"`
-	UpdatedAt           time.Time                `json:"updated_at"`
-}
 
 func (s *Server) handleListSites(w http.ResponseWriter, r *http.Request) {
 	apps, err := s.store.ListApps(r.Context())
@@ -39,39 +20,8 @@ func (s *Server) handleListSites(w http.ResponseWriter, r *http.Request) {
 
 	result := make([]SiteDTO, 0, len(apps))
 	for _, a := range apps {
-		var hostnames []string
-		_ = json.Unmarshal([]byte(a.Hostnames), &hostnames)
-		var upstreams []control.UpstreamTarget
-		_ = json.Unmarshal([]byte(a.Upstreams), &upstreams)
-		var headers map[string]string
-		_ = json.Unmarshal([]byte(a.CustomHeaders), &headers)
-		var proxySettings *control.ProxySettings
-		if a.ProxySettings != "" {
-			var ps control.ProxySettings
-			if err := json.Unmarshal([]byte(a.ProxySettings), &ps); err == nil {
-				proxySettings = &ps
-			}
-		}
-
-		result = append(result, SiteDTO{
-			ID:                  a.ID,
-			Name:                a.Name,
-			Hostnames:           hostnames,
-			Mode:                a.Mode,
-			Upstreams:           upstreams,
-			ProxySettings:       proxySettings,
-			BlockStatusCode:     int(a.BlockStatusCode),
-			BlockResponseBody:   a.BlockResponseBody,
-			OfflineStatusCode:   int(a.OfflineStatusCode),
-			OfflineResponseBody: a.OfflineResponseBody,
-			CustomHeaders:       headers,
-			AuthEnabled:         a.AuthEnabled == 1,
-			AuthBypassPaths:     parseBypassPaths(a.AuthBypassPaths),
-			CreatedAt:           a.CreatedAt,
-			UpdatedAt:           a.UpdatedAt,
-		})
+		result = append(result, siteDTOFromRecord(a))
 	}
-
 	respondJSON(w, http.StatusOK, result)
 }
 
@@ -83,30 +33,16 @@ func (s *Server) handleGetSite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var hostnames []string
-	_ = json.Unmarshal([]byte(app.Hostnames), &hostnames)
-	var upstreams []control.UpstreamTarget
-	_ = json.Unmarshal([]byte(app.Upstreams), &upstreams)
-	var headers map[string]string
-	_ = json.Unmarshal([]byte(app.CustomHeaders), &headers)
-	var proxySettings *control.ProxySettings
-	if app.ProxySettings != "" {
-		var ps control.ProxySettings
-		if err := json.Unmarshal([]byte(app.ProxySettings), &ps); err == nil {
-			proxySettings = &ps
-		}
-	}
-
+	dto := siteDTOFromRecord(app)
 	rules, err := s.store.ListForwardingRulesByApp(r.Context(), id)
-	var forwardingRules []control.ForwardingRule
 	if err == nil {
-		forwardingRules = make([]control.ForwardingRule, 0, len(rules))
+		dto.ForwardingRules = make([]control.ForwardingRule, 0, len(rules))
 		for _, rule := range rules {
 			var ruUpstreams []control.UpstreamTarget
 			if rule.Upstreams != "" {
 				_ = json.Unmarshal([]byte(rule.Upstreams), &ruUpstreams)
 			}
-			forwardingRules = append(forwardingRules, control.ForwardingRule{
+			dto.ForwardingRules = append(dto.ForwardingRules, control.ForwardingRule{
 				ID:                 rule.ID,
 				AppID:              rule.AppID,
 				Prefix:             rule.Prefix,
@@ -119,24 +55,7 @@ func (s *Server) handleGetSite(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	respondJSON(w, http.StatusOK, SiteDTO{
-		ID:                  app.ID,
-		Name:                app.Name,
-		Hostnames:           hostnames,
-		Mode:                app.Mode,
-		Upstreams:           upstreams,
-		ForwardingRules:     forwardingRules,
-		ProxySettings:       proxySettings,
-		BlockStatusCode:     int(app.BlockStatusCode),
-		BlockResponseBody:   app.BlockResponseBody,
-		OfflineStatusCode:   int(app.OfflineStatusCode),
-		OfflineResponseBody: app.OfflineResponseBody,
-		CustomHeaders:       headers,
-		AuthEnabled:         app.AuthEnabled == 1,
-		AuthBypassPaths:     parseBypassPaths(app.AuthBypassPaths),
-		CreatedAt:           app.CreatedAt,
-		UpdatedAt:           app.UpdatedAt,
-	})
+	respondJSON(w, http.StatusOK, dto)
 }
 
 // parseBypassPaths decodes the embedded auth_bypass_paths JSON array.
@@ -164,92 +83,75 @@ func (s *Server) handleCreateSite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.ID == "" {
-		req.ID = "site-" + uuid.New().String()[:8]
+	id := req.ID
+	if id == "" {
+		id = "site-" + uuid.New().String()[:8]
 	}
-	if req.Mode == "" {
-		req.Mode = string(control.ModeDefense)
-	}
-	if req.BlockStatusCode == 0 {
-		req.BlockStatusCode = 403
-	}
-	if req.OfflineStatusCode == 0 {
-		req.OfflineStatusCode = 503
-	}
-
-	hostnamesJSON, _ := json.Marshal(req.Hostnames)
-	upstreamsJSON, _ := json.Marshal(req.Upstreams)
-	headersJSON, _ := json.Marshal(req.CustomHeaders)
-	proxySettingsJSON, _ := json.Marshal(req.ProxySettings)
-	bypassPathsJSON := marshalBypassPaths(req.AuthBypassPaths)
 	now := time.Now().UTC()
 
-	err := s.store.CreateApp(r.Context(), control.SiteApp{
-		ID:                  req.ID,
-		Name:                req.Name,
-		Hostnames:           string(hostnamesJSON),
-		Mode:                req.Mode,
-		Upstreams:           string(upstreamsJSON),
-		BlockStatusCode:     int64(req.BlockStatusCode),
-		BlockResponseBody:   req.BlockResponseBody,
-		OfflineStatusCode:   int64(req.OfflineStatusCode),
-		OfflineResponseBody: req.OfflineResponseBody,
-		CustomHeaders:       string(headersJSON),
-		ProxySettings:       string(proxySettingsJSON),
-		AuthEnabled:         boolToInt64(req.AuthEnabled),
-		AuthBypassPaths:     string(bypassPathsJSON),
-		CreatedAt:           now,
-		UpdatedAt:           now,
-	})
+	record, err := s.siteRecordFromDTO(r.Context(), req, id, now)
 	if err != nil {
+		respondError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := s.store.CreateApp(r.Context(), record); err != nil {
 		respondError(w, http.StatusInternalServerError, "failed to create site: "+err.Error())
 		return
 	}
+	if record.SSLMode == control.SSLModeAuto {
+		if err := s.ensureAutoCertificate(r.Context(), siteDTOFromRecord(record).Hostnames); err != nil {
+			respondError(w, http.StatusInternalServerError, "site created but certificate provisioning failed: "+err.Error())
+			return
+		}
+	}
 
-	req.CreatedAt = now
-	req.UpdatedAt = now
-	respondJSON(w, http.StatusCreated, req)
+	resp := siteDTOFromRecord(record)
+	resp.ID = id
+	respondJSON(w, http.StatusCreated, resp)
 }
 
 func (s *Server) handleUpdateSite(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	var req SiteDTO
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	body, err := io.ReadAll(io.LimitReader(r.Body, 8<<20))
+	if err != nil {
 		respondError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
 		return
 	}
+	var patch SiteDTO
+	if err := json.Unmarshal(body, &patch); err != nil {
+		respondError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
+		return
+	}
+	var provided map[string]json.RawMessage
+	_ = json.Unmarshal(body, &provided)
 
-	hostnamesJSON, _ := json.Marshal(req.Hostnames)
-	upstreamsJSON, _ := json.Marshal(req.Upstreams)
-	headersJSON, _ := json.Marshal(req.CustomHeaders)
-	proxySettingsJSON, _ := json.Marshal(req.ProxySettings)
-	bypassPathsJSON := marshalBypassPaths(req.AuthBypassPaths)
-	now := time.Now().UTC()
-
-	err := s.store.UpdateApp(r.Context(), control.SiteApp{
-		ID:                  id,
-		Name:                req.Name,
-		Hostnames:           string(hostnamesJSON),
-		Mode:                req.Mode,
-		Upstreams:           string(upstreamsJSON),
-		BlockStatusCode:     int64(req.BlockStatusCode),
-		BlockResponseBody:   req.BlockResponseBody,
-		OfflineStatusCode:   int64(req.OfflineStatusCode),
-		OfflineResponseBody: req.OfflineResponseBody,
-		CustomHeaders:       string(headersJSON),
-		ProxySettings:       string(proxySettingsJSON),
-		AuthEnabled:         boolToInt64(req.AuthEnabled),
-		AuthBypassPaths:     string(bypassPathsJSON),
-		UpdatedAt:           now,
-	})
+	stored, err := s.store.GetApp(r.Context(), id)
 	if err != nil {
+		respondError(w, http.StatusNotFound, "site not found")
+		return
+	}
+	req := applySitePatch(siteDTOFromRecord(stored), patch, provided)
+
+	now := time.Now().UTC()
+	record, err := s.siteRecordFromDTO(r.Context(), req, id, now)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	record.CreatedAt = time.Time{}
+	if err := s.store.UpdateApp(r.Context(), record); err != nil {
 		respondError(w, http.StatusInternalServerError, "failed to update site: "+err.Error())
 		return
 	}
+	if record.SSLMode == control.SSLModeAuto {
+		if err := s.ensureAutoCertificate(r.Context(), siteDTOFromRecord(record).Hostnames); err != nil {
+			respondError(w, http.StatusInternalServerError, "site updated but certificate provisioning failed: "+err.Error())
+			return
+		}
+	}
 
-	req.ID = id
-	req.UpdatedAt = now
-	respondJSON(w, http.StatusOK, req)
+	existing, _ := s.store.GetApp(r.Context(), id)
+	respondJSON(w, http.StatusOK, siteDTOFromRecord(existing))
 }
 
 func (s *Server) handleDeleteSite(w http.ResponseWriter, r *http.Request) {

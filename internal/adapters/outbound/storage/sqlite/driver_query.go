@@ -37,6 +37,9 @@ func (s *controlStmt) Query(args []driver.Value) (driver.Rows, error) {
 	if rows, handled := s.queryAuthGate(st, q, args); handled {
 		return rows, nil
 	}
+	if rows, handled := s.queryCertificates(st, q, args); handled {
+		return rows, nil
+	}
 
 	return &driverMemoryRows{}, nil
 }
@@ -71,6 +74,8 @@ func (s *controlStmt) queryCore(st *databaseState, q string, args []driver.Value
 					"id", "name", "hostnames", "mode", "upstreams", "block_status_code",
 					"block_response_body", "offline_status_code", "offline_response_body",
 					"custom_headers", "proxy_settings", "auth_enabled", "auth_bypass_paths",
+					"description", "ports", "ssl_mode", "certificate_id", "routing_type",
+					"document_root", "redirect_url", "redirect_status", "load_balancing",
 					"created_at", "updated_at",
 				},
 				data: [][]driver.Value{
@@ -78,7 +83,10 @@ func (s *controlStmt) queryCore(st *databaseState, q string, args []driver.Value
 						app.ID, app.Name, app.Hostnames, app.Mode, app.Upstreams,
 						app.BlockStatusCode, app.BlockResponseBody, app.OfflineStatusCode,
 						app.OfflineResponseBody, app.CustomHeaders, app.ProxySettings,
-						app.AuthEnabled, app.AuthBypassPaths, app.CreatedAt, app.UpdatedAt,
+						app.AuthEnabled, app.AuthBypassPaths, app.Description, app.Ports,
+						app.SslMode, app.CertificateID, app.RoutingType, app.DocumentRoot,
+						app.RedirectUrl, app.RedirectStatus, app.LoadBalancing,
+						app.CreatedAt, app.UpdatedAt,
 					},
 				},
 			}, true
@@ -99,7 +107,10 @@ func (s *controlStmt) queryCore(st *databaseState, q string, args []driver.Value
 				app.ID, app.Name, app.Hostnames, app.Mode, app.Upstreams,
 				app.BlockStatusCode, app.BlockResponseBody, app.OfflineStatusCode,
 				app.OfflineResponseBody, app.CustomHeaders, app.ProxySettings,
-				app.AuthEnabled, app.AuthBypassPaths, app.CreatedAt, app.UpdatedAt,
+				app.AuthEnabled, app.AuthBypassPaths, app.Description, app.Ports,
+				app.SslMode, app.CertificateID, app.RoutingType, app.DocumentRoot,
+				app.RedirectUrl, app.RedirectStatus, app.LoadBalancing,
+				app.CreatedAt, app.UpdatedAt,
 			}
 		}
 		return &driverMemoryRows{
@@ -107,6 +118,8 @@ func (s *controlStmt) queryCore(st *databaseState, q string, args []driver.Value
 				"id", "name", "hostnames", "mode", "upstreams", "block_status_code",
 				"block_response_body", "offline_status_code", "offline_response_body",
 				"custom_headers", "proxy_settings", "auth_enabled", "auth_bypass_paths",
+				"description", "ports", "ssl_mode", "certificate_id", "routing_type",
+				"document_root", "redirect_url", "redirect_status", "load_balancing",
 				"created_at", "updated_at",
 			},
 			data: rows,

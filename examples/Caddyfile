@@ -1,9 +1,11 @@
 {
 	admin off
 	auto_https off
+	storage file_system /var/lib/raiwall/certmagic
 }
 
-:8080 {
+# Shared gateway handler imported by both the HTTP and HTTPS listeners.
+(raiwall_site) {
 	raiwall {
 		mode defense
 		block_status 403
@@ -108,4 +110,19 @@
 	# reverse_proxy 127.0.0.1:9001 127.0.0.1:9002 {
 	# 	lb_policy weighted_round_robin 3 1
 	# }
+}
+
+# Plain HTTP listener (admin console + HTTP gateway traffic).
+:8080 {
+	import raiwall_site
+}
+
+# HTTPS listener with dynamic SNI certificates managed by the control plane.
+# The get_certificate module serves uploaded/self-signed certificates directly
+# and lets Caddy's ACME automation issue and renew everything else.
+:8443 {
+	tls {
+		get_certificate raiwall
+	}
+	import raiwall_site
 }

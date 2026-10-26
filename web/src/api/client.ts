@@ -3,8 +3,17 @@ import type { ForensicEvent, AggregateStats } from '@/types/telemetry';
 export interface Site {
   id: string;
   name: string;
+  description?: string;
   hostnames: string[];
   mode: 'defense' | 'audit' | 'offline';
+  ports: ListeningPort[];
+  ssl_mode: 'none' | 'auto' | 'manual';
+  certificate_id?: string;
+  routing_type: 'proxy' | 'static' | 'redirect';
+  document_root?: string;
+  redirect_url?: string;
+  redirect_status?: number;
+  load_balancing: 'round_robin' | 'least_conn' | 'ip_hash' | 'primary_backup';
   upstreams: Upstream[];
   block_status_code: number;
   block_response_body?: string;
@@ -16,6 +25,44 @@ export interface Site {
   auth_bypass_paths?: string[];
   proxy_settings?: ProxySettings;
   forwarding_rules?: ForwardingRule[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+// Listening ports are declarative metadata: the data plane binds fixed shared
+// listeners (:8080 / :8443) and uses these for validation and reporting.
+export interface ListeningPort {
+  port: number;
+  scheme: 'http' | 'https';
+}
+
+export type CertificateSource = 'upload' | 'self_signed' | 'acme';
+export type CertificateStatus = 'valid' | 'expiring' | 'expired' | 'pending';
+
+export interface ManagedCertificate {
+  id: string;
+  name: string;
+  domains: string[];
+  source: CertificateSource;
+  cert_pem?: string;
+  fingerprint_sha256?: string;
+  issuer?: string;
+  not_before?: string;
+  not_after?: string;
+  auto_renew: boolean;
+  last_error?: string;
+  status: CertificateStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CertificatePayload {
+  name?: string;
+  domains: string[];
+  source: CertificateSource;
+  cert_pem?: string;
+  key_pem?: string;
+  auto_renew?: boolean;
 }
 
 export interface Upstream {
@@ -227,6 +274,26 @@ export async function request<T>(endpoint: string, options: RequestInit = {}): P
   return response.json();
 }
 
+// requestBlob downloads a non-JSON payload (certificate PEM) while reusing the
+// same auth/credential handling as request().
+export async function requestBlob(endpoint: string, options: RequestInit = {}): Promise<Blob> {
+  const response = await fetch(`${API_BASE}${endpoint}`, {
+    ...options,
+    credentials: 'include',
+  });
+  if (!response.ok) {
+    let detail = response.statusText;
+    try {
+      const body = await response.json();
+      detail = body.message || body.error || JSON.stringify(body);
+    } catch {
+      // ignore non-JSON error bodies
+    }
+    throw new Error(`API error (${response.status}): ${detail}`);
+  }
+  return response.blob();
+}
+
 export const api = {
   // Auth
   getMe: () => request<UserSession>('/auth/me'),
@@ -256,6 +323,29 @@ export const api = {
     request<void>(`/sites/${id}`, {
       method: 'DELETE',
     }),
+
+  // TLS certificates (private keys are never returned by the API)
+  listCertificates: () => request<ManagedCertificate[]>('/certificates'),
+  getCertificate: (id: string) => request<ManagedCertificate>(`/certificates/${id}`),
+  createCertificate: (payload: CertificatePayload) =>
+    request<ManagedCertificate>('/certificates', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  updateCertificate: (id: string, payload: Partial<CertificatePayload>) =>
+    request<ManagedCertificate>(`/certificates/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  deleteCertificate: (id: string) =>
+    request<void>(`/certificates/${id}`, {
+      method: 'DELETE',
+    }),
+  renewCertificate: (id: string) =>
+    request<ManagedCertificate>(`/certificates/${id}/renew`, {
+      method: 'POST',
+    }),
+  downloadCertificate: (id: string) => requestBlob(`/certificates/${id}/download`),
 
   // Forwarding rules (path-prefix routing)
   listForwardingRules: (siteId: string) => request<ForwardingRule[]>(`/sites/${siteId}/forwarding-rules`),

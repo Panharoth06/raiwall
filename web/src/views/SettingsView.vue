@@ -3,18 +3,20 @@ import { ref } from 'vue';
 import { useConfigStore } from '@/stores/config';
 import { useTheme } from '@/composables/useTheme';
 import ApiKeysManager from '@/components/ApiKeysManager.vue';
+import CertificatesPanel from '@/components/certificates/CertificatesPanel.vue';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Settings, Network, Key, Palette, Moon, Sun, Monitor } from 'lucide-vue-next';
+import { Settings, Network, Key, Palette, Moon, Sun, Monitor, Lock } from 'lucide-vue-next';
 import { Tabs, type Tab } from '@/components/ui/tabs';
 
 const configStore = useConfigStore();
 const { theme, setTheme } = useTheme();
 
-type SettingsSubTab = 'cluster' | 'apikeys';
+type SettingsSubTab = 'cluster' | 'certificates' | 'apikeys';
 const activeTab = ref<SettingsSubTab>('cluster');
 
 const tabs: (Tab & { id: SettingsSubTab })[] = [
   { id: 'cluster', label: 'Cluster Synchronization', icon: Network },
+  { id: 'certificates', label: 'TLS Certificates', icon: Lock },
   { id: 'apikeys', label: 'API Keys & Access', icon: Key },
 ];
 
@@ -154,6 +156,11 @@ const handleTabChange = (tabId: string) => {
           </CardContent>
         </Card>
       </template>
+
+      <!-- TLS Certificates -->
+      <Card v-else-if="activeTab === 'certificates'" class="p-4">
+        <CertificatesPanel />
+      </Card>
 
       <!-- API Keys Manager -->
       <Card v-else-if="activeTab === 'apikeys'" class="p-4">

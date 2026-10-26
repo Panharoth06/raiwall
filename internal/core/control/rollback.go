@@ -40,6 +40,7 @@ func DeploySnapshot(ctx context.Context, store ControlStore, author, description
 
 	snap.Version = uint64(saved.Version)
 	StoreSnapshot(snap)
+	runDeployHooks(ctx, snap)
 
 	return snap, nil
 }
@@ -69,6 +70,7 @@ func RollbackToVersion(ctx context.Context, store ControlStore, targetVersion ui
 
 	snap.Version = targetVersion
 	StoreSnapshot(&snap)
+	runDeployHooks(ctx, &snap)
 
 	return &snap, nil
 }

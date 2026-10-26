@@ -14,10 +14,38 @@ CREATE TABLE IF NOT EXISTS raiwall_apps (
     proxy_settings TEXT NOT NULL DEFAULT '{}',
     auth_enabled INTEGER NOT NULL DEFAULT 0,
     auth_bypass_paths TEXT NOT NULL DEFAULT '[]',
+    description TEXT NOT NULL DEFAULT '',
+    ports TEXT NOT NULL DEFAULT '[{"port":80,"scheme":"http"}]',
+    ssl_mode TEXT NOT NULL DEFAULT 'none',
+    certificate_id TEXT NOT NULL DEFAULT '',
+    routing_type TEXT NOT NULL DEFAULT 'proxy',
+    document_root TEXT NOT NULL DEFAULT '',
+    redirect_url TEXT NOT NULL DEFAULT '',
+    redirect_status INTEGER NOT NULL DEFAULT 302,
+    load_balancing TEXT NOT NULL DEFAULT 'round_robin',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_raiwall_apps_mode ON raiwall_apps(mode);
+
+CREATE TABLE IF NOT EXISTS raiwall_certificates (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    domains TEXT NOT NULL DEFAULT '[]',
+    source TEXT NOT NULL DEFAULT 'self_signed',
+    cert_pem TEXT NOT NULL DEFAULT '',
+    encrypted_key_pem TEXT NOT NULL DEFAULT '',
+    fingerprint_sha256 TEXT NOT NULL DEFAULT '',
+    issuer TEXT NOT NULL DEFAULT '',
+    not_before TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    not_after TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    auto_renew INTEGER NOT NULL DEFAULT 1,
+    acme_staging INTEGER NOT NULL DEFAULT 0,
+    last_error TEXT NOT NULL DEFAULT '',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_raiwall_certificates_source ON raiwall_certificates(source);
 
 CREATE TABLE IF NOT EXISTS raiwall_exceptions (
     id TEXT PRIMARY KEY,

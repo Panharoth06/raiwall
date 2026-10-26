@@ -32,6 +32,8 @@ type Server struct {
 	waitingRoom      *rate.WaitingRoomManager
 	ipGroupMgr       *acl.IPGroupManager
 	templateMgr      *templates.TemplateManager
+	certReloader     func(context.Context) error
+	certReconciler   func(context.Context)
 }
 
 // NewServer initializes a new Control Plane API server with Chi routing.
@@ -55,6 +57,26 @@ func NewServer(store control.ControlStore, hmacSecret []byte) *Server {
 // SetClusterPublisher sets the distributed cluster event publisher.
 func (s *Server) SetClusterPublisher(pub ClusterPublisher) {
 	s.clusterPublisher = pub
+}
+
+// SetCertificateReloader installs the TLS provider refresh callback invoked
+// after certificate records change.
+func (s *Server) SetCertificateReloader(fn func(context.Context) error) {
+	s.certReloader = fn
+}
+
+// reloadCertificates refreshes the data-plane certificate index, if wired.
+func (s *Server) reloadCertificates(ctx context.Context) {
+	if s.certReloader == nil {
+		return
+	}
+	_ = s.certReloader(ctx)
+}
+
+// SetCertificateReconciler installs the callback that renews/obtains
+// certificates in the data plane.
+func (s *Server) SetCertificateReconciler(fn func(context.Context)) {
+	s.certReconciler = fn
 }
 
 // ClusterPublisher returns the configured cluster event publisher.

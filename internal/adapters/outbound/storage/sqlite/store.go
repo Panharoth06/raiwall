@@ -51,6 +51,12 @@ func InitDB(dsn string) (*Store, error) {
 		return nil, fmt.Errorf("failed to apply database schema: %w", err)
 	}
 
+	// Upgrade databases created before additive columns were introduced.
+	if err := applyAdditiveUpgrades(db); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("failed to upgrade database schema: %w", err)
+	}
+
 	return &Store{
 		db:      db,
 		ownsDB:  true,

@@ -81,8 +81,10 @@ const createApp = `-- name: CreateApp :exec
 INSERT INTO raiwall_apps (
     id, name, hostnames, mode, upstreams, block_status_code, block_response_body,
     offline_status_code, offline_response_body, custom_headers, proxy_settings,
-    auth_enabled, auth_bypass_paths, created_at, updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    auth_enabled, auth_bypass_paths, description, ports, ssl_mode, certificate_id,
+    routing_type, document_root, redirect_url, redirect_status, load_balancing,
+    created_at, updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateAppParams struct {
@@ -99,6 +101,15 @@ type CreateAppParams struct {
 	ProxySettings       string
 	AuthEnabled         int64
 	AuthBypassPaths     string
+	Description         string
+	Ports               string
+	SslMode             string
+	CertificateID       string
+	RoutingType         string
+	DocumentRoot        string
+	RedirectUrl         string
+	RedirectStatus      int64
+	LoadBalancing       string
 	CreatedAt           time.Time
 	UpdatedAt           time.Time
 }
@@ -118,6 +129,15 @@ func (q *Queries) CreateApp(ctx context.Context, arg CreateAppParams) error {
 		arg.ProxySettings,
 		arg.AuthEnabled,
 		arg.AuthBypassPaths,
+		arg.Description,
+		arg.Ports,
+		arg.SslMode,
+		arg.CertificateID,
+		arg.RoutingType,
+		arg.DocumentRoot,
+		arg.RedirectUrl,
+		arg.RedirectStatus,
+		arg.LoadBalancing,
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)
@@ -444,6 +464,76 @@ func (q *Queries) DeleteUser(ctx context.Context, id string) error {
 	return err
 }
 
+const fetchCertificate = `-- name: FetchCertificate :one
+SELECT id, name, domains, source, cert_pem, encrypted_key_pem, fingerprint_sha256, issuer, not_before, not_after, auto_renew, acme_staging, last_error, created_at, updated_at FROM raiwall_certificates WHERE id = ? LIMIT 1
+`
+
+func (q *Queries) FetchCertificate(ctx context.Context, id string) (RaiwallCertificate, error) {
+	row := q.db.QueryRowContext(ctx, fetchCertificate, id)
+	var i RaiwallCertificate
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Domains,
+		&i.Source,
+		&i.CertPem,
+		&i.EncryptedKeyPem,
+		&i.FingerprintSha256,
+		&i.Issuer,
+		&i.NotBefore,
+		&i.NotAfter,
+		&i.AutoRenew,
+		&i.AcmeStaging,
+		&i.LastError,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const fetchCertificates = `-- name: FetchCertificates :many
+SELECT id, name, domains, source, cert_pem, encrypted_key_pem, fingerprint_sha256, issuer, not_before, not_after, auto_renew, acme_staging, last_error, created_at, updated_at FROM raiwall_certificates ORDER BY name ASC
+`
+
+func (q *Queries) FetchCertificates(ctx context.Context) ([]RaiwallCertificate, error) {
+	rows, err := q.db.QueryContext(ctx, fetchCertificates)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []RaiwallCertificate
+	for rows.Next() {
+		var i RaiwallCertificate
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Domains,
+			&i.Source,
+			&i.CertPem,
+			&i.EncryptedKeyPem,
+			&i.FingerprintSha256,
+			&i.Issuer,
+			&i.NotBefore,
+			&i.NotAfter,
+			&i.AutoRenew,
+			&i.AcmeStaging,
+			&i.LastError,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getACLRule = `-- name: GetACLRule :one
 SELECT id, name, expression, "action", priority, status_code, redirect_url, is_active, created_at, updated_at FROM raiwall_acl_rules WHERE id = ? LIMIT 1
 `
@@ -527,7 +617,7 @@ func (q *Queries) GetAPIResource(ctx context.Context, id string) (RaiwallApiReso
 }
 
 const getApp = `-- name: GetApp :one
-SELECT id, name, hostnames, mode, upstreams, block_status_code, block_response_body, offline_status_code, offline_response_body, custom_headers, proxy_settings, auth_enabled, auth_bypass_paths, created_at, updated_at FROM raiwall_apps WHERE id = ? LIMIT 1
+SELECT id, name, hostnames, mode, upstreams, block_status_code, block_response_body, offline_status_code, offline_response_body, custom_headers, proxy_settings, auth_enabled, auth_bypass_paths, description, ports, ssl_mode, certificate_id, routing_type, document_root, redirect_url, redirect_status, load_balancing, created_at, updated_at FROM raiwall_apps WHERE id = ? LIMIT 1
 `
 
 func (q *Queries) GetApp(ctx context.Context, id string) (RaiwallApp, error) {
@@ -547,6 +637,15 @@ func (q *Queries) GetApp(ctx context.Context, id string) (RaiwallApp, error) {
 		&i.ProxySettings,
 		&i.AuthEnabled,
 		&i.AuthBypassPaths,
+		&i.Description,
+		&i.Ports,
+		&i.SslMode,
+		&i.CertificateID,
+		&i.RoutingType,
+		&i.DocumentRoot,
+		&i.RedirectUrl,
+		&i.RedirectStatus,
+		&i.LoadBalancing,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -719,6 +818,53 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (Raiwa
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const insertCertificate = `-- name: InsertCertificate :exec
+INSERT INTO raiwall_certificates (
+    id, name, domains, source, cert_pem, encrypted_key_pem, fingerprint_sha256,
+    issuer, not_before, not_after, auto_renew, acme_staging, last_error,
+    created_at, updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+`
+
+type InsertCertificateParams struct {
+	ID                string
+	Name              string
+	Domains           string
+	Source            string
+	CertPem           string
+	EncryptedKeyPem   string
+	FingerprintSha256 string
+	Issuer            string
+	NotBefore         time.Time
+	NotAfter          time.Time
+	AutoRenew         int64
+	AcmeStaging       int64
+	LastError         string
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+}
+
+func (q *Queries) InsertCertificate(ctx context.Context, arg InsertCertificateParams) error {
+	_, err := q.db.ExecContext(ctx, insertCertificate,
+		arg.ID,
+		arg.Name,
+		arg.Domains,
+		arg.Source,
+		arg.CertPem,
+		arg.EncryptedKeyPem,
+		arg.FingerprintSha256,
+		arg.Issuer,
+		arg.NotBefore,
+		arg.NotAfter,
+		arg.AutoRenew,
+		arg.AcmeStaging,
+		arg.LastError,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+	)
+	return err
 }
 
 const listACLRules = `-- name: ListACLRules :many
@@ -1068,7 +1214,7 @@ func (q *Queries) ListAllActiveForwardingRules(ctx context.Context) ([]RaiwallFo
 }
 
 const listApps = `-- name: ListApps :many
-SELECT id, name, hostnames, mode, upstreams, block_status_code, block_response_body, offline_status_code, offline_response_body, custom_headers, proxy_settings, auth_enabled, auth_bypass_paths, created_at, updated_at FROM raiwall_apps ORDER BY name ASC
+SELECT id, name, hostnames, mode, upstreams, block_status_code, block_response_body, offline_status_code, offline_response_body, custom_headers, proxy_settings, auth_enabled, auth_bypass_paths, description, ports, ssl_mode, certificate_id, routing_type, document_root, redirect_url, redirect_status, load_balancing, created_at, updated_at FROM raiwall_apps ORDER BY name ASC
 `
 
 func (q *Queries) ListApps(ctx context.Context) ([]RaiwallApp, error) {
@@ -1094,6 +1240,15 @@ func (q *Queries) ListApps(ctx context.Context) ([]RaiwallApp, error) {
 			&i.ProxySettings,
 			&i.AuthEnabled,
 			&i.AuthBypassPaths,
+			&i.Description,
+			&i.Ports,
+			&i.SslMode,
+			&i.CertificateID,
+			&i.RoutingType,
+			&i.DocumentRoot,
+			&i.RedirectUrl,
+			&i.RedirectStatus,
+			&i.LoadBalancing,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -1376,6 +1531,60 @@ func (q *Queries) ListUsers(ctx context.Context) ([]RaiwallUser, error) {
 	return items, nil
 }
 
+const modifyCertificate = `-- name: ModifyCertificate :exec
+UPDATE raiwall_certificates SET
+    name = ?, domains = ?, source = ?, cert_pem = ?, encrypted_key_pem = ?,
+    fingerprint_sha256 = ?, issuer = ?, not_before = ?, not_after = ?,
+    auto_renew = ?, acme_staging = ?, last_error = ?, updated_at = ?
+WHERE id = ?
+`
+
+type ModifyCertificateParams struct {
+	Name              string
+	Domains           string
+	Source            string
+	CertPem           string
+	EncryptedKeyPem   string
+	FingerprintSha256 string
+	Issuer            string
+	NotBefore         time.Time
+	NotAfter          time.Time
+	AutoRenew         int64
+	AcmeStaging       int64
+	LastError         string
+	UpdatedAt         time.Time
+	ID                string
+}
+
+func (q *Queries) ModifyCertificate(ctx context.Context, arg ModifyCertificateParams) error {
+	_, err := q.db.ExecContext(ctx, modifyCertificate,
+		arg.Name,
+		arg.Domains,
+		arg.Source,
+		arg.CertPem,
+		arg.EncryptedKeyPem,
+		arg.FingerprintSha256,
+		arg.Issuer,
+		arg.NotBefore,
+		arg.NotAfter,
+		arg.AutoRenew,
+		arg.AcmeStaging,
+		arg.LastError,
+		arg.UpdatedAt,
+		arg.ID,
+	)
+	return err
+}
+
+const removeCertificate = `-- name: RemoveCertificate :exec
+DELETE FROM raiwall_certificates WHERE id = ?
+`
+
+func (q *Queries) RemoveCertificate(ctx context.Context, id string) error {
+	_, err := q.db.ExecContext(ctx, removeCertificate, id)
+	return err
+}
+
 const updateACLRule = `-- name: UpdateACLRule :exec
 UPDATE raiwall_acl_rules SET
     name = ?, expression = ?, action = ?, priority = ?, status_code = ?,
@@ -1429,6 +1638,8 @@ UPDATE raiwall_apps SET
     name = ?, hostnames = ?, mode = ?, upstreams = ?, block_status_code = ?,
     block_response_body = ?, offline_status_code = ?, offline_response_body = ?,
     custom_headers = ?, proxy_settings = ?, auth_enabled = ?, auth_bypass_paths = ?,
+    description = ?, ports = ?, ssl_mode = ?, certificate_id = ?, routing_type = ?,
+    document_root = ?, redirect_url = ?, redirect_status = ?, load_balancing = ?,
     updated_at = ?
 WHERE id = ?
 `
@@ -1446,6 +1657,15 @@ type UpdateAppParams struct {
 	ProxySettings       string
 	AuthEnabled         int64
 	AuthBypassPaths     string
+	Description         string
+	Ports               string
+	SslMode             string
+	CertificateID       string
+	RoutingType         string
+	DocumentRoot        string
+	RedirectUrl         string
+	RedirectStatus      int64
+	LoadBalancing       string
 	UpdatedAt           time.Time
 	ID                  string
 }
@@ -1464,6 +1684,15 @@ func (q *Queries) UpdateApp(ctx context.Context, arg UpdateAppParams) error {
 		arg.ProxySettings,
 		arg.AuthEnabled,
 		arg.AuthBypassPaths,
+		arg.Description,
+		arg.Ports,
+		arg.SslMode,
+		arg.CertificateID,
+		arg.RoutingType,
+		arg.DocumentRoot,
+		arg.RedirectUrl,
+		arg.RedirectStatus,
+		arg.LoadBalancing,
 		arg.UpdatedAt,
 		arg.ID,
 	)

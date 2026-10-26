@@ -77,6 +77,11 @@ func (s *Server) routes() {
 			api.Put("/sites/{id}", s.handleUpdateSite)
 			api.Delete("/sites/{id}", s.handleDeleteSite)
 
+			// Managed TLS Certificates
+			registerCertificateRoutes(api, "/certificates", s)
+			// Documented compatibility surface (docs/api-specification.md).
+			registerCertificateRoutes(api, "/open/cert", s)
+
 			// Site Forwarding Rules
 			api.Get("/sites/{id}/forwarding-rules", s.handleListForwardingRules)
 			api.Post("/sites/{id}/forwarding-rules", s.handleCreateForwardingRule)

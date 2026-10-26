@@ -7,14 +7,20 @@ SELECT * FROM raiwall_apps WHERE id = ? LIMIT 1;
 -- name: CreateApp :exec
 INSERT INTO raiwall_apps (
     id, name, hostnames, mode, upstreams, block_status_code, block_response_body,
-    offline_status_code, offline_response_body, custom_headers, proxy_settings, created_at, updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    offline_status_code, offline_response_body, custom_headers, proxy_settings,
+    auth_enabled, auth_bypass_paths, description, ports, ssl_mode, certificate_id,
+    routing_type, document_root, redirect_url, redirect_status, load_balancing,
+    created_at, updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: UpdateApp :exec
 UPDATE raiwall_apps SET
     name = ?, hostnames = ?, mode = ?, upstreams = ?, block_status_code = ?,
     block_response_body = ?, offline_status_code = ?, offline_response_body = ?,
-    custom_headers = ?, proxy_settings = ?, updated_at = ?
+    custom_headers = ?, proxy_settings = ?, auth_enabled = ?, auth_bypass_paths = ?,
+    description = ?, ports = ?, ssl_mode = ?, certificate_id = ?, routing_type = ?,
+    document_root = ?, redirect_url = ?, redirect_status = ?, load_balancing = ?,
+    updated_at = ?
 WHERE id = ?;
 
 -- name: DeleteApp :exec
@@ -228,3 +234,26 @@ DELETE FROM raiwall_api_resources WHERE id = ?;
 -- name: DeleteAPIResourcesByApp :exec
 DELETE FROM raiwall_api_resources WHERE app_id = ?;
 
+
+-- name: FetchCertificates :many
+SELECT * FROM raiwall_certificates ORDER BY name ASC;
+
+-- name: FetchCertificate :one
+SELECT * FROM raiwall_certificates WHERE id = ? LIMIT 1;
+
+-- name: InsertCertificate :exec
+INSERT INTO raiwall_certificates (
+    id, name, domains, source, cert_pem, encrypted_key_pem, fingerprint_sha256,
+    issuer, not_before, not_after, auto_renew, acme_staging, last_error,
+    created_at, updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+-- name: ModifyCertificate :exec
+UPDATE raiwall_certificates SET
+    name = ?, domains = ?, source = ?, cert_pem = ?, encrypted_key_pem = ?,
+    fingerprint_sha256 = ?, issuer = ?, not_before = ?, not_after = ?,
+    auto_renew = ?, acme_staging = ?, last_error = ?, updated_at = ?
+WHERE id = ?;
+
+-- name: RemoveCertificate :exec
+DELETE FROM raiwall_certificates WHERE id = ?;

@@ -8,6 +8,7 @@ import { Tabs, type Tab } from '@/components/ui/tabs';
 import type { ExceptionDraft } from '@/types/telemetry';
 
 type AttackSubTab = 'events' | 'logs';
+type InspectorView = 'events' | 'incidents';
 
 const route = useRoute();
 const router = useRouter();
@@ -22,6 +23,12 @@ const getInitialTab = (): AttackSubTab => {
 };
 
 const activeTab = ref<AttackSubTab>(getInitialTab());
+
+// The inspector view (event rows vs aggregated incidents) is URL-driven so the
+// incidents drill-down stays linkable and survives a refresh.
+const activeView = computed<InspectorView>(() =>
+  activeTab.value === 'events' && route.value?.query?.view === 'incidents' ? 'incidents' : 'events'
+);
 
 watch(
   () => route.value?.query?.tab,
@@ -58,6 +65,14 @@ function handleTabChange(tabId: string) {
   router.push(`/attacks?${query.toString()}`);
 }
 
+function handleViewChange(view: string) {
+  const query = new URLSearchParams(route.value?.query ?? {});
+  query.set('tab', 'events');
+  if (view === 'incidents') query.set('view', 'incidents');
+  else query.delete('view');
+  router.push(`/attacks?${query.toString()}`);
+}
+
 function handleCreateException(draft: ExceptionDraft) {
   const query = new URLSearchParams({
     create: 'true',
@@ -87,8 +102,8 @@ function handleCreateException(draft: ExceptionDraft) {
     <div class="flex-1 min-h-0">
       <LiveInspector
         v-if="activeTab === 'events'"
-        view="events"
-        @update:view="handleTabChange"
+        :view="activeView"
+        @update:view="handleViewChange"
         @create-exception="handleCreateException"
       />
       <LogsViewer

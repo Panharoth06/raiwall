@@ -68,6 +68,10 @@ func CompileSnapshot(ctx context.Context, store ControlStore) (*ConfigSnapshot, 
 		if a.AuthBypassPaths != "" {
 			_ = json.Unmarshal([]byte(a.AuthBypassPaths), &bypassPaths)
 		}
+		var ports []ListeningPort
+		if a.Ports != "" {
+			_ = json.Unmarshal([]byte(a.Ports), &ports)
+		}
 
 		appConfigs = append(appConfigs, &AppConfig{
 			ID:                  a.ID,
@@ -84,6 +88,15 @@ func CompileSnapshot(ctx context.Context, store ControlStore) (*ConfigSnapshot, 
 			CustomHeaders:       customHeaders,
 			AuthEnabled:         a.AuthEnabled == 1,
 			AuthBypassPaths:     bypassPaths,
+			Description:         a.Description,
+			Ports:               ports,
+			SSLMode:             a.SSLMode,
+			CertificateID:       a.CertificateID,
+			RoutingType:         a.RoutingType,
+			DocumentRoot:        a.DocumentRoot,
+			RedirectURL:         a.RedirectURL,
+			RedirectStatus:      int(a.RedirectStatus),
+			LoadBalancing:       a.LoadBalancing,
 		})
 	}
 

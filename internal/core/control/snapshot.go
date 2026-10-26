@@ -1,6 +1,8 @@
 package control
 
 import (
+	"context"
+	"sync"
 	"sync/atomic"
 
 	"github.com/Panharoth06/raiwall/internal/core/waf"
@@ -52,6 +54,32 @@ func GetActiveSnapshot() *ConfigSnapshot {
 // SetActiveSnapshot atomically sets the global active snapshot.
 func SetActiveSnapshot(newSnap *ConfigSnapshot) {
 	StoreSnapshot(newSnap)
+}
+
+var (
+	deployHooksMu sync.RWMutex
+	deployHooks   []func(context.Context, *ConfigSnapshot)
+)
+
+// RegisterDeployHook registers a callback invoked after a snapshot is committed
+// and swapped in, allowing the data plane to reconcile derived state (for
+// example ACME certificate issuance).
+func RegisterDeployHook(fn func(context.Context, *ConfigSnapshot)) {
+	if fn == nil {
+		return
+	}
+	deployHooksMu.Lock()
+	defer deployHooksMu.Unlock()
+	deployHooks = append(deployHooks, fn)
+}
+
+func runDeployHooks(ctx context.Context, snap *ConfigSnapshot) {
+	deployHooksMu.RLock()
+	hooks := append([]func(context.Context, *ConfigSnapshot){}, deployHooks...)
+	deployHooksMu.RUnlock()
+	for _, fn := range hooks {
+		fn(ctx, snap)
+	}
 }
 
 // SnapshotMatrixSource resolves the effective SemanticMatrix for an application

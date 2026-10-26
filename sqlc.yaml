@@ -1,10 +1,10 @@
 version: "2"
 sql:
-  - schema: "pkg/control/db/schema.sql"
-    queries: "pkg/control/db/query.sql"
+  - schema: "internal/adapters/outbound/storage/sqlite/schema.sql"
+    queries: "internal/adapters/outbound/storage/sqlite/query.sql"
     engine: "sqlite"
     gen:
       go:
-        package: "db"
-        out: "pkg/control/db"
+        package: "sqlite"
+        out: "internal/adapters/outbound/storage/sqlite"
         sql_package: "database/sql"

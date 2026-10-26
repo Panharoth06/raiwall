@@ -55,55 +55,72 @@ func (m *Middleware) forwardAndInspectResponse(
 	var matchedRule *control.ForwardingRule
 	forwardReq := r
 
-	if appCfg != nil && m.upstreamRegistry != nil {
-		if len(appCfg.ForwardingRules) > 0 {
-			matchedRule = MatchForwardingRule(appCfg.ForwardingRules, r.URL.Path)
-			if matchedRule != nil && len(matchedRule.Upstreams) > 0 {
-				targetPool = m.upstreamRegistry.GetOrCreatePool(matchedRule.Upstreams)
-			}
-		}
-		if targetPool == nil && len(appCfg.Upstreams) > 0 {
-			targetPool = m.upstreamRegistry.GetOrCreatePool(appCfg.Upstreams)
-		}
+	routing := control.RoutingProxy
+	if appCfg != nil && appCfg.RoutingType != "" {
+		routing = appCfg.RoutingType
 	}
 
 	var nextErr error
-	if targetPool != nil {
-		backend, err := targetPool.NextBackend()
-		if err != nil {
-			http.Error(interceptor, "Bad Gateway: "+err.Error(), http.StatusBadGateway)
-			nextErr = err
-		} else {
-			forwardReq = r.Clone(r.Context())
-			if matchedRule != nil {
-				if matchedRule.StripPrefix && matchedRule.Prefix != "" && matchedRule.Prefix != "/" {
-					cleanPrefix := strings.TrimSuffix(matchedRule.Prefix, "/")
-					forwardReq.URL.Path = strings.TrimPrefix(forwardReq.URL.Path, cleanPrefix)
-					if !strings.HasPrefix(forwardReq.URL.Path, "/") {
-						forwardReq.URL.Path = "/" + forwardReq.URL.Path
-					}
-					if forwardReq.URL.RawPath != "" {
-						forwardReq.URL.RawPath = strings.TrimPrefix(forwardReq.URL.RawPath, cleanPrefix)
-						if !strings.HasPrefix(forwardReq.URL.RawPath, "/") {
-							forwardReq.URL.RawPath = "/" + forwardReq.URL.RawPath
+	switch routing {
+	case control.RoutingRedirect:
+		nextErr = m.serveRedirect(interceptor, r, appCfg)
+	case control.RoutingStatic:
+		nextErr = m.serveStatic(interceptor, r, appCfg)
+	default:
+		if appCfg != nil && m.upstreamRegistry != nil {
+			if len(appCfg.ForwardingRules) > 0 {
+				matchedRule = MatchForwardingRule(appCfg.ForwardingRules, r.URL.Path)
+				if matchedRule != nil && len(matchedRule.Upstreams) > 0 {
+					targetPool = m.upstreamRegistry.GetOrCreatePool(matchedRule.Upstreams)
+				}
+			}
+			if targetPool == nil && len(appCfg.Upstreams) > 0 {
+				targetPool = m.upstreamRegistry.GetOrCreatePool(appCfg.Upstreams)
+			}
+		}
+
+		if targetPool != nil {
+			clientIPStr := ""
+			if clientIP != nil {
+				clientIPStr = clientIP.String()
+			}
+			backend, release, err := targetPool.SelectBackend(appCfg.LoadBalancing, clientIPStr)
+			if err != nil {
+				http.Error(interceptor, "Bad Gateway: "+err.Error(), http.StatusBadGateway)
+				nextErr = err
+			} else {
+				defer release()
+				forwardReq = r.Clone(r.Context())
+				if matchedRule != nil {
+					if matchedRule.StripPrefix && matchedRule.Prefix != "" && matchedRule.Prefix != "/" {
+						cleanPrefix := strings.TrimSuffix(matchedRule.Prefix, "/")
+						forwardReq.URL.Path = strings.TrimPrefix(forwardReq.URL.Path, cleanPrefix)
+						if !strings.HasPrefix(forwardReq.URL.Path, "/") {
+							forwardReq.URL.Path = "/" + forwardReq.URL.Path
+						}
+						if forwardReq.URL.RawPath != "" {
+							forwardReq.URL.RawPath = strings.TrimPrefix(forwardReq.URL.RawPath, cleanPrefix)
+							if !strings.HasPrefix(forwardReq.URL.RawPath, "/") {
+								forwardReq.URL.RawPath = "/" + forwardReq.URL.RawPath
+							}
 						}
 					}
+					if matchedRule.HostHeaderOverride != "" {
+						forwardReq.Host = matchedRule.HostHeaderOverride
+					}
 				}
-				if matchedRule.HostHeaderOverride != "" {
-					forwardReq.Host = matchedRule.HostHeaderOverride
+				var transport http.RoundTripper = http.DefaultTransport
+				if m.upstreamRegistry != nil && m.upstreamRegistry.SharedTransport() != nil {
+					transport = m.upstreamRegistry.SharedTransport()
 				}
+				nextErr = ProxyToBackend(interceptor, forwardReq, backend.Dial, transport)
 			}
-			var transport http.RoundTripper = http.DefaultTransport
-			if m.upstreamRegistry != nil && m.upstreamRegistry.SharedTransport() != nil {
-				transport = m.upstreamRegistry.SharedTransport()
-			}
-			nextErr = ProxyToBackend(interceptor, forwardReq, backend.Dial, transport)
+		} else if next != nil {
+			nextErr = next.ServeHTTP(interceptor, forwardReq)
+		} else {
+			interceptor.WriteHeader(http.StatusBadGateway)
+			_, _ = interceptor.Write([]byte("Raiwall Gateway: No upstream backend configured for this host. Configure protected applications in the Web Dashboard at /.raiwall/#/sites\n"))
 		}
-	} else if next != nil {
-		nextErr = next.ServeHTTP(interceptor, forwardReq)
-	} else {
-		interceptor.WriteHeader(http.StatusBadGateway)
-		_, _ = interceptor.Write([]byte("Raiwall Gateway: No upstream backend configured for this host. Configure protected applications in the Web Dashboard at /.raiwall/#/sites\n"))
 	}
 
 	// Record clean transit traffic to passive API cataloger

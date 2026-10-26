@@ -14,6 +14,13 @@ type ControlStore interface {
 	UpdateApp(ctx context.Context, app SiteApp) error
 	DeleteApp(ctx context.Context, id string) error
 
+	// Managed TLS Certificates
+	ListCertificates(ctx context.Context) ([]CertificateRecord, error)
+	GetCertificate(ctx context.Context, id string) (CertificateRecord, error)
+	CreateCertificate(ctx context.Context, cert CertificateRecord) error
+	UpdateCertificate(ctx context.Context, cert CertificateRecord) error
+	DeleteCertificate(ctx context.Context, id string) error
+
 	// Exceptions
 	ListExceptions(ctx context.Context) ([]ExceptionRule, error)
 	ListActiveExceptions(ctx context.Context) ([]ExceptionRule, error)

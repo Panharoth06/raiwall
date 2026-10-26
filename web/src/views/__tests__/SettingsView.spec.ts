@@ -18,7 +18,12 @@ beforeEach(() => {
 });
 
 describe('SettingsView.vue', () => {
-  it('renders Tabs with cluster and apikeys sub-tabs and defaults to cluster', () => {
+  const stubs = {
+    ApiKeysManager: { template: '<div data-testid="apikeys-subview">API Keys Manager</div>' },
+    CertificatesPanel: { template: '<div data-testid="certificates-subview">Certificates</div>' },
+  };
+
+  it('renders cluster, certificates, and apikeys sub-tabs and defaults to cluster', () => {
     const store = useConfigStore();
     store.cluster = {
       mode: 'cluster',
@@ -28,23 +33,32 @@ describe('SettingsView.vue', () => {
     };
 
     const wrapper = mount(SettingsView, {
-      global: {
-        stubs: {
-          ApiKeysManager: { template: '<div data-testid="apikeys-subview">API Keys Manager</div>' },
-        },
-      },
+      global: { stubs },
     });
 
     const tabItems = wrapper.findAll('[data-testid="tab-item"]');
-    expect(tabItems.length).toBe(2);
+    expect(tabItems.length).toBe(3);
     expect(tabItems[0].text()).toContain('Cluster Synchronization');
-    expect(tabItems[1].text()).toContain('API Keys & Access');
+    expect(tabItems[1].text()).toContain('TLS Certificates');
+    expect(tabItems[2].text()).toContain('API Keys & Access');
 
     expect(wrapper.text()).toContain('Cluster Node & State Synchronization');
     expect(wrapper.find('[data-testid="apikeys-subview"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="certificates-subview"]').exists()).toBe(false);
   });
 
-  it('switches to API keys tab when clicking the second tab', async () => {
+  it('switches to the certificates tab', async () => {
+    const wrapper = mount(SettingsView, { global: { stubs } });
+
+    const tabItems = wrapper.findAll('[data-testid="tab-item"]');
+    await tabItems[1].trigger('click');
+    await nextTick();
+
+    expect(wrapper.find('[data-testid="certificates-subview"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="apikeys-subview"]').exists()).toBe(false);
+  });
+
+  it('switches to API keys tab when clicking the third tab', async () => {
     const store = useConfigStore();
     store.cluster = {
       mode: 'standalone',
@@ -54,15 +68,11 @@ describe('SettingsView.vue', () => {
     };
 
     const wrapper = mount(SettingsView, {
-      global: {
-        stubs: {
-          ApiKeysManager: { template: '<div data-testid="apikeys-subview">API Keys Manager</div>' },
-        },
-      },
+      global: { stubs },
     });
 
     const tabItems = wrapper.findAll('[data-testid="tab-item"]');
-    await tabItems[1].trigger('click');
+    await tabItems[2].trigger('click');
     await nextTick();
 
     expect(wrapper.find('[data-testid="apikeys-subview"]').exists()).toBe(true);

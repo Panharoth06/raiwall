@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from '@/router';
-import { api, type Site } from '@/api/client';
+import { api, type ManagedCertificate, type Site } from '@/api/client';
 import ForwardingRulesEditor from '@/components/site-detail/ForwardingRulesEditor.vue';
 import ProxyConfigEditor from '@/components/site-detail/ProxyConfigEditor.vue';
 import ApiInventoryTable from '@/components/site-detail/ApiInventoryTable.vue';
@@ -15,6 +15,7 @@ const route = useRoute();
 const router = useRouter();
 
 const site = ref<Site | null>(null);
+const certificates = ref<ManagedCertificate[]>([]);
 const loading = ref(true);
 const error = ref('');
 
@@ -33,8 +34,13 @@ const loadSite = async () => {
   error.value = '';
   site.value = null;
   try {
-    const sites = await api.listSites();
-    site.value = sites.find((s) => s.id === siteId.value) || null;
+    const [sitesResult, certsResult] = await Promise.allSettled([
+      api.listSites(),
+      api.listCertificates(),
+    ]);
+    if (sitesResult.status === 'rejected') throw sitesResult.reason;
+    site.value = sitesResult.value.find((s) => s.id === siteId.value) || null;
+    certificates.value = certsResult.status === 'fulfilled' ? certsResult.value : [];
     if (!site.value) {
       error.value = 'Site not found — it may have been deleted.';
     }
@@ -96,6 +102,34 @@ const modeVariant = (mode?: string): 'default' | 'destructive' | 'secondary' => 
   if (mode === 'offline') return 'destructive';
   return 'secondary';
 };
+
+const routingLabels: Record<string, string> = {
+  proxy: 'Reverse Proxy',
+  static: 'Static Files',
+  redirect: 'Redirect',
+};
+
+const routingDetail = (current: Site): string => {
+  if (current.routing_type === 'static') return current.document_root || 'document root not set';
+  if (current.routing_type === 'redirect') {
+    return `${current.redirect_status || 302} → ${current.redirect_url || 'target not set'}`;
+  }
+  const count = current.upstreams?.length || 0;
+  return `${count} upstream${count === 1 ? '' : 's'} · ${current.load_balancing || 'round_robin'}`;
+};
+
+const tlsDetail = (current: Site): string => {
+  const mode = current.ssl_mode || ((current.ports || []).some((p) => p.scheme === 'https') ? 'auto' : 'none');
+  if (mode === 'none') return 'no TLS — HTTP only';
+  if (mode === 'manual') {
+    const match = certificates.value.find((c) => c.id === current.certificate_id);
+    return `manual — ${match?.name || current.certificate_id || 'certificate not set'}`;
+  }
+  return 'auto — ACME or managed self-signed';
+};
+
+const portsDetail = (current: Site): string =>
+  (current.ports || []).map((p) => `${p.port}/${p.scheme}`).join(', ') || '—';
 </script>
 
 <template>
@@ -133,11 +167,30 @@ const modeVariant = (mode?: string): 'default' | 'destructive' | 'secondary' => 
               <span class="text-xs text-muted-foreground">Operational Mode</span>
               <Badge :variant="modeVariant(site.mode)" class="text-xs uppercase font-mono">{{ site.mode }}</Badge>
             </div>
-            <div class="px-3 py-2.5" data-testid="site-basic-upstreams">
+            <div class="px-3 py-2.5 flex items-center justify-between" data-testid="site-basic-route">
+              <span class="text-xs text-muted-foreground">Routing</span>
+              <span class="text-xs font-mono text-right">
+                {{ routingLabels[site.routing_type || 'proxy'] || 'Reverse Proxy' }} · {{ routingDetail(site) }}
+              </span>
+            </div>
+            <div class="px-3 py-2.5 flex items-center justify-between" data-testid="site-basic-tls">
+              <span class="text-xs text-muted-foreground">TLS</span>
+              <span class="text-xs font-mono text-right">{{ tlsDetail(site) }}</span>
+            </div>
+            <div class="px-3 py-2.5 flex items-center justify-between" data-testid="site-basic-ports">
+              <span class="text-xs text-muted-foreground">Declared Ports</span>
+              <span class="text-xs font-mono tabular-nums">{{ portsDetail(site) }}</span>
+            </div>
+            <div
+              v-if="(site.routing_type || 'proxy') === 'proxy'"
+              class="px-3 py-2.5"
+              data-testid="site-basic-upstreams"
+            >
               <span class="text-xs text-muted-foreground">Default Upstream Pool</span>
               <p class="text-xs font-mono mt-0.5">
                 {{ site.upstreams.map((u) => `${u.dial} (w${u.weight})`).join(', ') || '— none —' }}
               </p>
+              <p class="text-xs text-muted-foreground mt-0.5">Policy: {{ site.load_balancing }}</p>
             </div>
             <div class="px-3 py-2.5 flex items-center justify-between" data-testid="site-basic-status-codes">
               <span class="text-xs text-muted-foreground">Block / Offline Status</span>

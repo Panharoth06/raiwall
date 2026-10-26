@@ -27,6 +27,7 @@ var migrations = []Migration{
 	{Version: 5, Description: "inner_rules", File: "0005_inner_rules.sql"},
 	{Version: 6, Description: "identity_directory", File: "0006_identity_directory.sql"},
 	{Version: 7, Description: "app_auth_gate", File: "0007_app_auth_gate.sql"},
+	{Version: 8, Description: "app_routing_certificates", File: "0008_app_routing_certificates.sql"},
 }
 
 // NormalizeDriver standardizes dialect names to "sqlite" or "postgres".

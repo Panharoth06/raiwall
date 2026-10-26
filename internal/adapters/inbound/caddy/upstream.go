@@ -24,6 +24,7 @@ type UpstreamBackend struct {
 
 	healthy       atomic.Bool
 	fails         atomic.Int32
+	inflight      atomic.Int64
 	client        *http.Client
 	stopChan      chan struct{}
 	closeOnce     sync.Once

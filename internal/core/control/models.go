@@ -21,8 +21,37 @@ type SiteApp struct {
 	ProxySettings       string    `json:"proxy_settings"`
 	AuthEnabled         int64     `json:"auth_enabled"`
 	AuthBypassPaths     string    `json:"auth_bypass_paths"`
+	Description         string    `json:"description"`
+	Ports               string    `json:"ports"`
+	SSLMode             string    `json:"ssl_mode"`
+	CertificateID       string    `json:"certificate_id"`
+	RoutingType         string    `json:"routing_type"`
+	DocumentRoot        string    `json:"document_root"`
+	RedirectURL         string    `json:"redirect_url"`
+	RedirectStatus      int64     `json:"redirect_status"`
+	LoadBalancing       string    `json:"load_balancing"`
 	CreatedAt           time.Time `json:"created_at"`
 	UpdatedAt           time.Time `json:"updated_at"`
+}
+
+// CertificateRecord is a managed TLS certificate (uploaded, self-signed, or ACME).
+// Private key material is stored encrypted and is never serialized to API clients.
+type CertificateRecord struct {
+	ID                string    `json:"id"`
+	Name              string    `json:"name"`
+	Domains           string    `json:"domains"`
+	Source            string    `json:"source"`
+	CertPEM           string    `json:"cert_pem"`
+	EncryptedKeyPEM   string    `json:"encrypted_key_pem"`
+	FingerprintSHA256 string    `json:"fingerprint_sha256"`
+	Issuer            string    `json:"issuer"`
+	NotBefore         time.Time `json:"not_before"`
+	NotAfter          time.Time `json:"not_after"`
+	AutoRenew         int64     `json:"auto_renew"`
+	ACMEStaging       int64     `json:"acme_staging"`
+	LastError         string    `json:"last_error"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
 }
 
 // ExceptionRule represents a parameter-level false-positive bypass exception.
