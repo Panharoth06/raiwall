@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Panharoth06/raiwall/internal/core/control"
+	"github.com/Panharoth06/raiwall/internal/core/control/declarative"
 	"github.com/Panharoth06/raiwall/internal/core/control/templates"
 	"github.com/go-chi/chi/v5"
 )
@@ -21,8 +22,19 @@ type TemplateDTO struct {
 	BrandName   string    `json:"brand_name"`
 	LogoURL     string    `json:"logo_url"`
 	IsCustom    bool      `json:"is_custom"`
+	Managed     bool      `json:"managed"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+// isManagedTemplate reports whether the stored template row is owned by
+// raiwall.yaml (templates are keyed by status code, not ID).
+func (s *Server) isManagedTemplate(r *http.Request, code int) (bool, error) {
+	rec, err := s.store.GetTemplate(r.Context(), code)
+	if err != nil {
+		return false, err
+	}
+	return declarative.IsManaged(rec.ID), nil
 }
 
 // handleListTemplates lists all deterministic error and challenge response templates.
@@ -36,6 +48,7 @@ func (s *Server) handleListTemplates(w http.ResponseWriter, r *http.Request) {
 	for _, t := range tmpls {
 		result = append(result, TemplateDTO{
 			ID:          t.ID,
+			Managed:     declarative.IsManaged(t.ID),
 			StatusCode:  t.StatusCode,
 			Title:       t.Title,
 			ContentHTML: t.ContentHTML,
@@ -71,6 +84,7 @@ func (s *Server) handleGetTemplate(w http.ResponseWriter, r *http.Request) {
 
 	respondJSON(w, http.StatusOK, TemplateDTO{
 		ID:          t.ID,
+		Managed:     declarative.IsManaged(t.ID),
 		StatusCode:  t.StatusCode,
 		Title:       t.Title,
 		ContentHTML: t.ContentHTML,
@@ -89,6 +103,10 @@ func (s *Server) handleUpdateTemplate(w http.ResponseWriter, r *http.Request) {
 	code, err := strconv.Atoi(codeStr)
 	if err != nil {
 		respondError(w, http.StatusBadRequest, "invalid status code")
+		return
+	}
+	if managed, lookupErr := s.isManagedTemplate(r, code); lookupErr == nil && managed {
+		respondError(w, http.StatusConflict, "template is managed by the declarative configuration file; edit raiwall.yaml and redeploy")
 		return
 	}
 
@@ -131,6 +149,7 @@ func (s *Server) handleUpdateTemplate(w http.ResponseWriter, r *http.Request) {
 
 	respondJSON(w, http.StatusOK, TemplateDTO{
 		ID:          t.ID,
+		Managed:     declarative.IsManaged(t.ID),
 		StatusCode:  t.StatusCode,
 		Title:       t.Title,
 		ContentHTML: t.ContentHTML,
@@ -179,6 +198,10 @@ func (s *Server) handleResetTemplate(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusBadRequest, "invalid status code")
 		return
 	}
+	if managed, lookupErr := s.isManagedTemplate(r, code); lookupErr == nil && managed {
+		respondError(w, http.StatusConflict, "template is managed by the declarative configuration file; edit raiwall.yaml and redeploy")
+		return
+	}
 
 	if s.templateMgr == nil {
 		s.templateMgr = templates.NewTemplateManager()
@@ -195,6 +218,7 @@ func (s *Server) handleResetTemplate(w http.ResponseWriter, r *http.Request) {
 
 	respondJSON(w, http.StatusOK, TemplateDTO{
 		ID:          t.ID,
+		Managed:     declarative.IsManaged(t.ID),
 		StatusCode:  t.StatusCode,
 		Title:       t.Title,
 		ContentHTML: t.ContentHTML,

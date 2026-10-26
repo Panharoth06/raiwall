@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "raiwall.fullname" . }}-test-connection
+  labels:
+    {{- include "raiwall.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+  containers:
+    - name: curl
+      image: curlimages/curl:8.10.1
+      command:
+        - sh
+        - -c
+        - |
+          {{- if .Values.config.server.http.enabled }}
+          curl -fsS "http://{{ include "raiwall.fullname" . }}:{{ include "raiwall.containerPort" .Values.config.server.http.listen }}/.raiwall/api/openapi.json" > /dev/null
+          {{- else }}
+          curl -fsSk "https://{{ include "raiwall.fullname" . }}:{{ include "raiwall.containerPort" .Values.config.server.https.listen }}/.raiwall/api/openapi.json" > /dev/null
+          {{- end }}
+          echo "Raiwall API is reachable."

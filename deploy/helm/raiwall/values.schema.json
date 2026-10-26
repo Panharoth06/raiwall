@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "Raiwall Helm values",
+  "type": "object",
+  "required": ["config", "image", "database", "service"],
+  "properties": {
+    "nameOverride": { "type": "string" },
+    "fullnameOverride": { "type": "string" },
+    "image": {
+      "type": "object",
+      "required": ["repository"],
+      "properties": {
+        "repository": { "type": "string", "minLength": 1 },
+        "tag": { "type": "string" },
+        "pullPolicy": { "type": "string", "enum": ["Always", "IfNotPresent", "Never"] }
+      }
+    },
+    "imagePullSecrets": { "type": "array", "items": { "type": "object" } },
+    "replicaCount": { "type": "integer", "minimum": 0 },
+    "serviceAccount": {
+      "type": "object",
+      "properties": {
+        "create": { "type": "boolean" },
+        "name": { "type": "string" },
+        "annotations": { "type": "object" }
+      }
+    },
+    "podAnnotations": { "type": "object" },
+    "podLabels": { "type": "object" },
+    "podSecurityContext": { "type": "object" },
+    "securityContext": { "type": "object" },
+    "service": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": { "type": "string", "enum": ["ClusterIP", "NodePort", "LoadBalancer"] },
+        "annotations": { "type": "object" }
+      }
+    },
+    "ingress": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "className": { "type": "string" },
+        "annotations": { "type": "object" },
+        "hosts": { "type": "array", "items": { "type": "object" } },
+        "tls": { "type": "array", "items": { "type": "object" } }
+      }
+    },
+    "persistence": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "existingClaim": { "type": "string" },
+        "storageClass": { "type": "string" },
+        "accessModes": { "type": "array", "items": { "type": "string" } },
+        "size": { "type": "string" },
+        "annotations": { "type": "object" }
+      }
+    },
+    "database": {
+      "type": "object",
+      "required": ["host", "port", "name", "user"],
+      "properties": {
+        "host": { "type": "string", "minLength": 1 },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "name": { "type": "string", "minLength": 1 },
+        "user": { "type": "string", "minLength": 1 },
+        "password": { "type": "string" },
+        "sslmode": { "type": "string", "enum": ["disable", "allow", "prefer", "require", "verify-ca", "verify-full"] },
+        "existingSecret": { "type": "string" },
+        "urlKey": { "type": "string" }
+      }
+    },
+    "secrets": {
+      "type": "object",
+      "properties": {
+        "existingSecret": { "type": "string" },
+        "hmacSecret": { "type": "string" },
+        "powSecret": { "type": "string" },
+        "adminPassword": { "type": "string" },
+        "sessionSecret": { "type": "string" },
+        "alertWebhook": { "type": "string" }
+      }
+    },
+    "probes": { "type": "object" },
+    "resources": { "type": "object" },
+    "nodeSelector": { "type": "object" },
+    "tolerations": { "type": "array" },
+    "affinity": { "type": "object" },
+    "topologySpreadConstraints": { "type": "array" },
+    "podDisruptionBudget": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "minAvailable": { "type": ["integer", "string"] }
+      }
+    },
+    "serviceMonitor": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "interval": { "type": "string" },
+        "scrapeTimeout": { "type": "string" },
+        "path": { "type": "string" },
+        "labels": { "type": "object" },
+        "bearerTokenSecret": { "type": "object" }
+      }
+    },
+    "extraEnv": { "type": "array" },
+    "extraEnvFrom": { "type": "array" },
+    "extraVolumes": { "type": "array" },
+    "extraVolumeMounts": { "type": "array" },
+    "config": {
+      "type": "object",
+      "required": ["version"],
+      "properties": {
+        "version": { "type": "integer", "enum": [1] },
+        "server": { "type": "object" },
+        "caddy": { "type": "object" },
+        "logging": { "type": "object" },
+        "storage": { "type": "object" },
+        "control": { "type": "object" },
+        "security": { "type": "object" },
+        "waf": { "type": "object" },
+        "bot": { "type": "object" },
+        "rate_limit": { "type": "object" },
+        "waiting_room": { "type": "object" },
+        "auth": { "type": "object" },
+        "telemetry": { "type": "object" },
+        "sidecar": { "type": "object" },
+        "threat_feeds": { "type": "object" },
+        "geoip": { "type": "object" },
+        "declarative": {
+          "type": "object",
+          "properties": {
+            "mode": { "type": "string", "enum": ["off", "seed", "sync"] },
+            "prune": { "type": "boolean" },
+            "strict": { "type": "boolean" }
+          }
+        },
+        "applications": { "type": "array" },
+        "certificates": { "type": "array" },
+        "acls": { "type": "array" },
+        "exceptions": { "type": "array" },
+        "ip_groups": { "type": "array" },
+        "rate_policies": { "type": "array" },
+        "bot_policies": { "type": "array" },
+        "identity_providers": { "type": "array" },
+        "templates": { "type": "array" },
+        "detector": { "type": "object" }
+      }
+    }
+  }
+}

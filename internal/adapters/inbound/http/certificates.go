@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Panharoth06/raiwall/internal/core/control"
+	"github.com/Panharoth06/raiwall/internal/core/control/declarative"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
@@ -29,6 +30,7 @@ type CertificateDTO struct {
 	AutoRenew         bool      `json:"auto_renew"`
 	LastError         string    `json:"last_error,omitempty"`
 	Status            string    `json:"status"`
+	Managed           bool      `json:"managed"`
 	CreatedAt         time.Time `json:"created_at"`
 	UpdatedAt         time.Time `json:"updated_at"`
 }
@@ -68,6 +70,7 @@ func certificateDTO(rec control.CertificateRecord, now time.Time) CertificateDTO
 		AutoRenew:         rec.AutoRenew == 1,
 		LastError:         rec.LastError,
 		Status:            status,
+		Managed:           declarative.IsManaged(rec.ID),
 		CreatedAt:         rec.CreatedAt,
 		UpdatedAt:         rec.UpdatedAt,
 	}

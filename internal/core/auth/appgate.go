@@ -68,7 +68,7 @@ type LoginEvent struct {
 // AppAuthGateOption customizes a gate at construction time.
 type AppAuthGateOption func(*AppAuthGate)
 
-// WithSimpleAuth adds Caddyfile-managed local users to the credential chain.
+// WithSimpleAuth adds config-declared local users to the credential chain.
 func WithSimpleAuth(sa *SimpleAuth) AppAuthGateOption {
 	return func(g *AppAuthGate) {
 		if sa != nil {
@@ -109,7 +109,7 @@ func WithSessionSecure(secure bool) AppAuthGateOption {
 type AppAuthGate struct {
 	sessions *SessionManager
 	store    AppLoginStore
-	// simple holds Caddyfile-defined users; nil when unused.
+	// simple holds config-declared users; nil when unused.
 	simple *SimpleAuth
 	// providers holds external directory connectors.
 	providers []IdentityProvider
@@ -251,7 +251,7 @@ func (g *AppAuthGate) verifyDirectoryLogin(user *AppLoginUser, password, totpCod
 	if err := login.Authenticate(password, totpCode); err != nil {
 		return nil, "directory", err
 	}
-	// appID is empty in portal-wide (Caddyfile) mode, where app bindings do
+	// appID is empty in portal-wide mode, where app bindings do
 	// not apply. Per-site mode still enforces membership.
 	if appID != "" {
 		if len(user.AuthorizedApps) == 0 {

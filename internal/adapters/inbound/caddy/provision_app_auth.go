@@ -35,7 +35,7 @@ func (m *Middleware) resolveAppAuthSecret(ctx context.Context) (*string, error) 
 	return &secret, nil
 }
 
-// buildGlobalAuthGate compiles the Caddyfile `auth` block into the same HTTP
+// buildGlobalAuthGate compiles the global `auth` block into the same HTTP
 // 467 portal used by per-site gates. Called after the control store exists so
 // stored identity providers can join the credential chain.
 func (m *Middleware) buildGlobalAuthGate() {
@@ -65,8 +65,8 @@ func (m *Middleware) buildGlobalAuthGate() {
 	}
 
 	// One clearance secret for both gate modes. The persisted value is
-	// authoritative so a cookie minted by the Caddyfile gate is accepted by
-	// per-site gates (and vice versa). The Caddyfile secret is only a
+	// authoritative so a cookie minted by the global gate is accepted by
+	// per-site gates (and vice versa). The configured secret is only a
 	// fallback when no control store is available.
 	secret := ""
 	if m.controlStore != nil {

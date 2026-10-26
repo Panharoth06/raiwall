@@ -1,0 +1,37 @@
+Raiwall {{ .Chart.AppVersion }} is being deployed.
+
+1. Admin console
+   {{- if .Values.ingress.enabled }}
+   {{- range .Values.ingress.hosts }}
+   http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}/
+   {{- end }}
+   {{- else }}
+   kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "raiwall.fullname" . }} 8080:{{ include "raiwall.containerPort" .Values.config.server.http.listen }}
+   Then open http://localhost:8080/
+   {{- end }}
+
+2. Credentials
+   Username: {{ .Values.config.control.bootstrap_admin.username }}
+   {{- if .Values.secrets.adminPassword }}
+   Password: read `RAIWALL_ADMIN_PASSWORD` from Secret `{{ include "raiwall.secretName" . }}`.
+   {{- else if .Values.secrets.existingSecret }}
+   Password: read `RAIWALL_ADMIN_PASSWORD` from Secret `{{ .Values.secrets.existingSecret }}`.
+   {{- else }}
+   Password: generated on first start. Read it with:
+     kubectl -n {{ .Release.Namespace }} logs deploy/{{ include "raiwall.fullname" . }} | grep -i "bootstrap admin"
+   {{- end }}
+
+3. Configuration
+   The canonical raiwall.yaml is rendered from `.Values.config` into ConfigMap
+   `{{ include "raiwall.fullname" . }}`. Change values and upgrade; the pod
+   restarts automatically via the checksum/config annotation.
+
+4. Database
+   {{- if .Values.database.existingSecret }}
+   DSN is read from Secret `{{ .Values.database.existingSecret }}` key `{{ .Values.database.urlKey }}`.
+   {{- else }}
+   DSN targets {{ .Values.database.host }}:{{ .Values.database.port }}/{{ .Values.database.name }}.
+   The chart never deploys PostgreSQL; point this at your managed instance.
+   {{- end }}
+
+WARNING: replace the default database password before installing.

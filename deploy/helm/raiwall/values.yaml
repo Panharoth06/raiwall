@@ -1,0 +1,271 @@
+# ==============================================================================
+# Raiwall Helm values
+# ==============================================================================
+# `config` is a 1:1 mirror of the canonical raiwall.yaml schema (docs/configuration.md)
+# and is rendered verbatim into a ConfigMap. Secrets never live in the ConfigMap:
+# they are injected through the chart-managed Secret or an existing Secret.
+# ==============================================================================
+
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  repository: ghcr.io/panharoth06/raiwall
+  tag: ""  # defaults to .Chart.AppVersion
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+replicaCount: 1
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  fsGroup: 1000
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: ["ALL"]
+
+service:
+  type: ClusterIP
+  annotations: {}
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: raiwall.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  #  - secretName: raiwall-tls
+  #    hosts:
+  #      - raiwall.example.com
+
+persistence:
+  enabled: true
+  # Use an existing PVC instead of provisioning one.
+  existingClaim: ""
+  storageClass: ""
+  accessModes:
+    - ReadWriteOnce
+  size: 1Gi
+  annotations: {}
+
+# External PostgreSQL is the only supported database in this chart. There is no
+# bundled PostgreSQL subchart.
+database:
+  host: postgres.example.com
+  port: 5432
+  name: raiwall
+  user: raiwall
+  password: change-me
+  sslmode: require
+  # Prefer an existing Secret that holds the full DSN. When set, `password` is
+  # ignored and the chart does not render RAIWALL_DATABASE_URL itself.
+  existingSecret: ""
+  urlKey: database-url
+
+secrets:
+  # Use one existing Secret holding every RAIWALL_* key below. When set, the
+  # chart does not create its own Secret.
+  existingSecret: ""
+  # Empty values are generated once and preserved across upgrades. An empty
+  # adminPassword is omitted so the application generates and logs one.
+  hmacSecret: ""
+  powSecret: ""
+  adminPassword: ""
+  sessionSecret: ""
+  alertWebhook: ""
+
+# Probes target the unauthenticated OpenAPI document.
+probes:
+  liveness:
+    enabled: true
+    path: /.raiwall/api/openapi.json
+    initialDelaySeconds: 10
+    periodSeconds: 20
+    timeoutSeconds: 3
+    failureThreshold: 3
+  readiness:
+    enabled: true
+    path: /.raiwall/api/openapi.json
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+  startup:
+    enabled: true
+    path: /.raiwall/api/openapi.json
+    periodSeconds: 5
+    failureThreshold: 30
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 512Mi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+topologySpreadConstraints: []
+
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+
+serviceMonitor:
+  enabled: false
+  interval: 30s
+  scrapeTimeout: 10s
+  path: /metrics
+  labels: {}
+  # Metrics are served by the authenticated control plane. Reference a Secret
+  # containing a bearer token if your Prometheus requires one.
+  bearerTokenSecret: {}
+
+extraEnv: []
+extraEnvFrom: []
+extraVolumes: []
+extraVolumeMounts: []
+
+# ==============================================================================
+# Canonical configuration (rendered into the raiwall ConfigMap)
+# ==============================================================================
+config:
+  version: 1
+
+  server:
+    http:
+      enabled: true
+      listen: ":8080"
+    https:
+      enabled: true
+      listen: ":8443"
+      http3: true
+      tls_min_version: "1.2"
+    auto_https: false
+    acme:
+      email: ""
+      ca: ""
+      staging: false
+
+  caddy:
+    admin:
+      listen: "off"
+    storage:
+      module: file_system
+      root: /var/lib/raiwall/certmagic
+
+  logging:
+    level: info
+    format: json
+    output: stderr
+
+  storage:
+    # Injected from the chart Secret (or an existing Secret).
+    database_url: "${RAIWALL_DATABASE_URL}"
+    stores: {}
+    control: ""
+    telemetry: ""
+
+  control:
+    hmac_secret: "${RAIWALL_HMAC_SECRET}"
+    bootstrap_admin:
+      username: admin
+      password: "${RAIWALL_ADMIN_PASSWORD}"
+      role: admin
+
+  security:
+    strict_secrets: false
+
+  waf:
+    mode: defense
+    block_status_code: 403
+    offline_status_code: 503
+    strip_headers: [Server, X-Powered-By, X-AspNet-Version]
+    ast_timeout: 5ms
+    max_param_size: 32768
+
+  bot:
+    defense: defense
+    pow_difficulty: 50000
+    pow_secret: "${RAIWALL_POW_SECRET}"
+    clearance_ttl: 2h
+    honeypot_trap: true
+
+  rate_limit:
+    tier1_rate: 100
+    tier1_period: 10s
+    tier1_burst: 20
+    tier2_threshold: 10
+    tier2_window: 60s
+    tier2_ban_duration: 24h
+    tier3_threshold: 20
+    tier3_window: 30s
+    tier3_ban_duration: 24h
+    storage: memory
+    storage_addr: ""
+
+  waiting_room:
+    enabled: true
+    max_concurrent: 500
+    max_queue_depth: 1000
+    admission_rate: 50
+    token_ttl: 15m
+    target_paths: []
+
+  telemetry:
+    flush_interval: 500ms
+    buffer_size: 4096
+    retention: 720h
+    alert_channels: []
+
+  sidecar:
+    enabled: false
+    listen: ":50051"
+    max_body_size: 1048576
+
+  threat_feeds: {}
+
+  geoip:
+    country: ""
+    asn: ""
+
+  declarative:
+    mode: sync
+    prune: false
+    strict: false
+
+  # Declare applications, certificates, ACLs, exceptions, IP groups, policies,
+  # identity providers, templates, and detector modes exactly as in raiwall.yaml.
+  applications: []
+  certificates: []
+  acls: []
+  exceptions: []
+  ip_groups: []
+  rate_policies: []
+  bot_policies: []
+  identity_providers: []
+  templates: []
+  # detector:
+  #   modules:
+  #     sql_inj: strict
+  #   inner_rules_disabled: []

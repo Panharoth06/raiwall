@@ -13,7 +13,7 @@ import (
 
 // evaluateAuthGate selects the single browser auth authority for the request:
 // the per-site gate when the site enables auth, otherwise the portal-wide
-// Caddyfile gate. Both share the same HTTP 467 portal and clearance cookie.
+// configured gate. Both share the same HTTP 467 portal and clearance cookie.
 func (m *Middleware) evaluateAuthGate(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -87,7 +87,7 @@ func (m *Middleware) evaluateAppAuthGate(
 	return true, nil
 }
 
-// evaluateGlobalAuthGate applies the Caddyfile `auth` block to hosts without
+// evaluateGlobalAuthGate applies the global `auth` block to hosts without
 // per-site auth enabled. API transports receive JSON 401 instead of HTML.
 func (m *Middleware) evaluateGlobalAuthGate(w http.ResponseWriter, r *http.Request, clientIP net.IP) bool {
 	gate := m.globalAuthGate

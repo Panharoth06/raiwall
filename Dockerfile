@@ -62,8 +62,8 @@ RUN apk --no-cache add ca-certificates tzdata curl \
     && chown -R raiwall:raiwall /etc/raiwall /var/lib/raiwall /var/log/raiwall
 
 COPY --from=backend-builder /bin/raiwall /usr/local/bin/raiwall
-COPY --chown=raiwall:raiwall examples/Caddyfile /etc/raiwall/Caddyfile
-COPY --chown=raiwall:raiwall examples/feeds /etc/raiwall/examples/feeds
+COPY --chown=raiwall:raiwall config/raiwall.yaml /etc/raiwall/raiwall.yaml
+COPY --chown=raiwall:raiwall examples/feeds /etc/raiwall/feeds
 
 USER raiwall:raiwall
 WORKDIR /etc/raiwall
@@ -74,4 +74,4 @@ EXPOSE 8080 8443
 VOLUME ["/var/lib/raiwall"]
 
 ENTRYPOINT ["/usr/local/bin/raiwall"]
-CMD ["run", "--config", "/etc/raiwall/Caddyfile"]
+CMD ["run", "--config", "/etc/raiwall/raiwall.yaml"]

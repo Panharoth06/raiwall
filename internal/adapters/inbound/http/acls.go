@@ -7,6 +7,7 @@ import (
 
 	"github.com/Panharoth06/raiwall/internal/core/acl"
 	"github.com/Panharoth06/raiwall/internal/core/control"
+	"github.com/Panharoth06/raiwall/internal/core/control/declarative"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
@@ -22,6 +23,7 @@ type ACLRuleDTO struct {
 	RedirectURL string    `json:"redirect_url"`
 	IsActive    bool      `json:"is_active"`
 	Enabled     bool      `json:"enabled"`
+	Managed     bool      `json:"managed"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
@@ -37,6 +39,7 @@ func (s *Server) handleListACLRules(w http.ResponseWriter, r *http.Request) {
 	for _, rule := range rules {
 		result = append(result, ACLRuleDTO{
 			ID:          rule.ID,
+			Managed:     declarative.IsManaged(rule.ID),
 			Name:        rule.Name,
 			Expression:  rule.Expression,
 			Action:      rule.Action,
@@ -62,6 +65,7 @@ func (s *Server) handleGetACLRule(w http.ResponseWriter, r *http.Request) {
 
 	respondJSON(w, http.StatusOK, ACLRuleDTO{
 		ID:          rule.ID,
+		Managed:     declarative.IsManaged(rule.ID),
 		Name:        rule.Name,
 		Expression:  rule.Expression,
 		Action:      rule.Action,

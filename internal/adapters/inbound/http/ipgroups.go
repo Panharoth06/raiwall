@@ -9,6 +9,7 @@ import (
 
 	"github.com/Panharoth06/raiwall/internal/core/acl"
 	"github.com/Panharoth06/raiwall/internal/core/control"
+	"github.com/Panharoth06/raiwall/internal/core/control/declarative"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
@@ -19,6 +20,7 @@ type IPGroupDTO struct {
 	Name        string            `json:"name"`
 	Description string            `json:"description"`
 	Type        string            `json:"type"`
+	Managed     bool              `json:"managed"`
 	EntryCount  int               `json:"entry_count"`
 	Entries     []IPGroupEntryDTO `json:"entries,omitempty"`
 	CreatedAt   time.Time         `json:"created_at"`
@@ -47,6 +49,7 @@ func (s *Server) handleListIPGroups(w http.ResponseWriter, r *http.Request) {
 		entries, _ := s.store.ListIPGroupEntries(r.Context(), grp.ID)
 		result = append(result, IPGroupDTO{
 			ID:          grp.ID,
+			Managed:     declarative.IsManaged(grp.ID),
 			Name:        grp.Name,
 			Description: grp.Description,
 			Type:        grp.Type,
@@ -90,6 +93,7 @@ func (s *Server) handleGetIPGroup(w http.ResponseWriter, r *http.Request) {
 
 	respondJSON(w, http.StatusOK, IPGroupDTO{
 		ID:          grp.ID,
+		Managed:     declarative.IsManaged(grp.ID),
 		Name:        grp.Name,
 		Description: grp.Description,
 		Type:        grp.Type,
@@ -143,6 +147,7 @@ func (s *Server) handleCreateIPGroup(w http.ResponseWriter, r *http.Request) {
 
 	respondJSON(w, http.StatusCreated, IPGroupDTO{
 		ID:          grp.ID,
+		Managed:     declarative.IsManaged(grp.ID),
 		Name:        grp.Name,
 		Description: grp.Description,
 		Type:        grp.Type,
@@ -182,6 +187,7 @@ func (s *Server) handleUpdateIPGroup(w http.ResponseWriter, r *http.Request) {
 
 	respondJSON(w, http.StatusOK, IPGroupDTO{
 		ID:          grp.ID,
+		Managed:     declarative.IsManaged(grp.ID),
 		Name:        grp.Name,
 		Description: grp.Description,
 		Type:        grp.Type,

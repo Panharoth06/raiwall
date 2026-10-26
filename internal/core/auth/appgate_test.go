@@ -321,7 +321,7 @@ func TestChallengeTemplateForm(t *testing.T) {
 	require.Contains(t, string(raw), AppAuthLoginPath)
 }
 
-// TestAppAuthGate_SimpleUserLogin proves Caddyfile-style local users share the
+// TestAppAuthGate_SimpleUserLogin proves config-declared local users share the
 // same portal and clearance cookie as directory users.
 func TestAppAuthGate_SimpleUserLogin(t *testing.T) {
 	simple := NewSimpleAuth(SimpleUser{

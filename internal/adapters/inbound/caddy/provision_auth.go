@@ -8,7 +8,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// provisionAuth compiles the Caddyfile `auth` block into the shared HTTP 467
+// provisionAuth compiles the global `auth` block into the shared HTTP 467
 // portal backends (local users + OIDC). The legacy AuthGateway login page is
 // retired; the portal is the single browser login surface.
 func (m *Middleware) provisionAuth(ctx caddy.Context) error {

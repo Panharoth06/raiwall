@@ -42,7 +42,7 @@ Built natively as a **Caddy v2** module, Raiwall combines extreme proxy throughp
 
 ### 🛡️ 1. High-Throughput Reverse Proxy & Gateway (Data Plane)
 - **Multi-Protocol Gateway:** Native termination and reverse proxying for HTTP/1.1, HTTP/2, HTTP/3 (QUIC), WebSockets, and gRPC.
-- **Application Registry & Routing Modes:** Register each application by hostname and route it three ways — reverse proxy to one or more upstreams, static file serving from a document root, or redirect (301/302/307/308) — all resolved by `Host` and hot-swapped on apply without editing the Caddyfile.
+- **Application Registry & Routing Modes:** Register each application by hostname and route it three ways — reverse proxy to one or more upstreams, static file serving from a document root, or redirect (301/302/307/308) — all resolved by `Host` and hot-swapped on apply without editing the configuration file.
 - **Managed TLS Lifecycle:** Per-SNI resolution via `tls.get_certificate.raiwall` across ACME issuance/renewal (CertMagic), uploaded PEM chains, and generated self-signed certificates. Private keys are AES-256-GCM encrypted at rest, and renewal reconciles at startup and after every deploy.
 - **Zero-Downtime Hot Swaps:** `atomic.Pointer[ConfigSnapshot]` applies per-site protection states (**Defense**, **Audit**, **Offline**) in nanoseconds without restarting or dropping long-lived connections.
 - **Upstream Resilience:** Four selection policies — smooth weighted round-robin, least connections, IP hash, and primary-backup — with background active health probes and automatic failover.
@@ -83,7 +83,7 @@ Built natively as a **Caddy v2** module, Raiwall combines extreme proxy throughp
 ### 🎛️ 7. Control Plane & Single-Binary Packaging
 - **Unified Binary:** REST API (`huma` OpenAPI 3.1), Embedded Vue 3 Dashboard, and Caddy Data Plane ship in a single compact binary (~50 MB, not strictly bounded under 50 MB).
 - **Draft-First Administration:** Applications, certificates, exceptions, ACLs, and policies are staged as a draft with a pending-change banner, applied atomically to a new config version, and rollback-able by version.
-- **Portable Control Store:** Embedded SQLite in WAL mode by default, or PostgreSQL via `DATABASE_URL` for multi-instance deployments.
+- **Portable Control Store:** Embedded SQLite in WAL mode by default, or PostgreSQL via `storage.database_url` / `RAIWALL_DATABASE_URL` for multi-instance deployments.
 - **Sidecar Mode:** Envoy External Processor (`ext_proc/v3`) gRPC interface for Kubernetes ingress sidecar deployment.
 
 ---
@@ -226,8 +226,12 @@ raiwall/
 ├── web/                                  # Vue 3 + TypeScript admin dashboard (embedded via go:embed)
 ├── tests/
 │   └── e2e/                              # End-to-end integration test suites (build tag: integration)
+├── config/
+│   └── raiwall.yaml                      # Canonical deployable configuration (Compose mount)
 ├── examples/
-│   └── Caddyfile                         # Example Caddyfile configuration
+│   └── raiwall.yaml                      # Annotated reference covering every schema section
+├── deploy/
+│   └── helm/raiwall/                     # Helm chart (ConfigMap from values, external PostgreSQL)
 ├── Dockerfile                            # Multi-stage alpine build (lightweight container, ~50MB)
 └── Makefile                              # Build, test, and dev tooling
 ```
@@ -253,9 +257,24 @@ This produces the standalone binary at `./bin/raiwall`.
 ./bin/raiwall version
 ```
 
-### 3. Run with Example Caddyfile
+### 3. Run with the Shipped Configuration
 ```bash
-./bin/raiwall run --config examples/Caddyfile
+make validate-config       # validates config/ and examples/ documents
+make run                   # starts the gateway on :8080 / :8443
+```
+
+`make run` points SQLite and CertMagic storage at `./data/` so nothing outside
+the repository is touched. To run the binary directly:
+```bash
+RAIWALL_DATABASE_URL="file:./data/raiwall.db?_pragma=busy_timeout(5000)" \
+RAIWALL_CERTMAGIC_ROOT="./data/certmagic" \
+./bin/raiwall run --config config/raiwall.yaml
+```
+
+Or start the full stack (PostgreSQL + demo upstream + gateway) with Docker:
+```bash
+cp .env.example .env      # then edit secrets
+docker compose up -d
 ```
 
 ### 4. Admin CLI & Sidecar Operations
@@ -286,75 +305,162 @@ This produces the standalone binary at `./bin/raiwall`.
 
 ## Configuration
 
-Raiwall supports both declarative Caddyfile configuration and dynamic runtime API configuration via the control plane.
+Raiwall is configured by a single versioned YAML document, `raiwall.yaml`. The
+same document is consumed by the binary, Docker Compose, and the Helm chart —
+there is no separate Caddyfile dialect.
 
-### Example Caddyfile
+### Discovery and precedence
 
-```caddyfile
-{
-    admin off
-    auto_https off
-    storage file_system /var/lib/raiwall/certmagic
-}
-
-# Shared gateway handler imported by both listeners.
-(raiwall_site) {
-    raiwall {
-        mode defense          # defense | audit | offline
-        block_status 403      # HTTP status code for blocked attacks
-        offline_status 503    # HTTP status code for offline mode
-
-        # Control Plane persistence and API auth
-        control {
-            db_path file:raiwall_control.db
-            hmac_secret "insecure-change-in-production-secret-key-32b"
-        }
-    }
-}
-
-# HTTP: admin console, REST API, and gateway traffic.
-:8080 {
-    import raiwall_site
-}
-
-# HTTPS: SNI certificates are served from the control plane (uploaded or
-# generated self-signed); anything else is issued by Caddy's ACME automation.
-:8443 {
-    tls {
-        get_certificate raiwall
-    }
-    import raiwall_site
-}
+```text
+--config <path>
+  → $RAIWALL_CONFIG
+  → /etc/raiwall/raiwall.yaml
+  → ./raiwall.yaml
+  → config/raiwall.yaml
+  → hard failure with an actionable error
 ```
 
-The gateway binds these two fixed listeners; per-application port values are validated metadata used for display and reporting, not per-site sockets. Upstreams and routing are registered per application (see below) and resolved by the `Host` header.
+Precedence is **built-in defaults < YAML file < curated `RAIWALL_*` environment
+variables**. Environment overrides exist only for deployment-specific values
+(listeners, DSNs, bootstrap admin, HMAC/PoW/session secrets, sidecar address,
+log level); everything else is file-driven.
 
-> Telemetry follows the same store as the control plane when `DATABASE_URL` is set (the bundled Compose stack does this): both roles bind to PostgreSQL, and an explicit `telemetry { storage ... }` block is ignored with a startup warning. To bind the roles explicitly, declare named stores:
->
-> ```caddyfile
-> raiwall {
->     storage {
->         store "pg" {
->             driver postgres
->             dsn "postgres://…"
->         }
->         store "local" {
->             driver sqlite
->             dsn "file:raiwall_telemetry.db"
->         }
->         control pg
->         telemetry pg      # use "local" to split telemetry onto SQLite
->     }
-> }
-> ```
+Validate any document before deploying:
 
-> For Envoy `ext_proc` deployments, add `sidecar { listen :50051 }` inside the `raiwall` block of a **single** listener — every importing server would otherwise try to bind the same port.
+```bash
+./bin/raiwall config validate --config config/raiwall.yaml
+./bin/raiwall config print --config config/raiwall.yaml   # adapted Caddy JSON
+```
 
-> SQLite storage is a real embedded database (`modernc.org/sqlite`, pure Go, WAL mode) and survives restarts. On first start after upgrading from an older build, a placeholder `<name>.db` that contains only the 16-byte SQLite header is renamed to `<name>.db.legacy-stub` and a fresh database is created in its place.
+### Example
+
+```yaml
+version: 1
+
+server:
+  http:  { enabled: true, listen: ":8080" }
+  https: { enabled: true, listen: ":8443", http3: true, tls_min_version: "1.2" }
+  auto_https: false
+
+storage:
+  database_url: "${RAIWALL_DATABASE_URL:-file:/var/lib/raiwall/raiwall.db?_pragma=busy_timeout(5000)}"
+
+control:
+  hmac_secret: "${RAIWALL_HMAC_SECRET:-}"
+  bootstrap_admin:
+    username: admin
+    password: "${RAIWALL_ADMIN_PASSWORD:-}"   # empty = generated once at startup
+    role: admin
+
+waf:
+  mode: defense
+  ast_timeout: 5ms
+  max_param_size: 32768
+
+applications:
+  - name: portal
+    hostnames: ["portal.example.com"]
+    mode: defense
+    routing_type: proxy
+    upstreams:
+      - dial: "10.0.0.10:8080"
+        weight: 3
+      - dial: "10.0.0.11:8080"
+        weight: 1
+
+ip_groups:
+  - name: private_networks
+    entries:
+      - cidr: 10.0.0.0/8
+      - cidr: 192.168.0.0/16
+
+acls:
+  - name: block_admin_from_public
+    expression: "has_prefix(path, '/admin') && !in_ip_group(client_ip, 'private_networks')"
+    action: block
+```
+
+The complete annotated reference is [`examples/raiwall.yaml`](examples/raiwall.yaml);
+every key, default, and constraint is documented in
+[`docs/configuration.md`](docs/configuration.md).
+
+### Schema sections
+
+| Section | Purpose |
+| :--- | :--- |
+| `server` | HTTP/HTTPS listeners, HTTP/3, TLS minimum, automatic HTTPS, ACME |
+| `caddy` | Caddy admin endpoint and certificate storage backend |
+| `logging` | Level (`debug`/`info`/`warn`/`error`), format (`json`/`console`), output |
+| `storage` | Shared `database_url` or named `stores` bound to `control` and `telemetry` roles |
+| `control` | Admin HMAC secret and bootstrap operator |
+| `security` | `strict_secrets` rejects inline plaintext secrets |
+| `waf` | Run mode, block/offline responses, AST timeout, parameter cap, stripped headers |
+| `bot` | Bot defense mode, PoW difficulty/secret, clearance TTL, honeypot |
+| `rate_limit` | Three tiers (velocity, attack frequency, scanner trap) and memory/Redis storage |
+| `waiting_room` | Bounded admission queue and target paths |
+| `auth` | Portal-wide zero-trust gate (simple users or OIDC) |
+| `telemetry` | Flush interval, buffer, retention, Shoutrrr alert channels |
+| `sidecar` | Envoy `ext_proc` gRPC listener |
+| `geoip` / `threat_feeds` | MaxMind databases and local CIDR feeds |
+| `declarative` | `off` / `seed` / `sync`, `prune`, `strict` |
+| `applications`, `certificates`, `acls`, `exceptions`, `ip_groups`, `rate_policies`, `bot_policies`, `identity_providers`, `templates`, `detector` | File-declared resources |
+
+### Secrets
+
+Use `${VAR}` placeholders; the loader also resolves `VAR_FILE` (Docker/Kubernetes
+secret file mounts) and `${VAR:?message}` for required values. Inline plaintext
+secrets are accepted with a startup warning, or rejected outright when
+`security.strict_secrets: true`.
+
+When `control.bootstrap_admin.password` is empty, Raiwall generates a random
+password on first start and logs it once at WARN level.
+
+### Declarative resources
+
+File-declared resources receive deterministic IDs (`cfg:<kind>:<name>`), so the
+file and the database never drift:
+
+- `mode: seed` creates missing records only; UI edits are preserved.
+- `mode: sync` upserts every declared record and overwrites UI edits.
+- `prune: true` deletes file-managed records that are no longer declared.
+- `strict: true` aborts startup on conflicts with API-managed records; otherwise
+  conflicting resources are skipped with a warning.
+
+Records owned by the file are marked `managed: true` in the API and return
+**409 Conflict** when a mutation is attempted through the dashboard or REST API.
+A new snapshot is deployed only when the compiled content hash changes, so
+restarting with an unchanged file does not churn config versions.
+
+### Storage
+
+`storage.database_url` is a shortcut that binds both control and telemetry to
+one database. For split roles, declare named stores:
+
+```yaml
+storage:
+  stores:
+    control:
+      driver: postgres
+      dsn: "${RAIWALL_CONTROL_DSN:?control DSN required}"
+      max_open: 20
+      max_idle: 10
+    telemetry:
+      driver: clickhouse
+      dsn: "${RAIWALL_TELEMETRY_DSN:?telemetry DSN required}"
+      retention: 720h
+      prune_interval: 1h
+  control: control
+  telemetry: telemetry
+```
+
+The bundled Compose stack sets `RAIWALL_DATABASE_URL` to its PostgreSQL service;
+the Helm chart always targets an external PostgreSQL instance and never bundles
+one.
 
 ### Applications, Routing & Certificates
 
-Applications are registered in **Protected Sites** (`/.raiwall/#/sites`) or via `POST /.raiwall/api/v1/sites`, and take effect after a config apply. Each application declares:
+Applications can be declared in `applications:` or registered through
+**Protected Sites** (`/.raiwall/#/sites`). Each application declares:
 
 | Field | Options |
 | :--- | :--- |
@@ -364,12 +470,28 @@ Applications are registered in **Protected Sites** (`/.raiwall/#/sites`) or via 
 | **TLS mode** | `none`, `auto`, `manual` |
 
 - **`none`** — plain HTTP only; any HTTPS listener on the site is rejected.
-- **`auto`** — public DNS names are issued through ACME; internal or private hostnames get a generated self-signed certificate. No certificate needs to exist up front.
-- **`manual`** — requires a managed certificate whose SANs cover every hostname of the site.
+- **`auto`** — public DNS names are issued through ACME; internal or private hostnames get a generated self-signed certificate.
+- **`manual`** — requires a managed certificate (referenced by name in YAML) whose SANs cover every hostname of the site.
 
-Certificates live under **Settings → TLS Certificates** (`/.raiwall/#/settings`) and come from three sources: generated self-signed, uploaded PEM chain + key (validated to match), or ACME. Keys are AES-256-GCM encrypted before storage and never returned by the API. Deletion is refused with **409** while a site references the certificate or serves a covered hostname. Self-signed material renews inside a 30-day window on startup and after each deploy; ACME renewals are delegated to Caddy's TLS automation.
+Certificates live under **Settings → TLS Certificates** or in the
+`certificates:` list, and come from three sources: generated self-signed,
+uploaded PEM chain + key (validated to match), or ACME. Keys are AES-256-GCM
+encrypted before storage and never returned by the API. Deletion is refused
+with **409** while a site references the certificate or serves a covered
+hostname.
 
-Changes stay in the draft until applied — the dashboard shows a pending-change banner with **Apply now**, and every apply creates a version you can roll back to.
+### Deployment
+
+- **Docker Compose:** `config/raiwall.yaml` is mounted read-only at
+  `/etc/raiwall/raiwall.yaml`; secrets come from `.env` (see `.env.example`).
+- **Helm:** `deploy/helm/raiwall/values.yaml#config` mirrors the schema 1:1 and
+  renders a ConfigMap. Secrets are injected from a chart-managed Secret or an
+  existing Secret. See [`deploy/helm/raiwall/README.md`](deploy/helm/raiwall/README.md).
+
+### Run Modes
+- **`defense`**: Full threat detection active. Malicious requests are blocked immediately with an HTTP 403 response.
+- **`audit`**: Passive inspection. Attacks are detected, logged, and audited without blocking client traffic.
+- **`offline`**: Maintenance state. Serves a clean HTTP 503 maintenance page immediately without burdening backends.
 
 ### Accessing the Control Plane & Documentation
 - **Web Admin Dashboard:** `http://localhost:8080/.raiwall/`
@@ -378,11 +500,6 @@ Changes stay in the draft until applied — the dashboard shows a pending-change
 - **Interactive OpenAPI 3.1 Scalar Docs:** `http://localhost:8080/.raiwall/api/docs`
 - **OpenAPI 3.1 JSON Specification:** `http://localhost:8080/.raiwall/api/openapi.json`
 - **Model Context Protocol (MCP) SSE Stream:** `http://localhost:8080/.raiwall/api/mcp`
-
-### Run Modes
-- **`defense`**: Full threat detection active. Malicious requests are blocked immediately with an HTTP 403 response.
-- **`audit`**: Passive inspection. Attacks are detected, logged, and audited without blocking client traffic.
-- **`offline`**: Maintenance state. Serves a clean HTTP 503 maintenance page immediately without burdening backends.
 
 ---
 
@@ -397,7 +514,7 @@ make test-race          # Run unit tests with Go race detector
 make test-integration   # Run end-to-end integration test suite
 make test-all           # Run all unit and integration tests with -race
 make lint               # Run go vet
-make run                # Run Raiwall with examples/Caddyfile
+make run                # Run Raiwall with config/raiwall.yaml
 make web-dev            # Run Vue 3 admin dashboard in Vite dev mode
 make web-build          # Build production Vue 3 admin dashboard into web/dist
 make web-test           # Run Vue 3 frontend test suite with Vitest

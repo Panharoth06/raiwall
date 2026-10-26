@@ -8,6 +8,7 @@ import (
 
 	"github.com/Panharoth06/raiwall/internal/core/auth"
 	"github.com/Panharoth06/raiwall/internal/core/control"
+	"github.com/Panharoth06/raiwall/internal/core/control/declarative"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
@@ -22,6 +23,7 @@ type IdentityProviderDTO struct {
 	Name      string          `json:"name"`
 	Config    json.RawMessage `json:"config"`
 	Enabled   bool            `json:"enabled"`
+	Managed   bool            `json:"managed"`
 	CreatedAt time.Time       `json:"created_at"`
 	UpdatedAt time.Time       `json:"updated_at"`
 }
@@ -48,6 +50,7 @@ func providerRecordToDTO(p control.IdentityProviderRecord) IdentityProviderDTO {
 		Name:      p.Name,
 		Config:    json.RawMessage(strings.TrimSpace(p.Config)),
 		Enabled:   p.Enabled == 1,
+		Managed:   declarative.IsManaged(p.ID),
 		CreatedAt: p.CreatedAt,
 		UpdatedAt: p.UpdatedAt,
 	}

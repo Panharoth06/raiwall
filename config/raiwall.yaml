@@ -1,0 +1,256 @@
+# ==============================================================================
+# Raiwall canonical configuration
+# ==============================================================================
+#
+# This single document configures the entire stack: listeners, storage, the
+# control plane, the WAF pipeline, and every declarative resource. It is consumed
+# unchanged by:
+#
+#   * the binary            -> raiwall run --config /etc/raiwall/raiwall.yaml
+#   * Docker Compose        -> mounted at /etc/raiwall/raiwall.yaml
+#   * the Helm chart        -> rendered from deploy/helm/raiwall/values.yaml
+#
+# Precedence: built-in defaults < this file < curated RAIWALL_* environment
+# variables. Secrets use ${VAR} placeholders; the loader also resolves
+# ${VAR_FILE} (Docker/Kubernetes secret file mounts). Inline plaintext secrets
+# are accepted with a startup warning unless security.strict_secrets is true.
+#
+# Validate before deploying:
+#
+#   raiwall config validate --config ./config/raiwall.yaml
+#
+# Full reference: docs/configuration.md
+# ==============================================================================
+
+version: 1
+
+server:
+  http:
+    enabled: true
+    listen: ":8080"
+  https:
+    enabled: true
+    listen: ":8443"
+    http3: true
+    tls_min_version: "1.2"
+  # Leave false to serve only certificates declared under `certificates`.
+  # Set true to let Caddy obtain certificates for unknown SNI via ACME.
+  auto_https: false
+  acme:
+    email: ""
+    staging: false
+
+caddy:
+  # The Caddy admin API is intentionally disabled; configuration is file-driven.
+  admin:
+    listen: "off"
+  storage:
+    module: file_system
+    root: /var/lib/raiwall/certmagic
+
+logging:
+  level: info
+  format: json
+  output: stderr
+
+storage:
+  # ONE DSN shared by the control and telemetry roles. The default is an
+  # embedded SQLite database inside the /var/lib/raiwall volume. Point
+  # RAIWALL_DATABASE_URL at postgres://... for HA deployments; Compose and Helm
+  # do this for you.
+  database_url: "${RAIWALL_DATABASE_URL:-file:/var/lib/raiwall/raiwall.db?_pragma=busy_timeout(5000)}"
+
+  # For split roles replace the shortcut above with:
+  #
+  # stores:
+  #   control:
+  #     driver: postgres
+  #     dsn: "${RAIWALL_CONTROL_DSN:?control DSN required}"
+  #     max_open: 20
+  #     max_idle: 10
+  #   telemetry:
+  #     driver: clickhouse
+  #     dsn: "${RAIWALL_TELEMETRY_DSN:?telemetry DSN required}"
+  #     retention: 720h
+  #     prune_interval: 1h
+  # control: control
+  # telemetry: telemetry
+
+control:
+  # Signs admin session cookies. Empty = generated per boot (sessions do not
+  # survive a restart). Set a stable 32+ byte value in production.
+  hmac_secret: "${RAIWALL_HMAC_SECRET:-}"
+  bootstrap_admin:
+    username: "${RAIWALL_ADMIN_USERNAME:-admin}"
+    # Empty = a random password is generated and logged once at WARN level.
+    password: "${RAIWALL_ADMIN_PASSWORD:-}"
+    role: admin
+
+security:
+  strict_secrets: false
+
+waf:
+  mode: defense                 # defense | audit | offline
+  block_status_code: 403
+  offline_status_code: 503
+  strip_headers: [Server, X-Powered-By, X-AspNet-Version]
+  ast_timeout: 5ms              # hard ceiling: 5ms per parameter
+  max_param_size: 32768         # hard ceiling: 32 KiB per parameter
+
+bot:
+  defense: defense              # defense | challenge | strict | audit | off
+  pow_difficulty: 50000         # 1,000-200,000 when PoW is enabled
+  pow_secret: "${RAIWALL_POW_SECRET:-}"
+  clearance_ttl: 2h
+  honeypot_trap: true
+
+rate_limit:
+  tier1_rate: 100
+  tier1_period: 10s
+  tier1_burst: 20
+  tier2_threshold: 10
+  tier2_window: 60s
+  tier2_ban_duration: 24h
+  tier3_threshold: 20
+  tier3_window: 30s
+  tier3_ban_duration: 24h
+  storage: memory               # memory | redis
+  storage_addr: "${RAIWALL_RATE_REDIS_ADDR:-}"
+
+waiting_room:
+  enabled: true
+  max_concurrent: 500
+  max_queue_depth: 1000
+  admission_rate: 50
+  token_ttl: 15m
+
+telemetry:
+  flush_interval: 500ms
+  buffer_size: 4096
+  retention: 720h
+  # Any Shoutrrr URL works (Slack, Discord, Telegram, generic webhook).
+  # alert_channels:
+  #   - name: security
+  #     url: "${RAIWALL_ALERT_WEBHOOK:?webhook required}"
+  #     events: [block, ban]
+  #     cooldown: 5m
+
+geoip:
+  country: ""
+  asn: ""
+
+# How file-declared resources are reconciled into the control store:
+#   seed -> create missing records only
+#   sync -> upsert every declared record (UI edits are overwritten)
+# prune  -> delete file-managed records that are no longer declared
+# strict -> abort startup on conflicts with API-managed records
+declarative:
+  mode: sync
+  prune: false
+  strict: false
+
+# ==============================================================================
+# Declarative resources
+# ==============================================================================
+
+applications:
+  - name: demo
+    description: Compose demo upstream used by the E2E suite.
+    hostnames: ["demo.localhost"]
+    mode: defense
+    routing_type: proxy
+    ports:
+      - port: 8080
+        scheme: http
+    upstreams:
+      - dial: "upstream:80"
+        weight: 1
+        health_check_path: "/"
+        health_check_interval: 30s
+    proxy:
+      client_ip_source: remote
+      rewrite_xff: true
+      enable_compression: false
+      enable_sse: false
+    semantic_policy:
+      sql_inj: strict
+      xss: strict
+    block_status_code: 403
+    offline_status_code: 503
+
+ip_groups:
+  - name: private_networks
+    description: RFC1918 address space.
+    entries:
+      - cidr: 10.0.0.0/8
+        comment: RFC1918
+      - cidr: 172.16.0.0/12
+        comment: RFC1918
+      - cidr: 192.168.0.0/16
+        comment: RFC1918
+
+acls:
+  - name: block_admin_from_public
+    expression: "has_prefix(path, '/admin') && !in_ip_group(client_ip, 'private_networks')"
+    action: block
+    priority: 100
+    status_code: 403
+    enabled: true
+
+exceptions:
+  - name: allow_search_query
+    description: Search terms legitimately contain SQL-looking text.
+    host: demo.localhost
+    path_prefix: /search
+    method: GET
+    location: query
+    param_name: q
+    rule_id: SEMANTIC_SQLI
+    enabled: true
+
+rate_policies:
+  - name: demo_rate
+    host: demo.localhost
+    tier1_rate: 100
+    tier1_burst: 20
+    tier1_period: 10s
+    tier2_threshold: 10
+    tier2_window: 60s
+    tier2_ban_duration: 24h
+    tier3_threshold: 20
+    tier3_window: 30s
+    tier3_ban_duration: 24h
+    waiting_room_enabled: false
+    waiting_room_capacity: 500
+
+bot_policies:
+  - name: demo_bot
+    host: demo.localhost
+    pow_enabled: true
+    pow_difficulty: 50000
+    trap_urls: []
+
+templates:
+  - name: blocked
+    status_code: 403
+    title: Request blocked
+    brand_name: Raiwall
+    content_html: |
+      <!doctype html>
+      <html lang="en">
+        <head><meta charset="utf-8"><title>Request blocked</title></head>
+        <body style="font-family:system-ui,sans-serif;max-width:40rem;margin:4rem auto">
+          <h1>Request blocked</h1>
+          <p>The request was rejected by the Raiwall WAF.</p>
+          <p style="color:#666">Event: {{.EventID}}</p>
+        </body>
+      </html>
+
+detector:
+  modules:
+    sql_inj: strict
+    xss: strict
+    cmd_inj: balance
+    ssti: balance
+    ssrf: balance
+  inner_rules_disabled: []

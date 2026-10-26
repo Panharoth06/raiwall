@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 
 	"github.com/caddyserver/caddy/v2"
-	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	"github.com/caddyserver/certmagic"
 )
 
@@ -27,15 +26,6 @@ func (CertificateGetter) CaddyModule() caddy.ModuleInfo {
 	}
 }
 
-// UnmarshalCaddyfile parses the directive: `get_certificate raiwall`.
-func (g *CertificateGetter) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
-	d.Next()
-	if d.NextArg() {
-		return d.ArgErr()
-	}
-	return nil
-}
-
 // GetCertificate implements certmagic.Manager.
 func (g *CertificateGetter) GetCertificate(ctx context.Context, hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
 	provider := CurrentCertificateProvider()
@@ -45,7 +35,4 @@ func (g *CertificateGetter) GetCertificate(ctx context.Context, hello *tls.Clien
 	return provider.GetCertificate(ctx, hello)
 }
 
-var (
-	_ caddyfile.Unmarshaler = (*CertificateGetter)(nil)
-	_ certmagic.Manager     = (*CertificateGetter)(nil)
-)
+var _ certmagic.Manager = (*CertificateGetter)(nil)

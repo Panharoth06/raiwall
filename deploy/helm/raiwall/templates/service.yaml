@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "raiwall.fullname" . }}
+  labels:
+    {{- include "raiwall.labels" . | nindent 4 }}
+  {{- with .Values.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    {{- include "raiwall.selectorLabels" . | nindent 4 }}
+  ports:
+    {{- if .Values.config.server.http.enabled }}
+    - name: http
+      port: {{ include "raiwall.containerPort" .Values.config.server.http.listen }}
+      targetPort: http
+      protocol: TCP
+    {{- end }}
+    {{- if .Values.config.server.https.enabled }}
+    - name: https
+      port: {{ include "raiwall.containerPort" .Values.config.server.https.listen }}
+      targetPort: https
+      protocol: TCP
+    {{- end }}
+    {{- if and .Values.config.sidecar .Values.config.sidecar.enabled }}
+    - name: grpc
+      port: {{ include "raiwall.containerPort" .Values.config.sidecar.listen }}
+      targetPort: grpc
+      protocol: TCP
+    {{- end }}

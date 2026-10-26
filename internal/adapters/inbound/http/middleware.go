@@ -6,6 +6,9 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/Panharoth06/raiwall/internal/core/control/declarative"
+	"github.com/go-chi/chi/v5"
 )
 
 type contextKey string
@@ -21,6 +24,28 @@ func ContextWithAuth(ctx context.Context, ac *AuthContext) context.Context {
 func AuthFromContext(ctx context.Context) (*AuthContext, bool) {
 	ac, ok := ctx.Value(authContextKey).(*AuthContext)
 	return ac, ok && ac != nil
+}
+
+// DeclarativeGuardMiddleware rejects mutations of records owned by
+// raiwall.yaml. Operators change the file and redeploy instead of drifting the
+// database away from Git.
+func DeclarativeGuardMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet, http.MethodHead, http.MethodOptions:
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		for _, param := range []string{"id", "rule_id", "entryId"} {
+			if declarative.IsManaged(chi.URLParam(r, param)) {
+				respondError(w, http.StatusConflict,
+					"resource is managed by the declarative configuration file; edit raiwall.yaml and redeploy")
+				return
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // AuthMiddleware verifies API tokens or session cookies and enforces 2-tier RBAC.

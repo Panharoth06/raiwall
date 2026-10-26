@@ -2,6 +2,8 @@ package caddy
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"sync"
@@ -69,6 +71,11 @@ func (m *Middleware) provisionControl(ctx caddy.Context) error {
 		// Restore the last committed snapshot so applications keep routing
 		// across restarts without requiring an operator to re-apply.
 		m.restoreActiveSnapshot()
+		// Reconcile file-declared resources once per process and deploy only
+		// when the compiled content actually changed.
+		if err := m.syncDeclarative(); err != nil {
+			return err
+		}
 		m.installCertificateProvider(ctx)
 	}
 
@@ -165,25 +172,80 @@ func (m *Middleware) installCertificateProvider(ctx caddy.Context) {
 func (m *Middleware) ensureInitialAdminUser(store control.ControlStore) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
+
 	users, err := store.ListUsers(ctx)
-	if err == nil && len(users) == 0 {
-		hash, err := api.HashPassword("admin")
-		if err == nil {
-			now := time.Now().UTC()
-			_ = store.CreateUser(ctx, control.UserRecord{
-				ID:           uuid.New().String(),
-				Username:     "admin",
-				PasswordHash: hash,
-				Role:         "admin",
-				IsActive:     1,
-				CreatedAt:    now,
-				UpdatedAt:    now,
-			})
-			if m.logger != nil {
-				m.logger.Info("auto-provisioned initial admin user", zap.String("username", "admin"))
-			}
-		}
+	if err != nil || len(users) > 0 {
+		return
 	}
+
+	username := "admin"
+	role := "admin"
+	password := ""
+	if m.ControlConfig != nil && m.ControlConfig.BootstrapAdmin != nil {
+		admin := m.ControlConfig.BootstrapAdmin
+		if admin.Username != "" {
+			username = admin.Username
+		}
+		if admin.Role != "" {
+			role = admin.Role
+		}
+		password = admin.Password
+	}
+
+	generated := false
+	if password == "" {
+		password = generateBootstrapPassword()
+		generated = true
+	}
+
+	hash, err := api.HashPassword(password)
+	if err != nil {
+		if m.logger != nil {
+			m.logger.Error("failed to hash initial admin password", zap.Error(err))
+		}
+		return
+	}
+
+	now := time.Now().UTC()
+	err = store.CreateUser(ctx, control.UserRecord{
+		ID:           uuid.NewString(),
+		Username:     username,
+		PasswordHash: hash,
+		Role:         role,
+		IsActive:     1,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	})
+	if err != nil {
+		if m.logger != nil {
+			m.logger.Error("failed to provision initial admin user", zap.Error(err))
+		}
+		return
+	}
+
+	if m.logger == nil {
+		return
+	}
+	if generated {
+		m.logger.Warn("auto-provisioned initial admin user with generated password; store it now, it will not be shown again",
+			zap.String("username", username),
+			zap.String("password", password),
+			zap.String("remedy", "set control.bootstrap_admin.password, ${RAIWALL_ADMIN_PASSWORD}, or create a user with `raiwall admin create-user`"),
+		)
+		return
+	}
+	m.logger.Info("auto-provisioned initial admin user", zap.String("username", username))
+}
+
+// generateBootstrapPassword returns a 24-character URL-safe random password.
+func generateBootstrapPassword() string {
+	buf := make([]byte, 18)
+	if _, err := rand.Read(buf); err != nil {
+		// crypto/rand failure is fatal for any sane deployment; fall back to a
+		// fixed-length random-looking value is not safe, so panic loudly.
+		panic(fmt.Sprintf("generate bootstrap password: %v", err))
+	}
+	return base64.RawURLEncoding.EncodeToString(buf)
 }
 
 func (m *Middleware) syncIPGroupsWithStore(store control.ControlStore, mgr *acl.IPGroupManager) {

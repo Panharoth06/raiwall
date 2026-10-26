@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Panharoth06/raiwall/internal/core/control"
+	"github.com/Panharoth06/raiwall/internal/core/control/declarative"
 )
 
 // SiteDTO represents application domain configuration.
@@ -38,6 +39,7 @@ type SiteDTO struct {
 	CustomHeaders       map[string]string        `json:"custom_headers"`
 	AuthEnabled         bool                     `json:"auth_enabled,omitempty"`
 	AuthBypassPaths     []string                 `json:"auth_bypass_paths,omitempty"`
+	Managed             bool                     `json:"managed"`
 	CreatedAt           time.Time                `json:"created_at"`
 	UpdatedAt           time.Time                `json:"updated_at"`
 }
@@ -85,6 +87,7 @@ func siteDTOFromRecord(app control.SiteApp) SiteDTO {
 		CustomHeaders:       headers,
 		AuthEnabled:         app.AuthEnabled == 1,
 		AuthBypassPaths:     parseBypassPaths(app.AuthBypassPaths),
+		Managed:             declarative.IsManaged(app.ID),
 		CreatedAt:           app.CreatedAt,
 		UpdatedAt:           app.UpdatedAt,
 	}

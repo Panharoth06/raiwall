@@ -7,6 +7,7 @@ import (
 
 	"github.com/Panharoth06/raiwall/internal/core/acl"
 	"github.com/Panharoth06/raiwall/internal/core/control"
+	"github.com/Panharoth06/raiwall/internal/core/control/declarative"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
@@ -26,6 +27,7 @@ type ExceptionDTO struct {
 	ParamRegex  string    `json:"param_regex"`
 	RuleID      string    `json:"rule_id"`
 	IsActive    bool      `json:"is_active"`
+	Managed     bool      `json:"managed"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
@@ -45,6 +47,7 @@ func (s *Server) handleListExceptions(w http.ResponseWriter, r *http.Request) {
 		}
 		result = append(result, ExceptionDTO{
 			ID:          e.ID,
+			Managed:     declarative.IsManaged(e.ID),
 			Description: e.Description,
 			Reason:      e.Description,
 			Host:        e.Host,
@@ -78,6 +81,7 @@ func (s *Server) handleGetException(w http.ResponseWriter, r *http.Request) {
 	}
 	respondJSON(w, http.StatusOK, ExceptionDTO{
 		ID:          e.ID,
+		Managed:     declarative.IsManaged(e.ID),
 		Description: e.Description,
 		Reason:      e.Description,
 		Host:        e.Host,

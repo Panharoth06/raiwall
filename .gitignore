@@ -12,6 +12,7 @@ reference/
 *.db
 *.db-wal
 *.db-shm
+.env
 
 # Test lab local data and logs
 test-lab/coreruleset/

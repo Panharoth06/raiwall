@@ -7,6 +7,7 @@ import (
 	"github.com/Panharoth06/raiwall/internal/adapters/inbound/http"
 	"github.com/Panharoth06/raiwall/internal/adapters/outbound/alerts"
 	"github.com/Panharoth06/raiwall/internal/adapters/outbound/storage"
+	"github.com/Panharoth06/raiwall/internal/config"
 	"github.com/Panharoth06/raiwall/internal/core/acl"
 	"github.com/Panharoth06/raiwall/internal/core/auth"
 	"github.com/Panharoth06/raiwall/internal/core/bot"
@@ -77,7 +78,7 @@ type AuthSettings struct {
 	BypassPaths   []string          `json:"bypass_paths,omitempty"`
 }
 
-// AlertChannelSettings configures a notification channel in Caddyfile.
+// AlertChannelSettings configures a notification channel.
 type AlertChannelSettings struct {
 	Name     string         `json:"name,omitempty"`
 	URL      string         `json:"url,omitempty"`
@@ -114,8 +115,17 @@ type StorageSettings struct {
 
 // ControlSettings configures the Control Plane database and management API.
 type ControlSettings struct {
-	DBPath     string `json:"db_path,omitempty"`
-	HMACSecret string `json:"hmac_secret,omitempty"`
+	DBPath         string                  `json:"db_path,omitempty"`
+	HMACSecret     string                  `json:"hmac_secret,omitempty"`
+	BootstrapAdmin *BootstrapAdminSettings `json:"bootstrap_admin,omitempty"`
+}
+
+// BootstrapAdminSettings provisions the first operator account when the store
+// is empty. An empty password triggers one-time generated credentials.
+type BootstrapAdminSettings struct {
+	Username string `json:"username,omitempty"`
+	Password string `json:"password,omitempty"`
+	Role     string `json:"role,omitempty"`
 }
 
 // SidecarSettings configures the Envoy ext_proc gRPC sidecar service.
@@ -123,6 +133,9 @@ type SidecarSettings struct {
 	Listen      string `json:"listen,omitempty"`
 	MaxBodySize int64  `json:"max_body_size,omitempty"`
 }
+
+// DeclarativeSettings is the config package's declarative resource bundle.
+type DeclarativeSettings = config.DeclarativeResources
 
 // Middleware is the Caddy HTTP handler implementing Raiwall WAF and Gateway interception.
 type Middleware struct {
@@ -159,6 +172,10 @@ type Middleware struct {
 	ControlConfig *ControlSettings `json:"control,omitempty"`
 	SidecarConfig *SidecarSettings `json:"sidecar,omitempty"`
 
+	// DeclarativeConfig carries resources declared in raiwall.yaml. It is
+	// consumed once per process during provisioning.
+	DeclarativeConfig *DeclarativeSettings `json:"declarative,omitempty"`
+
 	engine     waf.WAFEnginePort
 	logger     *zap.Logger
 	bufferPool *sync.Pool
@@ -183,7 +200,7 @@ type Middleware struct {
 	ipGroupMgr      *acl.IPGroupManager
 	geoIPReader     acl.GeoIPReader
 	aclEngine       *acl.ACLEngine
-	// globalAuthGate is the portal-wide gate built from the Caddyfile `auth`
+	// globalAuthGate is the portal-wide gate built from the global `auth`
 	// block; it shares the HTTP 467 portal with per-site gates.
 	globalAuthGate  *auth.AppAuthGate
 	globalAuthOIDC  *auth.OIDCClient

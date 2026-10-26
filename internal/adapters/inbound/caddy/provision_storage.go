@@ -2,32 +2,22 @@ package caddy
 
 import (
 	"fmt"
-	"os"
-	"strings"
 	"time"
 
 	"github.com/Panharoth06/raiwall/internal/adapters/outbound/storage"
 	caddymod "github.com/caddyserver/caddy/v2"
 )
 
+// provisionStorage builds the named store registry. All connection details are
+// supplied by the declarative config adapter; no environment variables are read
+// here so the same binary behaves identically in Compose, Helm, and bare metal.
 func (m *Middleware) provisionStorage(_ caddymod.Context) error {
 	if m.storageRegistry != nil {
 		return nil
 	}
 
-	dbURL := strings.TrimSpace(os.Getenv("DATABASE_URL"))
-	hasCustomStores := m.StorageConfig != nil && len(m.StorageConfig.Stores) > 0
-
-	if !hasCustomStores && dbURL == "" {
+	if m.StorageConfig == nil || len(m.StorageConfig.Stores) == 0 {
 		return nil
-	}
-
-	regCfg := storage.StorageConfig{
-		Stores: make(map[string]storage.StoreConfig),
-	}
-	if m.StorageConfig != nil {
-		regCfg.Control = m.StorageConfig.Control
-		regCfg.Telemetry = m.StorageConfig.Telemetry
 	}
 
 	retention := 30 * 24 * time.Hour
@@ -35,36 +25,24 @@ func (m *Middleware) provisionStorage(_ caddymod.Context) error {
 		retention = time.Duration(m.TelemetryConfig.Retention)
 	}
 
-	if hasCustomStores {
-		for name, s := range m.StorageConfig.Stores {
-			storeRetention := time.Duration(s.Retention)
-			if storeRetention <= 0 {
-				storeRetention = retention
-			}
-			regCfg.Stores[name] = storage.StoreConfig{
-				Driver:        s.Driver,
-				DSN:           s.DSN,
-				MaxOpen:       s.MaxOpen,
-				MaxIdle:       s.MaxIdle,
-				Retention:     storeRetention,
-				PruneInterval: time.Duration(s.PruneInterval),
-			}
+	regCfg := storage.StorageConfig{
+		Stores:    make(map[string]storage.StoreConfig, len(m.StorageConfig.Stores)),
+		Control:   m.StorageConfig.Control,
+		Telemetry: m.StorageConfig.Telemetry,
+	}
+
+	for name, s := range m.StorageConfig.Stores {
+		storeRetention := time.Duration(s.Retention)
+		if storeRetention <= 0 {
+			storeRetention = retention
 		}
-	} else if dbURL != "" {
-		driver := storage.AutoDetectDriver(dbURL)
-		regCfg.Stores["default"] = storage.StoreConfig{
-			Driver:        driver,
-			DSN:           dbURL,
-			MaxOpen:       10,
-			MaxIdle:       5,
-			Retention:     retention,
-			PruneInterval: 1 * time.Hour,
-		}
-		if regCfg.Control == "" {
-			regCfg.Control = "default"
-		}
-		if regCfg.Telemetry == "" {
-			regCfg.Telemetry = "default"
+		regCfg.Stores[name] = storage.StoreConfig{
+			Driver:        s.Driver,
+			DSN:           s.DSN,
+			MaxOpen:       s.MaxOpen,
+			MaxIdle:       s.MaxIdle,
+			Retention:     storeRetention,
+			PruneInterval: time.Duration(s.PruneInterval),
 		}
 	}
 

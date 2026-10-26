@@ -74,6 +74,10 @@ trap shutdown SIGTERM SIGINT
 
 # 3. Start Raiwall WAF (Backend + Web Console on :8080)
 echo "[Entrypoint] Starting Raiwall WAF Gateway (Backend + Web Console on :8080)..."
+# Point the canonical config at the embedded PostgreSQL instance. The YAML file
+# stays deployment-agnostic; this environment layer supplies the DSN.
+export RAIWALL_CONFIG="${RAIWALL_CONFIG:-/etc/raiwall/raiwall.yaml}"
+export RAIWALL_DATABASE_URL="${RAIWALL_DATABASE_URL:-postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@127.0.0.1:5432/${POSTGRES_DB}?sslmode=disable}"
 if [ "$#" -eq 0 ]; then
     /usr/local/bin/raiwall &
 else

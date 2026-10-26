@@ -2,6 +2,7 @@ services:
   # ============================================================================
   # PostgreSQL 18 Database Service
   # ============================================================================
+  # Raiwall applies its embedded migrations on boot; no init scripts needed.
   postgres:
     image: postgres:18-alpine
     container_name: raiwall-postgres
@@ -15,13 +16,24 @@ services:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - ${POSTGRES_DATA_DIR:-./data/postgres}:/var/lib/postgresql/data
-      - ./internal/adapters/outbound/storage/migration/postgres:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-raiwall}"]
       interval: 5s
       timeout: 5s
       retries: 5
       start_period: 10s
+    networks:
+      - raiwall-net
+
+  # ============================================================================
+  # Demo upstream for the declarative application in config/raiwall.yaml
+  # ============================================================================
+  # Curl with `Host: demo.localhost` against the gateway to exercise the WAF
+  # without pointing at a real backend. Remove this service in production.
+  upstream:
+    image: nginx:1.27-alpine
+    container_name: raiwall-upstream
+    restart: unless-stopped
     networks:
       - raiwall-net
 
@@ -37,16 +49,24 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      upstream:
+        condition: service_started
     ports:
       - "${RAIWALL_HTTP_PORT:-8080}:8080"   # HTTP Gateway & Admin Console
       - "${RAIWALL_HTTPS_PORT:-8443}:8443"  # HTTPS Gateway (if enabled)
     environment:
-      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-raiwall}?sslmode=disable
+      # The canonical config is mounted read-only below. Environment variables
+      # only carry secrets and deployment-specific values.
+      RAIWALL_DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-raiwall}?sslmode=disable
+      RAIWALL_ADMIN_USERNAME: ${RAIWALL_ADMIN_USERNAME:-admin}
+      RAIWALL_ADMIN_PASSWORD: ${RAIWALL_ADMIN_PASSWORD:-admin}
+      RAIWALL_HMAC_SECRET: ${RAIWALL_HMAC_SECRET:-}
+      RAIWALL_POW_SECRET: ${RAIWALL_POW_SECRET:-}
+      RAIWALL_LOG_LEVEL: ${RAIWALL_LOG_LEVEL:-info}
     volumes:
       - raiwall_data:/var/lib/raiwall
-      - ./examples/Caddyfile:/etc/raiwall/Caddyfile:ro
-      - ./examples/feeds:/etc/raiwall/examples/feeds:ro
-      - ./examples/feeds:/examples/feeds:ro
+      - ./config/raiwall.yaml:/etc/raiwall/raiwall.yaml:ro
+      - ./examples/feeds:/etc/raiwall/feeds:ro
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/.raiwall/api/openapi.json"]
       interval: 10s

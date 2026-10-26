@@ -97,7 +97,7 @@ func (m *Middleware) ACLEngine() *acl.ACLEngine {
 }
 
 // SetGlobalAuthGate sets the portal-wide HTTP 467 gate built from the
-// Caddyfile auth block (also used by integration fixtures).
+// auth configuration block (also used by integration fixtures).
 func (m *Middleware) SetGlobalAuthGate(g *auth.AppAuthGate) {
 	m.globalAuthGate = g
 }

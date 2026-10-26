@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "raiwall.fullname" . }}
+  labels:
+    {{- include "raiwall.labels" . | nindent 4 }}
+  {{- with .Values.podAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+data:
+  # Rendered verbatim from .Values.config; secrets are injected as environment
+  # variables and never appear here.
+  raiwall.yaml: |
+    {{- toYaml .Values.config | nindent 4 }}

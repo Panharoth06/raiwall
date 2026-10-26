@@ -195,8 +195,12 @@ raiwall/
 │   └── package.json
 ├── tests/
 │   └── e2e/                  # Go integration tests (build tag: integration)
+├── config/
+│   └── raiwall.yaml          # Canonical deployable configuration (Compose mount)
 ├── examples/
-│   └── Caddyfile             # Example Caddyfile with weighted round-robin
+│   └── raiwall.yaml          # Annotated reference covering every schema section
+├── deploy/
+│   └── helm/raiwall/         # Helm chart (ConfigMap from values, external PostgreSQL)
 ├── tasks/
 │   ├── plan.md               # Implementation plan & architecture decisions
 │   └── todo.md               # Task breakdown with acceptance criteria

@@ -18,7 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestMiddleware_GlobalAuthGate_ServeHTTP proves the Caddyfile `auth` block is
+// TestMiddleware_GlobalAuthGate_ServeHTTP proves the global `auth` block is
 // served by the same HTTP 467 portal as per-site auth.
 func TestMiddleware_GlobalAuthGate_ServeHTTP(t *testing.T) {
 	control.StoreSnapshot(control.NewConfigSnapshot(100, control.ModeDefense, nil))
@@ -47,7 +47,7 @@ func TestMiddleware_GlobalAuthGate_ServeHTTP(t *testing.T) {
 	require.NoError(t, mw.Provision(caddyCtx))
 
 	gate := mw.GlobalAuthGate()
-	require.NotNil(t, gate, "Caddyfile auth block must compile into the shared portal")
+	require.NotNil(t, gate, "auth configuration block must compile into the shared portal")
 
 	t.Run("Browser unauthenticated receives the single 467 portal", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "http://example.com/dashboard", nil)
@@ -141,7 +141,7 @@ func TestMiddleware_GlobalAuthGate_ServeHTTP(t *testing.T) {
 	})
 }
 
-// TestMiddleware_GlobalAuthGate_DirectoryLogin proves the portal-wide Caddyfile
+// TestMiddleware_GlobalAuthGate_DirectoryLogin proves the portal-wide
 // gate authenticates identity-directory accounts, not just simple users.
 func TestMiddleware_GlobalAuthGate_DirectoryLogin(t *testing.T) {
 	control.StoreSnapshot(control.NewConfigSnapshot(101, control.ModeDefense, nil))

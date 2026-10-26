@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Panharoth06/raiwall/internal/core/control"
+	"github.com/Panharoth06/raiwall/internal/core/control/declarative"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
@@ -27,6 +28,7 @@ type RatePolicyDTO struct {
 	WaitingRoomCapacity int64     `json:"waiting_room_capacity"`
 	WaitingRoomPaths    []string  `json:"waiting_room_paths,omitempty"`
 	IsActive            bool      `json:"is_active"`
+	Managed             bool      `json:"managed"`
 	CreatedAt           time.Time `json:"created_at"`
 	UpdatedAt           time.Time `json:"updated_at"`
 }
@@ -46,6 +48,7 @@ func (s *Server) handleListRatePolicies(w http.ResponseWriter, r *http.Request) 
 		}
 		result = append(result, RatePolicyDTO{
 			ID:                  p.ID,
+			Managed:             declarative.IsManaged(p.ID),
 			Name:                p.Name,
 			Host:                p.Host,
 			Tier1Rate:           p.Tier1Rate,
@@ -82,6 +85,7 @@ func (s *Server) handleGetRatePolicy(w http.ResponseWriter, r *http.Request) {
 
 	respondJSON(w, http.StatusOK, RatePolicyDTO{
 		ID:                  p.ID,
+		Managed:             declarative.IsManaged(p.ID),
 		Name:                p.Name,
 		Host:                p.Host,
 		Tier1Rate:           p.Tier1Rate,

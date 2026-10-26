@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Panharoth06/raiwall/internal/core/control"
+	"github.com/Panharoth06/raiwall/internal/core/control/declarative"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
@@ -18,6 +19,7 @@ type BotConfigDTO struct {
 	PowDifficulty int       `json:"pow_difficulty"`
 	TrapURLs      []string  `json:"trap_urls"`
 	IsActive      bool      `json:"is_active"`
+	Managed       bool      `json:"managed"`
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
 }
@@ -35,6 +37,7 @@ func (s *Server) handleListBotConfigs(w http.ResponseWriter, r *http.Request) {
 		_ = json.Unmarshal([]byte(b.TrapUrls), &traps)
 		result = append(result, BotConfigDTO{
 			ID:            b.ID,
+			Managed:       declarative.IsManaged(b.ID),
 			Host:          b.Host,
 			PowEnabled:    b.PowEnabled == 1,
 			PowDifficulty: int(b.PowDifficulty),
@@ -59,6 +62,7 @@ func (s *Server) handleGetBotConfig(w http.ResponseWriter, r *http.Request) {
 	_ = json.Unmarshal([]byte(b.TrapUrls), &traps)
 	respondJSON(w, http.StatusOK, BotConfigDTO{
 		ID:            b.ID,
+		Managed:       declarative.IsManaged(b.ID),
 		Host:          b.Host,
 		PowEnabled:    b.PowEnabled == 1,
 		PowDifficulty: int(b.PowDifficulty),

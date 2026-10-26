@@ -1,0 +1,353 @@
+# ==============================================================================
+# Raiwall configuration reference
+# ==============================================================================
+#
+# A heavily annotated example that exercises every supported section. Copy it,
+# delete what you do not need, and validate with:
+#
+#   raiwall config validate --config examples/raiwall.yaml
+#
+# The deployable baseline lives at config/raiwall.yaml and docs/configuration.md
+# documents every key.
+# ==============================================================================
+
+version: 1
+
+server:
+  http:
+    enabled: true
+    listen: ":8080"
+  https:
+    enabled: true
+    listen: ":8443"
+    http3: true
+    tls_min_version: "1.2"
+  # Caddy obtains certificates for unknown SNI when true. Raiwall's managed
+  # certificate provider always handles declared certificates first.
+  auto_https: false
+  acme:
+    email: "${RAIWALL_ACME_EMAIL:-}"
+    ca: ""
+    staging: false
+
+caddy:
+  admin:
+    listen: "off"
+  storage:
+    module: file_system
+    root: /var/lib/raiwall/certmagic
+
+logging:
+  level: info
+  format: json
+  output: stderr
+
+storage:
+  database_url: "${RAIWALL_DATABASE_URL:-file:/var/lib/raiwall/raiwall.db?_pragma=busy_timeout(5000)}"
+
+control:
+  hmac_secret: "${RAIWALL_HMAC_SECRET:-}"
+  bootstrap_admin:
+    username: admin
+    password: "${RAIWALL_ADMIN_PASSWORD:-}"
+    role: admin
+
+security:
+  strict_secrets: false
+
+waf:
+  mode: defense
+  block_status_code: 403
+  offline_status_code: 503
+  strip_headers: [Server, X-Powered-By, X-AspNet-Version]
+  ast_timeout: 5ms
+  max_param_size: 32768
+
+bot:
+  defense: defense
+  pow_difficulty: 50000
+  pow_secret: "${RAIWALL_POW_SECRET:-}"
+  clearance_ttl: 2h
+  honeypot_trap: true
+
+rate_limit:
+  tier1_rate: 100
+  tier1_period: 10s
+  tier1_burst: 20
+  tier2_threshold: 10
+  tier2_window: 60s
+  tier2_ban_duration: 24h
+  tier3_threshold: 20
+  tier3_window: 30s
+  tier3_ban_duration: 24h
+  storage: memory
+  storage_addr: ""
+
+waiting_room:
+  enabled: true
+  max_concurrent: 500
+  max_queue_depth: 1000
+  admission_rate: 50
+  token_ttl: 15m
+  target_paths: ["/checkout", "/login"]
+
+telemetry:
+  flush_interval: 500ms
+  buffer_size: 4096
+  retention: 720h
+  # Shoutrrr-compatible targets. URLs embed credentials, so always source them
+  # from the environment.
+  # alert_channels:
+  #   - name: security
+  #     url: "${RAIWALL_ALERT_WEBHOOK:?webhook required}"
+  #     events: [block, ban, challenge]
+  #     cooldown: 5m
+
+# Portal-wide zero-trust gate. Uncomment to require login on every protected
+# site. `provider: simple` uses the local users below; `oidc` delegates to an
+# external IdP.
+# auth:
+#   provider: simple
+#   session_secret: "${RAIWALL_SESSION_SECRET:?session secret required}"
+#   session_cookie: rw_session
+#   session_ttl: 24h
+#   session_secure: true
+#   bypass_paths: ["/healthz", "/.well-known/"]
+#   users:
+#     - username: operator
+#       password_hash: "${RAIWALL_PORTAL_PASSWORD_HASH:?bcrypt hash required}"
+#       email: operator@example.com
+#       name: Operator
+#       roles: [admin]
+
+sidecar:
+  enabled: false
+  listen: ":50051"
+  max_body_size: 1048576
+
+threat_feeds:
+  emerging_threats: /etc/raiwall/feeds/emerging_threats.txt
+
+geoip:
+  country: /usr/share/GeoIP/GeoLite2-Country.mmdb
+  asn: /usr/share/GeoIP/GeoLite2-ASN.mmdb
+
+# seed -> create missing records only (safe for a first rollout).
+# sync -> upsert and let the file own every declared record.
+declarative:
+  mode: seed
+  prune: false
+  strict: false
+
+certificates:
+  # Let's Encrypt / ZeroSSL via CertMagic.
+  - name: portal_acme
+    domains: ["portal.example.com"]
+    source: acme
+    auto_renew: true
+    acme_staging: false
+
+  # Generated and rotated automatically by Raiwall.
+  - name: portal_self_signed
+    domains: ["staging.example.com"]
+    source: self-signed
+    auto_renew: true
+
+  # Uploaded pairs are sealed with the store certificate secret. Supply the
+  # PEM material through environment variables or mounted files.
+  # - name: portal_upload
+  #   domains: ["secure.example.com"]
+  #   source: upload
+  #   cert_pem: "${RAIWALL_CERT_PEM:?certificate required}"
+  #   key_pem: "${RAIWALL_CERT_KEY:?private key required}"
+
+applications:
+  - name: portal
+    description: Public portal with an API forwarding rule.
+    hostnames: ["portal.example.com"]
+    mode: defense
+    routing_type: proxy
+    ports:
+      - port: 443
+        scheme: https
+    ssl_mode: manual
+    certificate: portal_acme
+    load_balancing: round_robin
+    upstreams:
+      - dial: "10.0.0.10:8080"
+        weight: 3
+        max_fails: 3
+        fail_timeout: 30s
+        health_check_path: /healthz
+        health_check_interval: 15s
+      - dial: "10.0.0.11:8080"
+        weight: 1
+        max_fails: 3
+        fail_timeout: 30s
+        health_check_path: /healthz
+        health_check_interval: 15s
+    proxy:
+      client_ip_source: remote
+      rewrite_xff: true
+      hsts: true
+      enable_compression: false
+      enable_sse: true
+      redirect_http: true
+    custom_headers:
+      X-Frame-Options: DENY
+    auth:
+      enabled: false
+      bypass_paths: ["/login", "/oauth2/"]
+    forwarding:
+      - prefix: /api
+        upstreams:
+          - dial: "10.0.0.20:9000"
+        strip_prefix: false
+        host_header_override: api.internal
+        comment: Route API traffic to the dedicated service.
+    semantic_policy:
+      sql_inj: strict
+      xss: strict
+      cmd_inj: balance
+    block_status_code: 403
+    offline_status_code: 503
+
+  - name: staging
+    description: Static staging portal using a generated certificate.
+    hostnames: ["staging.example.com"]
+    mode: audit
+    routing_type: proxy
+    ports:
+      - port: 443
+        scheme: https
+    ssl_mode: manual
+    certificate: portal_self_signed
+    upstreams:
+      - dial: "10.0.0.30:8080"
+
+ip_groups:
+  - name: private_networks
+    description: RFC1918 address space.
+    entries:
+      - cidr: 10.0.0.0/8
+      - cidr: 172.16.0.0/12
+      - cidr: 192.168.0.0/16
+  - name: partner_networks
+    description: Trusted partner egress ranges.
+    entries:
+      - cidr: 198.51.100.0/24
+      - cidr: 203.0.113.0/24
+
+acls:
+  - name: block_admin_from_public
+    expression: "has_prefix(path, '/admin') && !in_ip_group(client_ip, 'private_networks')"
+    action: block
+    priority: 100
+    status_code: 403
+  - name: challenge_partner_api
+    expression: "has_prefix(path, '/api') && in_ip_group(client_ip, 'partner_networks')"
+    action: challenge
+    priority: 200
+  - name: audit_threat_feed
+    expression: "in_feed(client_ip, 'emerging_threats')"
+    action: audit
+    priority: 300
+
+exceptions:
+  - name: allow_search_query
+    description: Search terms legitimately contain SQL-looking text.
+    host: portal.example.com
+    path_prefix: /search
+    method: GET
+    location: query
+    param_name: q
+    rule_id: SEMANTIC_SQLI
+  - name: allow_webhook_payload
+    description: Signed partner webhooks carry opaque JSON bodies.
+    path_prefix: /webhooks/
+    method: POST
+    location: body
+    param_name: "*"
+    rule_id: "*"
+
+rate_policies:
+  - name: portal_rate
+    host: portal.example.com
+    tier1_rate: 100
+    tier1_burst: 20
+    tier1_period: 10s
+    tier2_threshold: 10
+    tier2_window: 60s
+    tier2_ban_duration: 24h
+    tier3_threshold: 20
+    tier3_window: 30s
+    tier3_ban_duration: 24h
+    waiting_room_enabled: true
+    waiting_room_capacity: 500
+    waiting_room_paths: ["/checkout"]
+
+bot_policies:
+  - name: portal_bot
+    host: portal.example.com
+    pow_enabled: true
+    pow_difficulty: 50000
+    trap_urls: ["/wp-login.php", "/.env"]
+
+identity_providers:
+  - name: corp_oidc
+    type: oidc
+    enabled: true
+    config:
+      issuer_url: "${RAIWALL_OIDC_ISSUER:-https://idp.example.com}"
+      client_id: "${RAIWALL_OIDC_CLIENT_ID:-raiwall}"
+      client_secret: "${RAIWALL_OIDC_CLIENT_SECRET:-}"
+      redirect_url: "https://portal.example.com/.raiwall/api/v1/auth/oidc/callback"
+      scopes: ["openid", "profile", "email"]
+
+templates:
+  - name: blocked
+    status_code: 403
+    title: Request blocked
+    brand_name: Raiwall
+    content_html: |
+      <!doctype html>
+      <html lang="en">
+        <head><meta charset="utf-8"><title>Request blocked</title></head>
+        <body style="font-family:system-ui,sans-serif;max-width:40rem;margin:4rem auto">
+          <h1>Request blocked</h1>
+          <p>The request was rejected by the Raiwall WAF.</p>
+          <p style="color:#666">Event: {{.EventID}} / Client: {{.ClientIP}}</p>
+        </body>
+      </html>
+  - name: unavailable
+    status_code: 503
+    title: Service unavailable
+    brand_name: Raiwall
+    content_html: |
+      <!doctype html>
+      <html lang="en">
+        <head><meta charset="utf-8"><title>Service unavailable</title></head>
+        <body style="font-family:system-ui,sans-serif;max-width:40rem;margin:4rem auto">
+          <h1>Service unavailable</h1>
+          <p>The backend did not respond. Retry shortly.</p>
+        </body>
+      </html>
+
+detector:
+  modules:
+    sql_inj: strict
+    xss: strict
+    file_upload: balance
+    file_include: balance
+    cmd_inj: strict
+    java_code_inj: balance
+    java_deserialization: balance
+    php_deserialization: balance
+    php_code_inj: balance
+    asp_code_inj: balance
+    ssti: balance
+    csrf: balance
+    ssrf: balance
+    mal_http: strict
+  inner_rules_disabled:
+    - CVE-2021-44228

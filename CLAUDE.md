@@ -43,7 +43,7 @@ There is no `lint` script and no ESLint/Prettier config in `web/`. The `npm run 
 ## Gotchas
 
 - `web/embed.go` uses `//go:embed all:dist`, so the Go build fails if `web/dist` is missing. Run `pnpm build` first on a clean checkout.
-- The Caddy module ID is `http.handlers.raiwall`, configured through the `raiwall { ... }` Caddyfile directive (`examples/Caddyfile`, parsers in `inbound/caddy/caddyfile_*.go`).
+- The Caddy module ID is `http.handlers.raiwall`, configured through the canonical `raiwall.yaml` document (loader in `internal/config/`, adapter in `inbound/caddy/config_adapter.go`). There is no Caddyfile support.
 - Playwright's default `baseURL` is a Vite dev server it starts on `:5193`. To test the Docker stack, set `PLAYWRIGHT_BASE_URL=http://localhost:8080/.raiwall/`. Only a 1440×900 Chromium project is configured, so tablet/mobile viewports must be set per test.
 - `tests/e2e/live_container_test.go` (tag `integration`) expects a running container that accepts `admin:admin` Basic Auth.
 - `test-lab/` holds an OWASP CRS / go-ftw attack harness (`run-ftw.sh`, `test-attacks.sh`). `web-draft/` is an old scaffold that `.dockerignore` excludes. The real frontend is `web/`.

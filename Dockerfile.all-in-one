@@ -52,7 +52,8 @@ RUN mkdir -p /var/lib/postgresql/data /run/postgresql /etc/raiwall /var/lib/raiw
     && chown -R postgres:postgres /var/lib/postgresql /run/postgresql
 
 COPY --from=backend-builder /bin/raiwall /usr/local/bin/raiwall
-COPY examples/Caddyfile /etc/raiwall/Caddyfile
+COPY config/raiwall.yaml /etc/raiwall/raiwall.yaml
+COPY examples/feeds /etc/raiwall/feeds
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
