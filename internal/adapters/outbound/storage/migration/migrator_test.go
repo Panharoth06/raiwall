@@ -5,14 +5,12 @@ import (
 	"database/sql"
 	"testing"
 
-	"github.com/Panharoth06/raiwall/internal/adapters/outbound/storage/sqlite"
 	"github.com/stretchr/testify/require"
+	_ "modernc.org/sqlite"
 )
 
 func TestMigrator_SQLite(t *testing.T) {
-	sqlite.RegisterDriver()
-
-	db, err := sql.Open("control_sqlite", "file:migration_test.db?mode=memory")
+	db, err := sql.Open("sqlite", "file:migration_test.db?mode=memory")
 	require.NoError(t, err)
 	defer db.Close()
 

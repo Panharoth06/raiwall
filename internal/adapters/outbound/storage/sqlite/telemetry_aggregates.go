@@ -238,7 +238,7 @@ func (s *TelemetryStore) GetAggregatedIncidents(ctx context.Context, params tele
 		SELECT COUNT(*) FROM (
 			SELECT 1 FROM forensic_events
 			WHERE %s
-			GROUP BY client_ip, host, (CAST(strftime('%%%%s', timestamp) AS INTEGER) / 300)
+			GROUP BY client_ip, host, (CAST(strftime('%%s', timestamp) AS INTEGER) / 300)
 		)
 	`, whereSQL)
 
@@ -260,7 +260,7 @@ func (s *TelemetryStore) GetAggregatedIncidents(ctx context.Context, params tele
 		SELECT 
 			client_ip,
 			host,
-			(CAST(strftime('%%%%s', timestamp) AS INTEGER) / 300) as time_window,
+			(CAST(strftime('%%s', timestamp) AS INTEGER) / 300) as time_window,
 			MIN(timestamp) as min_ts,
 			MAX(timestamp) as max_ts,
 			COUNT(*) as total_events,

@@ -25,9 +25,11 @@ func InitDB(dsn string) (*Store, error) {
 		dsn = "file:raiwall_control.db?_pragma=busy_timeout(5000)"
 	}
 
-	RegisterDriver()
+	if err := prepareSQLiteDSN(dsn); err != nil {
+		return nil, fmt.Errorf("prepare sqlite database %q: %w", dsn, err)
+	}
 
-	db, err := sql.Open("control_sqlite", dsn)
+	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open sqlite database: %w", err)
 	}

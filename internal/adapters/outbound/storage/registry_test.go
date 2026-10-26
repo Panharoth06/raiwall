@@ -2,11 +2,12 @@ package storage
 
 import (
 	"context"
+	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/Panharoth06/raiwall/internal/adapters/outbound/storage/sqlite"
 	"github.com/Panharoth06/raiwall/internal/core/control"
+	"github.com/Panharoth06/raiwall/internal/core/telemetry"
 	"github.com/stretchr/testify/require"
 )
 
@@ -20,7 +21,6 @@ func TestAutoDetectDriver(t *testing.T) {
 }
 
 func TestRegistry_SharedPoolSameStore(t *testing.T) {
-	sqlite.RegisterDriver()
 	ctx := context.Background()
 
 	reg, err := NewRegistry(StorageConfig{
@@ -64,8 +64,60 @@ func TestRegistry_SharedPoolSameStore(t *testing.T) {
 	require.Equal(t, "Registry App", app.Name)
 }
 
+func TestRegistry_SQLitePersistsAcrossReopen(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	cfg := StorageConfig{
+		Stores: map[string]StoreConfig{
+			"ctrl": {
+				Driver: "sqlite",
+				DSN:    "file:" + filepath.Join(dir, "control.db") + "?_pragma=busy_timeout(5000)",
+			},
+			"tele": {
+				Driver: "sqlite",
+				DSN:    "file:" + filepath.Join(dir, "telemetry.db") + "?_pragma=busy_timeout(5000)",
+			},
+		},
+		Control:   "ctrl",
+		Telemetry: "tele",
+	}
+	now := time.Now().UTC().Truncate(time.Second)
+
+	reg, err := NewRegistry(cfg)
+	require.NoError(t, err)
+	cs, err := reg.ControlStore(ctx)
+	require.NoError(t, err)
+	require.NoError(t, cs.CreateUser(ctx, control.UserRecord{
+		ID: "registry-user", Username: "registry-user", PasswordHash: "hash",
+		Role: "admin", IsActive: 1, CreatedAt: now, UpdatedAt: now,
+	}))
+	ts, err := reg.TelemetryStore(ctx)
+	require.NoError(t, err)
+	require.NoError(t, ts.SaveBatch(ctx, []*telemetry.ForensicEvent{{
+		EventID: "registry-event", Timestamp: now, Host: "app.example.com",
+		ClientIP: "203.0.113.9", Action: "block", RuleID: "SEMANTIC_SQLI", StatusCode: 403,
+	}}))
+	require.NoError(t, reg.Close())
+
+	reopened, err := NewRegistry(cfg)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = reopened.Close() })
+
+	user, err := reopened.ControlStore(ctx)
+	require.NoError(t, err)
+	record, err := user.GetUserByUsername(ctx, "registry-user")
+	require.NoError(t, err)
+	require.Equal(t, "admin", record.Role)
+
+	events, err := reopened.TelemetryStore(ctx)
+	require.NoError(t, err)
+	event, err := events.GetEventByID(ctx, "registry-event")
+	require.NoError(t, err)
+	require.NotNil(t, event)
+	require.Equal(t, "SEMANTIC_SQLI", event.RuleID)
+}
+
 func TestRegistry_DistinctStores(t *testing.T) {
-	sqlite.RegisterDriver()
 	ctx := context.Background()
 
 	reg, err := NewRegistry(StorageConfig{
@@ -117,7 +169,6 @@ func TestRegistry_UnconfiguredStoreError(t *testing.T) {
 }
 
 func TestOpenControlStore_Helper(t *testing.T) {
-	sqlite.RegisterDriver()
 	ctx := context.Background()
 
 	cs, err := OpenControlStore(ctx, "sqlite", "file:open_helper.db?mode=memory")
@@ -131,7 +182,6 @@ func TestOpenControlStore_Helper(t *testing.T) {
 }
 
 func TestOpenTelemetryStore_Helper(t *testing.T) {
-	sqlite.RegisterDriver()
 	ctx := context.Background()
 
 	ts, err := OpenTelemetryStore(ctx, "sqlite", "file:open_telem_helper.db?mode=memory", 24*time.Hour, time.Hour)

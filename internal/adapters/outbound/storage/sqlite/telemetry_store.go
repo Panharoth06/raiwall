@@ -37,6 +37,10 @@ func NewTelemetryStore(cfg TelemetryConfig) (*TelemetryStore, error) {
 		dsn = "file:raiwall_forensics.db?_pragma=busy_timeout(5000)"
 	}
 
+	if err := prepareSQLiteDSN(dsn); err != nil {
+		return nil, fmt.Errorf("prepare sqlite database %q: %w", dsn, err)
+	}
+
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite db: %w", err)

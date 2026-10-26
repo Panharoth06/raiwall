@@ -42,12 +42,14 @@ func (r *Registry) getOrOpenPool(ctx context.Context, name string, sc StoreConfi
 		}
 
 	case "sqlite":
-		sqlite.RegisterDriver()
 		dsn := sc.DSN
 		if dsn == "" {
 			dsn = "file:raiwall.db?_pragma=busy_timeout(5000)"
 		}
-		db, err = sql.Open("control_sqlite", dsn)
+		if err := sqlite.PrepareDSN(dsn); err != nil {
+			return nil, fmt.Errorf("prepare sqlite pool %q: %w", name, err)
+		}
+		db, err = sql.Open("sqlite", dsn)
 		if err != nil {
 			return nil, fmt.Errorf("open sqlite pool: %w", err)
 		}
@@ -61,6 +63,18 @@ func (r *Registry) getOrOpenPool(ctx context.Context, name string, sc StoreConfi
 		}
 		db.SetMaxOpenConns(maxOpen)
 		db.SetMaxIdleConns(maxIdle)
+
+		for _, pragma := range []string{
+			"PRAGMA journal_mode = WAL;",
+			"PRAGMA synchronous = NORMAL;",
+			"PRAGMA busy_timeout = 5000;",
+			"PRAGMA foreign_keys = ON;",
+		} {
+			if _, err := db.Exec(pragma); err != nil {
+				_ = db.Close()
+				return nil, fmt.Errorf("exec sqlite pragma %q: %w", pragma, err)
+			}
+		}
 
 	default:
 		return nil, fmt.Errorf("unsupported database pool driver: %s", driver)

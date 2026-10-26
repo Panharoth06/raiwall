@@ -350,6 +350,8 @@ The gateway binds these two fixed listeners; per-application port values are val
 
 > For Envoy `ext_proc` deployments, add `sidecar { listen :50051 }` inside the `raiwall` block of a **single** listener — every importing server would otherwise try to bind the same port.
 
+> SQLite storage is a real embedded database (`modernc.org/sqlite`, pure Go, WAL mode) and survives restarts. On first start after upgrading from an older build, a placeholder `<name>.db` that contains only the 16-byte SQLite header is renamed to `<name>.db.legacy-stub` and a fresh database is created in its place.
+
 ### Applications, Routing & Certificates
 
 Applications are registered in **Protected Sites** (`/.raiwall/#/sites`) or via `POST /.raiwall/api/v1/sites`, and take effect after a config apply. Each application declares:

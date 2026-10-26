@@ -3,18 +3,19 @@ package main
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/Panharoth06/raiwall/internal/adapters/outbound/storage/sqlite"
+	"github.com/Panharoth06/raiwall/internal/core/control"
 	caddycmd "github.com/caddyserver/caddy/v2/cmd"
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/require"
-	"github.com/Panharoth06/raiwall/internal/adapters/outbound/storage/sqlite"
-	"github.com/Panharoth06/raiwall/internal/core/control"
 )
 
 func TestAdminCLI_FullLifecycle(t *testing.T) {
-	dbDSN := fmt.Sprintf("file:test_admin_%d?mode=memory&cache=shared", time.Now().UnixNano())
+	dbDSN := filepath.Join(t.TempDir(), "admin.db")
 
 	// 1. Init
 	fs := pflag.NewFlagSet("admin", pflag.ContinueOnError)
@@ -163,4 +164,3 @@ func TestAdminCLI_DSNAndDriverFlags(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 0, code)
 }
-

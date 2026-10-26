@@ -2,6 +2,7 @@ package caddy
 
 import (
 	"context"
+	"path/filepath"
 	"testing"
 
 	caddyv2 "github.com/caddyserver/caddy/v2"
@@ -40,7 +41,7 @@ func TestUnmarshalCaddyfile_SessionSecure(t *testing.T) {
 }
 
 func TestUnmarshalCaddyfile_Telemetry(t *testing.T) {
-	dbPath := "/tmp/test-caddy-telemetry-" + t.Name() + ".db"
+	dbPath := filepath.Join(t.TempDir(), "telemetry.db")
 	input := `raiwall {
 		telemetry {
 			storage sqlite ` + dbPath + `

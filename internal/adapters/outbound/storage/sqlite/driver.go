@@ -1,141 +1,78 @@
 package sqlite
 
+// Blank import registers the pure-Go "sqlite" database/sql driver backed by
+// modernc.org/sqlite. Both the control and telemetry stores open it by name,
+// so persistence is real (no CGO, no in-process stand-in).
+
 import (
-	"context"
-	"database/sql"
-	"database/sql/driver"
-	"errors"
+	"os"
 	"strings"
-	"sync"
+
+	_ "modernc.org/sqlite"
 )
 
-var (
-	controlDriverOnce sync.Once
-)
+// legacyStubSize is the exact byte length of the file the retired in-memory
+// driver wrote: the 16-byte SQLite magic header with no pages behind it.
+const legacyStubSize = 16
 
-func init() {
-	RegisterDriver()
+const sqliteMagic = "SQLite format 3\x00"
+
+// PrepareDSN applies upgrade safeguards before opening a SQLite pool.
+func PrepareDSN(dsn string) error {
+	return prepareSQLiteDSN(dsn)
 }
 
-// RegisterDriver registers the "control_sqlite" driver.
-func RegisterDriver() {
-	controlDriverOnce.Do(func() {
-		for _, name := range sql.Drivers() {
-			if name == "control_sqlite" {
-				return
-			}
-		}
-		sql.Register("control_sqlite", &controlDriver{
-			databases: make(map[string]*databaseState),
-		})
-	})
-}
-
-type controlDriver struct {
-	mu        sync.Mutex
-	databases map[string]*databaseState
-}
-
-func (d *controlDriver) Open(name string) (driver.Conn, error) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-
-	cleanName := name
-	if strings.HasPrefix(cleanName, "file:") {
-		cleanName = strings.TrimPrefix(cleanName, "file:")
-	}
-	if idx := strings.Index(cleanName, "?"); idx != -1 {
-		cleanName = cleanName[:idx]
-	}
-	if cleanName == "" {
-		cleanName = ":memory:"
-	}
-
-	state, ok := d.databases[cleanName]
+// prepareSQLiteDSN quarantines a leftover magic-only stub so real SQLite can
+// create a valid database in its place. Databases with real pages are never
+// touched; names that do not map to a file (":memory:", shared-memory URIs)
+// are ignored.
+func prepareSQLiteDSN(dsn string) error {
+	path, ok := sqliteFilePath(dsn)
 	if !ok {
-		state = newDatabaseState(cleanName)
-		d.databases[cleanName] = state
+		return nil
 	}
 
-	return &controlConn{state: state}, nil
-}
-
-type controlConn struct {
-	state *databaseState
-	tx    *databaseState
-}
-
-func (c *controlConn) Prepare(query string) (driver.Stmt, error) {
-	return &controlStmt{conn: c, query: query}, nil
-}
-
-func (c *controlConn) Close() error {
-	return nil
-}
-
-func (c *controlConn) Begin() (driver.Tx, error) {
-	if c.tx != nil {
-		return nil, errors.New("transaction already active")
+	info, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
 	}
-	c.tx = c.state.clone()
-	return &controlTx{conn: c}, nil
-}
-
-func (c *controlConn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
-	stmt := &controlStmt{conn: c, query: query}
-	vals := make([]driver.Value, len(args))
-	for i, a := range args {
-		vals[i] = a.Value
+	if info.Size() != legacyStubSize {
+		return nil
 	}
-	return stmt.Exec(vals)
-}
 
-func (c *controlConn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
-	stmt := &controlStmt{conn: c, query: query}
-	vals := make([]driver.Value, len(args))
-	for i, a := range args {
-		vals[i] = a.Value
+	header, err := os.ReadFile(path)
+	if err != nil {
+		return err
 	}
-	return stmt.Query(vals)
-}
-
-type controlTx struct {
-	conn *controlConn
-}
-
-func (t *controlTx) Commit() error {
-	if t.conn.tx == nil {
-		return errors.New("no transaction to commit")
+	if string(header) != sqliteMagic {
+		return nil
 	}
-	t.conn.state.applyFrom(t.conn.tx)
-	t.conn.tx = nil
-	return nil
+
+	return os.Rename(path, path+".legacy-stub")
 }
 
-func (t *controlTx) Rollback() error {
-	if t.conn.tx == nil {
-		return errors.New("no transaction to rollback")
+// sqliteFilePath extracts an on-disk path from a database/sql DSN. It returns
+// false for in-memory databases, which must never be quarantined.
+func sqliteFilePath(dsn string) (string, bool) {
+	raw := strings.TrimSpace(dsn)
+	if raw == "" || raw == ":memory:" {
+		return "", false
 	}
-	t.conn.tx = nil
-	return nil
-}
+	raw = strings.TrimPrefix(raw, "file:")
 
-type controlStmt struct {
-	conn  *controlConn
-	query string
-}
-
-func (s *controlStmt) Close() error {
-	return nil
-}
-
-func (s *controlStmt) NumInput() int {
-	return -1
-}
-
-func (s *controlStmt) getTargetState() *databaseState {
-	if s.conn.tx != nil {
-		return s.conn.tx
+	if idx := strings.IndexByte(raw, '?'); idx >= 0 {
+		query := raw[idx+1:]
+		raw = raw[:idx]
+		if strings.Contains(query, "mode=memory") {
+			return "", false
+		}
 	}
-	return s.conn.state
+
+	if raw == "" || raw == ":memory:" {
+		return "", false
+	}
+	return raw, true
 }
