@@ -252,6 +252,19 @@ func TestControlStore_QueryFormatting(t *testing.T) {
 	require.NoError(t, standaloneStore.Close())
 }
 
+func TestAggregateWhereFilters(t *testing.T) {
+	start := time.Date(2026, 10, 26, 10, 0, 0, 0, time.UTC)
+	end := start.Add(time.Hour)
+
+	clause, args := aggregateWhere(start, end)
+	require.Equal(t, "timestamp >= $1 AND timestamp <= $2", clause)
+	require.Equal(t, []any{start, end}, args)
+
+	clause, args = aggregateWhere(start, end, telemetry.AggregateFilter{Host: "app.example.com", Country: "US"})
+	require.Equal(t, "timestamp >= $1 AND timestamp <= $2 AND host = $3 AND country = $4", clause)
+	require.Equal(t, []any{start, end, "app.example.com", "US"}, args)
+}
+
 func TestTelemetryStore_QueryFormatting(t *testing.T) {
 	mock := &mockDBTX{}
 	store := &TelemetryStore{

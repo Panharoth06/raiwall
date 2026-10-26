@@ -29,42 +29,82 @@ func (s *ClickHouseStore) QueryAggregates(ctx context.Context, start, end time.T
 		TopCategories: make([]telemetry.TopCount, 0),
 	}
 
+	whereClause := clickHouseWhere(startStr, endStr, filter...)
+
 	totalSQL := fmt.Sprintf(`
 		SELECT count() as total,
-		       countIf(action IN ('block', 'ban')) as blocked
+		       countIf(action IN ('block', 'ban')) as blocked,
+		       countIf((method = 'GET' OR method = '') AND (status_code < 400 OR status_code = 0) AND action NOT IN ('block', 'ban')) as page_views,
+		       uniqExactIf(client_ip, client_ip != '') as unique_ips,
+		       uniqExactIf(client_ip, action IN ('block', 'ban') AND client_ip != '') as blocked_ips,
+		       countIf((status_code >= 400 AND status_code < 500) OR action IN ('block', 'ban')) as status_4xx,
+		       countIf(action IN ('block', 'ban') OR status_code = 403) as status_4xx_blocked,
+		       countIf(status_code >= 500) as status_5xx
 		FROM %s.%s
-		WHERE timestamp >= '%s' AND timestamp <= '%s'
+		WHERE %s
 		FORMAT JSON
-	`, s.database, s.table, startStr, endStr)
+	`, s.database, s.table, whereClause)
 
 	resp, err := s.execWithRetry(ctx, totalSQL, nil)
 	if err == nil {
 		var d struct {
 			Data []struct {
-				Total   string `json:"total"`
-				Blocked string `json:"blocked"`
+				Total            string `json:"total"`
+				Blocked          string `json:"blocked"`
+				PageViews        string `json:"page_views"`
+				UniqueIPs        string `json:"unique_ips"`
+				BlockedIPs       string `json:"blocked_ips"`
+				Status4xx        string `json:"status_4xx"`
+				Status4xxBlocked string `json:"status_4xx_blocked"`
+				Status5xx        string `json:"status_5xx"`
 			} `json:"data"`
 		}
 		if json.Unmarshal(resp, &d) == nil && len(d.Data) > 0 {
-			fmt.Sscanf(d.Data[0].Total, "%d", &stats.TotalRequests)
-			fmt.Sscanf(d.Data[0].Blocked, "%d", &stats.TotalBlocked)
-			if stats.TotalRequests > 0 {
-				stats.BlockRatio = float64(stats.TotalBlocked) / float64(stats.TotalRequests)
-			}
+			row := d.Data[0]
+			stats.TotalRequests = parseClickHouseInt(row.Total)
+			stats.TotalBlocked = parseClickHouseInt(row.Blocked)
+			stats.PageViews = parseClickHouseInt(row.PageViews)
+			stats.UniqueIPs = parseClickHouseInt(row.UniqueIPs)
+			stats.BlockedIPs = parseClickHouseInt(row.BlockedIPs)
+			stats.Status4xx = parseClickHouseInt(row.Status4xx)
+			stats.Status4xxBlocked = parseClickHouseInt(row.Status4xxBlocked)
+			stats.Status5xx = parseClickHouseInt(row.Status5xx)
+		}
+	}
+
+	applyAggregateDerivations(stats)
+
+	// Live QPS is always measured over the last 10 seconds, independent of the
+	// selected reporting window, but keeps the host/country filter.
+	qpsStartStr := time.Now().Add(-10 * time.Second).UTC().Format("2006-01-02 15:04:05.000")
+	qpsEndStr := time.Now().UTC().Format("2006-01-02 15:04:05.000")
+	qpsSQL := fmt.Sprintf(`
+		SELECT count() as recent
+		FROM %s.%s
+		WHERE %s
+		FORMAT JSON
+	`, s.database, s.table, clickHouseWhere(qpsStartStr, qpsEndStr, filter...))
+	if resp, err := s.execWithRetry(ctx, qpsSQL, nil); err == nil {
+		var d struct {
+			Data []struct {
+				Recent string `json:"recent"`
+			} `json:"data"`
+		}
+		if json.Unmarshal(resp, &d) == nil && len(d.Data) > 0 {
+			stats.QPS = float64(parseClickHouseInt(d.Data[0].Recent)) / 10.0
 		}
 	}
 
 	countrySQL := fmt.Sprintf(`
 		SELECT country, count() as cnt
 		FROM %s.%s
-		WHERE timestamp >= '%s' AND timestamp <= '%s' AND country != ''
+		WHERE %s AND country != ''
 		GROUP BY country
 		ORDER BY cnt DESC
 		LIMIT 10
 		FORMAT JSON
-	`, s.database, s.table, startStr, endStr)
-	resp, err = s.execWithRetry(ctx, countrySQL, nil)
-	if err == nil {
+	`, s.database, s.table, whereClause)
+	if resp, err := s.execWithRetry(ctx, countrySQL, nil); err == nil {
 		var d struct {
 			Data []struct {
 				Country string `json:"country"`
@@ -73,9 +113,7 @@ func (s *ClickHouseStore) QueryAggregates(ctx context.Context, start, end time.T
 		}
 		if json.Unmarshal(resp, &d) == nil {
 			for _, r := range d.Data {
-				var count int64
-				fmt.Sscanf(r.Cnt, "%d", &count)
-				stats.TopCountries = append(stats.TopCountries, telemetry.TopCount{Key: r.Country, Count: count})
+				stats.TopCountries = append(stats.TopCountries, telemetry.TopCount{Key: r.Country, Count: parseClickHouseInt(r.Cnt)})
 			}
 		}
 	}
@@ -83,14 +121,13 @@ func (s *ClickHouseStore) QueryAggregates(ctx context.Context, start, end time.T
 	ruleSQL := fmt.Sprintf(`
 		SELECT rule_id, count() as cnt
 		FROM %s.%s
-		WHERE timestamp >= '%s' AND timestamp <= '%s' AND rule_id != ''
+		WHERE %s AND rule_id != ''
 		GROUP BY rule_id
 		ORDER BY cnt DESC
 		LIMIT 10
 		FORMAT JSON
-	`, s.database, s.table, startStr, endStr)
-	resp, err = s.execWithRetry(ctx, ruleSQL, nil)
-	if err == nil {
+	`, s.database, s.table, whereClause)
+	if resp, err := s.execWithRetry(ctx, ruleSQL, nil); err == nil {
 		var d struct {
 			Data []struct {
 				RuleID string `json:"rule_id"`
@@ -99,9 +136,7 @@ func (s *ClickHouseStore) QueryAggregates(ctx context.Context, start, end time.T
 		}
 		if json.Unmarshal(resp, &d) == nil {
 			for _, r := range d.Data {
-				var count int64
-				fmt.Sscanf(r.Cnt, "%d", &count)
-				stats.TopRules = append(stats.TopRules, telemetry.TopCount{Key: r.RuleID, Count: count})
+				stats.TopRules = append(stats.TopRules, telemetry.TopCount{Key: r.RuleID, Count: parseClickHouseInt(r.Cnt)})
 			}
 		}
 	}
@@ -109,14 +144,13 @@ func (s *ClickHouseStore) QueryAggregates(ctx context.Context, start, end time.T
 	ipSQL := fmt.Sprintf(`
 		SELECT client_ip, count() as cnt
 		FROM %s.%s
-		WHERE timestamp >= '%s' AND timestamp <= '%s' AND client_ip != ''
+		WHERE %s AND client_ip != ''
 		GROUP BY client_ip
 		ORDER BY cnt DESC
 		LIMIT 10
 		FORMAT JSON
-	`, s.database, s.table, startStr, endStr)
-	resp, err = s.execWithRetry(ctx, ipSQL, nil)
-	if err == nil {
+	`, s.database, s.table, whereClause)
+	if resp, err := s.execWithRetry(ctx, ipSQL, nil); err == nil {
 		var d struct {
 			Data []struct {
 				ClientIP string `json:"client_ip"`
@@ -125,25 +159,55 @@ func (s *ClickHouseStore) QueryAggregates(ctx context.Context, start, end time.T
 		}
 		if json.Unmarshal(resp, &d) == nil {
 			for _, r := range d.Data {
-				var count int64
-				fmt.Sscanf(r.Cnt, "%d", &count)
-				stats.TopIPs = append(stats.TopIPs, telemetry.TopCount{Key: r.ClientIP, Count: count})
+				stats.TopIPs = append(stats.TopIPs, telemetry.TopCount{Key: r.ClientIP, Count: parseClickHouseInt(r.Cnt)})
 			}
 		}
 	}
 
+	categorySQL := fmt.Sprintf(`
+		SELECT attack_category, count() as cnt
+		FROM %s.%s
+		WHERE %s AND attack_category != ''
+		GROUP BY attack_category
+		ORDER BY cnt DESC
+		LIMIT 10
+		FORMAT JSON
+	`, s.database, s.table, whereClause)
+	if resp, err := s.execWithRetry(ctx, categorySQL, nil); err == nil {
+		var d struct {
+			Data []struct {
+				Category string `json:"attack_category"`
+				Cnt      string `json:"cnt"`
+			} `json:"data"`
+		}
+		if json.Unmarshal(resp, &d) == nil {
+			for _, r := range d.Data {
+				stats.TopCategories = append(stats.TopCategories, telemetry.TopCount{Key: r.Category, Count: parseClickHouseInt(r.Cnt)})
+			}
+		}
+	}
+
+	// Match the SQLite bucket granularity so dashboards render consistently
+	// regardless of which telemetry backend is active.
+	bucketExpr := "toStartOfHour"
+	duration := end.Sub(start)
+	if duration <= 2*time.Hour {
+		bucketExpr = "toStartOfMinute"
+	} else if duration > 48*time.Hour {
+		bucketExpr = "toStartOfDay"
+	}
+
 	bucketSQL := fmt.Sprintf(`
-		SELECT toStartOfHour(timestamp) as bucket,
+		SELECT toString(%s(timestamp)) as bucket,
 		       count() as total,
 		       countIf(action IN ('block', 'ban')) as blocked
 		FROM %s.%s
-		WHERE timestamp >= '%s' AND timestamp <= '%s'
+		WHERE %s
 		GROUP BY bucket
 		ORDER BY bucket ASC
 		FORMAT JSON
-	`, s.database, s.table, startStr, endStr)
-	resp, err = s.execWithRetry(ctx, bucketSQL, nil)
-	if err == nil {
+	`, bucketExpr, s.database, s.table, whereClause)
+	if resp, err := s.execWithRetry(ctx, bucketSQL, nil); err == nil {
 		var d struct {
 			Data []struct {
 				Bucket  string `json:"bucket"`
@@ -153,29 +217,14 @@ func (s *ClickHouseStore) QueryAggregates(ctx context.Context, start, end time.T
 		}
 		if json.Unmarshal(resp, &d) == nil {
 			for _, r := range d.Data {
-				var total, blocked int64
-				fmt.Sscanf(r.Total, "%d", &total)
-				fmt.Sscanf(r.Blocked, "%d", &blocked)
-				t, err := time.Parse("2006-01-02 15:04:05", r.Bucket)
-				if err != nil {
-					t, _ = time.Parse(time.RFC3339, r.Bucket)
-				}
 				stats.TimeBuckets = append(stats.TimeBuckets, telemetry.TimeBucketCount{
-					Bucket: t,
-					Total:  total,
-					Block:  blocked,
+					Bucket: parseClickHouseBucket(r.Bucket),
+					Total:  parseClickHouseInt(r.Total),
+					Block:  parseClickHouseInt(r.Blocked),
 				})
 			}
 		}
 	}
 
 	return stats, nil
-}
-
-// GetAggregatedIncidents aggregates forensic events in ClickHouse.
-func (s *ClickHouseStore) GetAggregatedIncidents(ctx context.Context, params telemetry.IncidentQueryParams) (*telemetry.IncidentQueryResult, error) {
-	return &telemetry.IncidentQueryResult{
-		Incidents:  []*telemetry.Incident{},
-		TotalCount: 0,
-	}, nil
 }

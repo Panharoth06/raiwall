@@ -34,6 +34,13 @@ func (m *Middleware) provisionTelemetry(_ caddy.Context) error {
 
 	if m.telemetryStore == nil {
 		if m.storageRegistry != nil {
+			if m.TelemetryConfig != nil && strings.TrimSpace(m.TelemetryConfig.StorageType) != "" && m.logger != nil {
+				m.logger.Warn("telemetry storage directive ignored because DATABASE_URL or a storage registry is configured",
+					zap.String("directive_storage_type", m.TelemetryConfig.StorageType),
+					zap.String("directive_storage_path", m.TelemetryConfig.StoragePath),
+					zap.String("active_source", "storage registry"),
+				)
+			}
 			tStore, err := m.storageRegistry.TelemetryStore(context.Background())
 			if err != nil {
 				return fmt.Errorf("provision telemetry store from registry: %w", err)

@@ -32,31 +32,29 @@ func (s *telemetryDriverStmt) Query(args []driver.Value) (driver.Rows, error) {
 		var total, blocked, pageViews, status4xx, status4xxBlocked, status5xx int64
 		uniqueIPs := make(map[string]bool)
 		blockedIPs := make(map[string]bool)
-		start, end := s.extractTimeBounds(args)
+		filter := s.parseAggregateFilter(args)
 		for _, r := range s.conn.db.ordered {
-			if !start.IsZero() && r.Timestamp.Before(start) {
-				continue
-			}
-			if !end.IsZero() && r.Timestamp.After(end) {
+			if !filter.matches(r) {
 				continue
 			}
 			total++
 			if r.ClientIP != "" {
 				uniqueIPs[r.ClientIP] = true
 			}
-			if r.Action == "block" || r.Action == "ban" {
+			blockedEvent := isBlockedAction(r.Action)
+			if blockedEvent {
 				blocked++
 				if r.ClientIP != "" {
 					blockedIPs[r.ClientIP] = true
 				}
 			}
-			if r.Method == "GET" && (r.StatusCode < 400 || r.StatusCode == 0) {
+			if (r.Method == "GET" || r.Method == "") && (r.StatusCode < 400 || r.StatusCode == 0) && !blockedEvent {
 				pageViews++
 			}
-			if r.StatusCode >= 400 && r.StatusCode < 500 {
+			if (r.StatusCode >= 400 && r.StatusCode < 500) || blockedEvent {
 				status4xx++
 			}
-			if (r.StatusCode >= 400 && r.StatusCode < 500 && (r.Action == "block" || r.Action == "ban")) || r.StatusCode == 403 {
+			if blockedEvent || r.StatusCode == 403 {
 				status4xxBlocked++
 			}
 			if r.StatusCode >= 500 {
@@ -71,12 +69,9 @@ func (s *telemetryDriverStmt) Query(args []driver.Value) (driver.Rows, error) {
 
 	if strings.Contains(q, "GROUP BY country") {
 		counts := make(map[string]int64)
-		start, end := s.extractTimeBounds(args)
+		filter := s.parseAggregateFilter(args)
 		for _, r := range s.conn.db.ordered {
-			if !start.IsZero() && r.Timestamp.Before(start) {
-				continue
-			}
-			if !end.IsZero() && r.Timestamp.After(end) {
+			if !filter.matches(r) {
 				continue
 			}
 			if r.Country != "" {
@@ -88,12 +83,9 @@ func (s *telemetryDriverStmt) Query(args []driver.Value) (driver.Rows, error) {
 
 	if strings.Contains(q, "GROUP BY rule_id") {
 		counts := make(map[string]int64)
-		start, end := s.extractTimeBounds(args)
+		filter := s.parseAggregateFilter(args)
 		for _, r := range s.conn.db.ordered {
-			if !start.IsZero() && r.Timestamp.Before(start) {
-				continue
-			}
-			if !end.IsZero() && r.Timestamp.After(end) {
+			if !filter.matches(r) {
 				continue
 			}
 			if r.RuleID != "" {
@@ -105,12 +97,9 @@ func (s *telemetryDriverStmt) Query(args []driver.Value) (driver.Rows, error) {
 
 	if strings.Contains(q, "GROUP BY client_ip") {
 		counts := make(map[string]int64)
-		start, end := s.extractTimeBounds(args)
+		filter := s.parseAggregateFilter(args)
 		for _, r := range s.conn.db.ordered {
-			if !start.IsZero() && r.Timestamp.Before(start) {
-				continue
-			}
-			if !end.IsZero() && r.Timestamp.After(end) {
+			if !filter.matches(r) {
 				continue
 			}
 			if r.ClientIP != "" {
@@ -122,12 +111,9 @@ func (s *telemetryDriverStmt) Query(args []driver.Value) (driver.Rows, error) {
 
 	if strings.Contains(q, "GROUP BY attack_category") {
 		counts := make(map[string]int64)
-		start, end := s.extractTimeBounds(args)
+		filter := s.parseAggregateFilter(args)
 		for _, r := range s.conn.db.ordered {
-			if !start.IsZero() && r.Timestamp.Before(start) {
-				continue
-			}
-			if !end.IsZero() && r.Timestamp.After(end) {
+			if !filter.matches(r) {
 				continue
 			}
 			if r.AttackCategory != "" {
@@ -143,22 +129,20 @@ func (s *telemetryDriverStmt) Query(args []driver.Value) (driver.Rows, error) {
 			blocked int64
 		}
 		buckets := make(map[string]*bItem)
-		start, end := s.extractTimeBounds(args)
+		filter := s.parseAggregateFilter(args)
+		bucketSize := bucketGranularity(q)
 		for _, r := range s.conn.db.ordered {
-			if !start.IsZero() && r.Timestamp.Before(start) {
+			if !filter.matches(r) {
 				continue
 			}
-			if !end.IsZero() && r.Timestamp.After(end) {
-				continue
-			}
-			bKey := r.Timestamp.UTC().Truncate(time.Hour).Format("2006-01-02T15:00:00Z")
+			bKey := r.Timestamp.UTC().Truncate(bucketSize).Format("2006-01-02T15:04:05Z")
 			bi, ok := buckets[bKey]
 			if !ok {
 				bi = &bItem{}
 				buckets[bKey] = bi
 			}
 			bi.total++
-			if r.Action == "block" || r.Action == "ban" {
+			if isBlockedAction(r.Action) {
 				bi.blocked++
 			}
 		}

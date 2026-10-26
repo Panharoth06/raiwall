@@ -329,6 +329,25 @@ Raiwall supports both declarative Caddyfile configuration and dynamic runtime AP
 
 The gateway binds these two fixed listeners; per-application port values are validated metadata used for display and reporting, not per-site sockets. Upstreams and routing are registered per application (see below) and resolved by the `Host` header.
 
+> Telemetry follows the same store as the control plane when `DATABASE_URL` is set (the bundled Compose stack does this): both roles bind to PostgreSQL, and an explicit `telemetry { storage ... }` block is ignored with a startup warning. To bind the roles explicitly, declare named stores:
+>
+> ```caddyfile
+> raiwall {
+>     storage {
+>         store "pg" {
+>             driver postgres
+>             dsn "postgres://…"
+>         }
+>         store "local" {
+>             driver sqlite
+>             dsn "file:raiwall_telemetry.db"
+>         }
+>         control pg
+>         telemetry pg      # use "local" to split telemetry onto SQLite
+>     }
+> }
+> ```
+
 > For Envoy `ext_proc` deployments, add `sidecar { listen :50051 }` inside the `raiwall` block of a **single** listener — every importing server would otherwise try to bind the same port.
 
 ### Applications, Routing & Certificates

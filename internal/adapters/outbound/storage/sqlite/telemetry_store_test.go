@@ -149,6 +149,115 @@ func TestTelemetryStore_BatchQueryAndAggregates(t *testing.T) {
 	}
 }
 
+func TestTelemetryStore_AggregateFieldParity(t *testing.T) {
+	store, err := NewTelemetryStore(TelemetryConfig{
+		DSN: fmt.Sprintf("file:%s?_pragma=busy_timeout(5000)", filepath.Join(t.TempDir(), "parity.db")),
+	})
+	if err != nil {
+		t.Fatalf("failed to create telemetry store: %v", err)
+	}
+	defer store.Close()
+
+	ctx := context.Background()
+	now := time.Now().UTC().Truncate(time.Second)
+
+	seed := []*telemetry.ForensicEvent{
+		{
+			EventID: "parity-1", Timestamp: now.Add(-2 * time.Second), Host: "a.example.test",
+			Path: "/landing", Method: "GET", ClientIP: "192.0.2.10", Action: "allow",
+			StatusCode: 200, GeoData: telemetry.GeoData{Country: "US"},
+		},
+		{
+			EventID: "parity-2", Timestamp: now.Add(-3 * time.Minute), Host: "a.example.test",
+			Path: "/login", Method: "POST", ClientIP: "192.0.2.20", Action: "block",
+			RuleID: "SEMANTIC_SQLI", StatusCode: 403, AttackCategory: "sql_inj",
+			GeoData: telemetry.GeoData{Country: "CN"},
+		},
+		{
+			EventID: "parity-3", Timestamp: now.Add(-4 * time.Minute), Host: "b.example.test",
+			Path: "/api/items", Method: "POST", ClientIP: "192.0.2.10", Action: "allow",
+			StatusCode: 200, GeoData: telemetry.GeoData{Country: "US"},
+		},
+		{
+			EventID: "parity-4", Timestamp: now.Add(-5 * time.Minute), Host: "b.example.test",
+			Path: "/broken", Method: "GET", ClientIP: "192.0.2.30", Action: "allow",
+			StatusCode: 500, GeoData: telemetry.GeoData{Country: "CN"},
+		},
+	}
+	if err := store.SaveBatch(ctx, seed); err != nil {
+		t.Fatalf("failed to save batch: %v", err)
+	}
+
+	stats, err := store.QueryAggregates(ctx, now.Add(-time.Hour), now.Add(time.Minute))
+	if err != nil {
+		t.Fatalf("query aggregates failed: %v", err)
+	}
+
+	assertAggregateStats(t, stats, aggregateExpectation{
+		total: 4, blocked: 1, pageViews: 1, uniqueIPs: 3, blockedIPs: 1,
+		status4xx: 1, status4xxBlocked: 1, status5xx: 1,
+	})
+	if stats.QPS <= 0 {
+		t.Fatalf("expected live QPS > 0 for the event recorded seconds ago, got %f", stats.QPS)
+	}
+	if len(stats.TimeBuckets) == 0 {
+		t.Fatal("expected non-empty time buckets")
+	}
+
+	hostStats, err := store.QueryAggregates(ctx, now.Add(-time.Hour), now.Add(time.Minute),
+		telemetry.AggregateFilter{Host: "a.example.test"})
+	if err != nil {
+		t.Fatalf("query host-filtered aggregates failed: %v", err)
+	}
+	assertAggregateStats(t, hostStats, aggregateExpectation{
+		total: 2, blocked: 1, pageViews: 1, uniqueIPs: 2, blockedIPs: 1,
+		status4xx: 1, status4xxBlocked: 1, status5xx: 0,
+	})
+	if len(hostStats.TopCategories) != 1 || hostStats.TopCategories[0].Key != "sql_inj" {
+		t.Fatalf("expected sql_inj category for host filter, got %+v", hostStats.TopCategories)
+	}
+
+	countryStats, err := store.QueryAggregates(ctx, now.Add(-time.Hour), now.Add(time.Minute),
+		telemetry.AggregateFilter{Country: "US"})
+	if err != nil {
+		t.Fatalf("query country-filtered aggregates failed: %v", err)
+	}
+	assertAggregateStats(t, countryStats, aggregateExpectation{
+		total: 2, blocked: 0, pageViews: 1, uniqueIPs: 1, blockedIPs: 0,
+		status4xx: 0, status4xxBlocked: 0, status5xx: 0,
+	})
+	if countryStats.TopIPs[0].Key != "192.0.2.10" || countryStats.TopIPs[0].Count != 2 {
+		t.Fatalf("unexpected top IPs for country filter: %+v", countryStats.TopIPs)
+	}
+}
+
+type aggregateExpectation struct {
+	total, blocked, pageViews, uniqueIPs, blockedIPs int64
+	status4xx, status4xxBlocked, status5xx           int64
+}
+
+func assertAggregateStats(t *testing.T, stats *telemetry.AggregateStats, want aggregateExpectation) {
+	t.Helper()
+	if stats.TotalRequests != want.total ||
+		stats.TotalBlocked != want.blocked ||
+		stats.PageViews != want.pageViews ||
+		stats.UniqueIPs != want.uniqueIPs ||
+		stats.BlockedIPs != want.blockedIPs ||
+		stats.Status4xx != want.status4xx ||
+		stats.Status4xxBlocked != want.status4xxBlocked ||
+		stats.Status5xx != want.status5xx {
+		t.Fatalf("unexpected aggregate stats: %+v (want %+v)", stats, want)
+	}
+	if stats.TotalRequests > 0 {
+		if got, wantRatio := stats.BlockRatio, float64(want.blocked)/float64(want.total); got != wantRatio {
+			t.Fatalf("block ratio = %v, want %v", got, wantRatio)
+		}
+	}
+	if stats.UniqueVisitors != stats.UniqueIPs {
+		t.Fatalf("unique visitors = %d, want unique IPs %d", stats.UniqueVisitors, stats.UniqueIPs)
+	}
+}
+
 func TestTelemetryStore_IncidentAggregationAndLocations(t *testing.T) {
 	store, err := NewTelemetryStore(TelemetryConfig{
 		DSN: fmt.Sprintf("file:%s", filepath.Join(t.TempDir(), "incidents.db")),

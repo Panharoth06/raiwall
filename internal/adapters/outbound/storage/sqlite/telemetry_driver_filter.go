@@ -8,21 +8,6 @@ import (
 	"time"
 )
 
-func (s *telemetryDriverStmt) extractTimeBounds(args []driver.Value) (time.Time, time.Time) {
-	var start, end time.Time
-	if len(args) >= 2 {
-		start, _ = time.Parse(time.RFC3339Nano, fmt.Sprint(args[0]))
-		if start.IsZero() {
-			start, _ = time.Parse(time.RFC3339, fmt.Sprint(args[0]))
-		}
-		end, _ = time.Parse(time.RFC3339Nano, fmt.Sprint(args[1]))
-		if end.IsZero() {
-			end, _ = time.Parse(time.RFC3339, fmt.Sprint(args[1]))
-		}
-	}
-	return start, end
-}
-
 func (s *telemetryDriverStmt) buildTopCounts(counts map[string]int64) driver.Rows {
 	type pair struct {
 		key string
