@@ -52,7 +52,8 @@ const challengePageStyle = `
     .brand-sub {
       padding-left: 8px;
       border-left: 1px solid var(--border);
-      font-size: 12px;
+      font-size: 14px;
+      font-weight: 400;
       color: var(--muted);
     }
     main {
@@ -132,7 +133,7 @@ const challengePageStyle = `
     .destination {
       margin-top: 16px;
       color: var(--muted);
-      font-size: 12px;
+      font-size: 14px;
       line-height: 1.6;
       display: -webkit-box;
       -webkit-line-clamp: 2;
@@ -142,7 +143,7 @@ const challengePageStyle = `
     }
     .destination code {
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-size: 12px;
+      font-size: 14px;
       color: var(--fg);
     }
     .retry {
@@ -154,7 +155,7 @@ const challengePageStyle = `
       background: var(--surface);
       color: var(--fg);
       font: inherit;
-      font-size: 13px;
+      font-size: 14px;
       font-weight: 600;
       cursor: pointer;
       transition: background-color 0.15s ease-out, border-color 0.15s ease-out;
@@ -162,12 +163,12 @@ const challengePageStyle = `
     .retry:hover { border-color: var(--muted); background: var(--bg); }
     .retry:active { background: var(--surface); }
     .retry:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-    .footnote { margin-top: 12px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+    .footnote { margin-top: 12px; color: var(--muted); font-size: 14px; line-height: 1.6; }
     footer {
       padding: 20px 24px calc(20px + env(safe-area-inset-bottom));
       text-align: center;
       color: var(--muted);
-      font-size: 12px;
+      font-size: 14px;
     }
     .sr-only {
       position: absolute;

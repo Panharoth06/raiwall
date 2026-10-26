@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -159,5 +161,33 @@ func TestPoWEngine_RenderChallengePage(t *testing.T) {
 	// The interstitial must remain fully self-contained (no external CDNs).
 	if strings.Contains(body, "src=\"http") || strings.Contains(body, "href=\"http") {
 		t.Errorf("Rendered HTML must not reference external assets")
+	}
+}
+
+// TestChallengePageTypographyFloor guards Rule 3 of the frontend discipline:
+// body copy, helper text, and controls use 14px; nothing may drop below it.
+func TestChallengePageTypographyFloor(t *testing.T) {
+	engine := NewPoWEngine(PoWConfig{Secret: "typography-floor-secret", Difficulty: 5000})
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/protected/resource", nil)
+
+	if err := engine.RenderChallengePage(rec, req, "/protected/resource"); err != nil {
+		t.Fatalf("RenderChallengePage() failed: %v", err)
+	}
+
+	fontSize := regexp.MustCompile(`font-size:\s*([0-9.]+)px`)
+	matches := fontSize.FindAllStringSubmatch(rec.Body.String(), -1)
+	if len(matches) == 0 {
+		t.Fatal("Rendered HTML has no font-size declarations")
+	}
+
+	for _, match := range matches {
+		size, err := strconv.ParseFloat(match[1], 64)
+		if err != nil {
+			t.Fatalf("parse font-size %q: %v", match[1], err)
+		}
+		if size < 14 {
+			t.Errorf("font-size %.2fpx is below the 14px body/description floor", size)
+		}
 	}
 }
