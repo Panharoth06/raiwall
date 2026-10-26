@@ -85,7 +85,7 @@ export function useStatistics() {
         stats.value = {
           ...stats.value,
           ...data,
-          page_views: data.page_views ?? Math.round(data.total_requests * 0.4),
+          page_views: data.page_views ?? 0,
           unique_visitors: data.unique_visitors ?? data.unique_ips ?? 0,
           unique_ips: data.unique_ips ?? 0,
           blocked_ips: data.blocked_ips ?? 0,

@@ -48,12 +48,12 @@ const hiddenHosts = (row: BotAppRow) => Math.max(row.hostnames.length - 2, 0);
     <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-border">
       <div class="flex items-center gap-2 min-w-0">
         <Bot class="w-4 h-4 text-muted-foreground shrink-0" />
-        <h2 class="text-xs font-semibold uppercase tracking-wider text-foreground truncate">
+        <h2 class="text-sm font-semibold uppercase tracking-wider text-foreground truncate">
           Applications
         </h2>
-        <Badge variant="outline" class="font-mono text-[10px]">{{ rows.length }}</Badge>
+        <Badge variant="outline" class="font-mono text-xs">{{ rows.length }}</Badge>
       </div>
-      <span class="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+      <span class="text-xs font-mono uppercase tracking-wider text-muted-foreground">
         Application-scoped policy
       </span>
     </div>
@@ -62,12 +62,12 @@ const hiddenHosts = (row: BotAppRow) => Math.max(row.hostnames.length - 2, 0);
       <div v-for="i in 4" :key="i" class="h-10 rounded bg-muted/60 animate-pulse" />
     </div>
 
-    <div v-else-if="error" class="p-8 text-center" data-testid="bot-app-error">
-      <ShieldAlert class="w-8 h-8 text-threat mx-auto mb-2" />
-      <h3 class="text-xs font-semibold uppercase tracking-wider text-foreground">
+    <div v-else-if="error" class="pt-8 pb-10 p-4 text-center" data-testid="bot-app-error">
+      <ShieldAlert class="w-8 h-8 text-threat mx-auto mb-3" />
+      <h3 class="text-base font-semibold text-foreground">
         Could not load bot policies
       </h3>
-      <p class="mt-1 mb-4 text-[11px] text-muted-foreground font-mono break-all">{{ error }}</p>
+      <p class="mt-1 mb-4 text-xs text-muted-foreground font-mono break-all">{{ error }}</p>
       <Button variant="outline" size="sm" class="gap-1.5" @click="emit('retry')">
         <RefreshCw class="w-3.5 h-3.5" />
         <span>Retry</span>
@@ -98,7 +98,7 @@ const hiddenHosts = (row: BotAppRow) => Math.max(row.hostnames.length - 2, 0);
                 <span class="font-medium text-foreground truncate" :title="row.name">
                   {{ row.name }}
                 </span>
-                <Badge v-if="row.global" variant="outline" class="font-mono text-[9px] uppercase">
+                <Badge v-if="row.global" variant="outline" class="font-mono text-xs uppercase">
                   fallback
                 </Badge>
               </div>
@@ -110,41 +110,41 @@ const hiddenHosts = (row: BotAppRow) => Math.max(row.hostnames.length - 2, 0);
                 <span
                   v-for="host in visibleHosts(row)"
                   :key="host"
-                  class="max-w-[170px] truncate rounded border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
+                  class="max-w-[170px] truncate rounded border border-border px-1.5 py-0.5 font-mono text-xs text-muted-foreground"
                   :title="host"
                 >
                   {{ host }}
                 </span>
                 <span
                   v-if="hiddenHosts(row) > 0"
-                  class="px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
+                  class="px-1.5 py-0.5 font-mono text-xs text-muted-foreground"
                   :title="row.hostnames.join('\n')"
                 >
                   +{{ hiddenHosts(row) }}
                 </span>
               </div>
-              <span v-else class="font-mono text-[11px] text-muted-foreground">no hostnames</span>
+              <span v-else class="font-mono text-xs text-muted-foreground">no hostnames</span>
             </TableCell>
 
             <TableCell>
               <div class="flex flex-wrap items-center gap-1.5">
                 <Badge
                   :variant="statusVariant(row.status)"
-                  class="font-mono uppercase text-[10px]"
+                  class="font-mono uppercase text-xs"
                   data-testid="bot-row-status"
                 >
                   {{ statusCopy[row.status] }}
                 </Badge>
                 <span
                   v-if="row.coverage && row.status === 'partial'"
-                  class="font-mono text-[10px] text-muted-foreground"
+                  class="font-mono text-xs text-muted-foreground"
                 >
                   {{ row.coverage.custom }}/{{ row.coverage.total }} hosts
                 </span>
               </div>
             </TableCell>
 
-            <TableCell class="font-mono text-[11px] tabular-nums text-muted-foreground">
+            <TableCell class="font-mono text-xs tabular-nums text-muted-foreground">
               {{ row.difficulty ? row.difficulty.toLocaleString('en-US') : '—' }}
             </TableCell>
 
@@ -152,7 +152,7 @@ const hiddenHosts = (row: BotAppRow) => Math.max(row.hostnames.length - 2, 0);
               <Button
                 variant="outline"
                 size="sm"
-                class="h-7 gap-1.5 px-2 text-[10px] font-semibold uppercase tracking-wider"
+                class="h-7 gap-1.5 px-2 text-xs font-semibold uppercase tracking-wider"
                 :data-testid="row.global ? 'bot-configure-global' : 'bot-configure-app'"
                 @click="emit('configure', row)"
               >
@@ -176,24 +176,24 @@ const hiddenHosts = (row: BotAppRow) => Math.max(row.hostnames.length - 2, 0);
         <div class="flex items-start justify-between gap-2">
           <div class="flex flex-wrap items-center gap-1.5 min-w-0">
             <span class="text-xs font-medium text-foreground truncate">{{ row.name }}</span>
-            <Badge v-if="row.global" variant="outline" class="font-mono text-[9px] uppercase">
+            <Badge v-if="row.global" variant="outline" class="font-mono text-xs uppercase">
               fallback
             </Badge>
           </div>
           <Badge
             :variant="statusVariant(row.status)"
-            class="shrink-0 font-mono uppercase text-[10px]"
+            class="shrink-0 font-mono uppercase text-xs"
           >
             {{ statusCopy[row.status] }}
           </Badge>
         </div>
 
-        <p class="font-mono text-[10px] text-muted-foreground break-all">
+        <p class="font-mono text-xs text-muted-foreground break-all">
           {{ row.global ? 'All unconfigured hosts' : row.hostnames.join(' · ') || 'no hostnames' }}
         </p>
 
         <div class="flex items-center justify-between gap-2">
-          <span class="font-mono text-[10px] text-muted-foreground tabular-nums">
+          <span class="font-mono text-xs text-muted-foreground tabular-nums">
             {{ row.difficulty ? `${row.difficulty.toLocaleString('en-US')} iters` : 'no challenge' }}
             <span class="mx-1 text-border">·</span>
             {{ row.traps }} traps
@@ -205,7 +205,7 @@ const hiddenHosts = (row: BotAppRow) => Math.max(row.hostnames.length - 2, 0);
           <Button
             variant="outline"
             size="sm"
-            class="h-7 shrink-0 gap-1.5 px-2 text-[10px] font-semibold uppercase tracking-wider"
+            class="h-7 shrink-0 gap-1.5 px-2 text-xs font-semibold uppercase tracking-wider"
             :data-testid="row.global ? 'bot-configure-global-mobile' : 'bot-configure-app-mobile'"
             @click="emit('configure', row)"
           >
@@ -217,7 +217,7 @@ const hiddenHosts = (row: BotAppRow) => Math.max(row.hostnames.length - 2, 0);
     </div>
 
     <div class="px-4 py-2 border-t border-border/60">
-      <p class="text-[10px] text-muted-foreground font-mono">
+      <p class="text-xs text-muted-foreground font-mono">
         Exact Host header matching. Applications without an override inherit the global fallback.
         Changes compile on the next deployment.
       </p>

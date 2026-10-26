@@ -79,7 +79,7 @@ const handleSave = () => {
   <Dialog :open="open" @update:open="(val) => emit('update:open', val)">
     <DialogContent class="sm:max-w-lg">
       <DialogHeader>
-        <DialogTitle class="flex items-center gap-2 text-sm font-semibold tracking-wide">
+        <DialogTitle class="flex items-center gap-2 text-base font-semibold tracking-wide">
           <Sliders class="h-4 w-4 text-primary" />
           <span>Configure Virtual Waiting Room Engine (HTTP 465)</span>
         </DialogTitle>
@@ -93,7 +93,7 @@ const handleSave = () => {
         <div class="flex items-center justify-between p-3 border border-border rounded-lg bg-muted/20">
           <div>
             <div class="text-xs font-semibold text-foreground">Waiting Room Protection</div>
-            <div class="text-[11px] text-muted-foreground mt-0.5">
+            <div class="text-xs text-muted-foreground mt-0.5">
               Serve HTTP 465 waiting queue pages when concurrency capacity is exceeded.
             </div>
           </div>
@@ -113,7 +113,7 @@ const handleSave = () => {
             suffix="users"
             class="h-8 font-mono text-xs"
           />
-          <p class="text-[11px] text-muted-foreground">
+          <p class="text-xs text-muted-foreground">
             Maximum number of simultaneous active leases before incoming clients are queued.
           </p>
         </div>
@@ -143,7 +143,7 @@ const handleSave = () => {
           <div class="flex flex-wrap gap-1.5 pt-1 min-h-[32px] p-2 rounded-md bg-muted/40 border border-border">
             <span
               v-if="form.paths.length === 0"
-              class="text-[11px] text-muted-foreground italic flex items-center gap-1"
+              class="text-xs text-muted-foreground italic flex items-center gap-1"
             >
               <Layers class="h-3 w-3" />
               <span>All paths targeted by default (/*)</span>
@@ -151,7 +151,7 @@ const handleSave = () => {
             <span
               v-for="(p, idx) in form.paths"
               :key="idx"
-              class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-background text-foreground border border-border text-[11px] font-mono"
+              class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-background text-foreground border border-border text-xs font-mono"
             >
               <span>{{ p }}</span>
               <button

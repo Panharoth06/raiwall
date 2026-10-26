@@ -7,6 +7,7 @@ import {
   type ContinentGroup,
 } from './geoData';
 import { Search, Globe2, ChevronRight, X } from 'lucide-vue-next';
+import { Checkbox } from '@/components/ui/checkbox';
 
 const props = withDefaults(
   defineProps<{
@@ -132,7 +133,7 @@ const clearSelection = (e: MouseEvent) => {
     >
       <div class="flex items-center gap-1.5 truncate">
         <Globe2 class="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-        <span class="truncate font-mono text-[11px]">{{ displayLabel }}</span>
+        <span class="truncate font-mono text-xs">{{ displayLabel }}</span>
       </div>
 
       <div class="flex items-center gap-1 shrink-0">
@@ -191,13 +192,12 @@ const clearSelection = (e: MouseEvent) => {
           @click="toggleCountry(item.code)"
           class="flex items-center gap-2 px-2.5 py-1.5 rounded hover:bg-muted/60 cursor-pointer text-xs"
         >
-          <input
-            type="checkbox"
+          <Checkbox
             :checked="selectedCodes.has(item.code)"
-            class="rounded border-border text-primary focus:ring-primary w-3.5 h-3.5 cursor-pointer"
+            class="w-3.5 h-3.5 cursor-pointer"
             @click.stop="toggleCountry(item.code)"
           />
-          <span class="font-mono text-[11px] text-muted-foreground w-7">{{ item.code }}</span>
+          <span class="font-mono text-xs text-muted-foreground w-7">{{ item.code }}</span>
           <span class="text-foreground truncate">{{ item.name }}</span>
         </div>
         <div v-if="filteredCountries.length === 0" class="p-4 text-center text-xs text-muted-foreground">
@@ -220,10 +220,9 @@ const clearSelection = (e: MouseEvent) => {
             ]"
           >
             <div class="flex items-center gap-1.5 min-w-0">
-              <input
-                type="checkbox"
+              <Checkbox
                 :checked="isAllFullySelected"
-                class="rounded border-border text-primary focus:ring-primary w-3.5 h-3.5 cursor-pointer"
+                class="w-3.5 h-3.5 cursor-pointer"
                 @click.stop="toggleAll"
               />
               <span class="truncate">All</span>
@@ -244,11 +243,9 @@ const clearSelection = (e: MouseEvent) => {
             ]"
           >
             <div class="flex items-center gap-1.5 min-w-0">
-              <input
-                type="checkbox"
+              <Checkbox
                 :checked="isContinentFullySelected(grp)"
-                :indeterminate="isContinentPartiallySelected(grp)"
-                class="rounded border-border text-primary focus:ring-primary w-3.5 h-3.5 cursor-pointer"
+                class="w-3.5 h-3.5 cursor-pointer"
                 @click.stop="toggleContinent(grp)"
               />
               <span class="truncate">{{ grp.name }}</span>
@@ -265,13 +262,12 @@ const clearSelection = (e: MouseEvent) => {
             @click="toggleCountry(item.code)"
             class="flex items-center gap-2 px-2 py-1 rounded hover:bg-muted/60 cursor-pointer text-xs"
           >
-            <input
-              type="checkbox"
+            <Checkbox
               :checked="selectedCodes.has(item.code)"
-              class="rounded border-border text-primary focus:ring-primary w-3.5 h-3.5 cursor-pointer"
+              class="w-3.5 h-3.5 cursor-pointer"
               @click.stop="toggleCountry(item.code)"
             />
-            <span class="font-mono text-[11px] text-muted-foreground w-6">{{ item.code }}</span>
+            <span class="font-mono text-xs text-muted-foreground w-6">{{ item.code }}</span>
             <span class="text-foreground truncate">{{ item.name }}</span>
           </div>
         </div>
@@ -279,7 +275,7 @@ const clearSelection = (e: MouseEvent) => {
 
       <!-- Footer Bar -->
       <div class="p-2 bg-muted/30 flex items-center justify-between text-xs">
-        <span class="text-[11px] font-mono text-muted-foreground">
+        <span class="text-xs font-mono text-muted-foreground">
           Selected: <strong class="text-foreground">{{ selectedCodes.size }}</strong> countries
         </span>
         <button

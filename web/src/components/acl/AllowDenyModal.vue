@@ -8,6 +8,7 @@ import AdvancedExprEditor from './AdvancedExprEditor.vue';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { ShieldCheck, Ban, Plus, Code2, Save } from 'lucide-vue-next';
 
@@ -128,15 +129,18 @@ const calculatePriority = (): number => {
   return form.value.insertPosition === 'first' ? Math.max(1, min - 10) : max + 10;
 };
 
+const modalError = ref<string | null>(null);
+
 const handleSubmit = () => {
+  modalError.value = null;
   if (!form.value.name.trim()) {
-    alert('Please provide a rule name.');
+    modalError.value = 'Please provide a rule name.';
     return;
   }
 
   const expr = compiledExpression.value.trim();
   if (!expr) {
-    alert('Please configure at least one condition or expression.');
+    modalError.value = 'Please configure at least one condition or expression.';
     return;
   }
 
@@ -264,7 +268,7 @@ const handleSubmit = () => {
               <div class="absolute inset-0 flex items-center">
                 <div class="w-full border-t border-border"></div>
               </div>
-              <div class="relative flex items-center gap-1.5 px-3 py-1 rounded-full bg-card border border-warning/50 text-warning text-[10px] font-mono font-bold tracking-wider uppercase shadow-none">
+              <div class="relative flex items-center gap-1.5 px-3 py-1 rounded-full bg-card border border-warning/50 text-warning text-xs font-mono font-bold tracking-wider uppercase shadow-none">
                 <span>OR</span>
               </div>
             </div>
@@ -290,14 +294,18 @@ const handleSubmit = () => {
           </Button>
         </div>
 
+        <!-- Error banner -->
+        <div v-if="modalError" class="p-3 bg-threat/10 border border-threat/30 rounded-lg text-threat text-xs">
+          {{ modalError }}
+        </div>
+
         <!-- 5. Options Checkboxes -->
         <div class="pt-2 space-y-2.5 border-t border-border">
           <div class="flex items-center space-x-2">
-            <input
-              type="checkbox"
+            <Checkbox
               id="continue-inspection"
-              v-model="form.continueInspection"
-              class="rounded border-border text-primary focus:ring-primary accent-primary w-4 h-4 cursor-pointer"
+              :checked="form.continueInspection"
+              @update:checked="form.continueInspection = $event"
             />
             <label for="continue-inspection" class="text-xs text-foreground cursor-pointer select-none">
               Continue to detect and log attack requests even when {{ form.action === 'allow' ? 'whitelisting' : 'denying' }}.
@@ -305,11 +313,10 @@ const handleSubmit = () => {
           </div>
 
           <div class="flex items-center space-x-2">
-            <input
-              type="checkbox"
+            <Checkbox
               id="rule-enabled"
-              v-model="form.enabled"
-              class="rounded border-border text-primary focus:ring-primary accent-primary w-4 h-4 cursor-pointer"
+              :checked="form.enabled"
+              @update:checked="form.enabled = $event"
             />
             <label for="rule-enabled" class="text-xs text-foreground font-medium cursor-pointer select-none">
               Enabled

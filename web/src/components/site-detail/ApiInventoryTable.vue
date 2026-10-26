@@ -83,15 +83,16 @@ const lastSeen = (r: APIResource): string => {
 
     <p v-if="error" class="text-xs text-destructive" data-testid="inventory-error">{{ error }}</p>
 
-    <div v-if="loading" class="flex items-center justify-center py-12 space-x-2 text-xs text-muted-foreground" data-testid="inventory-loading">
+    <div v-if="loading" class="flex items-center justify-center py-10 space-x-2 text-xs text-muted-foreground" data-testid="inventory-loading">
       <Loader2 class="w-4 h-4 animate-spin" />
       <span>Loading inventory…</span>
     </div>
 
-    <div v-else-if="filtered.length === 0" class="flex flex-col items-center justify-center py-12 space-y-2 text-xs text-muted-foreground" data-testid="inventory-empty">
-      <Radar class="w-5 h-5" />
-      <span v-if="search">No endpoints match the search</span>
-      <span v-else>No traffic observed yet — endpoints appear as clients hit the site</span>
+    <div v-else-if="filtered.length === 0" class="flex flex-col items-center justify-start pt-10 pb-12 space-y-1 text-center" data-testid="inventory-empty">
+      <Radar class="w-8 h-8 text-muted-foreground/60 mb-2" />
+      <span v-if="search" class="text-base font-semibold text-foreground">No endpoints match the search</span>
+      <span v-else class="text-base font-semibold text-foreground">No traffic observed yet</span>
+      <span class="text-xs text-muted-foreground">Endpoints appear automatically as clients hit the site.</span>
     </div>
 
     <div v-else class="max-h-96 overflow-auto rounded-lg border border-border bg-card">
@@ -109,7 +110,7 @@ const lastSeen = (r: APIResource): string => {
         <TableBody class="font-mono tabular-nums">
           <TableRow v-for="(resource, i) in filtered" :key="resource.id" :data-testid="`inventory-row-${i}`">
             <TableCell>
-              <Badge :variant="methodVariant(resource.method)" class="text-[10px]">{{ resource.method }}</Badge>
+              <Badge :variant="methodVariant(resource.method)" class="text-xs">{{ resource.method }}</Badge>
             </TableCell>
             <TableCell class="font-medium">{{ resource.path_pattern }}</TableCell>
             <TableCell class="max-w-32 truncate text-muted-foreground" :title="resource.content_type">{{ resource.content_type || '—' }}</TableCell>

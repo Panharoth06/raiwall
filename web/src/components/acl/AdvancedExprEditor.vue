@@ -42,7 +42,7 @@ const validateSyntax = async () => {
 <template>
   <div class="space-y-2">
     <div class="flex items-center justify-between">
-      <label class="text-[11px] font-mono text-muted-foreground">
+      <label class="text-xs font-mono text-muted-foreground">
         Boolean Expression (expr-lang)
       </label>
       <Button
@@ -51,7 +51,7 @@ const validateSyntax = async () => {
         size="sm"
         :disabled="validating"
         @click="validateSyntax"
-        class="h-6 text-[11px] px-2 text-primary hover:bg-primary/10"
+        class="h-6 text-xs px-2 text-primary hover:bg-primary/10"
       >
         {{ validating ? 'Verifying...' : 'Verify Syntax' }}
       </Button>
@@ -71,7 +71,7 @@ const validateSyntax = async () => {
         <CheckCircle2 class="w-4 h-4 text-success shrink-0" />
         <span>Expression verified cleanly (sub-15ns bytecode compatible)</span>
       </div>
-      <div v-else class="text-threat flex items-center space-x-1.5 font-mono text-[11px]">
+      <div v-else class="text-threat flex items-center space-x-1.5 font-mono text-xs">
         <AlertCircle class="w-4 h-4 text-threat shrink-0" />
         <span>{{ validationResult.error }}</span>
       </div>

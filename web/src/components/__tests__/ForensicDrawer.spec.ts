@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { nextTick } from 'vue';
 import ForensicDrawer from '@/components/forensic/ForensicDrawer.vue';
+import IpGroupPicker from '@/components/forensic/IpGroupPicker.vue';
+import { Select } from '@/components/ui/select';
 import type { ForensicEvent, IPGroupOption } from '@/types/telemetry';
 
 const event: ForensicEvent = {
@@ -82,8 +84,9 @@ describe('ForensicDrawer.vue', () => {
   it('emits add-to-ipgroup with the selected group', async () => {
     const wrapper = mount(ForensicDrawer, { props: { event, groups } });
 
-    const select = wrapper.find('[data-testid="ipgroup-select"]');
-    await select.setValue('grp-custom');
+    const ipPicker = wrapper.findComponent(IpGroupPicker);
+    ipPicker.findComponent(Select).vm.$emit('update:modelValue', 'grp-custom');
+    await nextTick();
     await wrapper.find('[data-testid="add-to-ipgroup-btn"]').trigger('click');
 
     expect(wrapper.emitted('add-to-ipgroup')?.[0]).toEqual([{ event, groupId: 'grp-custom' }]);

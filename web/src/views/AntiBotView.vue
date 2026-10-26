@@ -139,11 +139,11 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="h-full flex flex-col space-y-4 p-6 bg-card text-card-foreground rounded-xl border border-border shadow-none font-sans overflow-hidden">
+  <div class="h-full flex flex-col space-y-6 p-6 bg-card text-card-foreground rounded-xl border border-border shadow-none font-sans overflow-hidden">
     <div class="flex flex-wrap items-start justify-between gap-3 shrink-0">
       <div class="min-w-0">
-        <h1 class="text-sm font-semibold uppercase tracking-wider text-foreground flex items-center gap-2">
-          <Bot class="w-4 h-4 text-muted-foreground" />
+        <h1 class="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
+          <Bot class="w-5 h-5 text-muted-foreground" />
           <span>Anti-Bot Defense</span>
         </h1>
         <p class="text-sm text-muted-foreground mt-1 leading-relaxed">
@@ -151,7 +151,7 @@ onMounted(async () => {
           challenge telemetry.
         </p>
       </div>
-      <Badge variant="outline" class="font-mono text-[10px] uppercase">
+      <Badge variant="outline" class="font-mono text-xs uppercase">
         Application-scoped · PoW · JA4
       </Badge>
     </div>

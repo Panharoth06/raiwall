@@ -61,7 +61,7 @@ function formatLatency(durNs: number): string {
           </TableCell>
           <TableCell class="whitespace-nowrap">
             <span
-              class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide uppercase border"
+              class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold tracking-wide uppercase border"
               :class="getActionBadgeClass(ev.action)"
             >
               <CheckCircle2 v-if="ev.action === 'allow'" class="w-2.5 h-2.5" />
@@ -77,7 +77,7 @@ function formatLatency(durNs: number): string {
           </TableCell>
           <TableCell class="whitespace-nowrap text-foreground">
             <span>{{ ev.client_ip }}</span>
-            <span v-if="ev.geo_data?.country" class="ml-1.5 text-muted-foreground text-[11px]">
+            <span v-if="ev.geo_data?.country" class="ml-1.5 text-muted-foreground text-xs">
               [{{ ev.geo_data.country }}]
             </span>
           </TableCell>
@@ -93,7 +93,7 @@ function formatLatency(durNs: number): string {
               v-if="ev.action !== 'allow'"
               type="button"
               data-testid="create-exception-quick-btn"
-              class="px-2 py-1 text-[11px] font-medium text-primary hover:text-primary-foreground bg-primary/10 hover:bg-primary border border-primary/30 rounded transition-all mr-2 cursor-pointer"
+              class="px-2 py-1 text-xs font-medium text-primary hover:text-primary-foreground bg-primary/10 hover:bg-primary border border-primary/30 rounded transition-all mr-2 cursor-pointer"
               title="Create 1-Click Rule Exception"
               @click="emit('create-exception', ev)"
             >
@@ -101,7 +101,7 @@ function formatLatency(durNs: number): string {
             </button>
             <button
               type="button"
-              class="px-2 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground bg-muted hover:bg-muted/80 border border-border rounded transition-all cursor-pointer"
+              class="px-2 py-1 text-xs font-medium text-muted-foreground hover:text-foreground bg-muted hover:bg-muted/80 border border-border rounded transition-all cursor-pointer"
               @click="emit('inspect', ev)"
             >
               Inspect
@@ -110,11 +110,11 @@ function formatLatency(durNs: number): string {
         </TableRow>
 
         <TableRow v-if="events.length === 0">
-          <TableCell colspan="7" class="h-80 text-center font-sans text-muted-foreground">
-            <div class="h-full flex flex-col items-center justify-center p-8">
-              <Activity class="w-8 h-8 mx-auto mb-2 text-muted-foreground/60 opacity-60 animate-pulse" />
-              <p class="text-sm font-medium">Waiting for incoming telemetry events...</p>
-              <p class="text-xs text-muted-foreground/80 mt-1">Events appear automatically via server-sent events</p>
+          <TableCell colspan="7" class="h-80 text-center font-sans text-muted-foreground align-top">
+            <div class="flex flex-col items-center justify-start pt-10 pb-12 p-8">
+              <Activity class="w-8 h-8 mx-auto mb-3 text-muted-foreground/60 opacity-60 animate-pulse" />
+              <p class="text-base font-semibold text-foreground">Waiting for incoming telemetry events...</p>
+              <p class="text-xs text-muted-foreground mt-1">Events appear automatically via server-sent events</p>
             </div>
           </TableCell>
         </TableRow>

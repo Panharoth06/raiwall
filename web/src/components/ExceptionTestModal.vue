@@ -108,7 +108,7 @@ const handleOpenChange = (openState: boolean) => {
 
         <div class="grid grid-cols-3 gap-3">
           <div>
-            <label class="block text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Method</label>
+            <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Method</label>
             <Select v-model="testMethod">
               <SelectTrigger class="w-full h-9">
                 <SelectValue />
@@ -120,16 +120,10 @@ const handleOpenChange = (openState: boolean) => {
                 <SelectItem value="DELETE">DELETE</SelectItem>
               </SelectContent>
             </Select>
-            <select v-model="testMethod" class="sr-only" tabindex="-1" aria-hidden="true">
-              <option value="GET">GET</option>
-              <option value="POST">POST</option>
-              <option value="PUT">PUT</option>
-              <option value="DELETE">DELETE</option>
-            </select>
           </div>
 
           <div class="col-span-2">
-            <label class="block text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Host Header</label>
+            <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Host Header</label>
             <Input
               v-model="testHost"
               placeholder="api.example.com"
@@ -138,7 +132,7 @@ const handleOpenChange = (openState: boolean) => {
         </div>
 
         <div>
-          <label class="block text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Request Path</label>
+          <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Request Path</label>
           <Input
             v-model="testPath"
             placeholder="/v1/search"
@@ -147,7 +141,7 @@ const handleOpenChange = (openState: boolean) => {
 
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="block text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Param Name</label>
+            <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Param Name</label>
             <Input
               v-model="testParamName"
               placeholder="query"
@@ -155,7 +149,7 @@ const handleOpenChange = (openState: boolean) => {
           </div>
 
           <div>
-            <label class="block text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Test Payload</label>
+            <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Test Payload</label>
             <Input
               v-model="testParamVal"
               placeholder="' OR 1=1 --"
@@ -170,7 +164,7 @@ const handleOpenChange = (openState: boolean) => {
             <ShieldAlert v-else class="w-4 h-4 text-threat" />
             <span>{{ result.matched ? 'Suppression Matched (Traffic Allowed)' : 'No Match (Threat Blocked)' }}</span>
           </div>
-          <p class="mt-1 text-foreground text-[11px] font-mono">{{ result.reason }}</p>
+          <p class="mt-1 text-foreground text-xs font-mono">{{ result.reason }}</p>
         </div>
       </div>
 

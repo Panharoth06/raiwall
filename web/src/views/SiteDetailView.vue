@@ -99,16 +99,16 @@ const modeVariant = (mode?: string): 'default' | 'destructive' | 'secondary' => 
 </script>
 
 <template>
-  <div class="h-full flex flex-col space-y-4 p-6 bg-card text-card-foreground rounded-xl border border-border shadow-none font-sans overflow-hidden">
+  <div class="h-full flex flex-col space-y-6 p-6 bg-card text-card-foreground rounded-xl border border-border shadow-none font-sans overflow-hidden">
     <div class="shrink-0">
-      <button class="text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground flex items-center gap-1 mb-2" data-testid="site-back" @click="router.push('/sites')">
-        <ArrowLeft class="w-3 h-3" />
+      <button class="text-xs uppercase tracking-wider text-muted-foreground hover:text-foreground flex items-center gap-1 mb-2 cursor-pointer" data-testid="site-back" @click="router.push('/sites')">
+        <ArrowLeft class="w-3.5 h-3.5" />
         All Sites
       </button>
-      <h1 class="text-sm font-semibold uppercase tracking-wider text-foreground flex items-center gap-2">
-        <Boxes class="w-4 h-4 text-muted-foreground" />
+      <h1 class="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
+        <Boxes class="w-5 h-5 text-muted-foreground" />
         <span data-testid="site-name">{{ site?.name || (loading ? 'Loading…' : 'Site Detail') }}</span>
-        <Badge v-if="site" :variant="modeVariant(site.mode)" class="text-[10px] uppercase" data-testid="site-mode-badge">
+        <Badge v-if="site" :variant="modeVariant(site.mode)" class="text-xs uppercase" data-testid="site-mode-badge">
           {{ site.mode }}
         </Badge>
       </h1>
@@ -131,7 +131,7 @@ const modeVariant = (mode?: string): 'default' | 'destructive' | 'secondary' => 
           <div class="border border-border rounded-lg divide-y divide-border bg-background">
             <div class="px-3 py-2.5 flex items-center justify-between" data-testid="site-basic-mode">
               <span class="text-xs text-muted-foreground">Operational Mode</span>
-              <Badge :variant="modeVariant(site.mode)" class="text-[10px] uppercase font-mono">{{ site.mode }}</Badge>
+              <Badge :variant="modeVariant(site.mode)" class="text-xs uppercase font-mono">{{ site.mode }}</Badge>
             </div>
             <div class="px-3 py-2.5" data-testid="site-basic-upstreams">
               <span class="text-xs text-muted-foreground">Default Upstream Pool</span>

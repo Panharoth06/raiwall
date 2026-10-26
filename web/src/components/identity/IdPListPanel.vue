@@ -106,15 +106,15 @@ const configSummary = (provider: IdentityProvider): string => {
 
     <p v-if="error" class="text-xs text-destructive shrink-0" data-testid="idp-error">{{ error }}</p>
 
-    <div v-if="loading" class="flex-1 min-h-[300px] flex items-center justify-center space-x-2 text-xs text-muted-foreground" data-testid="idp-loading">
+    <div v-if="loading" class="flex-1 min-h-[200px] flex items-center justify-center space-x-2 text-xs text-muted-foreground" data-testid="idp-loading">
       <Loader2 class="w-4 h-4 animate-spin" />
       <span>Loading connectors…</span>
     </div>
 
-    <div v-else-if="providers.length === 0" class="flex-1 min-h-[300px] flex flex-col items-center justify-center space-y-2 text-xs text-muted-foreground text-center" data-testid="idp-empty">
-      <PlugZap class="w-6 h-6 text-muted-foreground/60 mb-1" />
-      <span class="font-medium">No external directory connected — the built-in account directory serves logins</span>
-      <span class="text-[10px]">OIDC, LDAP (ldap:// / ldaps://), and GitHub OAuth2 are supported</span>
+    <div v-else-if="providers.length === 0" class="flex-1 flex flex-col items-center justify-start pt-10 pb-12 space-y-1 text-center" data-testid="idp-empty">
+      <PlugZap class="w-8 h-8 text-muted-foreground/60 mb-2" />
+      <span class="text-base font-semibold text-foreground">No external directory connected</span>
+      <span class="text-xs text-muted-foreground">The built-in account directory serves logins. OIDC, LDAP, and GitHub OAuth2 are supported.</span>
     </div>
 
     <div v-else class="space-y-2 overflow-auto flex-1">
@@ -123,10 +123,10 @@ const configSummary = (provider: IdentityProvider): string => {
           <div class="min-w-0">
             <div class="flex items-center gap-2">
               <span class="text-xs font-medium truncate">{{ p.name }}</span>
-              <Badge variant="secondary" class="text-[10px] font-mono">{{ p.type }}</Badge>
-              <Badge v-if="!p.enabled" variant="outline" class="text-[10px]">disabled</Badge>
+              <Badge variant="secondary" class="text-xs font-mono">{{ p.type }}</Badge>
+              <Badge v-if="!p.enabled" variant="outline" class="text-xs">disabled</Badge>
             </div>
-            <p class="text-[10px] font-mono text-muted-foreground truncate mt-0.5">{{ configSummary(p) }}</p>
+            <p class="text-xs font-mono text-muted-foreground truncate mt-0.5">{{ configSummary(p) }}</p>
           </div>
           <div class="flex items-center gap-1 shrink-0">
             <Button variant="ghost" size="sm" class="h-6 px-1.5" :data-testid="`idp-toggle-${i}`" :disabled="pending.has(p.id)" @click="toggleProvider(p)">

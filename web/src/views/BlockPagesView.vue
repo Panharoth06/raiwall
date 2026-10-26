@@ -11,6 +11,7 @@ import TemplateCodeEditor from '@/components/TemplateCodeEditor.vue';
 import TemplatePreviewCard from '@/components/TemplatePreviewCard.vue';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { ConfirmDialog } from '@/components/ui/dialog';
 import {
   Select,
   SelectTrigger,
@@ -44,6 +45,7 @@ const formLogo = ref('');
 const previewHtml = ref('');
 const isSaving = ref(false);
 const isResetting = ref(false);
+const showResetConfirm = ref(false);
 const isLoading = ref(true);
 const statusMessage = ref<{ text: string; type: 'success' | 'error' } | null>(null);
 
@@ -135,8 +137,12 @@ const handleSave = async () => {
   }
 };
 
+const triggerReset = () => {
+  showResetConfirm.value = true;
+};
+
 const handleReset = async () => {
-  if (!confirm(`Reset HTTP ${selectedCode.value} template back to factory default?`)) return;
+  showResetConfirm.value = false;
   isResetting.value = true;
   statusMessage.value = null;
   try {
@@ -183,7 +189,7 @@ onMounted(() => {
           class="h-8 text-xs gap-1.5"
           data-testid="btn-reset-template"
           :disabled="isResetting || isLoading"
-          @click="handleReset"
+          @click="triggerReset"
         >
           <RotateCcw class="w-3.5 h-3.5" />
           Reset Default
@@ -237,7 +243,7 @@ onMounted(() => {
                 <span class="text-xs text-foreground truncate max-w-[180px]" :title="opt.name">
                   {{ opt.name }}
                 </span>
-                <Badge variant="outline" class="text-[9px] uppercase font-mono px-1 py-0 ml-auto shrink-0">
+                <Badge variant="outline" class="text-xs uppercase font-mono px-1 py-0 ml-auto shrink-0">
                   {{ opt.category }}
                 </Badge>
               </div>
@@ -252,15 +258,14 @@ onMounted(() => {
           <TooltipTrigger as-child>
             <div
               class="flex items-center gap-2 text-xs text-muted-foreground truncate max-w-md cursor-help border border-border/80 bg-card px-2.5 py-1.5 rounded-md"
-              :title="`${currentOption?.name}: ${currentOption?.description}`"
             >
               <span class="font-medium text-foreground truncate">{{ currentOption?.name }}</span>
-              <span class="text-[11px] opacity-75 truncate hidden sm:inline">— {{ currentOption?.description }}</span>
+              <span class="text-xs opacity-75 truncate hidden sm:inline">— {{ currentOption?.description }}</span>
             </div>
           </TooltipTrigger>
           <TooltipContent side="bottom" class="max-w-xs text-xs">
             <p class="font-bold">HTTP {{ selectedCode }}: {{ currentOption?.name }}</p>
-            <p class="text-[11px] text-muted-foreground mt-0.5">{{ currentOption?.description }}</p>
+            <p class="text-xs text-muted-foreground mt-0.5">{{ currentOption?.description }}</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
@@ -274,12 +279,12 @@ onMounted(() => {
     <!-- Main Workspace: Split Editor & Live Preview -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
       <!-- Editor Column -->
-      <div class="bg-card border border-border rounded-xl p-4 shadow-xs space-y-4">
+      <div class="bg-card border border-border rounded-xl p-5 shadow-xs space-y-4">
         <div class="flex items-center justify-between border-b border-border pb-3">
           <div>
             <div class="flex items-center gap-2">
-              <span class="font-mono font-bold text-sm text-foreground">HTTP {{ selectedCode }}</span>
-              <Badge :variant="isCustomized ? 'default' : 'secondary'" class="text-[10px] uppercase font-mono tracking-wider">
+              <span class="font-mono font-bold text-base text-foreground">HTTP {{ selectedCode }}</span>
+              <Badge :variant="isCustomized ? 'default' : 'secondary'" class="text-xs uppercase font-mono tracking-wider">
                 {{ isCustomized ? 'Customized' : 'Factory Default' }}
               </Badge>
             </div>
@@ -301,5 +306,16 @@ onMounted(() => {
         @refresh="updatePreview"
       />
     </div>
+
+    <!-- Reset Confirmation Dialog -->
+    <ConfirmDialog
+      v-model:open="showResetConfirm"
+      title="Reset Response Template"
+      :description="`Reset HTTP ${selectedCode} template back to factory default? Any custom HTML/CSS modifications will be discarded.`"
+      confirm-text="Reset Template"
+      variant="destructive"
+      @confirm="handleReset"
+      @cancel="showResetConfirm = false"
+    />
   </div>
 </template>

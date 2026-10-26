@@ -107,7 +107,7 @@ onMounted(loadSites);
             :model-value="selectedAppID"
             @update:model-value="(val) => selectApp(val === '__none__' ? '' : (val as string))"
           >
-            <SelectTrigger class="h-8 text-xs font-mono bg-card border-border text-foreground">
+            <SelectTrigger data-testid="app-selector" class="h-8 text-xs font-mono bg-card border-border text-foreground">
               <SelectValue placeholder="Select site…" />
             </SelectTrigger>
             <SelectContent class="border-border bg-popover text-popover-foreground">
@@ -122,17 +122,6 @@ onMounted(loadSites);
               </SelectItem>
             </SelectContent>
           </Select>
-          <select
-            v-model="selectedAppID"
-            class="sr-only"
-            tabindex="-1"
-            aria-hidden="true"
-            data-testid="app-selector"
-            @change="selectApp(($event.target as HTMLSelectElement).value)"
-          >
-            <option value="">Select site…</option>
-            <option v-for="site in filteredSites" :key="site.id" :value="site.id">{{ site.name }}</option>
-          </select>
         </div>
       </div>
     </div>
@@ -142,11 +131,11 @@ onMounted(loadSites);
     <!-- Empty state -->
     <div
       v-if="!selectedAppID"
-      class="grow flex flex-col items-center justify-center gap-1 text-muted-foreground"
+      class="grow flex flex-col items-center justify-start pt-10 pb-8 gap-1 text-muted-foreground text-center"
       data-testid="override-empty"
     >
-      <p class="text-xs font-medium">No site selected</p>
-      <p class="text-[11px]">Pick a site to shape its detection posture independently of the global matrix.</p>
+      <p class="text-base font-semibold text-foreground">No site selected</p>
+      <p class="text-xs">Pick a site to shape its detection posture independently of the global matrix.</p>
     </div>
 
     <!-- Overrides table -->
@@ -157,9 +146,9 @@ onMounted(loadSites);
       <Table v-else data-testid="override-table" container-class="overflow-visible">
         <TableHeader>
           <TableRow>
-            <TableHead>Module</TableHead>
-            <TableHead class="w-32">Global</TableHead>
-            <TableHead class="w-80">Site Override</TableHead>
+            <TableHead class="text-xs uppercase font-semibold">Module</TableHead>
+            <TableHead class="w-32 text-xs uppercase font-semibold">Global</TableHead>
+            <TableHead class="w-80 text-xs uppercase font-semibold">Site Override</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -168,8 +157,8 @@ onMounted(loadSites);
             :key="module.module"
             :data-testid="`override-row-${module.module}`"
           >
-            <TableCell class="font-mono text-[11px] text-foreground">{{ module.name }}</TableCell>
-            <TableCell class="text-[10px] text-muted-foreground">global: {{ module.mode }}</TableCell>
+            <TableCell class="font-mono text-xs text-foreground">{{ module.name }}</TableCell>
+            <TableCell class="text-xs text-muted-foreground">global: {{ module.mode }}</TableCell>
             <TableCell class="w-80">
               <SemanticsModeSegment
                 inherit
@@ -187,7 +176,7 @@ onMounted(loadSites);
       v-if="selectedAppID"
       class="flex items-center justify-between px-3 py-2 border-t border-border shrink-0"
     >
-      <Badge variant="outline" class="font-mono text-[10px] tracking-normal" data-testid="override-count">
+      <Badge variant="outline" class="font-mono text-xs tracking-normal" data-testid="override-count">
         {{ overrideCount }} overridden / {{ props.modules.length }}
       </Badge>
       <Button size="sm" class="h-7 text-xs gap-1" :disabled="saving" data-testid="save-overrides" @click="saveOverrides">

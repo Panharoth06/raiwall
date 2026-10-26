@@ -75,15 +75,16 @@ const timeOf = (e: IdentityAuthEvent): string => {
 
     <p v-if="error" class="text-xs text-destructive shrink-0" data-testid="authlog-error">{{ error }}</p>
 
-    <div v-if="loading" class="flex-1 min-h-[300px] flex items-center justify-center space-x-2 text-xs text-muted-foreground" data-testid="authlog-loading">
+    <div v-if="loading" class="flex-1 min-h-[200px] flex items-center justify-center space-x-2 text-xs text-muted-foreground" data-testid="authlog-loading">
       <Loader2 class="w-4 h-4 animate-spin" />
       <span>Loading authentication log…</span>
     </div>
 
-    <div v-else-if="filtered.length === 0" class="flex-1 min-h-[300px] flex flex-col items-center justify-center space-y-2 text-xs text-muted-foreground text-center" data-testid="authlog-empty">
-      <ScrollText class="w-6 h-6 text-muted-foreground/60 mb-1" />
-      <span v-if="search" class="font-medium">No events match the filter</span>
-      <span v-else class="font-medium">No login attempts recorded yet</span>
+    <div v-else-if="filtered.length === 0" class="flex-1 flex flex-col items-center justify-start pt-10 pb-12 space-y-1 text-center" data-testid="authlog-empty">
+      <ScrollText class="w-8 h-8 text-muted-foreground/60 mb-2" />
+      <span v-if="search" class="text-base font-semibold text-foreground">No events match the filter</span>
+      <span v-else class="text-base font-semibold text-foreground">No login attempts recorded yet</span>
+      <span class="text-xs text-muted-foreground">Authentication attempts and session events will appear here in real time.</span>
     </div>
 
     <div v-else class="flex-1 overflow-auto rounded-lg border border-border bg-card">
@@ -107,7 +108,7 @@ const timeOf = (e: IdentityAuthEvent): string => {
             <TableCell>{{ e.app_id || '—' }}</TableCell>
             <TableCell class="text-muted-foreground">{{ e.method }}</TableCell>
             <TableCell>
-              <Badge :variant="resultVariant(e.result)" class="text-[10px]">{{ e.result }}</Badge>
+              <Badge :variant="resultVariant(e.result)" class="text-xs">{{ e.result }}</Badge>
             </TableCell>
             <TableCell>{{ e.client_ip || '—' }}</TableCell>
             <TableCell>{{ e.country || '—' }}</TableCell>

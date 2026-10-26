@@ -320,10 +320,10 @@ const handleLogout = async () => {
             {{ authStore.user?.username?.slice(0, 2).toUpperCase() || 'AD' }}
           </div>
           <div class="min-w-0">
-            <span class="text-[13px] font-medium text-foreground block truncate">
+            <span class="text-sm font-medium text-foreground block truncate">
               {{ authStore.user?.username || 'Operator' }}
             </span>
-            <span class="text-[11px] text-primary uppercase tracking-wider block font-semibold font-mono">
+            <span class="text-xs text-primary uppercase tracking-wider block font-semibold font-mono">
               {{ authStore.user?.role || 'admin' }}
             </span>
           </div>

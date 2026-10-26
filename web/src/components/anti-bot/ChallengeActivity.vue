@@ -51,10 +51,10 @@ const formatCount = (value: number) => value.toLocaleString('en-US');
     <div class="flex items-center justify-between gap-2 px-4 py-3 border-b border-border">
       <div class="flex items-center gap-2 min-w-0">
         <Activity class="w-4 h-4 text-muted-foreground shrink-0" />
-        <h2 class="text-xs font-semibold uppercase tracking-wider text-foreground truncate">
+        <h2 class="text-sm font-semibold uppercase tracking-wider text-foreground truncate">
           Challenge Activity
         </h2>
-        <Badge variant="outline" class="font-mono uppercase text-[10px]">24h</Badge>
+        <Badge variant="outline" class="font-mono uppercase text-xs">24h</Badge>
       </div>
 
       <Button
@@ -78,7 +78,7 @@ const formatCount = (value: number) => value.toLocaleString('en-US');
         class="bg-card px-3 py-2.5"
         :data-testid="`bot-metric-${metric.label.toLowerCase().replace(' ', '-')}`"
       >
-        <div class="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+        <div class="flex items-center gap-1.5 text-xs font-mono uppercase tracking-wider text-muted-foreground">
           <component :is="metric.icon" class="w-3 h-3" />
           <span>{{ metric.label }}</span>
         </div>
@@ -92,10 +92,10 @@ const formatCount = (value: number) => value.toLocaleString('en-US');
     <!-- Recent challenges -->
     <div class="border-t border-border">
       <div class="flex items-center justify-between px-4 py-2">
-        <span class="text-[10px] font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+        <span class="text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">
           Recent challenges
         </span>
-        <span class="text-[10px] font-mono text-muted-foreground tabular-nums">
+        <span class="text-xs font-mono text-muted-foreground tabular-nums">
           {{ formatCount(challengeTotal) }} total
         </span>
       </div>
@@ -105,7 +105,7 @@ const formatCount = (value: number) => value.toLocaleString('en-US');
       </div>
 
       <div v-else-if="error" class="px-4 pb-4" data-testid="bot-activity-error">
-        <div class="flex items-start gap-2 rounded-md border border-threat/30 bg-threat/10 px-3 py-2 text-[11px] text-threat">
+        <div class="flex items-start gap-2 rounded-md border border-threat/30 bg-threat/10 px-3 py-2 text-xs text-threat">
           <ShieldAlert class="w-3.5 h-3.5 mt-px shrink-0" />
           <div class="min-w-0">
             <p class="font-medium">Activity unavailable</p>
@@ -118,10 +118,10 @@ const formatCount = (value: number) => value.toLocaleString('en-US');
         </Button>
       </div>
 
-      <div v-else-if="visibleEvents.length === 0" class="px-4 pb-6 pt-2 text-center" data-testid="bot-activity-empty">
-        <ShieldCheck class="w-7 h-7 text-success mx-auto mb-2" />
-        <p class="text-[11px] font-medium text-foreground">No challenges served in the last 24h</p>
-        <p class="mt-0.5 text-[11px] text-muted-foreground">
+      <div v-else-if="visibleEvents.length === 0" class="px-4 pt-6 pb-8 text-center" data-testid="bot-activity-empty">
+        <ShieldCheck class="w-8 h-8 text-success mx-auto mb-2" />
+        <p class="text-base font-semibold text-foreground">No challenges served in the last 24h</p>
+        <p class="mt-1 text-xs text-muted-foreground">
           Browser traffic was not challenged under the current mode.
         </p>
       </div>
@@ -134,26 +134,26 @@ const formatCount = (value: number) => value.toLocaleString('en-US');
         >
           <div class="min-w-0">
             <div class="flex items-center gap-1.5 min-w-0">
-              <span class="font-mono text-[11px] text-foreground">{{ event.client_ip }}</span>
-              <span class="font-mono text-[10px] text-muted-foreground">{{ formatTime(event.timestamp) }}</span>
-              <Badge variant="warning" class="font-mono text-[9px] px-1 py-0">{{ event.status_code }}</Badge>
+              <span class="font-mono text-xs text-foreground">{{ event.client_ip }}</span>
+              <span class="font-mono text-xs text-muted-foreground">{{ formatTime(event.timestamp) }}</span>
+              <Badge variant="warning" class="font-mono text-xs px-1.5 py-0">{{ event.status_code }}</Badge>
             </div>
-            <p class="mt-0.5 truncate font-mono text-[10px] text-muted-foreground" :title="event.path">
+            <p class="mt-0.5 truncate font-mono text-xs text-muted-foreground" :title="event.path">
               {{ event.method }} {{ event.path }}
             </p>
           </div>
           <div class="shrink-0 max-w-[120px] text-right">
             <span
-              class="block truncate font-mono text-[10px] text-muted-foreground"
+              class="block truncate font-mono text-xs text-muted-foreground"
               :title="event.ja4 || 'No TLS fingerprint'"
             >
               {{ event.ja4 || 'no-ja4' }}
             </span>
-            <span class="font-mono text-[9px] text-muted-foreground/70">{{ event.host }}</span>
+            <span class="font-mono text-xs text-muted-foreground/70">{{ event.host }}</span>
           </div>
         </li>
         <li v-if="hiddenCount > 0" class="px-4 py-2 text-center">
-          <span class="text-[10px] font-mono text-muted-foreground">
+          <span class="text-xs font-mono text-muted-foreground">
             +{{ hiddenCount }} more in this sample
           </span>
         </li>

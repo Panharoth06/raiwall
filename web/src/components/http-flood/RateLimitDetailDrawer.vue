@@ -157,14 +157,14 @@ const formatCountdown = (seconds: number): string => {
             </div>
             <div class="min-w-0">
               <div class="flex items-center gap-2">
-                <h3 class="text-sm font-bold font-mono text-foreground truncate">
+                <h3 class="text-base font-semibold font-mono text-foreground truncate">
                   {{ entry.client_ip || entry.key }}
                 </h3>
-                <span class="px-1.5 py-0.2 rounded text-[10px] font-semibold uppercase bg-threat/15 text-threat border border-threat/25">
+                <span class="px-1.5 py-0.5 rounded text-xs font-semibold uppercase bg-threat/15 text-threat border border-threat/25">
                   Banned
                 </span>
               </div>
-              <div class="text-[11px] text-muted-foreground flex items-center gap-1.5 mt-0.5">
+              <div class="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
                 <Clock class="h-3 w-3 shrink-0" />
                 <span class="font-mono tabular-nums">{{ formatCountdown(entry.remaining_seconds) }}</span>
               </div>
@@ -185,7 +185,7 @@ const formatCountdown = (seconds: number): string => {
         <div class="flex-1 min-h-0 overflow-y-auto p-6 space-y-5 text-xs">
           <!-- Trigger Overview -->
           <div class="p-3.5 rounded-lg border border-border bg-muted/10 space-y-2.5">
-            <div class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <div class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Defense Trigger
             </div>
             <div class="flex items-center justify-between">
@@ -217,14 +217,14 @@ const formatCountdown = (seconds: number): string => {
           <!-- Diagnostic Log Box -->
           <div class="space-y-1.5">
             <div class="flex items-center justify-between">
-              <span class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <span class="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                 <Terminal class="h-3 w-3" />
                 Raw Violation Diagnostics
               </span>
               <Button
                 variant="ghost"
                 size="sm"
-                class="h-6 px-2 text-[10px] text-muted-foreground hover:text-foreground"
+                class="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
                 @click="handleCopy(parsedReason.raw, 'raw')"
               >
                 <Check v-if="copiedField === 'raw'" class="h-3 w-3 mr-1 text-success" />
@@ -232,25 +232,25 @@ const formatCountdown = (seconds: number): string => {
                 {{ copiedField === 'raw' ? 'Copied' : 'Copy Log' }}
               </Button>
             </div>
-            <div class="p-3 rounded-lg border border-border bg-muted/40 font-mono text-[11px] text-foreground leading-relaxed break-all select-all whitespace-pre-wrap">
+            <div class="p-3 rounded-lg border border-border bg-muted/40 font-mono text-xs text-foreground leading-relaxed break-all select-all whitespace-pre-wrap">
               {{ parsedReason.raw }}
             </div>
           </div>
 
           <!-- Identifiers & Fingerprint -->
           <div class="space-y-3">
-            <div class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+            <div class="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
               <Fingerprint class="h-3 w-3" />
               Fingerprint & Keys
             </div>
 
             <div v-if="entry.ja4" class="p-2.5 rounded-lg border border-border bg-card space-y-1">
               <div class="flex items-center justify-between">
-                <span class="text-[11px] text-muted-foreground font-mono">JA4 TLS Hash</span>
+                <span class="text-xs text-muted-foreground font-mono">JA4 TLS Hash</span>
                 <Button
                   variant="ghost"
                   size="sm"
-                  class="h-5 px-1.5 text-[10px] text-muted-foreground hover:text-foreground"
+                  class="h-5 px-1.5 text-xs text-muted-foreground hover:text-foreground"
                   @click="handleCopy(entry.ja4, 'ja4')"
                 >
                   <Check v-if="copiedField === 'ja4'" class="h-2.5 w-2.5 mr-0.5 text-success" />
@@ -263,11 +263,11 @@ const formatCountdown = (seconds: number): string => {
 
             <div class="p-2.5 rounded-lg border border-border bg-card space-y-1">
               <div class="flex items-center justify-between">
-                <span class="text-[11px] text-muted-foreground font-mono">Composite Ban Key</span>
+                <span class="text-xs text-muted-foreground font-mono">Composite Ban Key</span>
                 <Button
                   variant="ghost"
                   size="sm"
-                  class="h-5 px-1.5 text-[10px] text-muted-foreground hover:text-foreground"
+                  class="h-5 px-1.5 text-xs text-muted-foreground hover:text-foreground"
                   @click="handleCopy(entry.key, 'key')"
                 >
                   <Check v-if="copiedField === 'key'" class="h-2.5 w-2.5 mr-0.5 text-success" />

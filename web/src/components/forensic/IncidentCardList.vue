@@ -44,10 +44,10 @@ function spanSeconds(incident: Incident): number {
       />
     </div>
 
-    <div v-else-if="error" class="py-12 text-center text-xs font-sans">
-      <AlertCircle class="w-7 h-7 mx-auto mb-2 text-threat" />
-      <p class="text-foreground font-medium">Failed to load aggregated incidents</p>
-      <p class="text-muted-foreground mt-1">{{ error }}</p>
+    <div v-else-if="error" class="pt-8 pb-10 text-center font-sans">
+      <AlertCircle class="w-8 h-8 mx-auto mb-3 text-threat" />
+      <p class="text-base font-semibold text-foreground">Failed to load aggregated incidents</p>
+      <p class="text-xs text-muted-foreground mt-1">{{ error }}</p>
       <button
         type="button"
         data-testid="incidents-retry"
@@ -59,10 +59,10 @@ function spanSeconds(incident: Incident): number {
       </button>
     </div>
 
-    <div v-else-if="incidents.length === 0" class="py-12 text-center text-xs font-sans">
-      <ShieldAlert class="w-7 h-7 mx-auto mb-2 text-muted-foreground/60" />
-      <p class="text-foreground font-medium">No incident clusters in this window</p>
-      <p class="text-muted-foreground mt-1">Attack bursts are grouped by client IP, host, and 5-minute window.</p>
+    <div v-else-if="incidents.length === 0" class="pt-8 pb-10 text-center font-sans">
+      <ShieldAlert class="w-8 h-8 mx-auto mb-3 text-muted-foreground/60" />
+      <p class="text-base font-semibold text-foreground">No incident clusters in this window</p>
+      <p class="text-xs text-muted-foreground mt-1">Attack bursts are grouped by client IP, host, and 5-minute window.</p>
       <button
         type="button"
         data-testid="incidents-retry"
@@ -87,20 +87,20 @@ function spanSeconds(incident: Incident): number {
           <span class="font-mono text-xs font-semibold text-foreground truncate">{{ incident.client_ip }}</span>
           <span
             v-if="incident.max_severity"
-            class="px-1.5 py-0.5 rounded border text-[10px] font-semibold uppercase tracking-wide"
+            class="px-1.5 py-0.5 rounded border text-xs font-semibold uppercase tracking-wide"
             :class="severityClass(incident.max_severity)"
           >
             {{ incident.max_severity }}
           </span>
         </div>
 
-        <p class="mt-1 text-[11px] font-mono text-muted-foreground truncate">{{ incident.host }}</p>
+        <p class="mt-1 text-xs font-mono text-muted-foreground truncate">{{ incident.host }}</p>
 
         <p class="mt-2 text-xs text-foreground truncate">
           {{ incident.category || incident.top_rule_id || 'Unclassified' }}
         </p>
 
-        <div class="mt-2.5 flex items-center gap-3 text-[11px] text-muted-foreground font-mono tabular-nums">
+        <div class="mt-2.5 flex items-center gap-3 text-xs text-muted-foreground font-mono tabular-nums">
           <span>{{ incident.total_events }} events</span>
           <span class="text-threat">{{ incident.total_blocked }} blocked</span>
           <span class="inline-flex items-center gap-1">

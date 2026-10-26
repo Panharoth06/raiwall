@@ -137,15 +137,16 @@ const removeUser = async (user: IdentityUser) => {
 
     <p v-if="error" class="text-xs text-destructive shrink-0" data-testid="user-error">{{ error }}</p>
 
-    <div v-if="loading" class="flex-1 min-h-[300px] flex items-center justify-center space-x-2 text-xs text-muted-foreground" data-testid="user-loading">
+    <div v-if="loading" class="flex-1 min-h-[200px] flex items-center justify-center space-x-2 text-xs text-muted-foreground" data-testid="user-loading">
       <Loader2 class="w-4 h-4 animate-spin" />
       <span>Loading directory…</span>
     </div>
 
-    <div v-else-if="filtered.length === 0" class="flex-1 min-h-[300px] flex flex-col items-center justify-center space-y-2 text-xs text-muted-foreground text-center" data-testid="user-empty">
-      <UserRound class="w-6 h-6 text-muted-foreground/60 mb-1" />
-      <span v-if="search" class="font-medium">No users match the search</span>
-      <span v-else class="font-medium">Directory is empty — add the first account</span>
+    <div v-else-if="filtered.length === 0" class="flex-1 flex flex-col items-center justify-start pt-10 pb-12 space-y-1 text-center" data-testid="user-empty">
+      <UserRound class="w-8 h-8 text-muted-foreground/60 mb-2" />
+      <span v-if="search" class="text-base font-semibold text-foreground">No users match the search</span>
+      <span v-else class="text-base font-semibold text-foreground">Directory is empty</span>
+      <span class="text-xs text-muted-foreground">Add user accounts to grant application access credentials.</span>
     </div>
 
     <div v-else class="flex-1 overflow-auto rounded-lg border border-border bg-card">
@@ -164,21 +165,21 @@ const removeUser = async (user: IdentityUser) => {
           <TableRow v-for="(u, i) in filtered" :key="u.id" :data-testid="`user-row-${i}`">
             <TableCell>
               <span class="font-medium font-sans">{{ u.display_name || u.username }}</span>
-              <span class="ml-2 text-muted-foreground text-[10px]">{{ u.username }}</span>
+              <span class="ml-2 text-muted-foreground text-xs">{{ u.username }}</span>
             </TableCell>
             <TableCell class="text-muted-foreground">{{ u.email || '—' }}</TableCell>
             <TableCell class="max-w-40 truncate" :title="u.app_ids.map(siteName).join(', ')">
               {{ u.app_ids.map(siteName).join(', ') || '—' }}
             </TableCell>
             <TableCell>
-              <Badge :variant="u.totp_enrolled ? 'secondary' : 'outline'" class="text-[10px]" :data-testid="`user-totp-${i}`">
+              <Badge :variant="u.totp_enrolled ? 'secondary' : 'outline'" class="text-xs" :data-testid="`user-totp-${i}`">
                 {{ u.totp_enrolled ? '2FA on' : '2FA off' }}
               </Badge>
             </TableCell>
             <TableCell>
               <button
                 :data-testid="`user-toggle-${i}`"
-                class="text-[10px] font-sans px-2 py-0.5 rounded border"
+                class="text-xs font-sans px-2 py-0.5 rounded border"
                 :class="u.enabled ? 'border-transparent bg-secondary text-secondary-foreground' : 'border-border text-muted-foreground'"
                 :disabled="pending.has(u.id)"
                 @click="toggleEnabled(u, !u.enabled)"
@@ -214,7 +215,7 @@ const removeUser = async (user: IdentityUser) => {
     <div v-if="enrollment" class="border border-border rounded-lg p-3 bg-muted/40 text-xs space-y-1" data-testid="totp-enrollment-panel">
       <p class="font-medium">2FA enrolled — scan or store this secret now, it is shown once.</p>
       <p class="font-mono break-all" data-testid="totp-enrollment-secret">{{ enrollment.secret }}</p>
-      <p class="font-mono text-[10px] text-muted-foreground break-all">{{ enrollment.uri }}</p>
+      <p class="font-mono text-xs text-muted-foreground break-all">{{ enrollment.uri }}</p>
       <Button variant="outline" size="sm" data-testid="totp-enrollment-dismiss" @click="enrollment = null">Dismiss</Button>
     </div>
   </div>

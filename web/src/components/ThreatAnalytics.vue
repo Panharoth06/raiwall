@@ -97,52 +97,52 @@ const maxBucketVolume = computed(() => {
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
       <!-- Total Requests -->
       <div class="p-4 bg-card border border-border rounded-xl relative overflow-hidden">
-        <div class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+        <div class="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
           Total Requests
         </div>
         <div data-testid="metric-total-requests" class="text-2xl font-bold font-mono text-foreground">
           {{ activeStats.total_requests.toLocaleString() }}
         </div>
-        <div class="text-[10px] text-muted-foreground mt-1 flex items-center gap-1">
+        <div class="text-xs text-muted-foreground mt-1 flex items-center gap-1">
           <span class="text-success font-semibold">Active</span> Gateway Throughput
         </div>
       </div>
 
       <!-- Blocked Threats -->
       <div class="p-4 bg-card border border-border rounded-xl relative overflow-hidden">
-        <div class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+        <div class="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
           Threats Blocked
         </div>
         <div data-testid="metric-total-blocked" class="text-2xl font-bold font-mono text-threat">
           {{ activeStats.total_blocked.toLocaleString() }}
         </div>
-        <div class="text-[10px] text-muted-foreground mt-1">
+        <div class="text-xs text-muted-foreground mt-1">
           <span class="text-threat font-semibold">{{ blockPercentage }}%</span> Block Ratio
         </div>
       </div>
 
       <!-- Top Attacking Country -->
       <div class="p-4 bg-card border border-border rounded-xl relative overflow-hidden">
-        <div class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+        <div class="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
           Top Threat Origin
         </div>
         <div data-testid="metric-top-country" class="text-2xl font-bold font-mono text-warning truncate">
           {{ activeStats.top_countries[0]?.key || 'N/A' }}
         </div>
-        <div class="text-[10px] text-muted-foreground mt-1">
+        <div class="text-xs text-muted-foreground mt-1">
           {{ activeStats.top_countries[0]?.count.toLocaleString() || '0' }} events
         </div>
       </div>
 
       <!-- Top Triggered Rule -->
       <div class="p-4 bg-card border border-border rounded-xl relative overflow-hidden">
-        <div class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+        <div class="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
           Top Block Rule
         </div>
         <div data-testid="metric-top-rule" class="text-lg font-bold font-mono text-primary truncate">
           {{ activeStats.top_rules[0]?.key || 'NONE' }}
         </div>
-        <div class="text-[10px] text-muted-foreground mt-1">
+        <div class="text-xs text-muted-foreground mt-1">
           {{ activeStats.top_rules[0]?.count.toLocaleString() || '0' }} triggers
         </div>
       </div>
@@ -153,11 +153,11 @@ const maxBucketVolume = computed(() => {
       <!-- Time-Series Volume & Attack Chart -->
       <div class="lg:col-span-2 p-5 bg-card border border-border rounded-xl flex flex-col justify-between">
         <div class="flex items-center justify-between mb-4">
-          <div class="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
-            <TrendingUp class="w-3.5 h-3.5 text-muted-foreground" />
+          <div class="text-sm font-semibold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+            <TrendingUp class="w-4 h-4 text-muted-foreground" />
             Traffic & Attack Volume (Time Buckets)
           </div>
-          <div class="flex items-center gap-3 text-[10px] font-mono">
+          <div class="flex items-center gap-3 text-xs font-mono">
             <span class="flex items-center gap-1 text-muted-foreground">
               <span class="w-2 h-2 rounded-full bg-primary"></span> Total
             </span>
@@ -178,7 +178,7 @@ const maxBucketVolume = computed(() => {
             class="flex-1 min-w-[20px] max-w-[40px] flex flex-col justify-end items-center group relative h-full"
           >
             <!-- Hover Tooltip -->
-            <div class="absolute bottom-full mb-1 hidden group-hover:flex flex-col bg-popover border border-border text-popover-foreground px-2 py-1 rounded text-[10px] whitespace-nowrap z-20 shadow-none">
+            <div class="absolute bottom-full mb-1 hidden group-hover:flex flex-col bg-popover border border-border text-popover-foreground px-2 py-1 rounded text-xs whitespace-nowrap z-20 shadow-none">
               <span class="font-bold text-foreground">{{ new Date(bucket.bucket).toLocaleTimeString() }}</span>
               <span class="text-primary">Total: {{ bucket.total }}</span>
               <span class="text-threat">Blocked: {{ bucket.block }}</span>
@@ -207,8 +207,8 @@ const maxBucketVolume = computed(() => {
 
       <!-- Threat Rule Breakdown -->
       <div class="p-5 bg-card border border-border rounded-xl flex flex-col">
-        <div class="text-xs font-bold text-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
-          <ShieldAlert class="w-3.5 h-3.5 text-muted-foreground" />
+        <div class="text-sm font-semibold text-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
+          <ShieldAlert class="w-4 h-4 text-muted-foreground" />
           Top Threat Rules
         </div>
         <div class="space-y-3 flex-1 overflow-y-auto">
@@ -242,8 +242,8 @@ const maxBucketVolume = computed(() => {
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
       <!-- Top Attacking Countries -->
       <div class="p-4 bg-card border border-border rounded-xl">
-        <h3 class="text-xs font-bold text-foreground uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-          <Globe2 class="w-3.5 h-3.5 text-muted-foreground" />
+        <h3 class="text-base font-semibold text-foreground uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+          <Globe2 class="w-4 h-4 text-muted-foreground" />
           Top Attacking Countries
         </h3>
         <div class="space-y-2">
@@ -253,7 +253,7 @@ const maxBucketVolume = computed(() => {
             class="flex items-center justify-between text-xs font-mono p-1.5 rounded hover:bg-muted/50"
           >
             <span class="flex items-center gap-2">
-              <span class="text-muted-foreground text-[10px]">#{{ idx + 1 }}</span>
+              <span class="text-muted-foreground text-xs">#{{ idx + 1 }}</span>
               <span class="font-bold text-foreground">{{ c.key }}</span>
             </span>
             <span class="text-muted-foreground">{{ c.count.toLocaleString() }} hits</span>
@@ -263,8 +263,8 @@ const maxBucketVolume = computed(() => {
 
       <!-- Top Client IPs -->
       <div class="p-4 bg-card border border-border rounded-xl">
-        <h3 class="text-xs font-bold text-foreground uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-          <Server class="w-3.5 h-3.5 text-muted-foreground" />
+        <h3 class="text-base font-semibold text-foreground uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+          <Server class="w-4 h-4 text-muted-foreground" />
           Top Suspicious IPs
         </h3>
         <div class="space-y-2">
@@ -274,7 +274,7 @@ const maxBucketVolume = computed(() => {
             class="flex items-center justify-between text-xs font-mono p-1.5 rounded hover:bg-muted/50"
           >
             <span class="flex items-center gap-2">
-              <span class="text-muted-foreground text-[10px]">#{{ idx + 1 }}</span>
+              <span class="text-muted-foreground text-xs">#{{ idx + 1 }}</span>
               <span class="font-bold text-foreground">{{ ip.key }}</span>
             </span>
             <span class="text-muted-foreground">{{ ip.count.toLocaleString() }} hits</span>

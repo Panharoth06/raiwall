@@ -37,13 +37,13 @@ const searchModel = computed({
 <template>
   <div class="flex flex-wrap items-center justify-between gap-3 px-5 py-3 border-b border-border bg-card">
     <div class="flex items-center gap-3">
-      <span data-testid="status-text" class="text-[11px] font-semibold tracking-wider uppercase text-muted-foreground">
+      <span data-testid="status-text" class="text-xs font-semibold tracking-wider uppercase text-muted-foreground">
         {{ isConnected ? 'Live Telemetry' : 'Disconnected' }}
       </span>
-      <span class="text-[11px] text-muted-foreground/60">|</span>
+      <span class="text-xs text-muted-foreground/60">|</span>
       <span
         data-testid="view-count"
-        class="text-[11px] font-mono tabular-nums text-muted-foreground"
+        class="text-xs font-mono tabular-nums text-muted-foreground"
       >
         {{ view === 'incidents' ? `${incidentCount} incidents` : `${eventCount} events` }}
       </span>
@@ -62,7 +62,7 @@ const searchModel = computed({
         v-if="hostFilter"
         type="button"
         data-testid="host-filter-chip"
-        class="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-mono bg-muted border border-border rounded-md text-foreground cursor-pointer"
+        class="inline-flex items-center gap-1 px-2 py-1 text-xs font-mono bg-muted border border-border rounded-md text-foreground cursor-pointer"
         title="Clear host filter"
         @click="emit('update:hostFilter', '')"
       >
@@ -71,7 +71,7 @@ const searchModel = computed({
 
       <div class="relative z-30">
         <Select :model-value="selectedAction" @update:model-value="emit('update:selectedAction', String($event))">
-          <SelectTrigger class="h-8 w-32 border-input bg-card text-foreground text-xs">
+          <SelectTrigger data-testid="action-filter-select" class="h-8 w-32 border-input bg-card text-foreground text-xs">
             <SelectValue placeholder="All Actions" />
           </SelectTrigger>
           <SelectContent class="border-border bg-popover text-popover-foreground z-50">
@@ -82,20 +82,6 @@ const searchModel = computed({
             <SelectItem value="ban">Ban</SelectItem>
           </SelectContent>
         </Select>
-        <select
-          :value="selectedAction"
-          data-testid="action-filter-select"
-          class="sr-only"
-          tabindex="-1"
-          aria-hidden="true"
-          @change="emit('update:selectedAction', ($event.target as HTMLSelectElement).value)"
-        >
-          <option value="all">All Actions</option>
-          <option value="allow">Allow</option>
-          <option value="block">Block</option>
-          <option value="challenge">Challenge</option>
-          <option value="ban">Ban</option>
-        </select>
       </div>
     </div>
 
@@ -103,7 +89,7 @@ const searchModel = computed({
       v-else
       type="button"
       data-testid="incidents-refresh"
-      class="px-3 py-1.5 text-[11px] font-medium text-muted-foreground hover:text-foreground bg-muted hover:bg-muted/80 border border-border rounded-md transition-colors cursor-pointer"
+      class="px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground bg-muted hover:bg-muted/80 border border-border rounded-md transition-colors cursor-pointer"
       @click="emit('refresh-incidents')"
     >
       Refresh incidents

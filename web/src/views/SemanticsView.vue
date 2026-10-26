@@ -43,19 +43,19 @@ onMounted(loadMatrix);
 </script>
 
 <template>
-  <div class="h-full flex flex-col space-y-4 p-6 bg-card text-card-foreground rounded-xl border border-border font-sans overflow-hidden">
+  <div class="h-full flex flex-col space-y-6 p-6 bg-card text-card-foreground rounded-xl border border-border font-sans overflow-hidden">
     <!-- Header -->
     <div class="flex items-center justify-between shrink-0">
       <div>
-        <h1 class="text-sm font-semibold uppercase tracking-wider text-foreground flex items-center gap-2">
-          <Activity class="w-4 h-4 text-muted-foreground" />
+        <h1 class="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
+          <Activity class="w-5 h-5 text-muted-foreground" />
           <span>Semantic Detection Matrix</span>
         </h1>
-        <p class="text-xs text-muted-foreground mt-0.5">
+        <p class="text-sm text-muted-foreground mt-1">
           {{ modules.length }}-module triage funnel — set global operating modes; per-site overrides below
         </p>
       </div>
-      <Badge variant="outline" class="font-mono text-[10px] tracking-normal" data-testid="staged-note">
+      <Badge variant="outline" class="font-mono text-xs tracking-normal" data-testid="staged-note">
         Applies as staged draft → POST /config/apply
       </Badge>
     </div>
@@ -85,11 +85,11 @@ onMounted(loadMatrix);
             :data-testid="`module-row-${module.module}`"
           >
             <TableCell class="font-medium">
-              <span class="font-mono text-[11px] text-foreground">{{ module.name }}</span>
+              <span class="font-mono text-xs text-foreground">{{ module.name }}</span>
               <span v-if="dirtyModules.has(module.module)" class="text-warning ml-1">●</span>
             </TableCell>
             <TableCell>
-              <Badge variant="secondary" class="font-mono text-[10px] tracking-normal">{{ module.category }}</Badge>
+              <Badge variant="secondary" class="font-mono text-xs tracking-normal">{{ module.category }}</Badge>
             </TableCell>
             <TableCell class="max-w-md truncate text-muted-foreground" :title="module.description">
               {{ module.description }}

@@ -77,20 +77,20 @@ const handleInsertTag = (tag: string) => {
     <div class="space-y-1.5">
       <div class="flex items-center justify-between text-xs text-muted-foreground px-0.5">
         <span>Template Placeholders (Click to insert or copy)</span>
-        <span class="text-[11px] font-mono opacity-80">{{ availableTags.length }} variables</span>
+        <span class="text-xs font-mono opacity-80">{{ availableTags.length }} variables</span>
       </div>
       <div class="flex flex-wrap gap-1.5">
         <button
           v-for="item in availableTags"
           :key="item.tag"
           type="button"
-          class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-mono bg-muted border border-border text-foreground hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer select-none"
+          class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-mono bg-muted border border-border text-foreground hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer select-none"
           :title="item.desc"
           @click="handleInsertTag(item.tag)"
           @dblclick.stop="copyTag(item.tag)"
         >
           <span>{{ item.tag }}</span>
-          <component :is="copiedTag === item.tag ? Check : Copy" class="w-2.5 h-2.5 text-muted-foreground" />
+          <component :is="copiedTag === item.tag ? Check : Copy" class="w-3 h-3 text-muted-foreground" />
         </button>
       </div>
     </div>
@@ -119,7 +119,7 @@ const handleInsertTag = (tag: string) => {
             Custom CSS
           </Button>
         </div>
-        <span class="text-[11px] font-mono text-muted-foreground">
+        <span class="text-xs font-mono text-muted-foreground">
           {{ activeTab === 'html' ? 'HTML5 Document' : 'CSS Variables & Rules' }}
         </span>
       </div>

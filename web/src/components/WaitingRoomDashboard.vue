@@ -232,9 +232,9 @@ const handleSavePolicy = (updated: PolicySettings) => {
 
 <template>
   <div class="space-y-4">
-    <h2 class="sr-only">Virtual Waiting Room Engine (HTTP 465)</h2>
     <!-- Filter Bar & Actions Right (matching RateLimitingTable exactly) -->
     <div class="flex flex-wrap items-center justify-between gap-3">
+      <h2 class="sr-only">Virtual Waiting Room Engine (HTTP 465)</h2>
       <div class="flex flex-wrap items-center gap-2.5 flex-1 min-w-0">
         <!-- Application Selector (shadcn Select) -->
         <div class="w-48">
@@ -346,11 +346,11 @@ const handleSavePolicy = (updated: PolicySettings) => {
 
           <!-- Empty State -->
           <TableRow v-else-if="filteredSessions.length === 0">
-            <TableCell colspan="8" class="h-64 text-center">
-              <div class="h-full flex flex-col items-center justify-center p-8">
-                <Layers class="h-8 w-8 mx-auto mb-2 text-muted-foreground/40" />
-                <div class="text-xs font-semibold text-foreground">No waiting room surge sessions recorded</div>
-                <div class="text-[11px] text-muted-foreground mt-0.5">
+            <TableCell colspan="8" class="h-64 text-center align-top">
+              <div class="flex flex-col items-center justify-start pt-10 pb-12 p-8">
+                <Layers class="h-8 w-8 mx-auto mb-3 text-muted-foreground/40" />
+                <div class="text-base font-semibold text-foreground">No waiting room surge sessions recorded</div>
+                <div class="text-xs text-muted-foreground mt-1">
                   No application traffic currently exceeds virtual waiting room capacity limits.
                 </div>
               </div>
@@ -377,7 +377,7 @@ const handleSavePolicy = (updated: PolicySettings) => {
                       title="Live Active Surge"
                     />
                   </div>
-                  <div class="text-[11px] text-muted-foreground mt-0.5 font-sans">
+                  <div class="text-xs text-muted-foreground mt-0.5 font-sans">
                     {{ s.hostPattern }}
                   </div>
                 </div>

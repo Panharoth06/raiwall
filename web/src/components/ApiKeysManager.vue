@@ -19,7 +19,9 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  ConfirmDialog,
 } from '@/components/ui/dialog';
+import { EmptyState } from '@/components/ui/empty-state';
 import {
   Select,
   SelectTrigger,
@@ -55,8 +57,13 @@ onMounted(() => {
   loadKeys();
 });
 
+const createError = ref<string | null>(null);
+const keyToDelete = ref<string | null>(null);
+const showRevokeConfirm = ref(false);
+
 const handleCreateKey = async () => {
   if (!newKeyName.value) return;
+  createError.value = null;
   try {
     const res = await api.createApiKey({
       name: newKeyName.value,
@@ -66,7 +73,7 @@ const handleCreateKey = async () => {
     generatedToken.value = res.token;
     await loadKeys();
   } catch (err: unknown) {
-    alert(err instanceof Error ? err.message : 'Failed to create API key');
+    createError.value = err instanceof Error ? err.message : 'Failed to create API key';
   }
 };
 
@@ -80,11 +87,18 @@ const copyToken = () => {
   }
 };
 
-const handleDeleteKey = async (id: string) => {
-  if (confirm('Revoke this API key? Applications using it will lose access immediately.')) {
-    await api.deleteApiKey(id);
+const confirmRevokeKey = (id: string) => {
+  keyToDelete.value = id;
+  showRevokeConfirm.value = true;
+};
+
+const executeRevokeKey = async () => {
+  if (keyToDelete.value) {
+    await api.deleteApiKey(keyToDelete.value);
+    keyToDelete.value = null;
     await loadKeys();
   }
+  showRevokeConfirm.value = false;
 };
 </script>
 
@@ -112,38 +126,42 @@ const handleDeleteKey = async (id: string) => {
 
     <!-- Keys Table Container -->
     <div class="bg-card border border-border rounded-lg overflow-hidden">
-      <div v-if="keys.length === 0" class="p-8 text-center text-sm text-muted-foreground">
-        No active API keys found. Generate a key to access the Huma REST API or MCP server.
-      </div>
+      <EmptyState
+        v-if="keys.length === 0"
+        :icon="Key"
+        title="No active API keys found"
+        description="Generate a key to access the Huma REST API or MCP server."
+        class="py-8"
+      />
 
       <Table v-else>
         <TableHeader>
           <TableRow>
-            <TableHead>Key Name</TableHead>
-            <TableHead>Prefix</TableHead>
-            <TableHead>Role</TableHead>
-            <TableHead>Created</TableHead>
-            <TableHead class="text-right">Actions</TableHead>
+            <TableHead class="text-xs uppercase font-semibold">Key Name</TableHead>
+            <TableHead class="text-xs uppercase font-semibold">Prefix</TableHead>
+            <TableHead class="text-xs uppercase font-semibold">Role</TableHead>
+            <TableHead class="text-xs uppercase font-semibold">Created</TableHead>
+            <TableHead class="text-right text-xs uppercase font-semibold">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           <TableRow v-for="key in keys" :key="key.id">
-            <TableCell class="font-medium text-foreground">{{ key.name }}</TableCell>
-            <TableCell class="font-mono text-primary">{{ key.prefix }}...</TableCell>
+            <TableCell class="font-medium text-foreground text-sm">{{ key.name }}</TableCell>
+            <TableCell class="font-mono text-primary text-xs">{{ key.prefix }}...</TableCell>
             <TableCell>
               <Badge
                 :variant="key.role === 'admin' ? 'warning' : 'secondary'"
-                class="font-mono uppercase tracking-wider"
+                class="font-mono uppercase tracking-wider text-xs"
               >
                 {{ key.role }}
               </Badge>
             </TableCell>
-            <TableCell class="text-muted-foreground">{{ new Date(key.created_at).toLocaleDateString() }}</TableCell>
+            <TableCell class="text-muted-foreground text-xs">{{ new Date(key.created_at).toLocaleDateString() }}</TableCell>
             <TableCell class="text-right">
               <Button
                 variant="ghost"
                 size="icon"
-                @click="handleDeleteKey(key.id)"
+                @click="confirmRevokeKey(key.id)"
                 class="h-7 w-7 text-muted-foreground hover:text-threat"
                 title="Revoke key"
               >
@@ -164,6 +182,10 @@ const handleDeleteKey = async (id: string) => {
             <DialogTitle>Generate API Bearer Token</DialogTitle>
           </div>
         </DialogHeader>
+
+        <div v-if="createError" class="p-3 bg-threat/10 border border-threat/30 rounded-lg text-threat text-xs">
+          {{ createError }}
+        </div>
 
         <div class="py-2 space-y-4">
           <div v-if="!generatedToken">
@@ -187,10 +209,6 @@ const handleDeleteKey = async (id: string) => {
                     <SelectItem value="admin">Admin (Read/Write mutating operations)</SelectItem>
                   </SelectContent>
                 </Select>
-                <select v-model="newKeyRole" class="sr-only" tabindex="-1" aria-hidden="true">
-                  <option value="viewer">Viewer</option>
-                  <option value="admin">Admin</option>
-                </select>
               </div>
 
               <div>
@@ -255,5 +273,16 @@ const handleDeleteKey = async (id: string) => {
         </div>
       </DialogContent>
     </Dialog>
+
+    <!-- Revoke Confirmation Modal -->
+    <ConfirmDialog
+      v-model:open="showRevokeConfirm"
+      title="Revoke API Key"
+      description="Revoke this API key? Applications and pipelines using it will lose access immediately."
+      confirm-text="Revoke Key"
+      variant="destructive"
+      @confirm="executeRevokeKey"
+      @cancel="showRevokeConfirm = false"
+    />
   </div>
 </template>

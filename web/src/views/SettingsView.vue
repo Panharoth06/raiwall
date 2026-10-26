@@ -24,11 +24,11 @@ const handleTabChange = (tabId: string) => {
 </script>
 
 <template>
-  <div class="h-full flex flex-col space-y-4 p-6 bg-card text-card-foreground rounded-xl border border-border shadow-none font-sans overflow-hidden">
+  <div class="h-full flex flex-col space-y-6 p-6 bg-card text-card-foreground rounded-xl border border-border shadow-none font-sans overflow-hidden">
     <!-- Header -->
     <div class="shrink-0">
-      <h1 class="text-sm font-semibold uppercase tracking-wider text-foreground flex items-center gap-2">
-        <Settings class="w-4 h-4 text-muted-foreground" />
+      <h1 class="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
+        <Settings class="w-5 h-5 text-muted-foreground" />
         <span>System Settings & Cluster Integration</span>
       </h1>
       <p class="text-sm text-muted-foreground mt-1 leading-relaxed">
@@ -53,7 +53,7 @@ const handleTabChange = (tabId: string) => {
           <CardHeader class="pb-2">
             <div class="flex items-center gap-2">
               <Network class="w-4 h-4 text-muted-foreground" />
-              <CardTitle class="text-xs uppercase tracking-wider text-foreground">
+              <CardTitle class="text-base font-semibold text-foreground">
                 Cluster Node & State Synchronization
               </CardTitle>
             </div>
@@ -62,14 +62,14 @@ const handleTabChange = (tabId: string) => {
           <CardContent class="pt-2">
             <div class="grid grid-cols-3 gap-3">
               <div class="p-3 bg-muted/50 border border-border rounded-md">
-                <span class="text-[10px] uppercase font-mono text-muted-foreground block mb-1">Operating Mode</span>
+                <span class="text-xs uppercase font-mono text-muted-foreground block mb-1">Operating Mode</span>
                 <span class="text-xs font-semibold text-foreground capitalize">
                   {{ configStore.cluster?.mode || 'Standalone' }}
                 </span>
               </div>
 
               <div class="p-3 bg-muted/50 border border-border rounded-md">
-                <span class="text-[10px] uppercase font-mono text-muted-foreground block mb-1">Redis Sync Status</span>
+                <span class="text-xs uppercase font-mono text-muted-foreground block mb-1">Redis Sync Status</span>
                 <span
                   class="text-xs font-semibold flex items-center gap-1.5"
                   :class="configStore.cluster?.redis_connected ? 'text-success' : 'text-muted-foreground'"
@@ -83,7 +83,7 @@ const handleTabChange = (tabId: string) => {
               </div>
 
               <div class="p-3 bg-muted/50 border border-border rounded-md">
-                <span class="text-[10px] uppercase font-mono text-muted-foreground block mb-1">Active Snapshot Version</span>
+                <span class="text-xs uppercase font-mono text-muted-foreground block mb-1">Active Snapshot Version</span>
                 <span class="text-xs font-semibold text-primary font-mono">
                   v{{ configStore.activeVersion }}
                 </span>
@@ -97,7 +97,7 @@ const handleTabChange = (tabId: string) => {
           <CardHeader class="pb-2">
             <div class="flex items-center gap-2">
               <Palette class="w-4 h-4 text-muted-foreground" />
-              <CardTitle class="text-xs uppercase tracking-wider text-foreground">
+              <CardTitle class="text-base font-semibold text-foreground">
                 Interface Theme & Color Mode
               </CardTitle>
             </div>
@@ -120,7 +120,7 @@ const handleTabChange = (tabId: string) => {
                   <Moon class="w-4 h-4" :class="theme === 'dark' ? 'text-primary' : 'text-muted-foreground'" />
                   <span class="text-xs font-semibold text-foreground">Dark Mode</span>
                 </div>
-                <span class="text-[11px] text-muted-foreground">Default high-contrast dark theme optimized for SOC operations.</span>
+                <span class="text-xs text-muted-foreground">Default high-contrast dark theme optimized for SOC operations.</span>
               </button>
 
               <button
@@ -134,7 +134,7 @@ const handleTabChange = (tabId: string) => {
                   <Sun class="w-4 h-4" :class="theme === 'light' ? 'text-warning' : 'text-muted-foreground'" />
                   <span class="text-xs font-semibold text-foreground">Light Mode</span>
                 </div>
-                <span class="text-[11px] text-muted-foreground">Clean, high-legibility light theme for daytime administrative review.</span>
+                <span class="text-xs text-muted-foreground">Clean, high-legibility light theme for daytime administrative review.</span>
               </button>
 
               <button
@@ -148,7 +148,7 @@ const handleTabChange = (tabId: string) => {
                   <Monitor class="w-4 h-4" :class="theme === 'system' ? 'text-primary' : 'text-muted-foreground'" />
                   <span class="text-xs font-semibold text-foreground">System Match</span>
                 </div>
-                <span class="text-[11px] text-muted-foreground">Automatically synchronizes with your OS color scheme preference.</span>
+                <span class="text-xs text-muted-foreground">Automatically synchronizes with your OS color scheme preference.</span>
               </button>
             </div>
           </CardContent>

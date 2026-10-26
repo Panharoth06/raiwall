@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
 import LogsViewer from '@/components/LogsViewer.vue';
+import { Select } from '@/components/ui/select';
 import { api } from '@/api/client';
 import type { ForensicEvent, EventsQueryResult } from '@/api/client';
 
@@ -83,14 +84,15 @@ describe('LogsViewer.vue', () => {
       expect(api.listEvents).toHaveBeenCalled();
     });
 
-    const actionSelect = wrapper.find('[data-testid="logs-action-filter-select"]');
-    await actionSelect.setValue('block');
-
-    expect(api.listEvents).toHaveBeenCalledWith(
-      expect.objectContaining({
-        action: 'block',
-      })
-    );
+    const actionSelect = wrapper.findComponent(Select);
+    actionSelect.vm.$emit('update:modelValue', 'block');
+    await vi.waitFor(() => {
+      expect(api.listEvents).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'block',
+        })
+      );
+    });
   });
 
   it('filters logs by search query', async () => {

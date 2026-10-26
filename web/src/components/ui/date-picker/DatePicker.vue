@@ -219,7 +219,7 @@ const clearDate = (e?: MouseEvent) => {
         <span
           v-for="d in dayLabels"
           :key="d"
-          class="text-[10px] font-medium text-muted-foreground py-0.5"
+          class="text-xs font-medium text-muted-foreground py-0.5"
         >
           {{ d }}
         </span>
@@ -248,7 +248,7 @@ const clearDate = (e?: MouseEvent) => {
         <Button
           variant="ghost"
           size="sm"
-          class="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground"
+          class="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
           @click="clearDate"
         >
           Clear
@@ -256,7 +256,7 @@ const clearDate = (e?: MouseEvent) => {
         <Button
           variant="ghost"
           size="sm"
-          class="h-6 px-2 text-[11px] font-medium text-primary hover:text-primary hover:bg-primary/10"
+          class="h-6 px-2 text-xs font-medium text-primary hover:text-primary hover:bg-primary/10"
           @click="selectToday"
         >
           Today

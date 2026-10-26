@@ -65,18 +65,18 @@ const handleTabChange = (tabId: string) => {
 </script>
 
 <template>
-  <div class="h-full flex flex-col space-y-4 p-6 bg-card text-card-foreground rounded-xl border border-border shadow-none font-sans overflow-hidden">
+  <div class="h-full flex flex-col space-y-6 p-6 bg-card text-card-foreground rounded-xl border border-border shadow-none font-sans overflow-hidden">
     <div class="flex flex-wrap items-start justify-between gap-3 shrink-0">
       <div class="min-w-0">
-        <h1 class="text-sm font-semibold uppercase tracking-wider text-foreground flex items-center gap-2">
-          <Lock class="w-4 h-4 text-muted-foreground" />
+        <h1 class="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
+          <Lock class="w-5 h-5 text-muted-foreground" />
           <span>Auth Gateway</span>
         </h1>
-        <p class="text-xs text-muted-foreground mt-1 leading-relaxed">
+        <p class="text-sm text-muted-foreground mt-1 leading-relaxed">
           Unified directory identity for protected sites — HTTP 467 portal, app bindings, 2FA, and external IdPs.
         </p>
       </div>
-      <Badge variant="outline" class="font-mono text-[10px] uppercase">
+      <Badge variant="outline" class="font-mono text-xs uppercase">
         Pre-App Auth · OIDC · MFA · RBAC
       </Badge>
     </div>

@@ -75,7 +75,7 @@ const isGeoOperator = (c: VisualCondition) => {
         class="absolute left-2.5 top-5 bottom-5 w-3 border-l-2 border-primary/40 rounded-l-sm pointer-events-none flex items-center"
       >
         <span
-          class="absolute -left-3.5 px-1 py-0.5 rounded text-[9px] font-mono font-bold uppercase tracking-wider bg-card text-primary border border-primary/50 shadow-none select-none"
+          class="absolute -left-3.5 px-1 py-0.5 rounded text-xs font-mono font-bold uppercase tracking-wider bg-card text-primary border border-primary/50 shadow-none select-none"
         >
           AND
         </span>
@@ -98,7 +98,7 @@ const isGeoOperator = (c: VisualCondition) => {
           class="col-span-12 min-w-0"
           :class="getTargetConfig(c.target).requiresKey ? 'sm:col-span-3' : 'sm:col-span-3'"
         >
-          <label class="block text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+          <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
             Match Target *
           </label>
           <Select
@@ -125,7 +125,7 @@ const isGeoOperator = (c: VisualCondition) => {
           v-if="getTargetConfig(c.target).requiresKey"
           class="col-span-12 sm:col-span-2 min-w-0"
         >
-          <label class="block text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+          <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
             Name / Key *
           </label>
           <Input
@@ -140,7 +140,7 @@ const isGeoOperator = (c: VisualCondition) => {
           class="col-span-12 min-w-0"
           :class="getTargetConfig(c.target).requiresKey ? 'sm:col-span-3' : 'sm:col-span-3'"
         >
-          <label class="block text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+          <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
             Operator *
           </label>
           <Select
@@ -170,7 +170,7 @@ const isGeoOperator = (c: VisualCondition) => {
           class="col-span-10 min-w-0"
           :class="getTargetConfig(c.target).requiresKey ? 'sm:col-span-3' : 'sm:col-span-5'"
         >
-          <label class="block text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+          <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
             Content *
           </label>
           <CountrySelector

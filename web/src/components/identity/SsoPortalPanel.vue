@@ -72,14 +72,15 @@ const saveRow = async (row: SiteRow) => {
 
     <p v-if="error" class="text-xs text-destructive shrink-0" data-testid="sso-error">{{ error }}</p>
 
-    <div v-if="loading" class="flex-1 min-h-[300px] flex items-center justify-center space-x-2 text-xs text-muted-foreground" data-testid="sso-loading">
+    <div v-if="loading" class="flex-1 min-h-[200px] flex items-center justify-center space-x-2 text-xs text-muted-foreground" data-testid="sso-loading">
       <Loader2 class="w-4 h-4 animate-spin" />
       <span>Loading sites…</span>
     </div>
 
-    <div v-else-if="rows.length === 0" class="flex-1 min-h-[300px] flex flex-col items-center justify-center space-y-2 text-xs text-muted-foreground text-center" data-testid="sso-empty">
-      <Globe class="w-6 h-6 text-muted-foreground/60 mb-1" />
-      <span class="font-medium">No sites registered — gate enforcement is configured per site</span>
+    <div v-else-if="rows.length === 0" class="flex-1 flex flex-col items-center justify-start pt-10 pb-12 space-y-1 text-center" data-testid="sso-empty">
+      <Globe class="w-8 h-8 text-muted-foreground/60 mb-2" />
+      <span class="text-base font-semibold text-foreground">No sites registered</span>
+      <span class="text-xs text-muted-foreground">Gate enforcement is configured per site once sites are created.</span>
     </div>
 
     <div v-else class="space-y-2 overflow-auto flex-1">
@@ -92,15 +93,15 @@ const saveRow = async (row: SiteRow) => {
         <div class="flex items-center justify-between gap-3">
           <div class="min-w-0">
             <span class="text-xs font-medium">{{ row.site.name }}</span>
-            <span class="ml-2 text-[10px] font-mono text-muted-foreground">{{ row.site.hostnames.join(' · ') }}</span>
+            <span class="ml-2 text-xs font-mono text-muted-foreground">{{ row.site.hostnames.join(' · ') }}</span>
           </div>
           <div class="flex items-center gap-2 shrink-0">
-            <span class="text-[10px] font-mono" :class="row.enabled ? 'text-success' : 'text-muted-foreground'" :data-testid="`sso-state-${i}`">
+            <span class="text-xs font-mono" :class="row.enabled ? 'text-success' : 'text-muted-foreground'" :data-testid="`sso-state-${i}`">
               {{ row.enabled ? 'enforced' : 'open' }}
             </span>
             <button
               :data-testid="`sso-toggle-${i}`"
-              class="text-[10px] font-sans px-2 py-0.5 rounded border border-border hover:bg-muted"
+              class="text-xs font-sans px-2 py-0.5 rounded border border-border hover:bg-muted"
               :disabled="row.saving"
               @click="row.enabled = !row.enabled"
             >
@@ -110,19 +111,19 @@ const saveRow = async (row: SiteRow) => {
         </div>
 
         <div class="flex items-center gap-2">
-          <span class="text-[10px] uppercase tracking-wider text-muted-foreground shrink-0 w-20">Bypass paths</span>
+          <span class="text-xs uppercase tracking-wider text-muted-foreground shrink-0 w-24">Bypass paths</span>
           <Input
             v-model="row.bypass"
             placeholder="/health, /assets"
-            class="h-6 text-[10px] font-mono"
+            class="h-7 text-xs font-mono"
             :data-testid="`sso-bypass-${i}`"
           />
-          <Button variant="ghost" size="sm" class="h-6 px-1.5 shrink-0" :data-testid="`sso-reset-${i}`" :disabled="row.saving" @click="resetRow(row)">
-            <RotateCcw class="w-3 h-3" />
+          <Button variant="ghost" size="sm" class="h-7 px-1.5 shrink-0" :data-testid="`sso-reset-${i}`" :disabled="row.saving" @click="resetRow(row)">
+            <RotateCcw class="w-3.5 h-3.5" />
           </Button>
           <Button
             size="sm"
-            class="h-6 shrink-0"
+            class="h-7 shrink-0 text-xs"
             :data-testid="`sso-apply-${i}`"
             :disabled="row.saving || (row.enabled === !!row.site.auth_enabled && row.bypass === (row.site.auth_bypass_paths || []).join(', '))"
             @click="saveRow(row)"

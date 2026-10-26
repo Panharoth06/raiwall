@@ -1,63 +1,64 @@
 <script setup lang="ts">
-import { ref } from 'vue';
-import { RefreshCw, X, Calendar, Filter } from 'lucide-vue-next';
-import { Tabs, type Tab } from '@/components/ui/tabs';
+import { ref } from 'vue'
+import { RefreshCw, X, Calendar, Filter } from 'lucide-vue-next'
+import { Tabs, type Tab } from '@/components/ui/tabs'
+import { Button } from '@/components/ui/button'
 import {
   Select,
   SelectTrigger,
   SelectValue,
   SelectContent,
   SelectItem,
-} from '@/components/ui/select';
-import DatePicker from '@/components/ui/date-picker/DatePicker.vue';
-import type { TimeRangePreset } from '@/composables/useStatistics';
-import type { Site } from '@/api/client';
+} from '@/components/ui/select'
+import DatePicker from '@/components/ui/date-picker/DatePicker.vue'
+import type { TimeRangePreset } from '@/composables/useStatistics'
+import type { Site } from '@/api/client'
 
 const props = defineProps<{
-  activeTab: string;
-  timeRange: TimeRangePreset;
-  customStart: string;
-  customEnd: string;
-  selectedHost: string;
-  selectedCountry: string;
-  sites: Site[];
-  loading: boolean;
-  isConnected: boolean;
-}>();
+  activeTab: string
+  timeRange: TimeRangePreset
+  customStart: string
+  customEnd: string
+  selectedHost: string
+  selectedCountry: string
+  sites: Site[]
+  loading: boolean
+  isConnected: boolean
+}>()
 
 const emit = defineEmits<{
-  (e: 'update:activeTab', tab: string): void;
-  (e: 'update:timeRange', range: TimeRangePreset): void;
-  (e: 'update:customStart', val: string): void;
-  (e: 'update:customEnd', val: string): void;
-  (e: 'update:selectedHost', host: string): void;
-  (e: 'clearCountry'): void;
-  (e: 'refresh'): void;
-}>();
+  (e: 'update:activeTab', tab: string): void
+  (e: 'update:timeRange', range: TimeRangePreset): void
+  (e: 'update:customStart', val: string): void
+  (e: 'update:customEnd', val: string): void
+  (e: 'update:selectedHost', host: string): void
+  (e: 'clearCountry'): void
+  (e: 'refresh'): void
+}>()
 
 const tabs: Tab[] = [
   { id: 'traffic', label: 'TRAFFIC ANALYSIS', testId: 'tab-traffic-analysis' },
   { id: 'security', label: 'SECURITY POSTURE', testId: 'tab-security-posture' },
   { id: 'dashboard', label: 'DATA DASHBOARD', testId: 'tab-data-dashboard' },
-];
+]
 
-const showCustomModal = ref(false);
-const tempStart = ref(props.customStart || new Date(Date.now() - 86400000).toISOString().slice(0, 10));
-const tempEnd = ref(props.customEnd || new Date().toISOString().slice(0, 10));
+const showCustomModal = ref(false)
+const tempStart = ref(props.customStart || new Date(Date.now() - 86400000).toISOString().slice(0, 10))
+const tempEnd = ref(props.customEnd || new Date().toISOString().slice(0, 10))
 
 function onTimeRangeSelect(val: string) {
   if (val === 'custom') {
-    showCustomModal.value = true;
+    showCustomModal.value = true
   } else {
-    emit('update:timeRange', val as TimeRangePreset);
+    emit('update:timeRange', val as TimeRangePreset)
   }
 }
 
 function applyCustomRange() {
-  emit('update:customStart', tempStart.value);
-  emit('update:customEnd', tempEnd.value);
-  emit('update:timeRange', 'custom');
-  showCustomModal.value = false;
+  emit('update:customStart', tempStart.value)
+  emit('update:customEnd', tempEnd.value)
+  emit('update:timeRange', 'custom')
+  showCustomModal.value = false
 }
 </script>
 
@@ -122,22 +123,21 @@ function applyCustomRange() {
           v-if="selectedCountry"
           class="flex items-center gap-1.5 px-2.5 py-1 text-xs font-mono bg-primary/10 border border-primary/30 text-primary rounded-lg"
         >
-          <Filter class="w-3 h-3" />
+          <Filter class="w-3.5 h-3.5" />
           <span>{{ selectedCountry }}</span>
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon"
+            class="h-4 w-4 p-0 hover:bg-transparent ml-0.5"
             @click="emit('clearCountry')"
-            class="hover:opacity-80 ml-0.5 cursor-pointer"
           >
             <X class="w-3 h-3" />
-          </button>
+          </Button>
         </div>
 
         <!-- Live SSE Stream Status -->
-        <div
-          class="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-mono rounded-lg border border-border bg-card text-muted-foreground"
-          :title="isConnected ? 'Real-time telemetry SSE active' : 'Connecting SSE telemetry...'"
-        >
+        <div class="flex items-center gap-1.5 px-2.5 py-1 text-xs font-mono rounded-lg border border-border bg-card text-muted-foreground">
           <span
             :class="[
               'w-2 h-2 rounded-full transition-colors',
@@ -148,16 +148,18 @@ function applyCustomRange() {
         </div>
 
         <!-- Refresh Button -->
-        <button
+        <Button
           type="button"
           data-testid="refresh-stats-btn"
-          @click="emit('refresh')"
+          variant="outline"
+          size="sm"
           :disabled="loading"
-          class="h-8 px-2.5 text-xs font-medium text-foreground hover:bg-muted bg-card border border-border rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+          class="h-8 px-2.5 text-xs font-medium bg-card"
+          @click="emit('refresh')"
         >
-          <RefreshCw :class="['w-3.5 h-3.5', loading ? 'animate-spin' : '']" />
+          <RefreshCw :class="['w-3.5 h-3.5 mr-1.5', loading ? 'animate-spin' : '']" />
           <span class="hidden sm:inline">Refresh</span>
-        </button>
+        </Button>
       </div>
     </div>
 
@@ -168,17 +170,19 @@ function applyCustomRange() {
     >
       <div class="bg-card border border-border rounded-xl p-5 max-w-sm w-full space-y-4 shadow-lg">
         <div class="flex items-center justify-between">
-          <div class="flex items-center gap-2 text-sm font-bold text-foreground">
+          <div class="flex items-center gap-2 text-base font-semibold text-foreground">
             <Calendar class="w-4 h-4 text-primary" />
             <span>Select Custom Date Range</span>
           </div>
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon"
+            class="h-6 w-6 text-muted-foreground hover:text-foreground"
             @click="showCustomModal = false"
-            class="text-muted-foreground hover:text-foreground cursor-pointer"
           >
             <X class="w-4 h-4" />
-          </button>
+          </Button>
         </div>
 
         <div class="space-y-3 text-xs">
@@ -201,20 +205,23 @@ function applyCustomRange() {
         </div>
 
         <div class="flex justify-end gap-2 pt-2">
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
+            class="text-xs"
             @click="showCustomModal = false"
-            class="px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            size="sm"
+            class="text-xs font-semibold"
             @click="applyCustomRange"
-            class="px-3 py-1.5 text-xs font-semibold bg-primary text-primary-foreground rounded-lg cursor-pointer hover:opacity-90"
           >
             Apply Range
-          </button>
+          </Button>
         </div>
       </div>
     </div>

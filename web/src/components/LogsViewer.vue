@@ -246,7 +246,7 @@ function getPayloadOrQuery(ev: ForensicEvent): string {
         <!-- Action Filter Select -->
         <div class="relative z-30">
           <Select v-model="selectedAction">
-            <SelectTrigger class="h-8 w-32 border-input bg-background text-foreground text-xs">
+            <SelectTrigger data-testid="logs-action-filter-select" class="h-8 w-32 border-input bg-background text-foreground text-xs">
               <SelectValue placeholder="All Actions" />
             </SelectTrigger>
             <SelectContent class="border-border bg-popover text-popover-foreground z-50">
@@ -257,19 +257,6 @@ function getPayloadOrQuery(ev: ForensicEvent): string {
               <SelectItem value="ban">Ban</SelectItem>
             </SelectContent>
           </Select>
-          <select
-            v-model="selectedAction"
-            data-testid="logs-action-filter-select"
-            class="sr-only"
-            tabindex="-1"
-            aria-hidden="true"
-          >
-            <option value="all">All Actions</option>
-            <option value="allow">Allow</option>
-            <option value="block">Block</option>
-            <option value="challenge">Challenge</option>
-            <option value="ban">Ban</option>
-          </select>
         </div>
 
         <!-- Refresh Button -->
@@ -335,13 +322,13 @@ function getPayloadOrQuery(ev: ForensicEvent): string {
             <!-- Action Badge -->
             <TableCell class="whitespace-nowrap">
               <span
-                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide uppercase border"
+                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold tracking-wide uppercase border"
                 :class="getActionBadgeClass(ev.action)"
               >
-                <CheckCircle2 v-if="ev.action === 'allow'" class="w-2.5 h-2.5" />
-                <ShieldAlert v-else-if="ev.action === 'block'" class="w-2.5 h-2.5" />
-                <AlertTriangle v-else-if="ev.action === 'challenge'" class="w-2.5 h-2.5" />
-                <Ban v-else-if="ev.action === 'ban'" class="w-2.5 h-2.5" />
+                <CheckCircle2 v-if="ev.action === 'allow'" class="w-3 h-3" />
+                <ShieldAlert v-else-if="ev.action === 'block'" class="w-3 h-3" />
+                <AlertTriangle v-else-if="ev.action === 'challenge'" class="w-3 h-3" />
+                <Ban v-else-if="ev.action === 'ban'" class="w-3 h-3" />
                 {{ ev.action }}
               </span>
             </TableCell>
@@ -355,7 +342,7 @@ function getPayloadOrQuery(ev: ForensicEvent): string {
             <!-- Client IP & Geo -->
             <TableCell class="whitespace-nowrap text-foreground">
               <span>{{ ev.client_ip }}</span>
-              <span v-if="ev.geo_data?.country" class="ml-1.5 text-muted-foreground text-[11px]">
+              <span v-if="ev.geo_data?.country" class="ml-1.5 text-muted-foreground text-xs">
                 [{{ ev.geo_data.country }}]
               </span>
             </TableCell>
@@ -380,7 +367,7 @@ function getPayloadOrQuery(ev: ForensicEvent): string {
                 type="button"
                 data-testid="log-create-exception-quick-btn"
                 @click="handleCreateException(ev)"
-                class="px-2 py-1 text-[11px] font-medium text-primary hover:text-primary-foreground bg-primary/10 hover:bg-primary border border-primary/30 rounded transition-all mr-2 shadow-none cursor-pointer"
+                class="px-2.5 py-1 text-xs font-medium text-primary hover:text-primary-foreground bg-primary/10 hover:bg-primary border border-primary/30 rounded transition-all mr-2 shadow-none cursor-pointer"
                 title="Create 1-Click Rule Exception"
               >
                 Exception
@@ -388,30 +375,30 @@ function getPayloadOrQuery(ev: ForensicEvent): string {
               <button
                 type="button"
                 @click="openModal(ev)"
-                class="px-2 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground bg-muted hover:bg-muted/80 border border-border rounded transition-all cursor-pointer"
+                class="px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground bg-muted hover:bg-muted/80 border border-border rounded transition-all cursor-pointer"
               >
                 Inspect
               </button>
             </TableCell>
           </TableRow>
 
-          <!-- Empty State -->
+          <!-- Empty State: top-aligned -->
           <TableRow v-if="!isLoading && filteredLogs.length === 0">
             <TableCell colspan="7" class="h-80 text-center font-sans text-muted-foreground">
-              <div class="h-full flex flex-col items-center justify-center p-8">
+              <div class="h-full flex flex-col items-center justify-start pt-10 pb-8 px-4 text-center">
                 <Database class="w-8 h-8 mx-auto mb-2 text-muted-foreground/60 opacity-60" />
-                <p class="text-sm font-medium">No forensic logs found</p>
-                <p class="text-xs text-muted-foreground/80 mt-1">Logs stored in the database matching your criteria will appear here</p>
+                <p class="text-base font-semibold text-foreground">No forensic logs found</p>
+                <p class="text-xs text-muted-foreground mt-1">Logs stored in the database matching your criteria will appear here</p>
               </div>
             </TableCell>
           </TableRow>
 
-          <!-- Loading State -->
+          <!-- Loading State: top-aligned -->
           <TableRow v-if="isLoading && filteredLogs.length === 0">
             <TableCell colspan="7" class="h-80 text-center font-sans text-muted-foreground">
-              <div class="h-full flex flex-col items-center justify-center p-8">
+              <div class="h-full flex flex-col items-center justify-start pt-10 pb-8 px-4 text-center">
                 <RotateCw class="w-8 h-8 mx-auto mb-2 text-primary animate-spin opacity-80" />
-                <p class="text-sm font-medium">Querying forensic logs...</p>
+                <p class="text-base font-semibold text-foreground">Querying forensic logs...</p>
               </div>
             </TableCell>
           </TableRow>
@@ -478,10 +465,10 @@ function getPayloadOrQuery(ev: ForensicEvent): string {
               <FileCode class="w-5 h-5 text-muted-foreground" />
             </div>
             <div>
-              <h3 class="text-sm font-bold text-foreground flex items-center gap-2">
+              <h3 class="text-base font-semibold text-foreground flex items-center gap-2">
                 <span>{{ activeEvent.action === 'allow' ? 'Traffic Log Context' : 'Forensic Incident Context' }}</span>
                 <span
-                  class="px-2 py-0.5 rounded text-[10px] font-semibold uppercase border"
+                  class="px-2 py-0.5 rounded text-xs font-semibold uppercase border"
                   :class="getActionBadgeClass(activeEvent.action)"
                 >
                   {{ activeEvent.action }}
@@ -507,21 +494,21 @@ function getPayloadOrQuery(ev: ForensicEvent): string {
           <!-- Request & Client Summary Grid -->
           <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 font-sans">
             <div class="p-3 bg-muted/40 border border-border rounded-lg">
-              <span class="text-[10px] text-muted-foreground uppercase tracking-wider block mb-1">Target Host</span>
+              <span class="text-xs text-muted-foreground uppercase tracking-wider block mb-1">Target Host</span>
               <span class="font-mono text-foreground truncate block">{{ activeEvent.host }}</span>
             </div>
             <div class="p-3 bg-muted/40 border border-border rounded-lg">
-              <span class="text-[10px] text-muted-foreground uppercase tracking-wider block mb-1">Client IP</span>
+              <span class="text-xs text-muted-foreground uppercase tracking-wider block mb-1">Client IP</span>
               <span class="font-mono text-foreground block">{{ activeEvent.client_ip }}</span>
             </div>
             <div class="p-3 bg-muted/40 border border-border rounded-lg">
-              <span class="text-[10px] text-muted-foreground uppercase tracking-wider block mb-1">Rule ID</span>
+              <span class="text-xs text-muted-foreground uppercase tracking-wider block mb-1">Rule ID</span>
               <span class="font-mono text-warning font-semibold block truncate">
                 {{ activeEvent.rule_id || 'NONE' }}
               </span>
             </div>
             <div class="p-3 bg-muted/40 border border-border rounded-lg">
-              <span class="text-[10px] text-muted-foreground uppercase tracking-wider block mb-1">Latency</span>
+              <span class="text-xs text-muted-foreground uppercase tracking-wider block mb-1">Latency</span>
               <span class="font-mono text-foreground block">{{ formatLatency(activeEvent.latency) }}</span>
             </div>
           </div>
@@ -546,7 +533,7 @@ function getPayloadOrQuery(ev: ForensicEvent): string {
           <div>
             <h4 class="text-xs font-semibold text-foreground uppercase tracking-wider font-sans mb-2 flex items-center justify-between">
               <span>Sanitized Request Headers</span>
-              <span class="text-[10px] text-muted-foreground font-normal">PII/PCI-DSS masked</span>
+              <span class="text-xs text-muted-foreground font-normal">PII/PCI-DSS masked</span>
             </h4>
             <div class="p-3.5 bg-muted/60 border border-border rounded-lg overflow-x-auto max-h-48 text-foreground font-mono text-xs">
               <pre>{{ JSON.stringify(activeEvent.headers || {}, null, 2) }}</pre>
@@ -557,7 +544,7 @@ function getPayloadOrQuery(ev: ForensicEvent): string {
           <div>
             <h4 class="text-xs font-semibold text-foreground uppercase tracking-wider font-sans mb-2 flex items-center justify-between">
               <span>{{ activeEvent.method === 'GET' ? 'Inspected Query & URI Parameters' : 'Payload Snippet' }}</span>
-              <span class="text-[10px] text-muted-foreground font-normal">Clamped to 2 KB cap</span>
+              <span class="text-xs text-muted-foreground font-normal">Clamped to 2 KB cap</span>
             </h4>
             <div class="p-3.5 bg-muted/60 border border-border rounded-lg overflow-x-auto max-h-48 text-foreground font-mono text-xs">
               <pre>{{ getPayloadOrQuery(activeEvent) }}</pre>

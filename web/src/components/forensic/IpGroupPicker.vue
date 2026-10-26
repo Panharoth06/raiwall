@@ -45,7 +45,7 @@ function submit() {
         v-model="selected"
         :disabled="disabled || groups.length === 0"
       >
-        <SelectTrigger class="h-8 text-xs bg-background border-input text-foreground">
+        <SelectTrigger data-testid="ipgroup-select" class="h-8 text-xs bg-background border-input text-foreground">
           <SelectValue :placeholder="groups.length === 0 ? 'No IP groups' : 'Select IP group'" />
         </SelectTrigger>
         <SelectContent class="border-border bg-popover text-popover-foreground">
@@ -59,19 +59,6 @@ function submit() {
           </SelectItem>
         </SelectContent>
       </Select>
-      <select
-        v-model="selected"
-        data-testid="ipgroup-select"
-        class="sr-only"
-        tabindex="-1"
-        aria-hidden="true"
-        :disabled="disabled || groups.length === 0"
-      >
-        <option v-if="groups.length === 0" value="">No IP groups</option>
-        <option v-for="group in groups" :key="group.id" :value="group.id">
-          {{ group.name }}
-        </option>
-      </select>
     </div>
     <button
       type="button"
@@ -82,6 +69,6 @@ function submit() {
     >
       Add to IP Group
     </button>
-    <span v-if="status" class="text-[11px] text-muted-foreground">{{ status }}</span>
+    <span v-if="status" class="text-xs text-muted-foreground">{{ status }}</span>
   </div>
 </template>

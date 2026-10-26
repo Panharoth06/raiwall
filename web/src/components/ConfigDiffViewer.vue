@@ -38,11 +38,11 @@ defineProps<{
           <div>
             <div class="flex items-center space-x-2">
               <span class="font-semibold text-foreground text-sm">{{ item.name }}</span>
-              <span class="px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-muted text-muted-foreground border border-border">
+              <span class="px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wider bg-muted text-muted-foreground border border-border">
                 {{ item.type }}
               </span>
               <span
-                class="px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider"
+                class="px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wider"
                 :class="{
                   'bg-success/20 text-success': item.action === 'added',
                   'bg-warning/20 text-warning': item.action === 'modified',

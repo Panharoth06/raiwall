@@ -264,7 +264,7 @@ defineExpose({
     <slot name="suffix">
       <span
         v-if="unitSuffix"
-        class="ml-1.5 shrink-0 text-[11px] font-mono text-muted-foreground select-none pointer-events-none"
+        class="ml-1.5 shrink-0 text-xs font-mono text-muted-foreground select-none pointer-events-none"
       >
         {{ unitSuffix }}
       </span>

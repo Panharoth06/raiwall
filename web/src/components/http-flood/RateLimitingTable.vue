@@ -380,11 +380,11 @@ const goToSettings = () => {
 
           <!-- Empty State -->
           <TableRow v-else-if="filteredBans.length === 0">
-            <TableCell colspan="6" class="h-64 text-center">
-              <div class="h-full flex flex-col items-center justify-center p-8">
-                <ShieldOff class="h-8 w-8 mx-auto mb-2 text-muted-foreground/40" />
-                <div class="text-xs font-semibold text-foreground">No active client bans</div>
-                <div class="text-[11px] text-muted-foreground mt-0.5">
+            <TableCell colspan="6" class="h-64 text-center align-top">
+              <div class="flex flex-col items-center justify-start pt-10 pb-12 p-8">
+                <ShieldOff class="h-8 w-8 mx-auto mb-3 text-muted-foreground/40" />
+                <div class="text-base font-semibold text-foreground">No active client bans</div>
+                <div class="text-xs text-muted-foreground mt-1">
                   No IP addresses currently exceed access velocity, attack threshold, or scanner limits.
                 </div>
               </div>
@@ -404,12 +404,12 @@ const goToSettings = () => {
                 <span class="font-mono font-medium text-foreground text-xs">
                   {{ entry.client_ip || entry.key }}
                 </span>
-                <span class="text-[11px] text-muted-foreground">
+                <span class="text-xs text-muted-foreground">
                   {{ resolveCountry(entry.client_ip, entry.country) }}
                 </span>
                 <span
                   v-if="entry.ja4"
-                  class="font-mono text-[10px] px-1 py-0.2 rounded bg-muted text-muted-foreground border border-border truncate max-w-[120px]"
+                  class="font-mono text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border truncate max-w-[120px]"
                 >
                   {{ entry.ja4 }}
                 </span>
@@ -423,7 +423,7 @@ const goToSettings = () => {
                 <span class="font-medium text-foreground text-xs truncate max-w-[140px]">
                   {{ resolveAppName(entry.site_id).name }}
                 </span>
-                <span class="text-[11px] text-muted-foreground truncate max-w-[120px]">
+                <span class="text-xs text-muted-foreground truncate max-w-[120px]">
                   ({{ resolveAppName(entry.site_id).host }})
                 </span>
               </div>
@@ -433,7 +433,7 @@ const goToSettings = () => {
             <TableCell>
               <div class="flex items-center gap-2">
                 <span
-                  class="font-medium text-[11px] px-2 py-0.5 rounded border shrink-0"
+                  class="font-medium text-xs px-2 py-0.5 rounded border shrink-0"
                   :class="getTierBadge(entry.reason).cls"
                 >
                   {{ getTierBadge(entry.reason).name }}
@@ -443,7 +443,7 @@ const goToSettings = () => {
                 </span>
                 <span
                   v-if="entry.remaining_seconds > 0"
-                  class="text-[11px] text-muted-foreground font-mono shrink-0"
+                  class="text-xs text-muted-foreground font-mono shrink-0"
                 >
                   ({{ formatCountdown(entry.remaining_seconds) }})
                 </span>
@@ -459,7 +459,7 @@ const goToSettings = () => {
             </TableCell>
 
             <!-- 5. Start At -->
-            <TableCell class="font-mono text-[11px] text-muted-foreground tabular-nums">
+            <TableCell class="font-mono text-xs text-muted-foreground tabular-nums">
               {{ formatStartAt(entry.banned_at) }}
             </TableCell>
 

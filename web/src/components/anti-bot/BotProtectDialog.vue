@@ -118,12 +118,12 @@ function handleSave() {
       <DialogHeader>
         <div class="flex items-center gap-2.5">
           <Bot class="w-5 h-5 text-muted-foreground" />
-          <DialogTitle>BOT Protect</DialogTitle>
-          <Badge v-if="target?.global" variant="outline" class="font-mono text-[10px] uppercase">
+          <DialogTitle class="text-base font-semibold">BOT Protect</DialogTitle>
+          <Badge v-if="target?.global" variant="outline" class="font-mono text-xs uppercase">
             global
           </Badge>
         </div>
-        <DialogDescription class="text-[11px] text-muted-foreground">
+        <DialogDescription class="text-xs text-muted-foreground">
           <span class="font-medium text-foreground">{{ target?.name }}</span>
           <span class="mx-1.5 text-border">/</span>
           <span class="font-mono break-all">{{ scopeLabel }}</span>
@@ -132,7 +132,7 @@ function handleSave() {
 
       <div
         v-if="inherited && !target?.global"
-        class="flex items-start gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-[11px] text-muted-foreground"
+        class="flex items-start gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground"
         data-testid="bot-inherited-note"
       >
         <Info class="w-3.5 h-3.5 mt-px shrink-0" />
@@ -149,9 +149,9 @@ function handleSave() {
             <div class="min-w-0">
               <div class="flex items-center gap-1.5">
                 <Fingerprint class="w-3.5 h-3.5 text-muted-foreground" />
-                <h3 class="text-xs font-semibold text-foreground">Anti-Bot Challenge</h3>
+                <h3 class="text-sm font-semibold text-foreground">Anti-Bot Challenge</h3>
               </div>
-              <p class="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+              <p class="mt-0.5 text-xs leading-snug text-muted-foreground">
                 Automated browsers will be blocked when Anti-Bot is on. Humans solve a stateless
                 SHA-256 proof-of-work and receive a clearance cookie.
               </p>
@@ -167,11 +167,11 @@ function handleSave() {
             <div class="flex items-baseline justify-between gap-3">
               <label
                 for="bot-protect-difficulty"
-                class="text-[10px] font-mono font-semibold uppercase tracking-wider text-muted-foreground"
+                class="text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground"
               >
                 PoW difficulty
               </label>
-              <span class="font-mono text-[11px] text-foreground tabular-nums">
+              <span class="font-mono text-xs text-foreground tabular-nums">
                 {{ difficultyLabel }}
                 <span class="text-muted-foreground">iters · ≈{{ estimatedSolveMs }}ms</span>
               </span>
@@ -193,7 +193,7 @@ function handleSave() {
                 v-for="preset in presets"
                 :key="preset.value"
                 type="button"
-                class="px-2 py-1 rounded border text-[10px] font-mono uppercase tracking-wider transition-colors duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                class="px-2 py-1 rounded border text-xs font-mono uppercase tracking-wider transition-colors duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 :class="
                   difficulty === preset.value
                     ? 'border-primary text-foreground bg-primary/5'
@@ -204,7 +204,7 @@ function handleSave() {
               >
                 {{ preset.label }}
               </button>
-              <span class="ml-auto text-[10px] font-mono text-muted-foreground">
+              <span class="ml-auto text-xs font-mono text-muted-foreground">
                 {{ MIN_DIFFICULTY.toLocaleString() }} – {{ MAX_DIFFICULTY.toLocaleString() }}
               </span>
             </div>
@@ -217,9 +217,9 @@ function handleSave() {
             <div class="min-w-0">
               <div class="flex items-center gap-1.5">
                 <Ghost class="w-3.5 h-3.5 text-muted-foreground" />
-                <h3 class="text-xs font-semibold text-foreground">Crawler Trap</h3>
+                <h3 class="text-sm font-semibold text-foreground">Crawler Trap</h3>
               </div>
-              <p class="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+              <p class="mt-0.5 text-xs leading-snug text-muted-foreground">
                 Invisible trap paths. Any client that requests one is banned immediately, even when
                 no challenge was served.
               </p>
@@ -234,7 +234,7 @@ function handleSave() {
           <div v-if="trapsEnabled" class="border-t border-border/60 px-3 py-3">
             <label
               for="bot-protect-traps"
-              class="block mb-1 text-[10px] font-mono font-semibold uppercase tracking-wider text-muted-foreground"
+              class="block mb-1 text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground"
             >
               Trap URLs
             </label>
@@ -246,13 +246,13 @@ function handleSave() {
               class="w-full rounded-md border border-input bg-card px-3 py-2 font-mono text-xs text-foreground placeholder:text-muted-foreground shadow-none focus-visible:outline-none focus-visible:border-primary transition-colors resize-y"
               data-testid="bot-traps-input"
             />
-            <p class="mt-1 text-[10px] text-muted-foreground">
+            <p class="mt-1 text-xs text-muted-foreground">
               One path per line. Each must start with <code class="font-mono">/</code>.
             </p>
           </div>
         </section>
 
-        <div class="flex items-start gap-2 rounded-md border border-border/60 px-3 py-2 text-[11px] text-muted-foreground">
+        <div class="flex items-start gap-2 rounded-md border border-border/60 px-3 py-2 text-xs text-muted-foreground">
           <Info class="w-3.5 h-3.5 mt-px shrink-0" />
           <p class="leading-snug">
             Challenge bypass is automatic for
@@ -264,7 +264,7 @@ function handleSave() {
 
         <div
           v-if="localError || error"
-          class="flex items-start gap-2 rounded-md border border-threat/30 bg-threat/10 px-3 py-2 text-[11px] text-threat"
+          class="flex items-start gap-2 rounded-md border border-threat/30 bg-threat/10 px-3 py-2 text-xs text-threat"
           role="alert"
         >
           <ShieldAlert class="w-3.5 h-3.5 mt-px shrink-0" />

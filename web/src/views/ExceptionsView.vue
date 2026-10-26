@@ -1,12 +1,26 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue';
-import { useRoute } from '@/router';
-import { useConfigStore } from '@/stores/config';
-import type { ExceptionRule } from '@/api/client';
-import ExceptionTestModal from '@/components/ExceptionTestModal.vue';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
+import { ref, onMounted, watch } from 'vue'
+import { useRouter } from '@/router'
+import { useConfigStore } from '@/stores/config'
+import type { ExceptionRule } from '@/api/client'
+import ExceptionTestModal from '@/components/ExceptionTestModal.vue'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { ConfirmDialog } from '@/components/ui/dialog'
+import { EmptyState } from '@/components/ui/empty-state'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from '@/components/ui/select'
 import {
   Table,
   TableHeader,
@@ -14,75 +28,74 @@ import {
   TableHead,
   TableRow,
   TableCell,
-} from '@/components/ui/table';
+} from '@/components/ui/table'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from '@/components/ui/dialog';
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from '@/components/ui/select';
-import { Plus, Shield, Trash2, Play, Sparkles, Save } from 'lucide-vue-next';
+} from '@/components/ui/dialog'
+import { Plus, Shield, ShieldCheck, Trash2, Play } from 'lucide-vue-next'
 
-const configStore = useConfigStore();
+const router = useRouter()
+const route = router.currentRoute
+const configStore = useConfigStore()
 
-const showAddModal = ref(false);
-const testModalOpen = ref(false);
-const selectedRuleForTest = ref<ExceptionRule | null>(null);
+const showAddModal = ref(false)
+const addError = ref<string | null>(null)
+const newHost = ref('*')
+const newPath = ref('')
+const newMethod = ref('ALL')
+const newLocation = ref('query')
+const newParamName = ref('')
+const newReason = ref('')
+const newRuleId = ref('ALL')
 
-const newHost = ref('');
-const newPath = ref('');
-const newMethod = ref('ALL');
-const newLocation = ref('query');
-const newParamName = ref('');
-const newReason = ref('');
-const newRuleId = ref('ALL');
+const testModalOpen = ref(false)
+const selectedRuleForTest = ref<ExceptionRule | null>(null)
+const deleteRuleId = ref<string | null>(null)
+const showDeleteConfirm = ref(false)
 
 const openAddModal = () => {
-  newHost.value = '';
-  newPath.value = '';
-  newMethod.value = 'ALL';
-  newLocation.value = 'query';
-  newParamName.value = '';
-  newReason.value = '';
-  newRuleId.value = 'ALL';
-  showAddModal.value = true;
-};
-
-const route = useRoute();
+  newHost.value = '*'
+  newPath.value = ''
+  newMethod.value = 'ALL'
+  newLocation.value = 'query'
+  newParamName.value = ''
+  newReason.value = ''
+  newRuleId.value = 'ALL'
+  addError.value = null
+  showAddModal.value = true
+}
 
 const checkQueryAndOpen = () => {
-  if (route.value?.query?.create === 'true') {
-    newHost.value = route.value.query.host || '';
-    newPath.value = route.value.query.path || '';
-    newMethod.value = route.value.query.method || 'ALL';
-    newLocation.value = route.value.query.location || 'query';
-    newParamName.value = route.value.query.param || '*';
-    newReason.value = 'Created from live attack inspector';
-    newRuleId.value = route.value.query.rule_id || 'ALL';
-    showAddModal.value = true;
+  const q = route.value?.query
+  if (q && (q.path || q.param_name || q.rule_id)) {
+    newHost.value = (q.host as string) || '*'
+    newPath.value = (q.path as string) || ''
+    newMethod.value = (q.method as string) || 'ALL'
+    newLocation.value = (q.location as string)?.toLowerCase() || 'query'
+    newParamName.value = (q.param_name as string) || ''
+    newReason.value = (q.reason as string) || 'Bypass false-positive via Forensic triage'
+    newRuleId.value = (q.rule_id as string) || 'ALL'
+    addError.value = null
+    showAddModal.value = true
   }
-};
+}
 
 onMounted(() => {
-  checkQueryAndOpen();
-});
+  checkQueryAndOpen()
+})
 
 watch(() => route.value?.query, () => {
-  checkQueryAndOpen();
-});
+  checkQueryAndOpen()
+})
 
 const handleSaveException = async () => {
   if (!newPath.value || !newParamName.value) {
-    alert('Path and Parameter Name are required');
-    return;
+    addError.value = 'Path and Parameter Name are required'
+    return
   }
 
   await configStore.createException({
@@ -93,30 +106,37 @@ const handleSaveException = async () => {
     param_name: newParamName.value,
     reason: newReason.value || 'False-positive suppression',
     rule_id: newRuleId.value || 'ALL',
-  });
+  })
 
-  showAddModal.value = false;
-};
+  showAddModal.value = false
+}
 
 const openTestSimulator = (rule: ExceptionRule) => {
-  selectedRuleForTest.value = rule;
-  testModalOpen.value = true;
-};
+  selectedRuleForTest.value = rule
+  testModalOpen.value = true
+}
 
-const handleDelete = async (id: string) => {
-  if (confirm('Delete this exception rule?')) {
-    await configStore.deleteException(id);
+const confirmDelete = (id: string) => {
+  deleteRuleId.value = id
+  showDeleteConfirm.value = true
+}
+
+const executeDelete = async () => {
+  if (deleteRuleId.value) {
+    await configStore.deleteException(deleteRuleId.value)
+    deleteRuleId.value = null
   }
-};
+  showDeleteConfirm.value = false
+}
 </script>
 
 <template>
-  <div class="h-full flex flex-col space-y-4 p-6 bg-card text-card-foreground rounded-xl border border-border shadow-none font-sans overflow-hidden">
+  <div class="h-full flex flex-col space-y-6 p-6 bg-card text-card-foreground rounded-xl border border-border shadow-none font-sans overflow-hidden">
     <!-- Header -->
-    <div class="flex items-center justify-between shrink-0">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-border shrink-0">
       <div>
-        <h1 class="text-sm font-semibold uppercase tracking-wider text-foreground flex items-center gap-2">
-          <Shield class="w-4 h-4 text-muted-foreground" />
+        <h1 class="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
+          <Shield class="w-5 h-5 text-primary" />
           <span>False-Positive Exception Rules</span>
         </h1>
         <p class="text-sm text-muted-foreground mt-1 leading-relaxed">
@@ -128,82 +148,98 @@ const handleDelete = async (id: string) => {
         @click="openAddModal"
         class="gap-1.5"
       >
-        <Plus class="w-3.5 h-3.5" />
+        <Plus class="w-4 h-4" />
         <span>Add Exception Rule</span>
       </Button>
     </div>
 
     <!-- Exceptions Table Container -->
     <div class="flex-1 min-h-0 bg-card border border-border rounded-lg overflow-y-auto">
-      <div v-if="configStore.exceptions.length === 0" class="p-12 text-center">
-        <Sparkles class="w-10 h-10 text-muted-foreground mx-auto mb-3" />
-        <h3 class="text-xs font-semibold uppercase tracking-wider text-foreground">No exception rules defined</h3>
-        <p class="text-sm text-muted-foreground mt-1 mb-4 leading-relaxed">
-          Suppress false-positives without disabling the WAF globally.
-        </p>
+      <EmptyState
+        v-if="configStore.exceptions.length === 0"
+        :icon="ShieldCheck"
+        title="No exception rules defined"
+        description="Suppress false-positives without disabling the WAF globally."
+        class="py-12"
+      >
         <Button
           @click="openAddModal"
           class="gap-1.5"
         >
-          <Plus class="w-3.5 h-3.5" />
+          <Plus class="w-4 h-4" />
           <span>Add First Exception</span>
         </Button>
-      </div>
+      </EmptyState>
 
       <Table v-else container-class="overflow-visible">
         <TableHeader>
           <TableRow>
-            <TableHead>Host / Path</TableHead>
-            <TableHead>Method</TableHead>
-            <TableHead>Location</TableHead>
-            <TableHead>Parameter Name</TableHead>
-            <TableHead>Suppressed Threat</TableHead>
-            <TableHead>Reason</TableHead>
-            <TableHead class="text-right">Actions</TableHead>
+            <TableHead class="text-xs uppercase font-semibold">Host / Path</TableHead>
+            <TableHead class="text-xs uppercase font-semibold">Method</TableHead>
+            <TableHead class="text-xs uppercase font-semibold">Location</TableHead>
+            <TableHead class="text-xs uppercase font-semibold">Parameter Name</TableHead>
+            <TableHead class="text-xs uppercase font-semibold">Suppressed Threat</TableHead>
+            <TableHead class="text-xs uppercase font-semibold">Reason</TableHead>
+            <TableHead class="text-right text-xs uppercase font-semibold">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           <TableRow v-for="rule in configStore.exceptions" :key="rule.id">
             <TableCell>
-              <span class="text-foreground font-medium block font-mono">{{ rule.path }}</span>
-              <span class="text-[10px] text-muted-foreground font-mono">{{ rule.host || '*' }}</span>
+              <span class="text-foreground font-medium block font-mono text-sm">{{ rule.path }}</span>
+              <span class="text-xs text-muted-foreground font-mono">{{ rule.host || '*' }}</span>
             </TableCell>
-            <TableCell class="font-mono text-[11px]">
+            <TableCell class="font-mono text-xs">
               <span class="px-2 py-0.5 bg-primary/10 border border-primary/30 rounded text-primary">
                 {{ rule.method }}
               </span>
             </TableCell>
             <TableCell>
-              <span class="capitalize text-foreground font-mono text-[11px]">{{ rule.location }}</span>
+              <span class="capitalize text-foreground font-mono text-xs">{{ rule.location }}</span>
             </TableCell>
-            <TableCell class="font-mono text-success font-semibold">
+            <TableCell class="font-mono text-success font-semibold text-xs">
               {{ rule.param_name }}
             </TableCell>
-            <TableCell class="font-mono text-muted-foreground text-[11px]">
+            <TableCell class="font-mono text-muted-foreground text-xs">
               {{ rule.rule_id || 'ALL' }}
             </TableCell>
-            <TableCell class="text-muted-foreground truncate max-w-xs text-[11px]">
+            <TableCell class="text-muted-foreground truncate max-w-xs text-xs">
               {{ rule.reason }}
             </TableCell>
             <TableCell class="text-right space-x-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                @click="openTestSimulator(rule)"
-                title="Test with simulator"
-                class="h-7 w-7 text-muted-foreground hover:text-foreground"
-              >
-                <Play class="w-3.5 h-3.5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                @click="handleDelete(rule.id)"
-                title="Delete exception"
-                class="h-7 w-7 text-muted-foreground hover:text-threat"
-              >
-                <Trash2 class="w-3.5 h-3.5" />
-              </Button>
+              <TooltipProvider :delay-duration="150">
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      class="h-7 w-7 text-muted-foreground hover:text-foreground"
+                      @click="openTestSimulator(rule)"
+                    >
+                      <Play class="w-3.5 h-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    <p class="text-xs">Test with simulator</p>
+                  </TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      class="h-7 w-7 text-muted-foreground hover:text-threat"
+                      @click="confirmDelete(rule.id)"
+                    >
+                      <Trash2 class="w-3.5 h-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    <p class="text-xs">Delete exception</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </TableCell>
           </TableRow>
         </TableBody>
@@ -212,40 +248,37 @@ const handleDelete = async (id: string) => {
 
     <!-- Add Exception Modal -->
     <Dialog :open="showAddModal" @update:open="showAddModal = $event">
-      <DialogContent class="max-w-lg">
+      <DialogContent class="max-w-md bg-card border-border">
         <DialogHeader>
-          <div class="flex items-center space-x-2.5">
-            <Shield class="w-5 h-5 text-muted-foreground" />
-            <DialogTitle>New Parameter Exception Rule</DialogTitle>
+          <div class="flex items-center space-x-2">
+            <Shield class="w-5 h-5 text-primary" />
+            <DialogTitle class="text-base font-semibold text-foreground">Add Rule Exception</DialogTitle>
           </div>
         </DialogHeader>
 
         <div class="space-y-4 py-2">
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Host (Optional)</label>
-              <Input
-                v-model="newHost"
-                placeholder="* or api.example.com"
-              />
-            </div>
-            <div>
-              <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Path</label>
-              <Input
-                v-model="newPath"
-                placeholder="/api/v1/search"
-              />
-            </div>
+          <div v-if="addError" class="p-3 bg-threat/10 border border-threat/30 rounded-lg text-threat text-xs">
+            {{ addError }}
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Target Host (* for all)</label>
+            <Input v-model="newHost" placeholder="e.g. api.example.com or *" />
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Request Path</label>
+            <Input v-model="newPath" placeholder="e.g. /checkout/payment" />
           </div>
 
           <div class="grid grid-cols-2 gap-4">
             <div>
               <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">HTTP Method</label>
               <Select v-model="newMethod">
-                <SelectTrigger class="w-full h-9">
+                <SelectTrigger class="w-full h-9 text-xs">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent class="bg-popover text-popover-foreground border-border">
                   <SelectItem value="ALL">ALL</SelectItem>
                   <SelectItem value="GET">GET</SelectItem>
                   <SelectItem value="POST">POST</SelectItem>
@@ -253,87 +286,76 @@ const handleDelete = async (id: string) => {
                   <SelectItem value="DELETE">DELETE</SelectItem>
                 </SelectContent>
               </Select>
-              <select v-model="newMethod" class="sr-only" tabindex="-1" aria-hidden="true">
-                <option value="ALL">ALL</option>
-                <option value="GET">GET</option>
-                <option value="POST">POST</option>
-                <option value="PUT">PUT</option>
-                <option value="DELETE">DELETE</option>
-              </select>
             </div>
             <div>
               <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Parameter Location</label>
               <Select v-model="newLocation">
-                <SelectTrigger class="w-full h-9">
+                <SelectTrigger class="w-full h-9 text-xs">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent class="bg-popover text-popover-foreground border-border">
                   <SelectItem value="query">Query Parameter</SelectItem>
                   <SelectItem value="header">Request Header</SelectItem>
                   <SelectItem value="cookie">Cookie</SelectItem>
                   <SelectItem value="body">Request Body</SelectItem>
                 </SelectContent>
               </Select>
-              <select v-model="newLocation" class="sr-only" tabindex="-1" aria-hidden="true">
-                <option value="query">Query Parameter</option>
-                <option value="header">Request Header</option>
-                <option value="cookie">Cookie</option>
-                <option value="body">Request Body</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Parameter Name</label>
-              <Input
-                v-model="newParamName"
-                placeholder="e.g. search_term"
-              />
-            </div>
-            <div>
-              <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Rule ID (or ALL)</label>
-              <Input
-                v-model="newRuleId"
-                placeholder="ALL or SQLI_*"
-              />
             </div>
           </div>
 
           <div>
-            <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Reason / Context</label>
-            <Input
-              v-model="newReason"
-              placeholder="e.g. Valid SQL editor payload in internal tool"
-            />
+            <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Parameter Name</label>
+            <Input v-model="newParamName" placeholder="e.g. signature or token" />
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Target Rule (or ALL)</label>
+            <Input v-model="newRuleId" placeholder="e.g. SEMANTIC_SQLI or ALL" />
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Suppression Reason</label>
+            <Input v-model="newReason" placeholder="e.g. Base64 encoded payload in webhook" />
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter class="flex gap-2 justify-end pt-2">
           <Button
             type="button"
-            variant="secondary"
+            variant="outline"
+            size="sm"
             @click="showAddModal = false"
           >
             Cancel
           </Button>
           <Button
             type="button"
+            size="sm"
             @click="handleSaveException"
-            class="gap-1.5"
           >
-            <Save class="w-3.5 h-3.5" />
-            <span>Add to Draft</span>
+            Add Exception
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
 
-    <!-- Test Simulator Modal -->
+    <!-- Exception Simulation Test Modal -->
     <ExceptionTestModal
+      v-if="selectedRuleForTest"
       :open="testModalOpen"
       :rule="selectedRuleForTest"
       @close="testModalOpen = false"
+    />
+
+    <!-- Delete Confirmation Modal -->
+    <ConfirmDialog
+      v-model:open="showDeleteConfirm"
+      title="Delete Rule Exception"
+      description="Are you sure you want to delete this exception rule? The WAF will immediately resume inspecting this parameter."
+      confirm-text="Delete Exception"
+      variant="destructive"
+      @confirm="executeDelete"
+      @cancel="showDeleteConfirm = false"
     />
   </div>
 </template>

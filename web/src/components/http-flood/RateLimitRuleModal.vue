@@ -138,7 +138,7 @@ const handleClose = () => {
       <div class="space-y-4 py-2">
         <!-- Natural Language Preview Box -->
         <div class="p-3 bg-muted/50 rounded-lg border border-border/80">
-          <span class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground block mb-1">
+          <span class="text-xs font-semibold uppercase tracking-wider text-muted-foreground block mb-1">
             Rule Preview
           </span>
           <p class="text-xs font-medium text-foreground leading-relaxed">

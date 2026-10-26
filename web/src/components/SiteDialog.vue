@@ -434,7 +434,7 @@ const handleOpenChange = (openState: boolean) => {
 
               <!-- Weight input when multiple upstreams exist -->
               <div v-if="upstreams.length > 1" class="w-24 shrink-0 flex items-center gap-1.5">
-                <span class="text-[11px] text-muted-foreground">Weight</span>
+                <span class="text-xs text-muted-foreground">Weight</span>
                 <NumberInput
                   v-model="u.weight"
                   :min="1"
@@ -522,7 +522,7 @@ const handleOpenChange = (openState: boolean) => {
 
           <div v-if="advancedOpen" class="space-y-3 pt-2 border-t border-border/60">
             <div>
-              <label class="block text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+              <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
                 Operational Mode
               </label>
               <Select v-model="formMode">
@@ -539,7 +539,7 @@ const handleOpenChange = (openState: boolean) => {
 
             <div class="grid grid-cols-2 gap-3">
               <div>
-                <label class="block text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+                <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
                   Block HTTP Status
                 </label>
                 <NumberInput
@@ -552,7 +552,7 @@ const handleOpenChange = (openState: boolean) => {
               </div>
 
               <div>
-                <label class="block text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+                <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
                   Offline HTTP Status
                 </label>
                 <NumberInput

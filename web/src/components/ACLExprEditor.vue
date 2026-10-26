@@ -136,7 +136,7 @@ const handleOpenChange = (openState: boolean) => {
               size="sm"
               :disabled="validating"
               @click="validateSyntax"
-              class="h-6 text-[11px] text-muted-foreground hover:text-foreground px-2"
+              class="h-6 text-xs text-muted-foreground hover:text-foreground px-2"
             >
               {{ validating ? 'Compiling...' : 'Verify Syntax' }}
             </Button>
@@ -154,7 +154,7 @@ const handleOpenChange = (openState: boolean) => {
               <CheckCircle2 class="w-4 h-4 text-success" />
               <span>Expression compiled cleanly (sub-15ns bytecode verified)</span>
             </div>
-            <div v-else class="text-threat flex items-center space-x-1.5 font-mono text-[11px]">
+            <div v-else class="text-threat flex items-center space-x-1.5 font-mono text-xs">
               <AlertCircle class="w-4 h-4 flex-shrink-0 text-threat" />
               <span>{{ validationResult.error }}</span>
             </div>
@@ -174,11 +174,6 @@ const handleOpenChange = (openState: boolean) => {
                 <SelectItem value="redirect">Redirect (302 Found)</SelectItem>
               </SelectContent>
             </Select>
-            <select v-model="formAction" class="sr-only" tabindex="-1" aria-hidden="true">
-              <option value="block">Block</option>
-              <option value="allow">Allow</option>
-              <option value="redirect">Redirect</option>
-            </select>
           </div>
 
           <div>

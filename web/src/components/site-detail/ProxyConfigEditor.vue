@@ -89,7 +89,7 @@ const TOGGLES: { key: keyof ProxySettings; label: string; hint: string }[] = [
       <div class="flex items-center justify-between px-3 py-2.5" data-testid="proxy-client-ip">
         <div class="min-w-0 pr-3">
           <p class="text-xs font-medium">Client IP Source</p>
-          <p class="text-[10px] text-muted-foreground mt-0.5">Header the gateway trusts for the real client address</p>
+          <p class="text-xs text-muted-foreground mt-0.5">Header the gateway trusts for the real client address</p>
         </div>
         <Select v-model="draft.client_ip_source">
           <SelectTrigger class="h-7 w-48 text-xs" data-testid="proxy-client-ip-select">
@@ -109,7 +109,7 @@ const TOGGLES: { key: keyof ProxySettings; label: string; hint: string }[] = [
       >
         <div class="min-w-0 pr-3">
           <p class="text-xs font-medium">{{ toggle.label }}</p>
-          <p class="text-[10px] text-muted-foreground mt-0.5">{{ toggle.hint }}</p>
+          <p class="text-xs text-muted-foreground mt-0.5">{{ toggle.hint }}</p>
         </div>
         <Switch
           :model-value="!!draft[toggle.key]"

@@ -31,7 +31,7 @@ const variantClasses: Record<NonNullable<BadgeProps['variant']>, string> = {
   <span
     :class="
       cn(
-        'inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-medium font-sans transition-colors shadow-none',
+        'inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium font-sans transition-colors shadow-none',
         variantClasses[props.variant || 'default'],
         props.class
       )

@@ -85,11 +85,11 @@ const handleTabChange = (tabId: string) => {
 </script>
 
 <template>
-  <div class="h-full flex flex-col space-y-4 p-6 bg-card text-card-foreground rounded-xl border border-border shadow-none font-sans overflow-hidden">
+  <div class="h-full flex flex-col space-y-6 p-6 bg-card text-card-foreground rounded-xl border border-border shadow-none font-sans overflow-hidden">
     <!-- Header -->
     <div class="shrink-0">
-      <h1 class="text-sm font-semibold uppercase tracking-wider text-foreground flex items-center gap-2">
-        <Activity class="w-4 h-4 text-muted-foreground" />
+      <h1 class="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
+        <Activity class="w-5 h-5 text-muted-foreground" />
         <span>HTTP Flood & Rate Limiting Defense</span>
       </h1>
       <p class="text-sm text-muted-foreground mt-1 leading-relaxed">
@@ -107,7 +107,7 @@ const handleTabChange = (tabId: string) => {
     </div>
 
     <!-- Scrollable Content -->
-    <div class="flex-1 min-h-0 overflow-y-auto space-y-4 pr-1">
+    <div class="flex-1 min-h-0 overflow-y-auto pr-1">
       <RateLimitingSettings v-if="activeView === 'settings'" />
       <WaitingRoomDashboard v-else-if="activeView === 'waiting-room'" v-model:policy="policy" />
       <RateLimitingTable v-else />

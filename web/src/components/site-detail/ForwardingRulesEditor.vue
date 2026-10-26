@@ -136,14 +136,15 @@ const activeCount = computed(() => rules.value.filter((r) => r.is_active).length
 
     <p v-if="error" class="text-xs text-destructive" data-testid="fwd-error">{{ error }}</p>
 
-    <div v-if="loading" class="flex items-center justify-center py-12 space-x-2 text-xs text-muted-foreground" data-testid="fwd-loading">
+    <div v-if="loading" class="flex items-center justify-center py-10 space-x-2 text-xs text-muted-foreground" data-testid="fwd-loading">
       <Loader2 class="w-4 h-4 animate-spin" />
       <span>Loading routing rules…</span>
     </div>
 
-    <div v-else-if="rules.length === 0" class="flex flex-col items-center justify-center py-12 space-y-2 text-xs text-muted-foreground" data-testid="fwd-empty">
-      <Split class="w-5 h-5" />
-      <span>No path-prefix rules — all traffic flows to the default upstream pool</span>
+    <div v-else-if="rules.length === 0" class="flex flex-col items-center justify-start pt-10 pb-12 space-y-1 text-center" data-testid="fwd-empty">
+      <Split class="w-8 h-8 text-muted-foreground/60 mb-2" />
+      <span class="text-base font-semibold text-foreground">No path-prefix forwarding rules</span>
+      <span class="text-xs text-muted-foreground">All traffic flows to the default upstream pool until routing rules are added.</span>
     </div>
 
     <div v-else class="overflow-auto rounded-lg border border-border bg-card">
@@ -165,7 +166,7 @@ const activeCount = computed(() => rules.value.filter((r) => r.is_active).length
             <TableCell>{{ rule.strip_prefix ? 'yes' : 'no' }}</TableCell>
             <TableCell>{{ rule.host_header_override || '—' }}</TableCell>
             <TableCell>
-              <Badge :variant="rule.is_active ? 'secondary' : 'outline'" class="text-[10px]">
+              <Badge :variant="rule.is_active ? 'secondary' : 'outline'" class="text-xs">
                 {{ rule.is_active ? 'active' : 'paused' }}
               </Badge>
             </TableCell>

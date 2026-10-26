@@ -40,7 +40,7 @@ const handleSelect = (value: ModuleMode | 'inherit') => {
       :aria-checked="props.modelValue === mode.value"
       :title="mode.title"
       :data-testid="`mode-${mode.value}`"
-      class="rounded px-2 py-0.5 text-[11px] font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+      class="rounded px-2 py-0.5 text-xs font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-pointer"
       :class="
         props.modelValue === mode.value
           ? 'bg-primary text-primary-foreground'

@@ -89,15 +89,15 @@ onMounted(loadRules);
 </script>
 
 <template>
-  <div class="h-full flex flex-col space-y-3 p-6 bg-card text-card-foreground rounded-xl border border-border font-sans overflow-hidden">
+  <div class="h-full flex flex-col space-y-6 p-6 bg-card text-card-foreground rounded-xl border border-border font-sans overflow-hidden">
     <!-- Header -->
     <div class="flex items-center justify-between shrink-0">
       <div>
-        <h1 class="text-sm font-semibold uppercase tracking-wider text-foreground flex items-center gap-2">
-          <ShieldCheck class="w-4 h-4 text-muted-foreground" />
+        <h1 class="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
+          <ShieldCheck class="w-5 h-5 text-muted-foreground" />
           <span>CVE Virtual Patches — Inner Rules</span>
         </h1>
-        <p class="text-xs text-muted-foreground mt-0.5" data-testid="rule-summary">
+        <p class="text-sm text-muted-foreground mt-1" data-testid="rule-summary">
           {{ enabledCount }} of {{ rules.length }} signatures enabled — state changes are staged, apply via Config
         </p>
       </div>
@@ -119,7 +119,7 @@ onMounted(loadRules);
       </div>
       <button
         type="button"
-        class="rounded-md border px-2 py-1 text-[11px] font-mono transition-colors duration-150"
+        class="rounded-md border px-2 py-1 text-xs font-mono transition-colors duration-150"
         :class="activeCategory === 'all' ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:text-foreground'"
         data-testid="category-chip-all"
         @click="activeCategory = 'all'"
@@ -130,7 +130,7 @@ onMounted(loadRules);
         v-for="cat in categories"
         :key="cat.category"
         type="button"
-        class="rounded-md border px-2 py-1 text-[11px] font-mono transition-colors duration-150"
+        class="rounded-md border px-2 py-1 text-xs font-mono transition-colors duration-150"
         :class="activeCategory === cat.category ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:text-foreground'"
         :data-testid="`category-chip-${cat.category}`"
         @click="activeCategory = cat.category"
@@ -160,8 +160,8 @@ onMounted(loadRules);
 
     <!-- Per-category batch for active filter -->
     <div v-if="activeCategory !== 'all'" class="flex items-center gap-2 shrink-0">
-      <span class="text-[11px] text-muted-foreground">Batch manager for</span>
-      <Badge variant="outline" class="font-mono text-[10px] tracking-normal">{{ activeCategory }}</Badge>
+      <span class="text-xs text-muted-foreground">Batch manager for</span>
+      <Badge variant="outline" class="font-mono text-xs tracking-normal">{{ activeCategory }}</Badge>
       <Button size="sm" variant="outline" class="h-7 text-xs gap-1" data-testid="batch-enable-category" @click="batchCategory(activeCategory, true)">
         Enable All {{ activeCategory }} Rules
       </Button>
@@ -193,11 +193,11 @@ onMounted(loadRules);
             :data-testid="`rule-row-${rule.id}`"
           >
             <TableCell>
-              <span class="font-mono text-[11px] text-primary">{{ rule.id }}</span>
+              <span class="font-mono text-xs text-primary">{{ rule.id }}</span>
             </TableCell>
             <TableCell class="text-foreground">{{ rule.name }}</TableCell>
             <TableCell>
-              <span class="font-mono text-[10px] text-muted-foreground">{{ rule.category }} ({{ categoryLabel(rule.category) }})</span>
+              <span class="font-mono text-xs text-muted-foreground">{{ rule.category }} ({{ categoryLabel(rule.category) }})</span>
             </TableCell>
             <TableCell class="text-right">
               <div class="inline-flex items-center gap-2">
@@ -211,10 +211,11 @@ onMounted(loadRules);
             </TableCell>
           </TableRow>
           <TableRow v-if="filteredRules.length === 0">
-            <TableCell colspan="4" class="h-64 text-center text-muted-foreground" data-testid="rules-empty">
-              <div class="h-full flex flex-col items-center justify-center p-8">
-                <ShieldCheck class="w-8 h-8 text-muted-foreground/40 mb-2" />
-                <span class="text-xs font-medium">No signatures match the current filter.</span>
+            <TableCell colspan="4" class="h-64 text-center text-muted-foreground align-top" data-testid="rules-empty">
+              <div class="flex flex-col items-center justify-start pt-10 pb-12 p-8">
+                <ShieldCheck class="w-8 h-8 text-muted-foreground/40 mb-3" />
+                <span class="text-base font-semibold text-foreground">No signatures match the current filter</span>
+                <span class="text-xs text-muted-foreground mt-1">Try clearing your search query or choosing another category.</span>
               </div>
             </TableCell>
           </TableRow>

@@ -725,7 +725,7 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
 
               <!-- Tenant Select -->
               <div class="space-y-1.5 mb-4">
-                <label class="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block">
+                <label class="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">
                   VIRTUAL HOST / TENANT
                 </label>
                 <Select v-model="selectedTenant">

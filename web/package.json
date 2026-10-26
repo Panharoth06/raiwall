@@ -16,11 +16,14 @@
     "clsx": "^2.1.1",
     "cobe": "^2.0.1",
     "d3": "^7.9.0",
+    "echarts": "^6.1.0",
     "lucide-vue-next": "^0.475.0",
     "pinia": "^2.3.1",
     "radix-vue": "^1.9.17",
     "tailwind-merge": "^3.0.2",
-    "vue": "^3.5.42"
+    "topojson-client": "^3.1.0",
+    "vue": "^3.5.42",
+    "world-atlas": "^2.0.2"
   },
   "devDependencies": {
     "@playwright/test": "^1.50.0",

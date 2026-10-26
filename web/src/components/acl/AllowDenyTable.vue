@@ -52,12 +52,12 @@ const formatDate = (dateStr?: string) => {
 <template>
   <div class="h-full flex flex-col bg-card border border-border rounded-lg overflow-hidden">
     <!-- Empty State -->
-    <div v-if="rules.length === 0" class="flex-1 min-h-[360px] flex flex-col items-center justify-center p-12 text-center">
+    <div v-if="rules.length === 0" class="flex-1 min-h-[360px] flex flex-col items-center justify-start pt-10 pb-12 px-6 text-center">
       <component
         :is="activeTab === 'allow' ? ShieldCheck : ShieldAlert"
         :class="['w-10 h-10 mx-auto mb-3', activeTab === 'allow' ? 'text-primary' : 'text-threat']"
       />
-      <h3 class="text-xs font-semibold uppercase tracking-wider text-foreground">
+      <h3 class="text-base font-semibold text-foreground">
         No {{ activeTab === 'allow' ? 'Whitelist' : 'Blacklist' }} Rules Configured
       </h3>
       <p class="text-sm text-muted-foreground mt-1 mb-4 max-w-md mx-auto leading-relaxed">
@@ -124,7 +124,7 @@ const formatDate = (dateStr?: string) => {
             </TableCell>
 
             <!-- 2. Rule ID -->
-            <TableCell class="font-mono text-[11px] text-muted-foreground">
+            <TableCell class="font-mono text-xs text-muted-foreground">
               {{ rule.id }}
             </TableCell>
 
@@ -138,7 +138,7 @@ const formatDate = (dateStr?: string) => {
 
             <!-- 4. Type -->
             <TableCell>
-              <Badge variant="outline" class="text-[10px] uppercase font-mono tracking-wider">
+              <Badge variant="outline" class="text-xs uppercase font-mono tracking-wider">
                 Custom Rule
               </Badge>
             </TableCell>
@@ -155,13 +155,13 @@ const formatDate = (dateStr?: string) => {
                   <Badge
                     v-if="chip.isConnector"
                     variant="outline"
-                    class="font-mono text-[9px] uppercase px-1 py-0 border-primary/40 text-primary"
+                    class="font-mono text-xs uppercase px-1.5 py-0 border-primary/40 text-primary"
                   >
                     {{ chip.text }}
                   </Badge>
                   <span
                     v-else
-                    class="font-mono text-[11px] bg-muted/60 text-foreground px-1.5 py-0.5 rounded border border-border/80 truncate max-w-xs"
+                    class="font-mono text-xs bg-muted/60 text-foreground px-1.5 py-0.5 rounded border border-border/80 truncate max-w-xs"
                     :title="chip.text"
                   >
                     {{ chip.text }}
@@ -171,12 +171,12 @@ const formatDate = (dateStr?: string) => {
             </TableCell>
 
             <!-- 7. Priority -->
-            <TableCell class="text-right font-mono text-[11px] tabular-nums text-muted-foreground">
+            <TableCell class="text-right font-mono text-xs tabular-nums text-muted-foreground">
               {{ rule.priority }}
             </TableCell>
 
             <!-- 8. Updated At -->
-            <TableCell class="font-mono text-[11px] text-muted-foreground whitespace-nowrap">
+            <TableCell class="font-mono text-xs text-muted-foreground whitespace-nowrap">
               {{ formatDate(rule.updated_at || rule.created_at) }}
             </TableCell>
 

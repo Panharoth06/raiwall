@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import { ref } from 'vue';
 import LiveInspector from '@/components/LiveInspector.vue';
+import { Select } from '@/components/ui/select';
 import { router } from '@/router';
 import type { ForensicEvent, Incident } from '@/types/telemetry';
 
@@ -114,8 +115,9 @@ describe('LiveInspector.vue', () => {
       },
     });
 
-    const actionSelect = wrapper.find('[data-testid="action-filter-select"]');
-    await actionSelect.setValue('allow');
+    const actionSelect = wrapper.findComponent(Select);
+    actionSelect.vm.$emit('update:modelValue', 'allow');
+    await flushPromises();
 
     const rows = wrapper.findAll('[data-testid="event-row"]');
     expect(rows.length).toBe(1);

@@ -73,7 +73,7 @@ const updateField = (index: number, field: keyof Upstream, val: any) => {
         class="p-3 bg-muted/40 border border-border rounded-lg flex flex-wrap items-center gap-3 text-xs"
       >
         <div class="flex-1 min-w-[180px]">
-          <span class="block text-[10px] text-muted-foreground mb-0.5">Dial Address</span>
+          <span class="block text-xs text-muted-foreground mb-0.5">Dial Address</span>
           <Input
             :model-value="target.dial"
             @update:model-value="updateField(idx, 'dial', String($event))"
@@ -82,7 +82,7 @@ const updateField = (index: number, field: keyof Upstream, val: any) => {
         </div>
 
         <div class="w-24">
-          <span class="block text-[10px] text-muted-foreground mb-0.5">Weight ({{ target.weight }})</span>
+          <span class="block text-xs text-muted-foreground mb-0.5">Weight ({{ target.weight }})</span>
           <NumberInput
             :model-value="target.weight"
             :min="1"
@@ -92,7 +92,7 @@ const updateField = (index: number, field: keyof Upstream, val: any) => {
         </div>
 
         <div class="flex-1 min-w-[120px]">
-          <span class="block text-[10px] text-muted-foreground mb-0.5">Health Check Path</span>
+          <span class="block text-xs text-muted-foreground mb-0.5">Health Check Path</span>
           <Input
             :model-value="target.health_check_path || ''"
             @update:model-value="updateField(idx, 'health_check_path', String($event))"
@@ -101,7 +101,7 @@ const updateField = (index: number, field: keyof Upstream, val: any) => {
         </div>
 
         <div class="w-20">
-          <span class="block text-[10px] text-muted-foreground mb-0.5">Interval</span>
+          <span class="block text-xs text-muted-foreground mb-0.5">Interval</span>
           <Input
             :model-value="target.interval || '10s'"
             @update:model-value="updateField(idx, 'interval', String($event))"

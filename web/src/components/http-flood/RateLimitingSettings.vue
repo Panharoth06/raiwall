@@ -197,7 +197,7 @@ const goBackToLimits = () => {
           <Button
             variant="outline"
             size="sm"
-            class="h-7 px-2.5 text-[11px] gap-1 font-medium"
+            class="h-7 px-2.5 text-xs gap-1 font-medium"
             @click="openEditModal('access')"
           >
             <Plus class="w-3 h-3" />
