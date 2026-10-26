@@ -232,7 +232,7 @@ const isEdit = () => Boolean(props.certificate)
           <div>
             <p class="text-xs font-semibold text-foreground">Auto-renew</p>
             <p class="text-xs text-muted-foreground">
-              Regenerate or re-issue before the 14-day expiry window.
+              Regenerate or re-issue before the 30-day expiry window.
             </p>
           </div>
           <Switch v-model:checked="autoRenew" aria-label="Auto-renew certificate" />

@@ -140,7 +140,7 @@ const confirmDelete = async () => {
         </h3>
         <p class="text-xs text-muted-foreground mt-1 leading-relaxed">
           Managed material for the <span class="font-mono">:8443</span> listener. Keys are
-          AES-256-GCM encrypted at rest; renewal runs inside the 14-day expiry window.
+          AES-256-GCM encrypted at rest; renewal runs inside the 30-day expiry window.
         </p>
       </div>
       <div class="flex items-center gap-2">

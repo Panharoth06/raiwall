@@ -42,9 +42,10 @@ Built natively as a **Caddy v2** module, Raiwall combines extreme proxy throughp
 
 ### 🛡️ 1. High-Throughput Reverse Proxy & Gateway (Data Plane)
 - **Multi-Protocol Gateway:** Native termination and reverse proxying for HTTP/1.1, HTTP/2, HTTP/3 (QUIC), WebSockets, and gRPC.
-- **Automated SSL/TLS Lifecycle:** ACME automation via CertMagic (Let's Encrypt / ZeroSSL), custom cert uploads, dynamic SNI, and OCSP stapling.
+- **Application Registry & Routing Modes:** Register each application by hostname and route it three ways — reverse proxy to one or more upstreams, static file serving from a document root, or redirect (301/302/307/308) — all resolved by `Host` and hot-swapped on apply without editing the Caddyfile.
+- **Managed TLS Lifecycle:** Per-SNI resolution via `tls.get_certificate.raiwall` across ACME issuance/renewal (CertMagic), uploaded PEM chains, and generated self-signed certificates. Private keys are AES-256-GCM encrypted at rest, and renewal reconciles at startup and after every deploy.
 - **Zero-Downtime Hot Swaps:** `atomic.Pointer[ConfigSnapshot]` applies per-site protection states (**Defense**, **Audit**, **Offline**) in nanoseconds without restarting or dropping long-lived connections.
-- **Upstream Resilience:** Smooth Weighted Round-Robin (SWRR) load balancing with background active health probes and automatic failover.
+- **Upstream Resilience:** Four selection policies — smooth weighted round-robin, least connections, IP hash, and primary-backup — with background active health probes and automatic failover.
 - **Accurate Client Attribution:** Extracts real client IPs through `CF-Connecting-IP`, `X-Real-IP`, `X-Forwarded-For`, and HAProxy `PROXY` protocol v1/v2.
 
 ### 🧠 2. Semantic Threat Detection Engine (Core WAF)
@@ -81,6 +82,8 @@ Built natively as a **Caddy v2** module, Raiwall combines extreme proxy throughp
 
 ### 🎛️ 7. Control Plane & Single-Binary Packaging
 - **Unified Binary:** REST API (`huma` OpenAPI 3.1), Embedded Vue 3 Dashboard, and Caddy Data Plane ship in a single compact binary (~50 MB, not strictly bounded under 50 MB).
+- **Draft-First Administration:** Applications, certificates, exceptions, ACLs, and policies are staged as a draft with a pending-change banner, applied atomically to a new config version, and rollback-able by version.
+- **Portable Control Store:** Embedded SQLite in WAL mode by default, or PostgreSQL via `DATABASE_URL` for multi-instance deployments.
 - **Sidecar Mode:** Envoy External Processor (`ext_proc/v3`) gRPC interface for Kubernetes ingress sidecar deployment.
 
 ---
@@ -140,7 +143,7 @@ flowchart TD
 flowchart TD
     subgraph ControlPlane["CONTROL PLANE (Admin & API)"]
         UI["Vue 3 + shadcn-vue<br/>(ECharts + Globe.gl)"] <--> API["Huma OpenAPI 3.1 REST API"]
-        API <--> DB[("SQLite WAL (sqlc)")]
+        API <--> DB[("SQLite / PostgreSQL<br/>(sqlc)")]
         API --> EngineConfig["Config Validation & Rollback"]
     end
 
@@ -163,7 +166,7 @@ flowchart TD
         Step9 -->|"Lexical Triage (<2µs)"| LibInj["libinjection-go (Pure Go)"]
         Step9 -->|"Suspicious Tokens"| AST["AST Context Verifier<br/>(TiDB SQL / mvdan Shell / tdewolff XSS)"]
         
-        LibInj -->|"Verdict: Allow"| Proxy["10. Reverse Proxy<br/>(Upstream SWRR + 403/404 Scanner Trap)"]
+        LibInj -->|"Verdict: Allow"| Proxy["10. Router<br/>(Proxy / Static / Redirect<br/>+ 4 LB Policies + Scanner Trap)"]
         AST -->|"Verdict: Allow"| Proxy
         AST -->|"Verdict: Block"| Block403(["HTTP 403 Blocked"])
         
@@ -288,8 +291,14 @@ Raiwall supports both declarative Caddyfile configuration and dynamic runtime AP
 ### Example Caddyfile
 
 ```caddyfile
-:8080 {
-    # Configure Raiwall WAF Middleware & Control Plane
+{
+    admin off
+    auto_https off
+    storage file_system /var/lib/raiwall/certmagic
+}
+
+# Shared gateway handler imported by both listeners.
+(raiwall_site) {
     raiwall {
         mode defense          # defense | audit | offline
         block_status 403      # HTTP status code for blocked attacks
@@ -300,29 +309,51 @@ Raiwall supports both declarative Caddyfile configuration and dynamic runtime AP
             db_path file:raiwall_control.db
             hmac_secret "insecure-change-in-production-secret-key-32b"
         }
-
-        # Embedded Envoy ext_proc gRPC sidecar listener (optional)
-        sidecar {
-            listen :50051
-            max_body_size 1MB
-        }
     }
+}
 
-    # Reverse proxy with Weighted Round-Robin load balancing & active health checks
-    reverse_proxy {
-        to http://127.0.0.1:9001 http://127.0.0.1:9002
-        lb_policy weighted_round_robin 3 1
+# HTTP: admin console, REST API, and gateway traffic.
+:8080 {
+    import raiwall_site
+}
 
-        health_uri /healthz
-        health_interval 5s
-        health_timeout 2s
-        health_status 200
+# HTTPS: SNI certificates are served from the control plane (uploaded or
+# generated self-signed); anything else is issued by Caddy's ACME automation.
+:8443 {
+    tls {
+        get_certificate raiwall
     }
+    import raiwall_site
 }
 ```
 
+The gateway binds these two fixed listeners; per-application port values are validated metadata used for display and reporting, not per-site sockets. Upstreams and routing are registered per application (see below) and resolved by the `Host` header.
+
+> For Envoy `ext_proc` deployments, add `sidecar { listen :50051 }` inside the `raiwall` block of a **single** listener — every importing server would otherwise try to bind the same port.
+
+### Applications, Routing & Certificates
+
+Applications are registered in **Protected Sites** (`/.raiwall/#/sites`) or via `POST /.raiwall/api/v1/sites`, and take effect after a config apply. Each application declares:
+
+| Field | Options |
+| :--- | :--- |
+| **Hostnames** | Exact names or wildcards (`*.example.com`); `*` matches any host |
+| **Routing** | `proxy` (one or more upstreams), `static` (absolute document root), `redirect` (absolute URL or site-relative path) |
+| **Load balancing** | `round_robin` (smooth weighted), `least_conn`, `ip_hash`, `primary_backup` |
+| **TLS mode** | `none`, `auto`, `manual` |
+
+- **`none`** — plain HTTP only; any HTTPS listener on the site is rejected.
+- **`auto`** — public DNS names are issued through ACME; internal or private hostnames get a generated self-signed certificate. No certificate needs to exist up front.
+- **`manual`** — requires a managed certificate whose SANs cover every hostname of the site.
+
+Certificates live under **Settings → TLS Certificates** (`/.raiwall/#/settings`) and come from three sources: generated self-signed, uploaded PEM chain + key (validated to match), or ACME. Keys are AES-256-GCM encrypted before storage and never returned by the API. Deletion is refused with **409** while a site references the certificate or serves a covered hostname. Self-signed material renews inside a 30-day window on startup and after each deploy; ACME renewals are delegated to Caddy's TLS automation.
+
+Changes stay in the draft until applied — the dashboard shows a pending-change banner with **Apply now**, and every apply creates a version you can roll back to.
+
 ### Accessing the Control Plane & Documentation
 - **Web Admin Dashboard:** `http://localhost:8080/.raiwall/`
+- **Applications & Routing:** `http://localhost:8080/.raiwall/#/sites`
+- **Managed Certificates:** `http://localhost:8080/.raiwall/#/settings`
 - **Interactive OpenAPI 3.1 Scalar Docs:** `http://localhost:8080/.raiwall/api/docs`
 - **OpenAPI 3.1 JSON Specification:** `http://localhost:8080/.raiwall/api/openapi.json`
 - **Model Context Protocol (MCP) SSE Stream:** `http://localhost:8080/.raiwall/api/mcp`
@@ -381,7 +412,7 @@ cd web && pnpm test
 ## Tech Stack
 
 - **Data Plane:** Go 1.27+, Caddy v2 (`caddyhttp`), CertMagic, `libinjection-go` (Pure Go), Coraza, TiDB Parser, `mvdan/sh`, `tdewolff/parse`, `exaring/ja4plus`, `gaissmai/bart`, `ristretto`.
-- **Control Plane:** Huma v2 (OpenAPI 3.1 REST API), `sqlc`, SQLite (`modernc.org/sqlite`), Zap logging, Prometheus metrics, Shoutrrr alerting, Model Context Protocol (MCP).
+- **Control Plane:** Huma v2 (OpenAPI 3.1 REST API), `sqlc`, SQLite (`modernc.org/sqlite`), PostgreSQL (`pgx`), Zap logging, Prometheus metrics, Shoutrrr alerting, Model Context Protocol (MCP).
 - **Dashboard UI:** Vue 3 (latest), TypeScript, Vite, `shadcn-vue` (Radix primitives + Tailwind CSS), Pinia, Vue Router 4, Apache ECharts, `globe.gl`.
 
 ---
@@ -391,6 +422,7 @@ cd web && pnpm test
 - [x] **Milestone 1 (Data Plane Core):** Caddy v2 reverse proxy middleware, `atomic.Pointer[ConfigSnapshot]` hot swaps, priority client IP extraction, two-phase request/response interception, decoupled `WAFEngine` interface, Smooth Weighted Round-Robin load balancing, and active health checks.
 - [x] **Milestone 2 (Stateful Defense & Semantic WAF):** Recursive normalization (Coraza), pure-Go `libinjection-go` lexical triage ($<2\text{ µs}$), bounded AST context evaluation (SQL, Shell, XSS), 3-Tier composite rate limiting, BART CIDR threat feeds, and SQLite/ClickHouse logging.
 - [x] **Milestone 3 (Active Defense & Control Plane):** JA4/JA4H TLS fingerprinting, HTTP 468 stateless PoW challenges, Vue 3 + TypeScript dashboard embedding, 3D attack globe, Envoy `ext_proc/v3` sidecar mode, Huma OpenAPI 3.1 REST API, and Model Context Protocol (MCP) server.
+- [x] **Milestone 4 (Application Routing & Managed Certificates):** Hostname-resolved application registry with reverse proxy, static file, and redirect routing, four load-balancing policies, managed certificate store (upload, self-signed, ACME) with AES-256-GCM key encryption and per-SNI resolution, per-site TLS modes, and draft-first apply with a pending-change banner.
 
 ---
 
