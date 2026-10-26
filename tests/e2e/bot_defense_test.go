@@ -102,8 +102,11 @@ func TestEndToEndBotDefense(t *testing.T) {
 		}
 
 		body := rec.Body.String()
-		if !strings.Contains(body, "Verifying Connection") {
+		if !strings.Contains(body, "Checking your browser") {
 			t.Errorf("Challenge page missing expected verification title")
+		}
+		if !strings.Contains(body, "Retry verification") {
+			t.Errorf("Challenge page missing retry affordance")
 		}
 		if !strings.Contains(body, "window.crypto.subtle.digest") {
 			t.Errorf("Challenge page missing WebCrypto solver")

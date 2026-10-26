@@ -141,10 +141,23 @@ func TestPoWEngine_RenderChallengePage(t *testing.T) {
 	if !strings.Contains(body, "Protected by Raiwall Gateway Defense") {
 		t.Errorf("Rendered HTML missing brand text")
 	}
+	if !strings.Contains(body, "Checking your browser") {
+		t.Errorf("Rendered HTML missing passive checking state")
+	}
+	if !strings.Contains(body, "Verification complete") {
+		t.Errorf("Rendered HTML missing success state")
+	}
+	if !strings.Contains(body, "Retry verification") {
+		t.Errorf("Rendered HTML missing retry affordance")
+	}
 	if !strings.Contains(body, "window.crypto.subtle.digest") {
 		t.Errorf("Rendered HTML missing WebCrypto solver")
 	}
 	if !strings.Contains(body, "/.raiwall/challenge/verify") {
 		t.Errorf("Rendered HTML missing verification endpoint")
+	}
+	// The interstitial must remain fully self-contained (no external CDNs).
+	if strings.Contains(body, "src=\"http") || strings.Contains(body, "href=\"http") {
+		t.Errorf("Rendered HTML must not reference external assets")
 	}
 }

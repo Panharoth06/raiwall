@@ -56,7 +56,7 @@ func TestTier1VelocityLimiter(t *testing.T) {
 		if rec2.Code != bot.HTTPStatusChallenge {
 			t.Errorf("expected HTTP status 468, got %d", rec2.Code)
 		}
-		if !strings.Contains(rec2.Body.String(), "Verifying Connection") && !strings.Contains(rec2.Body.String(), "Raiwall Gateway Defense") {
+		if !strings.Contains(rec2.Body.String(), "Checking your browser") && !strings.Contains(rec2.Body.String(), "Raiwall Gateway Defense") {
 			t.Errorf("expected PoW challenge HTML body, got: %s", rec2.Body.String())
 		}
 	})

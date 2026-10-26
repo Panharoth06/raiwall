@@ -131,7 +131,7 @@ func TestEndToEndRateLimitAndDDoSDefense(t *testing.T) {
 			}
 			if rec.Code == bot.HTTPStatusChallenge {
 				gotChallenge = true
-				if !strings.Contains(rec.Body.String(), "Verifying Connection") {
+				if !strings.Contains(rec.Body.String(), "Checking your browser") {
 					t.Errorf("expected PoW challenge HTML body, got: %s", rec.Body.String())
 				}
 				break
