@@ -501,6 +501,13 @@ hostname.
 - **OpenAPI 3.1 JSON Specification:** `http://localhost:8080/.raiwall/api/openapi.json`
 - **Model Context Protocol (MCP) SSE Stream:** `http://localhost:8080/.raiwall/api/mcp`
 
+A host that has **no site configured** has nothing to proxy, so browser navigations to
+it (`Accept: text/html`, `GET`/`HEAD`) are answered with `302 Found` →
+`/.raiwall/`. Opening `http://localhost:8080/` on a fresh install therefore lands on
+the dashboard instead of the bot challenge. API clients, probes and non-GET methods
+are never redirected. The redirect is `Cache-Control: no-store`, so it disappears the
+moment a site claims that hostname.
+
 ---
 
 ## Development

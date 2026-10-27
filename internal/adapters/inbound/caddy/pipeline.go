@@ -42,6 +42,12 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 		}
 	}
 
+	// No site for this host means there is no upstream to protect: send browser
+	// navigations to the dashboard instead of a bot challenge or 502.
+	if appCfg == nil && snap != nil && m.redirectUnconfiguredHost(w, r) {
+		return nil
+	}
+
 	// HTTP-to-HTTPS automatic 301 redirection if enabled in proxy settings
 	if appCfg != nil && appCfg.ProxySettings != nil && appCfg.ProxySettings.RedirectHTTP {
 		isHTTPS := r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
