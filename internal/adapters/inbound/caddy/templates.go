@@ -14,12 +14,12 @@ const defaultBlockHTML = `<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>403 Forbidden - Raiwall Protection</title>
 <style>
-body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-.card { background: #1e293b; padding: 2.5rem; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); max-width: 500px; text-align: center; border: 1px solid #334155; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #121212; color: #f5f5f5; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+.card { background: #1a1a1a; padding: 2.5rem; border-radius: 12px; max-width: 500px; text-align: center; border: 1px solid #2e2e2e; }
 .badge { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 9999px; background: #ef4444; color: #fff; font-size: 0.875rem; font-weight: 600; margin-bottom: 1rem; }
 h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
-p { color: #94a3b8; font-size: 0.95rem; line-height: 1.5; }
-.footer { margin-top: 1.5rem; font-size: 0.8rem; color: #64748b; border-top: 1px solid #334155; padding-top: 1rem; }
+p { color: #a8a8a8; font-size: 0.95rem; line-height: 1.5; }
+.footer { margin-top: 1.5rem; font-size: 0.8rem; color: #a8a8a8; border-top: 1px solid #2e2e2e; padding-top: 1rem; }
 </style>
 </head>
 <body>
@@ -39,12 +39,12 @@ const defaultOfflineHTML = `<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>503 Service Unavailable - Maintenance</title>
 <style>
-body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-.card { background: #1e293b; padding: 2.5rem; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); max-width: 500px; text-align: center; border: 1px solid #334155; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #121212; color: #f5f5f5; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+.card { background: #1a1a1a; padding: 2.5rem; border-radius: 12px; max-width: 500px; text-align: center; border: 1px solid #2e2e2e; }
 .badge { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 9999px; background: #f59e0b; color: #000; font-size: 0.875rem; font-weight: 600; margin-bottom: 1rem; }
 h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
-p { color: #94a3b8; font-size: 0.95rem; line-height: 1.5; }
-.footer { margin-top: 1.5rem; font-size: 0.8rem; color: #64748b; border-top: 1px solid #334155; padding-top: 1rem; }
+p { color: #a8a8a8; font-size: 0.95rem; line-height: 1.5; }
+.footer { margin-top: 1.5rem; font-size: 0.8rem; color: #a8a8a8; border-top: 1px solid #2e2e2e; padding-top: 1rem; }
 </style>
 </head>
 <body>

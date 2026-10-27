@@ -91,13 +91,13 @@ func BuiltinTemplates() map[int]DefaultTemplateDef {
 
 const baseTemplateCSS = `
 :root {
-  --bg: #090d16;
-  --card: #111726;
-  --border: #1e293b;
-  --text: #f8fafc;
-  --muted: #94a3b8;
+  --bg: #121212;
+  --card: #1a1a1a;
+  --border: #2e2e2e;
+  --text: #f5f5f5;
+  --muted: #a8a8a8;
   --threat: #ef4444;
-  --accent: #3b82f6;
+  --accent: #22d3ee;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -118,7 +118,6 @@ body {
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 2.5rem;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
 }
 .header {
   display: flex;
@@ -160,7 +159,7 @@ body {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.75rem;
-  background: rgba(0, 0, 0, 0.25);
+  background: rgba(0, 0, 0, 0.28);
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 1rem;
@@ -175,5 +174,11 @@ body {
   font-size: 0.8125rem;
   color: var(--muted);
   text-align: center;
+}
+@media (max-width: 560px) {
+  .container { padding: 1.75rem; }
+  .header { flex-wrap: wrap; }
+  .meta-grid { grid-template-columns: 1fr; }
+  .title { font-size: 1.25rem; }
 }
 `

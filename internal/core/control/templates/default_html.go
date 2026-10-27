@@ -4,6 +4,7 @@ const template403HTML = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{.StatusCode}} {{.StatusText}} - {{.BrandName}}</title>
   <style>{{.CustomCSS}}</style>
 </head>
@@ -30,6 +31,7 @@ const template404HTML = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>404 Not Found - {{.BrandName}}</title>
   <style>{{.CustomCSS}}</style>
 </head>
@@ -37,7 +39,7 @@ const template404HTML = `<!DOCTYPE html>
   <div class="container">
     <div class="header">
       <div class="brand">{{.BrandName}} Gateway</div>
-      <div class="status-badge" style="color: #94a3b8; border-color: #334155; background: #1e293b;">HTTP 404</div>
+      <div class="status-badge" style="color: #a8a8a8; border-color: #2e2e2e; background: #1f1f1f;">HTTP 404</div>
     </div>
     <h1 class="title">Resource Not Found</h1>
     <p class="description">The requested URI path does not exist on this server or has been relocated.</p>
@@ -54,6 +56,7 @@ const template429HTML = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>429 Too Many Requests - {{.BrandName}}</title>
   <style>{{.CustomCSS}}</style>
 </head>
@@ -78,6 +81,7 @@ const template465HTML = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Waiting Room - {{.BrandName}}</title>
   <style>{{.CustomCSS}}</style>
 </head>
@@ -85,7 +89,7 @@ const template465HTML = `<!DOCTYPE html>
   <div class="container">
     <div class="header">
       <div class="brand">{{.BrandName}} Virtual Waiting Room</div>
-      <div class="status-badge" style="color: #3b82f6; border-color: rgba(59, 130, 246, 0.3); background: rgba(59, 130, 246, 0.15);">HTTP 465</div>
+      <div class="status-badge" style="color: #22d3ee; border-color: rgba(34, 211, 238, 0.3); background: rgba(34, 211, 238, 0.15);">HTTP 465</div>
     </div>
     <h1 class="title">You are in the Queue</h1>
     <p class="description">We are experiencing heavy traffic. You will automatically be admitted as capacity opens up. Please do not close or refresh this page.</p>
@@ -102,6 +106,7 @@ const template466HTML = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Application Offline - {{.BrandName}}</title>
   <style>{{.CustomCSS}}</style>
 </head>
@@ -109,7 +114,7 @@ const template466HTML = `<!DOCTYPE html>
   <div class="container">
     <div class="header">
       <div class="brand">{{.BrandName}} Gateway</div>
-      <div class="status-badge" style="color: #64748b; border-color: #334155; background: #1e293b;">HTTP 466</div>
+      <div class="status-badge" style="color: #a8a8a8; border-color: #2e2e2e; background: #1f1f1f;">HTTP 466</div>
     </div>
     <h1 class="title">Service Offline for Maintenance</h1>
     <p class="description">This application is temporarily set to offline mode by system administrators. Please check back later.</p>
@@ -126,6 +131,7 @@ const template467HTML = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Zero-Trust Authentication - {{.BrandName}}</title>
   <style>{{.CustomCSS}}</style>
 </head>
@@ -150,6 +156,7 @@ const template468HTML = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Bot Verification - {{.BrandName}}</title>
   <style>{{.CustomCSS}}</style>
 </head>
@@ -174,6 +181,7 @@ const template502HTML = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>502 Bad Gateway - {{.BrandName}}</title>
   <style>{{.CustomCSS}}</style>
 </head>
@@ -198,6 +206,7 @@ const template504HTML = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>504 Gateway Timeout - {{.BrandName}}</title>
   <style>{{.CustomCSS}}</style>
 </head>

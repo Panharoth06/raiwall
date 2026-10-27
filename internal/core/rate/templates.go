@@ -79,13 +79,12 @@ const waitingRoomTemplate = `<!DOCTYPE html>
   <title>Virtual Waiting Room — High Demand</title>
   <style>
     :root {
-      --bg: #090d16;
-      --card-bg: rgba(17, 24, 39, 0.85);
-      --card-border: rgba(255, 255, 255, 0.08);
-      --text: #f3f4f6;
-      --text-muted: #9ca3af;
-      --accent: #3b82f6;
-      --accent-glow: rgba(59, 130, 246, 0.4);
+      --bg: #121212;
+      --card-bg: #1a1a1a;
+      --card-border: #2e2e2e;
+      --text: #f5f5f5;
+      --text-muted: #a8a8a8;
+      --accent: #22d3ee;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -106,16 +105,14 @@ const waitingRoomTemplate = `<!DOCTYPE html>
       max-width: 480px;
       width: 100%;
       text-align: center;
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6), 0 0 40px var(--accent-glow);
-      backdrop-filter: blur(16px);
     }
     .icon {
       width: 64px;
       height: 64px;
       margin: 0 auto 1.5rem;
       border-radius: 50%;
-      background: rgba(59, 130, 246, 0.12);
-      border: 1px solid rgba(59, 130, 246, 0.25);
+      background: rgba(34, 211, 238, 0.1);
+      border: 1px solid rgba(34, 211, 238, 0.25);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -123,8 +120,8 @@ const waitingRoomTemplate = `<!DOCTYPE html>
       animation: pulse 2.5s infinite ease-in-out;
     }
     @keyframes pulse {
-      0%, 100% { transform: scale(1); box-shadow: 0 0 10px rgba(59, 130, 246, 0.2); }
-      50% { transform: scale(1.06); box-shadow: 0 0 24px rgba(59, 130, 246, 0.5); }
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.06); }
     }
     h1 {
       font-size: 1.5rem;
@@ -145,7 +142,7 @@ const waitingRoomTemplate = `<!DOCTYPE html>
       margin-bottom: 1.5rem;
     }
     .metric-box {
-      background: rgba(255, 255, 255, 0.03);
+      background: rgba(255, 255, 255, 0.04);
       border: 1px solid var(--card-border);
       border-radius: 12px;
       padding: 1rem;
@@ -153,7 +150,7 @@ const waitingRoomTemplate = `<!DOCTYPE html>
     .metric-value {
       font-size: 1.75rem;
       font-weight: 700;
-      color: #60a5fa;
+      color: var(--accent);
       margin-bottom: 0.25rem;
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     }
@@ -174,7 +171,7 @@ const waitingRoomTemplate = `<!DOCTYPE html>
     .progress-bar-fill {
       height: 100%;
       width: 5%;
-      background: linear-gradient(90deg, #3b82f6, #60a5fa);
+      background: var(--accent);
       border-radius: 999px;
       transition: width 0.3s ease;
     }
@@ -188,7 +185,7 @@ const waitingRoomTemplate = `<!DOCTYPE html>
       padding-top: 1rem;
       border-top: 1px solid var(--card-border);
       font-size: 0.75rem;
-      color: #6b7280;
+      color: var(--text-muted);
     }
   </style>
 </head>

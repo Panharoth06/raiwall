@@ -17,15 +17,15 @@ const challengePageStyle = `
     }
     @media (prefers-color-scheme: dark) {
       :root {
-        --bg: #0b0f14;
-        --fg: #e6edf3;
-        --muted: #94a3b8;
-        --border: #1e293b;
-        --surface: #111820;
-        --accent: #4cc2ff;
-        --success: #3ddc97;
-        --threat: #ff6b6b;
-        --focus: rgba(76, 194, 255, 0.32);
+        --bg: #121212;
+        --fg: #f5f5f5;
+        --muted: #a8a8a8;
+        --border: #2e2e2e;
+        --surface: #1a1a1a;
+        --accent: #22d3ee;
+        --success: #10b981;
+        --threat: #ef4444;
+        --focus: rgba(34, 211, 238, 0.32);
       }
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
