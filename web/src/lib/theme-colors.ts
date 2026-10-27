@@ -9,7 +9,7 @@
 
 const isBrowser = typeof window !== 'undefined' && typeof document !== 'undefined'
 
-/** Raw token triplet, e.g. `"220 8% 34%"`. Empty string outside the browser. */
+/** Raw token triplet, e.g. `"0 0% 10%"`. Empty string outside the browser. */
 export function tokenTriplet(name: string): string {
   if (!isBrowser) return ''
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
@@ -20,7 +20,7 @@ export function cssToken(name: string, alpha?: number): string {
   return alpha === undefined ? `hsl(var(${name}))` : `hsl(var(${name}) / ${alpha})`
 }
 
-/** Concrete color string for canvas renderers, e.g. `hsl(220 8% 34% / 0.96)`. */
+/** Concrete color string for canvas renderers, e.g. `hsl(0 0% 10% / 0.96)`. */
 export function canvasColor(name: string, alpha?: number): string {
   const triplet = tokenTriplet(name)
   if (!triplet) return 'transparent'

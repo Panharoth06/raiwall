@@ -98,33 +98,36 @@
 
   .dark {
     /* Dark Mode Tokens (Default Cyber Console) */
-    /* Canvas is Charcoal #4A4A4A (hsl 0 0% 29%). Surfaces scale upward from it. */
-    --background: 0 0% 29%;
-    --foreground: 210 40% 98%;
+    /* Canvas is Obsidian Neutral #121212 (hsl 0 0% 7%): near-black without being
+       pure black. Every surface is fully desaturated so only the semantic
+       accents carry hue; cards step up 3% at a time because the app disables
+       box-shadow, leaving lightness as the only elevation cue. */
+    --background: 0 0% 7%;
+    --foreground: 0 0% 96%;
 
-    --card: 220 8% 34%;
-    --card-foreground: 210 40% 98%;
+    --card: 0 0% 10%;
+    --card-foreground: 0 0% 96%;
 
-    --popover: 220 8% 37%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 0 0% 12%;
+    --popover-foreground: 0 0% 96%;
 
     --primary: 180 100% 50%;
-    --primary-foreground: 210 20% 4%;
+    --primary-foreground: 0 0% 7%;
 
-    --secondary: 220 8% 40%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 0 0% 14%;
+    --secondary-foreground: 0 0% 96%;
 
-    --muted: 220 8% 35%;
-    --muted-foreground: 220 10% 82%;
+    --muted: 0 0% 13%;
+    --muted-foreground: 0 0% 66%;
 
-    --accent: 220 8% 40%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 0 0% 15%;
+    --accent-foreground: 0 0% 96%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 8% 44%;
-    --input: 220 8% 44%;
+    --border: 0 0% 18%;
+    --input: 0 0% 18%;
     --ring: 180 100% 50%;
 
     /* Security Domain Tokens */
@@ -140,35 +143,35 @@
     --info: 200 98% 39%;
     --info-foreground: 0 0% 100%;
 
-    /* Instrument / Topology Diagram Tokens (elevated above the charcoal canvas) */
-    --diagram-text: 210 40% 98%;
-    --diagram-text-muted: 220 8% 82%;
-    --diagram-text-subtle: 220 8% 68%;
-    --diagram-guide: 220 8% 46%;
-    --diagram-node: 220 8% 35%;
-    --diagram-node-elevated: 220 8% 37%;
-    --diagram-node-hover: 220 8% 41%;
-    --diagram-node-border: 220 8% 46%;
-    --diagram-hub: 220 8% 39%;
-    --diagram-hub-muted: 220 8% 36%;
-    --diagram-hub-border: 220 8% 38%;
-    --diagram-hub-border-hover: 220 8% 50%;
-    --diagram-toggle-track: 220 8% 42%;
-    --diagram-node-info: 217 30% 34%;
-    --diagram-node-info-active: 217 35% 38%;
-    --diagram-node-success: 160 25% 28%;
-    --diagram-node-success-active: 160 30% 32%;
-    --diagram-map-land: 220 8% 33%;
-    --diagram-map-land-active: 220 8% 38%;
-    --diagram-map-border: 220 8% 44%;
+    /* Instrument / Topology Diagram Tokens (elevated above the obsidian canvas) */
+    --diagram-text: 0 0% 96%;
+    --diagram-text-muted: 0 0% 80%;
+    --diagram-text-subtle: 0 0% 62%;
+    --diagram-guide: 0 0% 20%;
+    --diagram-node: 0 0% 13%;
+    --diagram-node-elevated: 0 0% 15%;
+    --diagram-node-hover: 0 0% 17%;
+    --diagram-node-border: 0 0% 22%;
+    --diagram-hub: 0 0% 16%;
+    --diagram-hub-muted: 0 0% 13%;
+    --diagram-hub-border: 0 0% 18%;
+    --diagram-hub-border-hover: 0 0% 30%;
+    --diagram-toggle-track: 0 0% 16%;
+    --diagram-node-info: 217 45% 16%;
+    --diagram-node-info-active: 217 50% 21%;
+    --diagram-node-success: 160 40% 14%;
+    --diagram-node-success-active: 160 45% 19%;
+    --diagram-map-land: 0 0% 14%;
+    --diagram-map-land-active: 0 0% 18%;
+    --diagram-map-border: 0 0% 22%;
     --diagram-sheen: 0 0% 100%;
-    --diagram-ribbon: hsl(210 40% 98% / 0.22);
-    --diagram-ribbon-hover: hsl(210 40% 98% / 0.52);
+    --diagram-ribbon: hsl(0 0% 96% / 0.22);
+    --diagram-ribbon-hover: hsl(0 0% 96% / 0.5);
 
     /* Globe Tokens (WebGL sphere, consumed as normalized RGB) */
-    --globe-base: 217 18% 22%;
+    --globe-base: 0 0% 18%;
     --globe-marker: 190 88% 60%;
-    --globe-glow: 217 24% 31%;
+    --globe-glow: 0 0% 26%;
     --globe-arc: 199 93% 66%;
   }
 
