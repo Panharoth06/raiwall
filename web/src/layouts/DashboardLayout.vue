@@ -20,6 +20,7 @@ import {
   Moon,
   ChevronRight,
   FileCode,
+  Rocket,
   Menu,
   X,
 } from 'lucide-vue-next';
@@ -95,6 +96,7 @@ const navItems: NavItem[] = [
       { name: 'Login Configuration', path: '/auth-gateway/idp', testId: 'nav-auth-idp' },
     ],
   },
+  { name: 'Deployments', path: '/deployments', icon: Rocket, testId: 'nav-deployments' },
   { name: 'Settings', path: '/system', icon: Settings, testId: 'nav-settings' },
 ];
 
@@ -141,6 +143,9 @@ const isItemActive = (path: string): boolean => {
   }
   if (path === '/system') {
     return currentPath.value.startsWith('/system') || currentPath.value.startsWith('/settings');
+  }
+  if (path === '/deployments') {
+    return currentPath.value.startsWith('/deployments') || currentPath.value.startsWith('/snapshots');
   }
   return currentPath.value.startsWith(path);
 };

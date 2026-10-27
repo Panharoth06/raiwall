@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import { ref } from 'vue';
+import { useRouter } from '@/router';
 import { useConfigStore } from '@/stores/config';
 import { useTheme } from '@/composables/useTheme';
 import ApiKeysManager from '@/components/ApiKeysManager.vue';
 import CertificatesPanel from '@/components/certificates/CertificatesPanel.vue';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Settings, Network, Key, Palette, Moon, Sun, Monitor, Lock } from 'lucide-vue-next';
+import { Button } from '@/components/ui/button';
+import { Settings, Network, Key, Palette, Moon, Sun, Monitor, Lock, History } from 'lucide-vue-next';
 import { Tabs, type Tab } from '@/components/ui/tabs';
 
+const router = useRouter();
 const configStore = useConfigStore();
 const { theme, setTheme } = useTheme();
 
@@ -90,6 +93,22 @@ const handleTabChange = (tabId: string) => {
                   v{{ configStore.activeVersion }}
                 </span>
               </div>
+            </div>
+
+            <div class="mt-3 pt-3 border-t border-border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <p class="text-xs text-muted-foreground">
+                Deploy staged changes and roll the data plane back to any historical snapshot.
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                data-testid="settings-deployment-history"
+                class="gap-1.5"
+                @click="router.push('/deployments')"
+              >
+                <History class="w-3.5 h-3.5" />
+                <span>Deployment History</span>
+              </Button>
             </div>
           </CardContent>
         </Card>

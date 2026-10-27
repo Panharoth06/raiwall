@@ -36,6 +36,7 @@ describe('DashboardLayout.vue (Task 74)', () => {
     expect(wrapper.find('[data-testid="nav-anti-bot"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="nav-auth-gateway"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="nav-auth-gateway-chevron"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="nav-deployments"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="nav-settings"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="nav-topology"]').exists()).toBe(true);
 
@@ -80,6 +81,17 @@ describe('DashboardLayout.vue (Task 74)', () => {
 
     await wrapper.find('[data-testid="nav-attacks"]').trigger('click');
     expect(mockPush).toHaveBeenCalledWith('/attacks');
+  });
+
+  it('exposes a persistent Deployments entry and highlights the snapshots alias', async () => {
+    const wrapper = mount(DashboardLayout);
+
+    await wrapper.find('[data-testid="nav-deployments"]').trigger('click');
+    expect(mockPush).toHaveBeenCalledWith('/deployments');
+
+    mockRoute.value = { path: '/snapshots', fullPath: '/snapshots', name: 'snapshots', params: {}, query: {} };
+    const aliased = mount(DashboardLayout);
+    expect(aliased.find('[data-testid="nav-deployments"]').classes()).toContain('text-primary');
   });
 
   it('renders circular theme toggle button and toggles theme on click', async () => {

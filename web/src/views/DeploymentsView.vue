@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useConfigStore } from '@/stores/config'
+import { useAuthStore } from '@/stores/auth'
 import ConfigDiffViewer from '@/components/ConfigDiffViewer.vue'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -22,7 +23,10 @@ import {
 import { Rocket, RotateCcw, History } from 'lucide-vue-next'
 
 const configStore = useConfigStore()
+const authStore = useAuthStore()
 
+const loading = ref(true)
+const loadError = ref<string | null>(null)
 const deployModalOpen = ref(false)
 const commitDescription = ref('')
 const deploying = ref(false)
@@ -33,9 +37,19 @@ const selectedRollbackVersion = ref<number | null>(null)
 const rollingBack = ref(false)
 const rollbackError = ref<string | null>(null)
 
-onMounted(async () => {
-  await configStore.loadAll()
-})
+const refresh = async () => {
+  loading.value = true
+  loadError.value = null
+  try {
+    await Promise.all([configStore.refreshHistory(), configStore.refreshDiff()])
+  } catch (err: unknown) {
+    loadError.value = err instanceof Error ? err.message : 'Failed to load snapshot history'
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(refresh)
 
 const openDeployModal = () => {
   commitDescription.value = ''
@@ -47,7 +61,10 @@ const handleDeploy = async () => {
   deploying.value = true
   deployError.value = null
   try {
-    await configStore.applyDraft(commitDescription.value || 'Deployed from web console')
+    await configStore.applyDraft(
+      authStore.user?.username || 'admin',
+      commitDescription.value.trim() || 'Deployed from web console'
+    )
     deployModalOpen.value = false
   } catch (err: unknown) {
     deployError.value = err instanceof Error ? err.message : 'Deployment failed'
@@ -95,9 +112,10 @@ const handleRollback = async () => {
         <Button
           variant="outline"
           size="sm"
-          @click="configStore.refreshDiff()"
+          :disabled="loading"
+          @click="refresh"
         >
-          Refresh Diff
+          {{ loading ? 'Refreshing...' : 'Refresh' }}
         </Button>
         <Button
           v-if="configStore.hasDraftChanges"
@@ -139,16 +157,46 @@ const handleRollback = async () => {
           </h2>
         </div>
 
+        <div
+          v-if="loadError && configStore.history.length > 0"
+          data-testid="snapshot-warning"
+          class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded-md border border-threat/30 bg-threat/10 px-3 py-2"
+        >
+          <span class="text-xs text-threat">{{ loadError }}</span>
+          <Button variant="outline" size="sm" @click="refresh">Retry</Button>
+        </div>
+
         <div class="bg-card border border-border rounded-lg overflow-hidden">
+          <div
+            v-if="loading && configStore.history.length === 0"
+            data-testid="snapshot-loading"
+            class="p-4 space-y-2"
+          >
+            <div
+              v-for="row in 4"
+              :key="row"
+              class="h-9 rounded bg-muted animate-pulse"
+            />
+          </div>
+
+          <div
+            v-else-if="loadError && configStore.history.length === 0"
+            data-testid="snapshot-error"
+            class="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+          >
+            <p class="text-sm text-threat">{{ loadError }}</p>
+            <Button variant="outline" size="sm" @click="refresh">Retry</Button>
+          </div>
+
           <EmptyState
-            v-if="configStore.history.length === 0"
+            v-else-if="configStore.history.length === 0"
             :icon="History"
             title="No historical snapshots recorded yet"
             description="Configuration snapshots will appear here as updates are committed and deployed."
             class="py-8"
           />
 
-          <Table v-else>
+          <Table v-else data-testid="snapshot-history-table">
             <TableHeader>
               <TableRow>
                 <TableHead class="text-xs uppercase font-semibold">Version</TableHead>
@@ -162,6 +210,7 @@ const handleRollback = async () => {
               <TableRow
                 v-for="snap in configStore.history"
                 :key="snap.version"
+                data-testid="snapshot-row"
                 :class="{ 'bg-primary/5': snap.version === configStore.activeVersion }"
               >
                 <TableCell class="font-mono font-bold">

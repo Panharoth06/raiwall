@@ -68,6 +68,16 @@ export const useConfigStore = defineStore('config', () => {
     }
   }
 
+  /** Reloads snapshot history and the active version; errors propagate to the caller. */
+  async function refreshHistory() {
+    const [historyData, clusterData] = await Promise.all([
+      api.getConfigHistory(),
+      api.getClusterStatus(),
+    ]);
+    history.value = historyData;
+    cluster.value = clusterData;
+  }
+
   // Sites
   async function createSite(site: Partial<Site>) {
     const created = await api.createSite(site);
@@ -196,6 +206,7 @@ export const useConfigStore = defineStore('config', () => {
     activeVersion,
     loadAll,
     refreshDiff,
+    refreshHistory,
     createSite,
     updateSite,
     deleteSite,

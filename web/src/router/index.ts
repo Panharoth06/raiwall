@@ -275,6 +275,7 @@ export const router = createSimpleRouter([
   { path: '/semantics', name: 'semantics', component: SemanticsView },
   { path: '/inner-rules', name: 'inner-rules', component: InnerRulesView },
   { path: '/deployments', name: 'deployments', component: DeploymentsView },
+  { path: '/snapshots', name: 'snapshots', component: DeploymentsView },
   { path: '/login', name: 'login', component: LoginView },
 ]);
 

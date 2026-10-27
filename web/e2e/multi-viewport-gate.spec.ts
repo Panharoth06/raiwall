@@ -15,6 +15,7 @@ const routes = [
   '/anti-bot',
   '/semantics',
   '/auth-gateway',
+  '/deployments',
 ];
 
 async function login(page: Page) {
@@ -68,6 +69,29 @@ for (const vp of viewports) {
         expect(bodyText).not.toContain('Internal Server Error');
         expect(bodyText).not.toContain('Cannot read properties');
       }
+    });
+
+    test(`deployment history is reachable from the sidebar (${vp.name})`, async ({ page }) => {
+      await login(page);
+
+      if (vp.width < 1024) {
+        await page.locator('[data-testid="nav-mobile-toggle"]').click();
+        await page.waitForTimeout(250);
+      }
+
+      await page.locator('[data-testid="nav-deployments"]').click();
+      await page.waitForTimeout(300);
+
+      expect(page.url()).toContain('#/deployments');
+      await expect(page.locator('h1')).toContainText('Deployments & Rollback History');
+      await expect(
+        page
+          .locator('[data-testid="snapshot-row"]')
+          .first()
+          .or(page.getByText('No historical snapshots recorded yet'))
+      ).toBeVisible({ timeout: 10000 });
+      await expect(page.locator('[data-testid="snapshot-error"]')).toHaveCount(0);
+      await expectNoHorizontalOverflow(page);
     });
 
     test(`anti-bot application policy and BOT Protect dialog remain usable (${vp.name})`, async ({ page }) => {
