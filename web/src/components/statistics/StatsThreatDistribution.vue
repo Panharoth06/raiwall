@@ -2,6 +2,7 @@
 import { ShieldAlert, Terminal, Server, Copy, Check } from 'lucide-vue-next'
 import { ref, computed } from 'vue'
 import type { TopCount } from '@/types/telemetry'
+import { cssToken } from '@/lib/theme-colors'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -32,16 +33,7 @@ function copyToClipboard(text: string) {
   }, 2000)
 }
 
-const donutColors = [
-  'hsl(var(--primary))',
-  'hsl(var(--threat))',
-  'hsl(var(--warning))',
-  'hsl(var(--success))',
-  'hsl(var(--info))',
-  'hsl(280 84% 60%)',
-  'hsl(190 90% 45%)',
-  'hsl(330 80% 60%)',
-]
+const donutColors = [1, 2, 3, 4, 5, 6, 7, 8].map((index) => cssToken(`--chart-${index}`))
 
 const totalCategoryBlocks = computed(() => {
   if (props.totalBlocked > 0) return props.totalBlocked

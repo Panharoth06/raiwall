@@ -2,6 +2,7 @@
 import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
 import createGlobe from 'cobe';
 import { useTheme } from '@/composables/useTheme';
+import { tokenRgb01 } from '@/lib/theme-colors';
 import { defaultMarkers, defaultArcs, type CdnMarker, type CdnArc } from './cobeDefaults';
 
 export interface GlobeCdnProps {
@@ -95,24 +96,13 @@ function handlePointerMove(e: PointerEvent) {
   }
 }
 
-const colorScheme = computed(() => {
-  if (isDark.value) {
-    return {
-      dark: 1,
-      baseColor: [0.12, 0.16, 0.22] as [number, number, number],
-      markerColor: [0.25, 0.82, 0.95] as [number, number, number],
-      glowColor: [0.18, 0.25, 0.35] as [number, number, number],
-      arcColor: [0.35, 0.78, 0.98] as [number, number, number],
-    };
-  }
-  return {
-    dark: 0,
-    baseColor: [1, 1, 1] as [number, number, number],
-    markerColor: [0, 0, 0] as [number, number, number],
-    glowColor: [0.94, 0.93, 0.91] as [number, number, number],
-    arcColor: [0, 0, 0] as [number, number, number],
-  };
-});
+const colorScheme = computed(() => ({
+  dark: isDark.value ? 1 : 0,
+  baseColor: tokenRgb01('--globe-base'),
+  markerColor: tokenRgb01('--globe-marker'),
+  glowColor: tokenRgb01('--globe-glow'),
+  arcColor: tokenRgb01('--globe-arc'),
+}));
 
 function initGlobe() {
   const canvas = canvasRef.value;

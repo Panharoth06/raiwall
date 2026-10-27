@@ -253,7 +253,7 @@ describe('WafCommandCenter.vue', () => {
     const stops = gradient.findAll('stop')
     expect(stops.length).toBeGreaterThanOrEqual(7)
     stops.forEach((stop) => {
-      expect(stop.attributes('stop-color')).toBe('#FFFFFF')
+      expect(stop.attributes('stop-color')).toBe('hsl(var(--diagram-sheen))')
     })
 
     // Filter exists with pure white feGaussianBlur and feMerge
@@ -289,14 +289,14 @@ describe('WafCommandCenter.vue', () => {
     const initialTicks = hubWafCore.findAll('line')
     const initialMaxY = Math.max(...initialTicks.map((l) => Number(l.attributes('y2'))))
     const initialShell = hubWafCore.findAll('circle')[0]
-    expect(initialShell.attributes('stroke')).toBe('#363D4C')
+    expect(initialShell.attributes('stroke')).toBe('hsl(var(--diagram-node-border))')
 
     // Trigger hover on hub-waf-core
     await hubWafCore.trigger('mouseenter')
 
     // Color shifts to emerald on hover
     const hoveredShell = hubWafCore.findAll('circle')[0]
-    expect(hoveredShell.attributes('stroke')).toBe('#10B981')
+    expect(hoveredShell.attributes('stroke')).toBe('hsl(var(--success))')
 
     // Strictly NO SCALE: Spike length and radial dimensions remain completely static
     const hoveredTicks = hubWafCore.findAll('line')
@@ -304,7 +304,7 @@ describe('WafCommandCenter.vue', () => {
     expect(hoveredMaxY).toBe(initialMaxY)
 
     await hubWafCore.trigger('mouseleave')
-    expect(hubWafCore.findAll('circle')[0].attributes('stroke')).toBe('#363D4C')
+    expect(hubWafCore.findAll('circle')[0].attributes('stroke')).toBe('hsl(var(--diagram-node-border))')
 
     // 2. OWASP filter dims unselected ribbons to shine opacity 0
     const filterBtn = wrapper.find('[data-testid="filter-trigger-btn"]')

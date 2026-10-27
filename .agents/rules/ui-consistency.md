@@ -61,6 +61,26 @@ All tokens are defined as HSL custom properties in `web/src/style.css` and expos
 | **Warning / Challenge** | `bg-warning/10` | `text-warning` | `border-warning/30` | Bot PoW challenge (468), Rate-limiting queue (465), degraded health. |
 | **Info / Discovery** | `bg-info/10` | `text-info` | `border-info/30` | Audit mode events, auto-discovered shadow APIs, TLS cert info. |
 
+### 2.6 Instrument, Chart & Brand-Artwork Tokens
+
+SVG topology diagrams, map/chart renderers, and WebGL globes must **never** contain literal colors either. They consume the same contract through dedicated token families:
+
+| Family | Tokens | Consumed By |
+| :--- | :--- | :--- |
+| **Diagram Surfaces** | `--diagram-node`, `--diagram-node-elevated`, `--diagram-node-hover`, `--diagram-node-border`, `--diagram-hub`, `--diagram-hub-border`, `--diagram-guide` | Topology SVG (`stroke="hsl(var(--diagram-guide))"`) |
+| **Diagram Text** | `--diagram-text`, `--diagram-text-muted`, `--diagram-text-subtle` | In-SVG labels and numeric readouts |
+| **Diagram Accents** | `--diagram-ribbon`, `--diagram-ribbon-hover`, `--diagram-sheen`, `--diagram-node-info`, `--diagram-node-success`, `--diagram-map-land`, `--diagram-map-border` | Sankey ribbons, map land masses, tinted nodes |
+| **Emphasis Accents** | `--threat-emphasis`, `--success-emphasis`, `--info-emphasis`, `--accent-blue` | Hover states that need a lighter shade than the base semantic token |
+| **Chart Palette** | `--chart-1` … `--chart-8` | Donuts, categorical series (`hsl(var(--chart-3))`) |
+| **Globe** | `--globe-base`, `--globe-marker`, `--globe-glow`, `--globe-arc` | cobe WebGL uniforms (normalized RGB) |
+
+Rules:
+
+1. **Template / SVG attributes** — use `hsl(var(--token))` (or `var(--token)` when alpha is baked into the token).
+2. **Canvas / WebGL renderers** (ECharts, cobe) cannot resolve `var()`. Use the helpers in `web/src/lib/theme-colors.ts`: `canvasColor()` for color strings, `tokenRgb01()` for WebGL uniforms. Never inline a hex there.
+3. **Brand artwork** (the Raiwall mascot logo) is theme-invariant by design. Its colors live in `web/src/lib/brand-palette.ts` as named constants — no hex in `RaiwallLogo.vue`.
+4. `web/src/style.css` is the **only** file allowed to declare color literals. `web/src/lib/brand-palette.ts` is the only other permitted exception.
+
 ---
 
 ## 3. Negative Constraints & Prohibited Patterns
@@ -82,6 +102,9 @@ Agents must strictly avoid these antipatterns:
 - ❌ **NO inline CSS color styles:**
   `style="background-color: #17223B"`  
   👉 **USE:** Tailwind semantic utility classes.
+- ❌ **NO literal colors in SVG, canvas, chart, or WebGL code:**
+  `stroke="#FFFFFF"`, `itemStyle: { color: '#3b82f6' }`, `baseColor: [0.12, 0.16, 0.22]`  
+  👉 **USE:** `hsl(var(--diagram-*))` / `hsl(var(--chart-*))`, or `canvasColor()` / `tokenRgb01()` from `@/lib/theme-colors`.
 
 ---
 

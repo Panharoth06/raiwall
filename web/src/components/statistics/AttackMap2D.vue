@@ -7,6 +7,7 @@ import { CanvasRenderer } from 'echarts/renderers'
 import * as topojson from 'topojson-client'
 import worldAtlas from 'world-atlas/countries-110m.json'
 import { useTheme } from '@/composables/useTheme'
+import { canvasColor } from '@/lib/theme-colors'
 import { countryCoords } from './geoData'
 import { Button } from '@/components/ui/button'
 import { ZoomIn, ZoomOut, RotateCcw, Globe } from 'lucide-vue-next'
@@ -76,7 +77,7 @@ function resolveCoords(countryName: string): [number, number] | null {
 
 function buildSeries(): echarts.SeriesOption[] {
   const isBlocked = props.dataMode === 'blocked'
-  const lineColor = isBlocked ? '#f43f5e' : '#06b6d4'
+  const lineColor = isBlocked ? canvasColor('--threat') : canvasColor('--primary')
   const series: echarts.SeriesOption[] = []
 
   // Source Origin Attacker / Traffic Nodes with Pulsing Ripple (ONLY verified countries)
@@ -160,9 +161,9 @@ function buildSeries(): echarts.SeriesOption[] {
       },
       symbolSize: 10,
       itemStyle: {
-        color: '#3b82f6',
+        color: canvasColor('--accent-blue'),
         shadowBlur: 10,
-        shadowColor: '#3b82f6',
+        shadowColor: canvasColor('--accent-blue'),
       },
       data: [{
         name: props.targetGateway.name,
@@ -178,12 +179,11 @@ function updateChart() {
   if (!chartInstance) return
 
   try {
-    const isDarkVal = isDark.value
-    const isBlocked = props.dataMode === 'blocked'
-    const lineColor = isBlocked ? '#f43f5e' : '#06b6d4'
-    const landColor = isDarkVal ? '#181b20' : '#e2e8f0'
-    const borderColor = isDarkVal ? '#2d3440' : '#cbd5e1'
-    const textColor = isDarkVal ? '#f8fafc' : '#0f172a'
+        const isBlocked = props.dataMode === 'blocked'
+    const lineColor = isBlocked ? canvasColor('--threat') : canvasColor('--primary')
+    const landColor = canvasColor('--diagram-map-land')
+    const borderColor = canvasColor('--diagram-map-border')
+    const textColor = canvasColor('--diagram-text')
 
     const series = buildSeries()
 
@@ -193,8 +193,8 @@ function updateChart() {
         backgroundColor: 'transparent',
         tooltip: {
           trigger: 'item',
-          backgroundColor: isDarkVal ? 'rgba(15, 23, 42, 0.92)' : 'rgba(255, 255, 255, 0.95)',
-          borderColor: isDarkVal ? '#334155' : '#e2e8f0',
+          backgroundColor: canvasColor('--popover', 0.95),
+          borderColor: canvasColor('--border'),
           borderWidth: 1,
           padding: [8, 12],
           textStyle: {
@@ -211,7 +211,7 @@ function updateChart() {
                     <span>➔</span>
                     <span>${params.data.toName}</span>
                   </div>
-                  <div style="margin-top: 4px; color: ${isDarkVal ? '#94a3b8' : '#64748b'};">
+                  <div style="margin-top: 4px; color: ${canvasColor('--muted-foreground')};">
                     <span style="font-weight: 700; color: ${textColor};">${params.data.value.toLocaleString()}</span> ${isBlocked ? 'threat blocks' : 'requests'}
                   </div>
                 </div>
@@ -221,7 +221,7 @@ function updateChart() {
               if (params.seriesName === 'Protected Gateway') {
                 return `
                   <div style="font-family: ui-monospace, monospace; font-size: 12px;">
-                    <div style="font-weight: 700; color: #3b82f6;">🛡️ Protected WAF Gateway</div>
+                    <div style="font-weight: 700; color: ${canvasColor('--accent-blue')};">🛡️ Protected WAF Gateway</div>
                     <div style="margin-top: 2px;">${params.data.name}</div>
                   </div>
                 `
@@ -255,7 +255,7 @@ function updateChart() {
           },
           emphasis: {
             itemStyle: {
-              areaColor: isDarkVal ? '#1e293b' : '#cbd5e1',
+              areaColor: canvasColor('--diagram-map-land-active'),
             },
             label: {
               show: false,
@@ -281,7 +281,7 @@ function updateChart() {
             },
             emphasis: {
               itemStyle: {
-                areaColor: isDarkVal ? '#1e293b' : '#cbd5e1',
+                areaColor: canvasColor('--diagram-map-land-active'),
               },
             },
           },

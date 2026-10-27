@@ -27,7 +27,6 @@ import { Switch } from '@/components/ui/switch'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { useRouter, useRoute } from '@/router'
 import { useAuthStore } from '@/stores/auth'
-import { useTheme } from '@/composables/useTheme'
 import type {
   ViewMode,
   IngressSourceId,
@@ -41,7 +40,6 @@ export type NavSection = 'topology' | 'analytics' | 'inspector' | 'globe' | 'sit
 
 const router = useRouter()
 const route = useRoute()
-const { isDark } = useTheme()
 
 // Navigation and Reactive State
 const activeNav = ref<NavSection>('topology')
@@ -247,18 +245,18 @@ const computeHubTicks = (cx: number, cy: number, hubId: WafHubId) => {
     // Strictly static radii - no scale distortion or length change on hover
     const r2 = isActive ? 90 : 76
 
-    let color = isHovered ? '#4E5A70' : '#3A4354'
+    let color = isHovered ? 'hsl(var(--diagram-hub-border-hover))' : 'hsl(var(--diagram-hub-border))'
     let strokeWidth = isActive ? 2.2 : 1.4
 
     if (isActive) {
       if (angle >= 135 && angle <= 225) {
         // Threat sector
-        color = isHovered ? '#F87171' : '#EF4444'
+        color = isHovered ? 'hsl(var(--threat-emphasis))' : 'hsl(var(--threat))'
       } else {
         // Clean sector: vibrant emerald for waf-core, electric blue for edge-defense
         color = isHovered
-          ? (hubId === 'waf-core' ? '#34D399' : '#60A5FA')
-          : (hubId === 'waf-core' ? '#10B981' : '#2574F5')
+          ? (hubId === 'waf-core' ? 'hsl(var(--success-emphasis))' : 'hsl(var(--info-emphasis))')
+          : (hubId === 'waf-core' ? 'hsl(var(--success))' : 'hsl(var(--accent-blue))')
       }
     }
 
@@ -455,12 +453,8 @@ const computeCubicPath = (x1: number, y1: number, x2: number, y2: number): strin
 }
 
 // Sankey Ribbons
-const getCleanRibbonColor = (isHovered: boolean) => {
-  if (isDark.value) {
-    return isHovered ? 'rgba(220, 232, 245, 0.52)' : 'rgba(175, 188, 204, 0.22)'
-  }
-  return isHovered ? 'rgba(37, 99, 235, 0.55)' : 'rgba(100, 116, 139, 0.28)'
-}
+const getCleanRibbonColor = (isHovered: boolean) =>
+  isHovered ? 'var(--diagram-ribbon-hover)' : 'var(--diagram-ribbon)'
 
 const sankeyRibbons = computed<SankeyRibbon[]>(() => {
   const ribbons: SankeyRibbon[] = []
@@ -472,7 +466,7 @@ const sankeyRibbons = computed<SankeyRibbon[]>(() => {
     d: computeCubicPath(240, 200, 800, 330),
     sourceId: 'bots',
     targetId: 'waf-core',
-    stroke: hoveredRibbonId.value === 'ribbon-bots-wafcore' ? 'rgba(239, 68, 68, 0.60)' : 'rgba(239, 68, 68, 0.28)',
+    stroke: hoveredRibbonId.value === 'ribbon-bots-wafcore' ? 'hsl(var(--threat) / 0.6)' : 'hsl(var(--threat) / 0.28)',
     strokeWidth: 8,
     isThreat: true,
     dimmed: false,
@@ -487,7 +481,7 @@ const sankeyRibbons = computed<SankeyRibbon[]>(() => {
     d: computeCubicPath(240, 200, 800, 600),
     sourceId: 'bots',
     targetId: 'edge-defense',
-    stroke: hoveredRibbonId.value === 'ribbon-bots-edgedefense' ? 'rgba(239, 68, 68, 0.60)' : 'rgba(239, 68, 68, 0.28)',
+    stroke: hoveredRibbonId.value === 'ribbon-bots-edgedefense' ? 'hsl(var(--threat) / 0.6)' : 'hsl(var(--threat) / 0.28)',
     strokeWidth: 6,
     isThreat: true,
     dimmed: botEdgeDimmed,
@@ -560,7 +554,7 @@ const sankeyRibbons = computed<SankeyRibbon[]>(() => {
     const isHovered = hoveredRibbonId.value === ribbonId
 
     let stroke = isThreat
-      ? (isHovered ? 'rgba(239, 68, 68, 0.60)' : 'rgba(239, 68, 68, 0.28)')
+      ? (isHovered ? 'hsl(var(--threat) / 0.6)' : 'hsl(var(--threat) / 0.28)')
       : getCleanRibbonColor(isHovered)
 
     ribbons.push({
@@ -585,7 +579,7 @@ const sankeyRibbons = computed<SankeyRibbon[]>(() => {
     const dimmed = owaspOnly.value && viewMode.value === 'traffic'
 
     let stroke = isThreat
-      ? (isHovered ? 'rgba(239, 68, 68, 0.60)' : 'rgba(239, 68, 68, 0.28)')
+      ? (isHovered ? 'hsl(var(--threat) / 0.6)' : 'hsl(var(--threat) / 0.28)')
       : getCleanRibbonColor(isHovered)
 
     ribbons.push({
@@ -782,12 +776,12 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
           <defs>
             <!-- Radial ambient glow filter -->
             <radialGradient id="hubGlowEmerald" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stop-color="#10B981" stop-opacity="0.35" />
-              <stop offset="100%" stop-color="#10B981" stop-opacity="0" />
+              <stop offset="0%" stop-color="hsl(var(--success))" stop-opacity="0.35" />
+              <stop offset="100%" stop-color="hsl(var(--success))" stop-opacity="0" />
             </radialGradient>
             <radialGradient id="hubGlowRed" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stop-color="#EF4444" stop-opacity="0.35" />
-              <stop offset="100%" stop-color="#EF4444" stop-opacity="0" />
+              <stop offset="0%" stop-color="hsl(var(--threat))" stop-opacity="0.35" />
+              <stop offset="100%" stop-color="hsl(var(--threat))" stop-opacity="0" />
             </radialGradient>
             <!-- Pure White Glow filter for shiny-text style ribbon shine -->
             <filter
@@ -807,15 +801,15 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
 
             <!-- Shiny-text specular sheen linear gradient (soft feathered falloff with luminous pure white peak) -->
             <linearGradient id="specularSheenGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0" />
-              <stop offset="15%" stop-color="#FFFFFF" stop-opacity="0.04" />
-              <stop offset="30%" stop-color="#FFFFFF" stop-opacity="0.22" />
-              <stop offset="44%" stop-color="#FFFFFF" stop-opacity="0.75" />
-              <stop offset="50%" stop-color="#FFFFFF" stop-opacity="1" />
-              <stop offset="56%" stop-color="#FFFFFF" stop-opacity="0.75" />
-              <stop offset="70%" stop-color="#FFFFFF" stop-opacity="0.22" />
-              <stop offset="85%" stop-color="#FFFFFF" stop-opacity="0.04" />
-              <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0" />
+              <stop offset="0%" stop-color="hsl(var(--diagram-sheen))" stop-opacity="0" />
+              <stop offset="15%" stop-color="hsl(var(--diagram-sheen))" stop-opacity="0.04" />
+              <stop offset="30%" stop-color="hsl(var(--diagram-sheen))" stop-opacity="0.22" />
+              <stop offset="44%" stop-color="hsl(var(--diagram-sheen))" stop-opacity="0.75" />
+              <stop offset="50%" stop-color="hsl(var(--diagram-sheen))" stop-opacity="1" />
+              <stop offset="56%" stop-color="hsl(var(--diagram-sheen))" stop-opacity="0.75" />
+              <stop offset="70%" stop-color="hsl(var(--diagram-sheen))" stop-opacity="0.22" />
+              <stop offset="85%" stop-color="hsl(var(--diagram-sheen))" stop-opacity="0.04" />
+              <stop offset="100%" stop-color="hsl(var(--diagram-sheen))" stop-opacity="0" />
             </linearGradient>
 
             <!-- Mask containing all active ribbon paths to keep shine strictly scoped to ribbons -->
@@ -833,7 +827,7 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
                 :key="`mask-${ribbon.id}`"
                 :d="ribbon.d"
                 fill="none"
-                stroke="#FFFFFF"
+                stroke="hsl(var(--diagram-sheen))"
                 :stroke-width="Math.max(3.6, ribbon.strokeWidth * 0.72)"
                 stroke-linecap="round"
                 :style="{
@@ -896,8 +890,8 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
               class="cursor-pointer"
             >
               <!-- Concentric Dashed Rings -->
-              <circle cx="240" cy="200" r="78" fill="none" :stroke="isDark ? '#2E3644' : '#CBD5E1'" stroke-dasharray="2 5" />
-              <circle cx="240" cy="200" r="108" fill="none" :stroke="isDark ? '#2E3644' : '#CBD5E1'" stroke-dasharray="2 5" />
+              <circle cx="240" cy="200" r="78" fill="none" :stroke="'hsl(var(--diagram-guide))'" stroke-dasharray="2 5" />
+              <circle cx="240" cy="200" r="108" fill="none" :stroke="'hsl(var(--diagram-guide))'" stroke-dasharray="2 5" />
 
               <!-- Orbiting Perimeter Badges (4 badges along rings) -->
               <g
@@ -906,28 +900,28 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
                 @mouseleave="hoveredBadgeCluster = null"
               >
                 <!-- Badge 1: 45° r=108 -> (316, 276) -->
-                <circle cx="316" cy="276" r="12" :fill="isDark ? '#161A22' : '#F1F5F9'" :stroke="isDark ? '#2E3644' : '#CBD5E1'" stroke-width="1.5" />
+                <circle cx="316" cy="276" r="12" :fill="'hsl(var(--diagram-node))'" :stroke="'hsl(var(--diagram-guide))'" stroke-width="1.5" />
                 <Bot class="w-3.5 h-3.5 text-muted-foreground" x="309" y="269" width="14" height="14" />
 
                 <!-- Badge 2: 135° r=108 -> (164, 276) -->
-                <circle cx="164" cy="276" r="12" :fill="isDark ? '#161A22' : '#F1F5F9'" :stroke="isDark ? '#2E3644' : '#CBD5E1'" stroke-width="1.5" />
+                <circle cx="164" cy="276" r="12" :fill="'hsl(var(--diagram-node))'" :stroke="'hsl(var(--diagram-guide))'" stroke-width="1.5" />
                 <Lock class="w-3.5 h-3.5 text-muted-foreground" x="157" y="269" width="14" height="14" />
 
                 <!-- Badge 3: 225° r=78 -> (185, 145) -->
-                <circle cx="185" cy="145" r="12" :fill="isDark ? '#161A22' : '#F1F5F9'" :stroke="isDark ? '#2E3644' : '#CBD5E1'" stroke-width="1.5" />
+                <circle cx="185" cy="145" r="12" :fill="'hsl(var(--diagram-node))'" :stroke="'hsl(var(--diagram-guide))'" stroke-width="1.5" />
                 <Globe class="w-3.5 h-3.5 text-muted-foreground" x="178" y="138" width="14" height="14" />
 
                 <!-- Badge 4: 315° r=78 -> (295, 145) -->
-                <circle cx="295" cy="145" r="12" :fill="isDark ? '#161A22' : '#F1F5F9'" :stroke="isDark ? '#2E3644' : '#CBD5E1'" stroke-width="1.5" />
+                <circle cx="295" cy="145" r="12" :fill="'hsl(var(--diagram-node))'" :stroke="'hsl(var(--diagram-guide))'" stroke-width="1.5" />
                 <Smartphone class="w-3.5 h-3.5 text-muted-foreground" x="288" y="138" width="14" height="14" />
               </g>
 
               <!-- Central Node Surface -->
-              <circle cx="240" cy="200" r="52" :fill="isDark ? '#11141A' : '#FFFFFF'" stroke="#EF4444" stroke-width="1.5" />
+              <circle cx="240" cy="200" r="52" :fill="'hsl(var(--diagram-hub))'" stroke="hsl(var(--threat))" stroke-width="1.5" />
               <!-- Text -->
-              <text x="240" y="192" text-anchor="middle" :fill="isDark ? '#FFFFFF' : '#0F172A'" font-size="20" font-weight="bold" class="tabular-nums">48.2k</text>
-              <text x="240" y="210" text-anchor="middle" :fill="isDark ? '#B0B8C4' : '#475569'" font-size="11" font-weight="600" letter-spacing="1">AUTOMATED BOTS</text>
-              <text x="240" y="226" text-anchor="middle" :fill="isDark ? '#848D9C' : '#64748B'" font-size="11">{{ botsSubtext }}</text>
+              <text x="240" y="192" text-anchor="middle" :fill="'hsl(var(--diagram-text))'" font-size="20" font-weight="bold" class="tabular-nums">48.2k</text>
+              <text x="240" y="210" text-anchor="middle" :fill="'hsl(var(--diagram-text-muted))'" font-size="11" font-weight="600" letter-spacing="1">AUTOMATED BOTS</text>
+              <text x="240" y="226" text-anchor="middle" :fill="'hsl(var(--diagram-text-subtle))'" font-size="11">{{ botsSubtext }}</text>
             </g>
 
             <!-- 2. Middle Cluster: Human Clients (y = 460) with Drill-Down -->
@@ -937,8 +931,8 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
               @click="toggleHumansExpanded"
             >
               <!-- Outer Dashed Rings -->
-              <circle cx="240" cy="460" r="78" fill="none" :stroke="isDark ? '#2E3644' : '#CBD5E1'" stroke-dasharray="2 5" />
-              <circle cx="240" cy="460" r="108" fill="none" :stroke="isDark ? '#2E3644' : '#CBD5E1'" stroke-dasharray="2 5" />
+              <circle cx="240" cy="460" r="78" fill="none" :stroke="'hsl(var(--diagram-guide))'" stroke-dasharray="2 5" />
+              <circle cx="240" cy="460" r="108" fill="none" :stroke="'hsl(var(--diagram-guide))'" stroke-dasharray="2 5" />
 
               <!-- Orbiting Badges -->
               <g
@@ -946,28 +940,28 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
                 @mouseenter="hoveredBadgeCluster = 'humans'"
                 @mouseleave="hoveredBadgeCluster = null"
               >
-                <circle cx="316" cy="536" r="12" :fill="isDark ? '#161A22' : '#F1F5F9'" :stroke="isDark ? '#2E3644' : '#CBD5E1'" stroke-width="1.5" />
+                <circle cx="316" cy="536" r="12" :fill="'hsl(var(--diagram-node))'" :stroke="'hsl(var(--diagram-guide))'" stroke-width="1.5" />
                 <Globe class="w-3.5 h-3.5 text-muted-foreground" x="309" y="529" width="14" height="14" />
 
-                <circle cx="164" cy="536" r="12" :fill="isDark ? '#161A22' : '#F1F5F9'" :stroke="isDark ? '#2E3644' : '#CBD5E1'" stroke-width="1.5" />
+                <circle cx="164" cy="536" r="12" :fill="'hsl(var(--diagram-node))'" :stroke="'hsl(var(--diagram-guide))'" stroke-width="1.5" />
                 <Smartphone class="w-3.5 h-3.5 text-muted-foreground" x="157" y="529" width="14" height="14" />
 
-                <circle cx="185" cy="405" r="12" :fill="isDark ? '#161A22' : '#F1F5F9'" :stroke="isDark ? '#2E3644' : '#CBD5E1'" stroke-width="1.5" />
+                <circle cx="185" cy="405" r="12" :fill="'hsl(var(--diagram-node))'" :stroke="'hsl(var(--diagram-guide))'" stroke-width="1.5" />
                 <Lock class="w-3.5 h-3.5 text-muted-foreground" x="178" y="398" width="14" height="14" />
 
-                <circle cx="295" cy="405" r="12" :fill="isDark ? '#161A22' : '#F1F5F9'" :stroke="isDark ? '#2E3644' : '#CBD5E1'" stroke-width="1.5" />
+                <circle cx="295" cy="405" r="12" :fill="'hsl(var(--diagram-node))'" :stroke="'hsl(var(--diagram-guide))'" stroke-width="1.5" />
                 <Bot class="w-3.5 h-3.5 text-muted-foreground" x="288" y="398" width="14" height="14" />
               </g>
 
               <!-- Central Node Surface -->
-              <circle cx="240" cy="460" r="52" :fill="isDark ? '#11141A' : '#FFFFFF'" stroke="#10B981" stroke-width="1.5" />
-              <text x="240" y="450" text-anchor="middle" :fill="isDark ? '#FFFFFF' : '#0F172A'" font-size="20" font-weight="bold" class="tabular-nums">142.8k</text>
-              <text x="240" y="468" text-anchor="middle" :fill="isDark ? '#B0B8C4' : '#475569'" font-size="11" font-weight="600" letter-spacing="1">HUMAN CLIENTS</text>
-              <text x="240" y="484" text-anchor="middle" :fill="isDark ? '#848D9C' : '#64748B'" font-size="11">{{ humansSubtext }}</text>
+              <circle cx="240" cy="460" r="52" :fill="'hsl(var(--diagram-hub))'" stroke="hsl(var(--success))" stroke-width="1.5" />
+              <text x="240" y="450" text-anchor="middle" :fill="'hsl(var(--diagram-text))'" font-size="20" font-weight="bold" class="tabular-nums">142.8k</text>
+              <text x="240" y="468" text-anchor="middle" :fill="'hsl(var(--diagram-text-muted))'" font-size="11" font-weight="600" letter-spacing="1">HUMAN CLIENTS</text>
+              <text x="240" y="484" text-anchor="middle" :fill="'hsl(var(--diagram-text-subtle))'" font-size="11">{{ humansSubtext }}</text>
 
               <!-- Expand / Collapse Indicator -->
               <g transform="translate(233, 495)">
-                <rect x="0" y="0" width="14" height="14" rx="7" :fill="isHumansExpanded ? '#2574F5' : (isDark ? '#1E232D' : '#E2E8F0')" :stroke="isHumansExpanded ? '#2574F5' : (isDark ? '#363D4C' : '#CBD5E1')" stroke-width="1" />
+                <rect x="0" y="0" width="14" height="14" rx="7" :fill="isHumansExpanded ? 'hsl(var(--accent-blue))' : ('hsl(var(--diagram-toggle-track))')" :stroke="isHumansExpanded ? 'hsl(var(--accent-blue))' : ('hsl(var(--diagram-node-border))')" stroke-width="1" />
                 <Minus v-if="isHumansExpanded" class="text-primary-foreground" :size="10" :x="2" :y="2" />
                 <ChevronDown v-else class="text-muted-foreground" :size="10" :x="2" :y="2" />
               </g>
@@ -976,32 +970,32 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
             <!-- Expanded Sub-nodes when isHumansExpanded is true -->
             <g v-if="isHumansExpanded" class="humans-expansion-layer transition-opacity">
               <!-- Outer dotted expansion ring (r = 195) -->
-              <circle cx="240" cy="460" r="195" fill="none" :stroke="isDark ? '#2E3644' : '#CBD5E1'" stroke-dasharray="2 5" />
+              <circle cx="240" cy="460" r="195" fill="none" :stroke="'hsl(var(--diagram-guide))'" stroke-dasharray="2 5" />
 
               <!-- Connector Lines -->
-              <path d="M 292 460 C 340 460, 360 345, 415 345" fill="none" :stroke="isDark ? '#2E3644' : '#CBD5E1'" stroke-dasharray="2 4" />
-              <path d="M 292 460 C 340 460, 360 575, 415 575" fill="none" :stroke="isDark ? '#2E3644' : '#CBD5E1'" stroke-dasharray="2 4" />
+              <path d="M 292 460 C 340 460, 360 345, 415 345" fill="none" :stroke="'hsl(var(--diagram-guide))'" stroke-dasharray="2 4" />
+              <path d="M 292 460 C 340 460, 360 575, 415 575" fill="none" :stroke="'hsl(var(--diagram-guide))'" stroke-dasharray="2 4" />
 
               <!-- Sub-node 1: Verified Sessions at (415, 345) -->
               <g data-testid="subnode-verified" class="cursor-pointer">
-                <circle cx="415" cy="345" r="44" :fill="isDark ? '#161A22' : '#FFFFFF'" stroke="#10B981" stroke-width="1.5" />
-                <text x="415" y="338" text-anchor="middle" :fill="isDark ? '#FFFFFF' : '#0F172A'" font-size="15" font-weight="bold" class="tabular-nums">128.4k</text>
-                <text x="415" y="352" text-anchor="middle" :fill="isDark ? '#B0B8C4' : '#475569'" font-size="10" font-weight="600" letter-spacing="0.5">VERIFIED SESSIONS</text>
-                <text x="415" y="366" text-anchor="middle" :fill="isDark ? '#848D9C' : '#64748B'" font-size="9.5">17.8M Reqs (JWT Valid)</text>
+                <circle cx="415" cy="345" r="44" :fill="'hsl(var(--diagram-node-elevated))'" stroke="hsl(var(--success))" stroke-width="1.5" />
+                <text x="415" y="338" text-anchor="middle" :fill="'hsl(var(--diagram-text))'" font-size="15" font-weight="bold" class="tabular-nums">128.4k</text>
+                <text x="415" y="352" text-anchor="middle" :fill="'hsl(var(--diagram-text-muted))'" font-size="10" font-weight="600" letter-spacing="0.5">VERIFIED SESSIONS</text>
+                <text x="415" y="366" text-anchor="middle" :fill="'hsl(var(--diagram-text-subtle))'" font-size="9.5">17.8M Reqs (JWT Valid)</text>
 
                 <!-- Info Badge (i) -->
                 <g transform="translate(444, 318)">
-                  <circle r="8" fill="#2574F5" />
+                  <circle r="8" fill="hsl(var(--accent-blue))" />
                   <Info class="w-2.5 h-2.5 text-primary-foreground" x="-5" y="-5" width="10" height="10" />
                 </g>
               </g>
 
               <!-- Sub-node 2: Anonymous / Proxy at (415, 575) -->
               <g data-testid="subnode-anonymous" class="cursor-pointer">
-                <circle cx="415" cy="575" r="44" :fill="isDark ? '#161A22' : '#FFFFFF'" stroke="#F59E0B" stroke-width="1.5" />
-                <text x="415" y="568" text-anchor="middle" :fill="isDark ? '#FFFFFF' : '#0F172A'" font-size="15" font-weight="bold" class="tabular-nums">14.4k</text>
-                <text x="415" y="582" text-anchor="middle" :fill="isDark ? '#B0B8C4' : '#475569'" font-size="10" font-weight="600" letter-spacing="0.5">ANONYMOUS / PROXY</text>
-                <text x="415" y="596" text-anchor="middle" :fill="isDark ? '#848D9C' : '#64748B'" font-size="9.5">1.1M Reqs (Challenged)</text>
+                <circle cx="415" cy="575" r="44" :fill="'hsl(var(--diagram-node-elevated))'" stroke="hsl(var(--warning))" stroke-width="1.5" />
+                <text x="415" y="568" text-anchor="middle" :fill="'hsl(var(--diagram-text))'" font-size="15" font-weight="bold" class="tabular-nums">14.4k</text>
+                <text x="415" y="582" text-anchor="middle" :fill="'hsl(var(--diagram-text-muted))'" font-size="10" font-weight="600" letter-spacing="0.5">ANONYMOUS / PROXY</text>
+                <text x="415" y="596" text-anchor="middle" :fill="'hsl(var(--diagram-text-subtle))'" font-size="9.5">1.1M Reqs (Challenged)</text>
               </g>
             </g>
 
@@ -1011,8 +1005,8 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
               class="cursor-pointer"
             >
               <!-- Outer Dashed Rings -->
-              <circle cx="240" cy="730" r="78" fill="none" :stroke="isDark ? '#2E3644' : '#CBD5E1'" stroke-dasharray="2 5" />
-              <circle cx="240" cy="730" r="108" fill="none" :stroke="isDark ? '#2E3644' : '#CBD5E1'" stroke-dasharray="2 5" />
+              <circle cx="240" cy="730" r="78" fill="none" :stroke="'hsl(var(--diagram-guide))'" stroke-dasharray="2 5" />
+              <circle cx="240" cy="730" r="108" fill="none" :stroke="'hsl(var(--diagram-guide))'" stroke-dasharray="2 5" />
 
               <!-- Orbiting Badges -->
               <g
@@ -1020,24 +1014,24 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
                 @mouseenter="hoveredBadgeCluster = 'api'"
                 @mouseleave="hoveredBadgeCluster = null"
               >
-                <circle cx="316" cy="806" r="12" :fill="isDark ? '#161A22' : '#F1F5F9'" :stroke="isDark ? '#2E3644' : '#CBD5E1'" stroke-width="1.5" />
+                <circle cx="316" cy="806" r="12" :fill="'hsl(var(--diagram-node))'" :stroke="'hsl(var(--diagram-guide))'" stroke-width="1.5" />
                 <Server class="w-3.5 h-3.5 text-muted-foreground" x="309" y="799" width="14" height="14" />
 
-                <circle cx="164" cy="806" r="12" :fill="isDark ? '#161A22' : '#F1F5F9'" :stroke="isDark ? '#2E3644' : '#CBD5E1'" stroke-width="1.5" />
+                <circle cx="164" cy="806" r="12" :fill="'hsl(var(--diagram-node))'" :stroke="'hsl(var(--diagram-guide))'" stroke-width="1.5" />
                 <Lock class="w-3.5 h-3.5 text-muted-foreground" x="157" y="799" width="14" height="14" />
 
-                <circle cx="185" cy="675" r="12" :fill="isDark ? '#161A22' : '#F1F5F9'" :stroke="isDark ? '#2E3644' : '#CBD5E1'" stroke-width="1.5" />
+                <circle cx="185" cy="675" r="12" :fill="'hsl(var(--diagram-node))'" :stroke="'hsl(var(--diagram-guide))'" stroke-width="1.5" />
                 <Globe class="w-3.5 h-3.5 text-muted-foreground" x="178" y="668" width="14" height="14" />
 
-                <circle cx="295" cy="675" r="12" :fill="isDark ? '#161A22' : '#F1F5F9'" :stroke="isDark ? '#2E3644' : '#CBD5E1'" stroke-width="1.5" />
+                <circle cx="295" cy="675" r="12" :fill="'hsl(var(--diagram-node))'" :stroke="'hsl(var(--diagram-guide))'" stroke-width="1.5" />
                 <Key class="w-3.5 h-3.5 text-muted-foreground" x="288" y="668" width="14" height="14" />
               </g>
 
               <!-- Central Node Surface -->
-              <circle cx="240" cy="730" r="52" :fill="isDark ? '#11141A' : '#FFFFFF'" stroke="#2574F5" stroke-width="1.5" />
-              <text x="240" y="722" text-anchor="middle" :fill="isDark ? '#FFFFFF' : '#0F172A'" font-size="20" font-weight="bold" class="tabular-nums">12.1k</text>
-              <text x="240" y="740" text-anchor="middle" :fill="isDark ? '#B0B8C4' : '#475569'" font-size="11" font-weight="600" letter-spacing="1">API CONSUMERS</text>
-              <text x="240" y="756" text-anchor="middle" :fill="isDark ? '#848D9C' : '#64748B'" font-size="11">{{ apiSubtext }}</text>
+              <circle cx="240" cy="730" r="52" :fill="'hsl(var(--diagram-hub))'" stroke="hsl(var(--accent-blue))" stroke-width="1.5" />
+              <text x="240" y="722" text-anchor="middle" :fill="'hsl(var(--diagram-text))'" font-size="20" font-weight="bold" class="tabular-nums">12.1k</text>
+              <text x="240" y="740" text-anchor="middle" :fill="'hsl(var(--diagram-text-muted))'" font-size="11" font-weight="600" letter-spacing="1">API CONSUMERS</text>
+              <text x="240" y="756" text-anchor="middle" :fill="'hsl(var(--diagram-text-subtle))'" font-size="11">{{ apiSubtext }}</text>
             </g>
           </g>
 
@@ -1083,8 +1077,8 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
                   cx="800"
                   cy="330"
                   r="56"
-                  :fill="hoveredHubId === 'waf-core' ? (isDark ? '#18202A' : '#ecfdf5') : (isDark ? '#161A22' : '#FFFFFF')"
-                  :stroke="hoveredHubId === 'waf-core' ? '#10B981' : (isDark ? '#363D4C' : '#CBD5E1')"
+                  :fill="hoveredHubId === 'waf-core' ? ('hsl(var(--diagram-node-success))') : ('hsl(var(--diagram-node-elevated))')"
+                  :stroke="hoveredHubId === 'waf-core' ? 'hsl(var(--success))' : ('hsl(var(--diagram-node-border))')"
                   :stroke-width="hoveredHubId === 'waf-core' ? 2.5 : 2"
                   class="transition-colors duration-200"
                 />
@@ -1092,8 +1086,8 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
                   cx="800"
                   cy="330"
                   r="44"
-                  :fill="hoveredHubId === 'waf-core' ? (isDark ? '#13231E' : '#d1fae5') : (isDark ? '#11141A' : '#F8FAFC')"
-                  :stroke="hoveredHubId === 'waf-core' ? '#34D399' : '#10B981'"
+                  :fill="hoveredHubId === 'waf-core' ? ('hsl(var(--diagram-node-success-active))') : ('hsl(var(--diagram-hub-muted))')"
+                  :stroke="hoveredHubId === 'waf-core' ? 'hsl(var(--success-emphasis))' : 'hsl(var(--success))'"
                   :stroke-opacity="hoveredHubId === 'waf-core' ? 1 : 0.8"
                   stroke-width="1.5"
                   class="transition-colors duration-200"
@@ -1118,7 +1112,7 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
                   x="800"
                   y="440"
                   text-anchor="middle"
-                  :fill="hoveredHubId === 'waf-core' ? '#10B981' : (isDark ? '#FFFFFF' : '#0F172A')"
+                  :fill="hoveredHubId === 'waf-core' ? 'hsl(var(--success))' : ('hsl(var(--diagram-text))')"
                   font-size="13"
                   font-weight="bold"
                   letter-spacing="0.5"
@@ -1126,7 +1120,7 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
                 >
                   WAF CORE ENGINE
                 </text>
-                <text x="800" y="456" text-anchor="middle" :fill="isDark ? '#848D9C' : '#64748B'" font-size="11">
+                <text x="800" y="456" text-anchor="middle" :fill="'hsl(var(--diagram-text-subtle))'" font-size="11">
                   OWASP CRS v4 + 42 Custom Rules • 0.8ms p95
                 </text>
               </g>
@@ -1172,8 +1166,8 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
                   cx="800"
                   cy="600"
                   r="56"
-                  :fill="hoveredHubId === 'edge-defense' ? (isDark ? '#18202A' : '#eff6ff') : (isDark ? '#161A22' : '#FFFFFF')"
-                  :stroke="hoveredHubId === 'edge-defense' ? '#2574F5' : (isDark ? '#363D4C' : '#CBD5E1')"
+                  :fill="hoveredHubId === 'edge-defense' ? ('hsl(var(--diagram-node-info))') : ('hsl(var(--diagram-node-elevated))')"
+                  :stroke="hoveredHubId === 'edge-defense' ? 'hsl(var(--accent-blue))' : ('hsl(var(--diagram-node-border))')"
                   :stroke-width="hoveredHubId === 'edge-defense' ? 2.5 : 2"
                   class="transition-colors duration-200"
                 />
@@ -1181,8 +1175,8 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
                   cx="800"
                   cy="600"
                   r="44"
-                  :fill="hoveredHubId === 'edge-defense' ? (isDark ? '#121D2C' : '#dbeafe') : (isDark ? '#11141A' : '#F8FAFC')"
-                  :stroke="hoveredHubId === 'edge-defense' ? '#60A5FA' : '#2574F5'"
+                  :fill="hoveredHubId === 'edge-defense' ? ('hsl(var(--diagram-node-info-active))') : ('hsl(var(--diagram-hub-muted))')"
+                  :stroke="hoveredHubId === 'edge-defense' ? 'hsl(var(--info-emphasis))' : 'hsl(var(--accent-blue))'"
                   :stroke-opacity="hoveredHubId === 'edge-defense' ? 1 : 0.8"
                   stroke-width="1.5"
                   class="transition-colors duration-200"
@@ -1207,7 +1201,7 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
                   x="800"
                   y="710"
                   text-anchor="middle"
-                  :fill="hoveredHubId === 'edge-defense' ? '#2574F5' : (isDark ? '#FFFFFF' : '#0F172A')"
+                  :fill="hoveredHubId === 'edge-defense' ? 'hsl(var(--accent-blue))' : ('hsl(var(--diagram-text))')"
                   font-size="13"
                   font-weight="bold"
                   letter-spacing="0.5"
@@ -1215,7 +1209,7 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
                 >
                   EDGE & BOT DEFENSE
                 </text>
-                <text x="800" y="726" text-anchor="middle" :fill="isDark ? '#848D9C' : '#64748B'" font-size="11">
+                <text x="800" y="726" text-anchor="middle" :fill="'hsl(var(--diagram-text-subtle))'" font-size="11">
                   18 Rate Policies, Geo-IP & JA4 Fingerprinting
                 </text>
               </g>
@@ -1230,20 +1224,20 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
               <path
                 d="M 1250 190 A 170 170 0 0 1 1310 330 A 170 170 0 0 1 1250 470"
                 fill="none"
-                :stroke="isDark ? '#363D4C' : '#CBD5E1'"
+                :stroke="'hsl(var(--diagram-node-border))'"
                 stroke-dasharray="2 5"
                 stroke-width="1.5"
               />
 
               <!-- Upper Summary Counter (x = 1140) -->
               <g data-testid="dest-summary-upper" class="cursor-default">
-                <text x="1140" y="318" :fill="isDark ? '#FFFFFF' : '#0F172A'" font-size="28" font-weight="bold" class="tabular-nums">
+                <text x="1140" y="318" :fill="'hsl(var(--diagram-text))'" font-size="28" font-weight="bold" class="tabular-nums">
                   {{ upperSummary.count }}
                 </text>
-                <text x="1140" y="338" :fill="isDark ? '#B0B8C4' : '#475569'" font-size="11" font-weight="600" letter-spacing="1">
+                <text x="1140" y="338" :fill="'hsl(var(--diagram-text-muted))'" font-size="11" font-weight="600" letter-spacing="1">
                   {{ upperSummary.title }}
                 </text>
-                <text x="1140" y="354" :fill="isDark ? '#848D9C' : '#64748B'" font-size="12">
+                <text x="1140" y="354" :fill="'hsl(var(--diagram-text-subtle))'" font-size="12">
                   {{ upperSummary.subtext }}
                 </text>
               </g>
@@ -1268,8 +1262,8 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
                   :cx="item.x"
                   :cy="item.y"
                   r="5"
-                  :fill="item.isAttackTarget || viewMode === 'threats' ? '#EF4444' : '#10B981'"
-                  :stroke="isDark ? '#161A22' : '#FFFFFF'"
+                  :fill="item.isAttackTarget || viewMode === 'threats' ? 'hsl(var(--threat))' : 'hsl(var(--success))'"
+                  :stroke="'hsl(var(--diagram-node-elevated))'"
                   stroke-width="1.5"
                 />
 
@@ -1281,8 +1275,8 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
                     :width="Math.max(item.label.length * 7 + (item.method ? 44 : 20), 80)"
                     height="20"
                     rx="4"
-                    :fill="isDark ? '#1E222A' : '#F1F5F9'"
-                    :stroke="isDark ? '#363D4C' : '#CBD5E1'"
+                    :fill="'hsl(var(--diagram-node-hover))'"
+                    :stroke="'hsl(var(--diagram-node-border))'"
                     stroke-width="1"
                     class="transition-colors group-hover:stroke-primary"
                   />
@@ -1291,7 +1285,7 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
                     v-if="item.method"
                     x="6"
                     y="14"
-                    :fill="item.method === 'POST' ? '#60A5FA' : '#10B981'"
+                    :fill="item.method === 'POST' ? 'hsl(var(--info-emphasis))' : 'hsl(var(--success))'"
                     font-size="9"
                     font-weight="bold"
                   >
@@ -1300,7 +1294,7 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
                   <text
                     :x="item.method ? 38 : 8"
                     y="14"
-                    :fill="isDark ? '#FFFFFF' : '#0F172A'"
+                    :fill="'hsl(var(--diagram-text))'"
                     font-size="10.5"
                     font-family="monospace"
                   >
@@ -1319,20 +1313,20 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
               <path
                 d="M 1250 460 A 170 170 0 0 1 1310 600 A 170 170 0 0 1 1250 740"
                 fill="none"
-                :stroke="isDark ? '#363D4C' : '#CBD5E1'"
+                :stroke="'hsl(var(--diagram-node-border))'"
                 stroke-dasharray="2 5"
                 stroke-width="1.5"
               />
 
               <!-- Lower Summary Counter (x = 1140) -->
               <g data-testid="dest-summary-lower" class="cursor-default">
-                <text x="1140" y="588" :fill="isDark ? '#FFFFFF' : '#0F172A'" font-size="28" font-weight="bold" class="tabular-nums">
+                <text x="1140" y="588" :fill="'hsl(var(--diagram-text))'" font-size="28" font-weight="bold" class="tabular-nums">
                   {{ lowerSummary.count }}
                 </text>
-                <text x="1140" y="608" :fill="isDark ? '#B0B8C4' : '#475569'" font-size="11" font-weight="600" letter-spacing="1">
+                <text x="1140" y="608" :fill="'hsl(var(--diagram-text-muted))'" font-size="11" font-weight="600" letter-spacing="1">
                   {{ lowerSummary.title }}
                 </text>
-                <text x="1140" y="624" :fill="isDark ? '#848D9C' : '#64748B'" font-size="12">
+                <text x="1140" y="624" :fill="'hsl(var(--diagram-text-subtle))'" font-size="12">
                   {{ lowerSummary.subtext }}
                 </text>
               </g>
@@ -1357,8 +1351,8 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
                   :cx="item.x"
                   :cy="item.y"
                   r="5"
-                  :fill="viewMode === 'threats' ? '#EF4444' : '#10B981'"
-                  :stroke="isDark ? '#161A22' : '#FFFFFF'"
+                  :fill="viewMode === 'threats' ? 'hsl(var(--threat))' : 'hsl(var(--success))'"
+                  :stroke="'hsl(var(--diagram-node-elevated))'"
                   stroke-width="1.5"
                 />
 
@@ -1370,8 +1364,8 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
                     :width="Math.max(item.label.length * 7 + (item.method ? 44 : 20), 80)"
                     height="20"
                     rx="4"
-                    :fill="isDark ? '#1E222A' : '#F1F5F9'"
-                    :stroke="isDark ? '#363D4C' : '#CBD5E1'"
+                    :fill="'hsl(var(--diagram-node-hover))'"
+                    :stroke="'hsl(var(--diagram-node-border))'"
                     stroke-width="1"
                     class="transition-colors group-hover:stroke-primary"
                   />
@@ -1380,7 +1374,7 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
                     v-if="item.method"
                     x="6"
                     y="14"
-                    :fill="item.method === 'POST' ? '#60A5FA' : '#10B981'"
+                    :fill="item.method === 'POST' ? 'hsl(var(--info-emphasis))' : 'hsl(var(--success))'"
                     font-size="9"
                     font-weight="bold"
                   >
@@ -1389,7 +1383,7 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
                   <text
                     :x="item.method ? 38 : 8"
                     y="14"
-                    :fill="isDark ? '#FFFFFF' : '#0F172A'"
+                    :fill="'hsl(var(--diagram-text))'"
                     font-size="10.5"
                     font-family="monospace"
                   >

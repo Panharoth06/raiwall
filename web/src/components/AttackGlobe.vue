@@ -28,7 +28,6 @@ interface ThreatArc {
   startLon: number;
   endLat: number;
   endLon: number;
-  color: string;
   ruleID?: string;
   region: string;
 }
@@ -41,7 +40,6 @@ function addAttackArc(event: ForensicEvent) {
   }
   if (event.action === 'allow') return;
 
-  const color = event.action === 'ban' ? '#c084fc' : event.action === 'challenge' ? '#fbbf24' : '#f43f5e';
   const id = `arc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 
   activeArcs.value.push({
@@ -50,7 +48,6 @@ function addAttackArc(event: ForensicEvent) {
     startLon: event.geo_data.longitude,
     endLat: props.gatewayLat,
     endLon: props.gatewayLon,
-    color,
     ruleID: event.rule_id,
     region: event.geo_data.country || 'Threat',
   });
@@ -79,7 +76,6 @@ onMounted(() => {
       startLon: 116.4074,
       endLat: props.gatewayLat,
       endLon: props.gatewayLon,
-      color: '#f43f5e',
       region: 'CN',
       ruleID: 'SQLI_ATTACK',
     },
@@ -89,7 +85,6 @@ onMounted(() => {
       startLon: 37.6173,
       endLat: props.gatewayLat,
       endLon: props.gatewayLon,
-      color: '#c084fc',
       region: 'RU',
       ruleID: 'RATE_LIMIT_TIER2',
     }
