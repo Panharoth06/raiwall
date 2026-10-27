@@ -52,6 +52,11 @@
     --success-emphasis: 158 64% 52%;
     --info-emphasis: 213 94% 68%;
 
+    /* Preview Canvas: sandboxed iframes render top-level documents, whose
+       default canvas is white. Theme-invariant so unstyled templates preview
+       exactly as a browser would paint them. */
+    --preview-canvas: 0 0% 100%;
+
     /* Instrument / Topology Diagram Tokens */
     --diagram-text: 222 47% 11%;
     --diagram-text-muted: 215 25% 27%;

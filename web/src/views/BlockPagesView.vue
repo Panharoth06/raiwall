@@ -15,7 +15,6 @@ import { ConfirmDialog } from '@/components/ui/dialog';
 import {
   Select,
   SelectTrigger,
-  SelectValue,
   SelectContent,
   SelectItem,
 } from '@/components/ui/select';
@@ -222,13 +221,18 @@ onMounted(() => {
       <label class="text-xs font-semibold text-muted-foreground uppercase tracking-wider whitespace-nowrap">
         Response Template:
       </label>
-      <div class="w-72 sm:w-80">
+      <div class="w-full sm:w-80">
         <Select
           :model-value="String(selectedCode)"
           @update:model-value="(val) => selectCode(Number(val))"
         >
-          <SelectTrigger class="h-9 w-full bg-card border-border text-xs font-mono" data-testid="status-template-select">
-            <SelectValue />
+          <SelectTrigger
+            class="h-9 w-full bg-card border-border gap-2 text-xs"
+            data-testid="status-template-select"
+            :aria-label="`HTTP ${selectedCode} ${currentOption?.name}`"
+          >
+            <span class="font-mono font-bold text-primary whitespace-nowrap">HTTP {{ selectedCode }}</span>
+            <span class="font-sans truncate text-foreground">{{ currentOption?.name }}</span>
           </SelectTrigger>
           <SelectContent class="border-border bg-popover text-popover-foreground max-h-80">
             <SelectItem
@@ -257,7 +261,7 @@ onMounted(() => {
         <Tooltip>
           <TooltipTrigger as-child>
             <div
-              class="flex items-center gap-2 text-xs text-muted-foreground truncate max-w-md cursor-help border border-border/80 bg-card px-2.5 py-1.5 rounded-md"
+              class="hidden md:flex items-center gap-2 text-xs text-muted-foreground truncate max-w-md cursor-help border border-border/80 bg-card px-2.5 py-1.5 rounded-md"
             >
               <span class="font-medium text-foreground truncate">{{ currentOption?.name }}</span>
               <span class="text-xs opacity-75 truncate hidden sm:inline">— {{ currentOption?.description }}</span>

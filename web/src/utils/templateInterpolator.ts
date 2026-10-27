@@ -28,7 +28,11 @@ export function interpolateTemplate(
     rendered = rendered.split(tag).join(val);
   }
 
-  if (css) {
+  // Templates that own a {{.CustomCSS}} slot get the stylesheet in place; the
+  // rest fall back to appending a style block so the preview always carries CSS.
+  if (rendered.includes('{{.CustomCSS}}')) {
+    rendered = rendered.split('{{.CustomCSS}}').join(css);
+  } else if (css) {
     if (rendered.includes('</head>')) {
       rendered = rendered.replace('</head>', `<style>${css}</style></head>`);
     } else {

@@ -73,7 +73,7 @@ const previewViewport = ref<'desktop' | 'tablet' | 'mobile'>('desktop');
         <iframe
           :srcdoc="previewHtml"
           sandbox="allow-same-origin"
-          class="w-full h-full border-none"
+          class="w-full h-full border-none bg-preview"
           title="Response Template Preview"
         />
       </div>

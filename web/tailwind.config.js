@@ -112,6 +112,8 @@ export default {
           'map-land': 'hsl(var(--diagram-map-land))',
           'map-border': 'hsl(var(--diagram-map-border))',
         },
+        // Default canvas painted under sandboxed template previews.
+        preview: 'hsl(var(--preview-canvas))',
         chart: {
           1: 'hsl(var(--chart-1))',
           2: 'hsl(var(--chart-2))',
