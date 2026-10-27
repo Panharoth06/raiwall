@@ -103,8 +103,8 @@ const updatePreview = async () => {
       brand_name: formBrand.value,
       logo_url: formLogo.value,
     });
-    if (res?.html) {
-      previewHtml.value = res.html;
+    if (res?.rendered_html) {
+      previewHtml.value = res.rendered_html;
     }
   } catch {
     // Keep client-interpolated HTML

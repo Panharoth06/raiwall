@@ -55,7 +55,7 @@ describe('BlockPagesView.vue (Task 95)', () => {
     });
 
     vi.mocked(templatesApi.previewTemplate).mockResolvedValue({
-      html: '<!DOCTYPE html><html><body><h1>Blocked preview-123</h1></body></html>',
+      rendered_html: '<!DOCTYPE html><html><body><h1>Blocked preview-123</h1></body></html>',
     });
   });
 

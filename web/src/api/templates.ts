@@ -79,7 +79,7 @@ export const templatesApi = {
       method: 'POST',
     }),
   previewTemplate: (code: number, payload: PreviewPayload) =>
-    request<{ html: string }>(`/templates/${code}/preview`, {
+    request<{ rendered_html: string }>(`/templates/${code}/preview`, {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
