@@ -54,20 +54,15 @@ const points = computed<Point[]>(() => {
   const list = props.buckets
   if (!list || list.length === 0) return []
 
-  const paddingLeft = 36
-  const paddingRight = 16
-  const paddingTop = 16
-  const paddingBottom = 28
-  const chartWidth = 400 - paddingLeft - paddingRight
-  const chartHeight = props.height - paddingTop - paddingBottom
   const max = maxVal.value || 1
 
   return list.map((b, i) => {
     const x = list.length === 1
-      ? paddingLeft + chartWidth / 2
-      : paddingLeft + (i / (list.length - 1)) * chartWidth
+      ? 50
+      : (i / (list.length - 1)) * 100
     const val = props.variant === 'requests' ? b.total : b.block
-    const y = paddingTop + chartHeight - (val / max) * chartHeight
+    // y goes from 6 (top margin) to 94 (bottom baseline)
+    const y = 94 - (val / max) * 88
 
     let timeStr = b.bucket
     try {
@@ -88,7 +83,7 @@ const points = computed<Point[]>(() => {
 const linePath = computed(() => {
   const pts = points.value
   if (pts.length === 0) return ''
-  if (pts.length === 1) return `M ${pts[0].x - 20} ${pts[0].y} L ${pts[0].x + 20} ${pts[0].y}`
+  if (pts.length === 1) return `M ${pts[0].x - 5} ${pts[0].y} L ${pts[0].x + 5} ${pts[0].y}`
 
   let path = `M ${pts[0].x} ${pts[0].y}`
   for (let i = 0; i < pts.length - 1; i++) {
@@ -102,7 +97,7 @@ const linePath = computed(() => {
     const cp2x = p2.x - (p3.x - p1.x) / 6
     const cp2y = p2.y - (p3.y - p1.y) / 6
 
-    path += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`
+    path += ` C ${cp1x.toFixed(2)} ${cp1y.toFixed(2)}, ${cp2x.toFixed(2)} ${cp2y.toFixed(2)}, ${p2.x.toFixed(2)} ${p2.y.toFixed(2)}`
   }
   return path
 })
@@ -110,7 +105,7 @@ const linePath = computed(() => {
 const areaPath = computed(() => {
   if (!linePath.value || points.value.length === 0) return ''
   const pts = points.value
-  const baseline = props.height - 28
+  const baseline = 94
   const first = pts[0]
   const last = pts[pts.length - 1]
   return `${linePath.value} L ${last.x} ${baseline} L ${first.x} ${baseline} Z`
@@ -179,146 +174,151 @@ const hoveredPoint = computed(() => {
         class="py-6 pt-4"
       />
 
-      <!-- High-Precision SVG Area / Line Chart -->
-      <div v-else class="relative w-full" :style="{ height: `${height}px` }">
-        <svg
-          viewBox="0 0 400 140"
-          preserveAspectRatio="none"
-          class="w-full h-full overflow-visible select-none"
-          @mouseleave="hoveredIdx = null"
-        >
-          <defs>
-            <linearGradient :id="gradientId" x1="0" y1="0" x2="0" y2="1">
-              <stop
-                offset="0%"
-                :stop-color="strokeColor"
-                :stop-opacity="variant === 'blocking' ? 0.35 : 0.25"
+      <!-- High-Precision Area / Line Chart with Crisp HTML Axis Typography -->
+      <div v-else class="flex flex-col w-full select-none">
+        <!-- Main Plot Area: Y-Axis Column (HTML) + SVG Vector Canvas -->
+        <div class="flex items-stretch w-full" :style="{ height: `${Math.max(80, height - 28)}px` }">
+          <!-- Y-axis numeric labels: pure HTML, zero SVG aspect ratio distortion -->
+          <div class="flex flex-col justify-between items-end pr-3 pb-1 shrink-0 text-xs font-mono text-muted-foreground/80 tabular-nums w-10 sm:w-11 select-none">
+            <span class="leading-none">{{ formatPeak(maxVal) }}</span>
+            <span class="leading-none opacity-80">{{ formatPeak(Math.round(maxVal / 2)) }}</span>
+            <span class="leading-none opacity-60">0</span>
+          </div>
+
+          <!-- SVG Plotting Canvas for Grid, Curve, Area & Guide -->
+          <div class="relative flex-1 h-full min-w-0" @mouseleave="hoveredIdx = null">
+            <svg
+              viewBox="0 0 100 100"
+              preserveAspectRatio="none"
+              class="w-full h-full overflow-visible"
+            >
+              <defs>
+                <linearGradient :id="gradientId" x1="0" y1="0" x2="0" y2="1">
+                  <stop
+                    offset="0%"
+                    :stop-color="strokeColor"
+                    :stop-opacity="variant === 'blocking' ? 0.35 : 0.25"
+                  />
+                  <stop offset="100%" :stop-color="strokeColor" stop-opacity="0.0" />
+                </linearGradient>
+              </defs>
+
+              <!-- Grid horizontal reference lines -->
+              <line
+                x1="0"
+                y1="6"
+                x2="100"
+                y2="6"
+                stroke="currentColor"
+                class="text-border/30"
+                stroke-dasharray="3 3"
+                vector-effect="non-scaling-stroke"
               />
-              <stop offset="100%" :stop-color="strokeColor" stop-opacity="0.0" />
-            </linearGradient>
-          </defs>
+              <line
+                x1="0"
+                y1="50"
+                x2="100"
+                y2="50"
+                stroke="currentColor"
+                class="text-border/25"
+                stroke-dasharray="3 3"
+                vector-effect="non-scaling-stroke"
+              />
+              <line
+                x1="0"
+                y1="94"
+                x2="100"
+                y2="94"
+                stroke="currentColor"
+                class="text-border/50"
+                vector-effect="non-scaling-stroke"
+              />
 
-          <!-- Grid horizontal dashed reference lines -->
-          <line
-            x1="36"
-            y1="16"
-            x2="384"
-            y2="16"
-            stroke="currentColor"
-            class="text-border/30"
-            stroke-dasharray="3 3"
-          />
-          <line
-            x1="36"
-            y1="64"
-            x2="384"
-            y2="64"
-            stroke="currentColor"
-            class="text-border/25"
-            stroke-dasharray="3 3"
-          />
-          <line
-            x1="36"
-            y1="112"
-            x2="384"
-            y2="112"
-            stroke="currentColor"
-            class="text-border/50"
-          />
+              <!-- Gradient Area Fill -->
+              <path v-if="areaPath" :d="areaPath" :fill="`url(#${gradientId})`" />
 
-          <!-- Y-axis numeric labels -->
-          <text x="30" y="20" text-anchor="end" class="text-[12px] font-mono fill-muted-foreground tabular-nums">
-            {{ formatPeak(maxVal) }}
-          </text>
-          <text x="30" y="68" text-anchor="end" class="text-[12px] font-mono fill-muted-foreground/70 tabular-nums">
-            {{ formatPeak(Math.round(maxVal / 2)) }}
-          </text>
-          <text x="30" y="115" text-anchor="end" class="text-[12px] font-mono fill-muted-foreground/50 tabular-nums">
-            0
-          </text>
+              <!-- Smooth Spline Stroke Line -->
+              <path
+                v-if="linePath"
+                :d="linePath"
+                fill="none"
+                :stroke="strokeColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                vector-effect="non-scaling-stroke"
+              />
 
-          <!-- Gradient Area Fill -->
-          <path v-if="areaPath" :d="areaPath" :fill="`url(#${gradientId})`" />
+              <!-- Vertical Tracking Guide Line on hover -->
+              <line
+                v-if="hoveredPoint"
+                :x1="hoveredPoint.x"
+                y1="6"
+                :x2="hoveredPoint.x"
+                y2="94"
+                stroke="currentColor"
+                class="text-muted-foreground/60"
+                stroke-dasharray="2 2"
+                vector-effect="non-scaling-stroke"
+              />
+            </svg>
 
-          <!-- Smooth Spline Stroke Line -->
-          <path
-            v-if="linePath"
-            :d="linePath"
-            fill="none"
-            :stroke="strokeColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          />
+            <!-- Data Points: Perfectly round HTML dots that never get oval-distorted -->
+            <div
+              v-for="(p, i) in points"
+              :key="`dot-${i}`"
+              class="absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 transition-all duration-150 pointer-events-none"
+              :class="hoveredIdx === i ? 'w-3 h-3 z-20 shadow-sm' : 'w-2 h-2 z-10'"
+              :style="{
+                left: `${p.x}%`,
+                top: `${p.y}%`,
+                borderColor: strokeColor,
+                backgroundColor: hoveredIdx === i ? 'hsl(var(--background))' : strokeColor,
+              }"
+            />
 
-          <!-- Vertical Tracking Guide Line on hover -->
-          <line
-            v-if="hoveredPoint"
-            :x1="hoveredPoint.x"
-            y1="16"
-            :x2="hoveredPoint.x"
-            y2="112"
-            stroke="currentColor"
-            class="text-muted-foreground/60"
-            stroke-dasharray="2 2"
-          />
+            <!-- Hover Target Hit Columns -->
+            <div class="absolute inset-0 flex">
+              <div
+                v-for="(p, i) in points"
+                :key="`hit-${i}`"
+                class="flex-1 h-full cursor-pointer"
+                @mouseenter="hoveredIdx = i"
+              />
+            </div>
 
-          <!-- Data Points -->
-          <circle
-            v-for="(p, i) in points"
-            :key="`pt-${i}`"
-            :cx="p.x"
-            :cy="p.y"
-            :r="hoveredIdx === i ? 5 : 3"
-            :fill="strokeColor"
-            :stroke="hoveredIdx === i ? 'hsl(var(--background))' : 'transparent'"
-            :stroke-width="hoveredIdx === i ? 2 : 0"
-            class="transition-all duration-150"
-          />
+            <!-- Floating Tooltip -->
+            <div
+              v-if="hoveredPoint"
+              class="absolute z-30 pointer-events-none px-2.5 py-1.5 rounded-lg bg-popover border border-border shadow-md text-xs font-mono transition-transform duration-75 whitespace-nowrap"
+              :style="{
+                left: `${hoveredPoint.x}%`,
+                top: `${Math.max(4, hoveredPoint.y - 15)}%`,
+                transform: 'translate(-50%, -100%)',
+              }"
+            >
+              <div class="font-bold text-foreground flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full" :style="{ backgroundColor: strokeColor }" />
+                <span>{{ hoveredPoint.val.toLocaleString() }} {{ variant === 'blocking' ? 'blocked' : 'requests' }}</span>
+              </div>
+              <div class="text-muted-foreground text-xs mt-0.5">
+                {{ hoveredPoint.time }}
+              </div>
+            </div>
+          </div>
+        </div>
 
-          <!-- X-axis Ticks -->
-          <text
+        <!-- X-axis Ticks: HTML row under plotting canvas, aligned with the graph line -->
+        <div class="flex items-center justify-between ml-10 sm:ml-11 pt-2 text-xs font-mono text-muted-foreground tabular-nums select-none">
+          <span
             v-for="(p, i) in xAxisTicks"
             :key="`tick-${i}`"
-            :x="p.x"
-            y="132"
-            :text-anchor="i === 0 ? 'start' : i === xAxisTicks.length - 1 ? 'end' : 'middle'"
-            class="text-[12px] font-mono fill-muted-foreground tabular-nums"
+            :class="[
+              i === 0 ? 'text-left' : i === xAxisTicks.length - 1 ? 'text-right' : 'text-center'
+            ]"
           >
             {{ p.time }}
-          </text>
-
-          <!-- Hover Target Hit Rectangles -->
-          <g v-for="(p, i) in points" :key="`hit-${i}`">
-            <rect
-              :x="Math.max(0, p.x - (points.length > 1 ? 400 / points.length / 2 : 20))"
-              y="0"
-              :width="points.length > 1 ? 400 / points.length : 40"
-              height="140"
-              fill="transparent"
-              class="cursor-pointer"
-              @mouseenter="hoveredIdx = i"
-            />
-          </g>
-        </svg>
-
-        <!-- Floating Tooltip -->
-        <div
-          v-if="hoveredPoint"
-          class="absolute z-30 pointer-events-none px-2.5 py-1.5 rounded-lg bg-popover border border-border shadow-md text-xs font-mono transition-transform duration-75 whitespace-nowrap"
-          :style="{
-            left: `${(hoveredPoint.x / 400) * 100}%`,
-            top: `${Math.max(4, (hoveredPoint.y / 140) * 100 - 34)}%`,
-            transform: 'translate(-50%, -100%)',
-          }"
-        >
-          <div class="font-bold text-foreground flex items-center gap-1.5">
-            <span class="w-2 h-2 rounded-full" :style="{ backgroundColor: strokeColor }" />
-            <span>{{ hoveredPoint.val.toLocaleString() }} {{ variant === 'blocking' ? 'blocked' : 'requests' }}</span>
-          </div>
-          <div class="text-muted-foreground text-xs mt-0.5">
-            {{ hoveredPoint.time }}
-          </div>
+          </span>
         </div>
       </div>
     </CardContent>
