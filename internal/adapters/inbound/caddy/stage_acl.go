@@ -23,7 +23,7 @@ func (m *Middleware) evaluateAccessControl(
 	appCfg *control.AppConfig,
 	currentMode control.RunMode,
 	startTime time.Time,
-) (bypassWAF bool, handled bool, err error) {
+) (bypassWAF bool, continueInspection bool, handled bool, err error) {
 	// Pre-Application Authentication is enforced by the shared HTTP 467 gate
 	// earlier in the pipeline. Sites without any auth authority still strip
 	// untrusted client-supplied identity headers.
@@ -31,8 +31,10 @@ func (m *Middleware) evaluateAccessControl(
 		auth.StripAuthHeaders(r.Header)
 	}
 
-	// Compiled Bytecode ACL Rules & Threat Feeds
-	if m.aclEngine != nil || m.bartTable != nil {
+	// Compiled Bytecode ACL Rules & Threat Feeds. The engine is loaded once per
+	// request so a concurrent deploy cannot swap it mid-evaluation.
+	aclEngine := m.aclEngine.Load()
+	if aclEngine != nil || m.bartTable != nil {
 		aclReqCtx := &waf.RequestContext{
 			ClientIP:  clientIP,
 			Method:    r.Method,
@@ -48,8 +50,8 @@ func (m *Middleware) evaluateAccessControl(
 			aclReqCtx.AppID = appCfg.ID
 		}
 
-		if m.aclEngine != nil {
-			aclVerdict, evalErr := m.aclEngine.EvaluateRequest(aclReqCtx)
+		if aclEngine != nil {
+			aclVerdict, evalErr := aclEngine.EvaluateRequest(aclReqCtx)
 			if evalErr != nil && m.logger != nil {
 				m.logger.Error("ACL evaluation error", zap.Error(evalErr))
 			}
@@ -112,7 +114,7 @@ func (m *Middleware) evaluateAccessControl(
 					w.WriteHeader(statusCode)
 					rendered := m.renderBlockResponse(statusCode, eventID, clientIP.String(), r.Host, r.URL.Path, body)
 					_, _ = w.Write([]byte(rendered))
-					return false, true, nil
+					return false, false, true, nil
 
 				case acl.ActionChallenge:
 					if currentMode == control.ModeAudit {
@@ -141,7 +143,7 @@ func (m *Middleware) evaluateAccessControl(
 							Latency:    time.Since(startTime),
 							StatusCode: 468,
 						})
-						return false, true, m.powEngine.RenderChallengePage(w, r, r.URL.RequestURI())
+						return false, false, true, m.powEngine.RenderChallengePage(w, r, r.URL.RequestURI())
 					}
 
 				case acl.ActionRedirect:
@@ -150,10 +152,15 @@ func (m *Middleware) evaluateAccessControl(
 						statusCode = http.StatusFound
 					}
 					http.Redirect(w, r, aclVerdict.RedirectURL, statusCode)
-					return false, true, nil
+					return false, false, true, nil
 
 				case acl.ActionAllow:
-					bypassWAF = true
+					if aclVerdict.ContinueInspection {
+						bypassWAF = false
+						continueInspection = true
+					} else {
+						bypassWAF = true
+					}
 
 				case acl.ActionAudit:
 					if m.logger != nil {
@@ -237,12 +244,12 @@ func (m *Middleware) evaluateAccessControl(
 						w.WriteHeader(statusCode)
 						rendered := m.renderBlockResponse(statusCode, eventID, clientIP.String(), r.Host, r.URL.Path, body)
 						_, _ = w.Write([]byte(rendered))
-						return false, true, nil
+						return false, false, true, nil
 					}
 				}
 			}
 		}
 	}
 
-	return bypassWAF, false, nil
+	return bypassWAF, continueInspection, false, nil
 }

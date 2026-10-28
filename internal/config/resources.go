@@ -87,13 +87,14 @@ type Certificate struct {
 
 // ACLRule declares a compiled boolean access control rule.
 type ACLRule struct {
-	Name        string `yaml:"name" json:"name"`
-	Expression  string `yaml:"expression" json:"expression"`
-	Action      string `yaml:"action" json:"action"`
-	Priority    int64  `yaml:"priority" json:"priority"`
-	StatusCode  int64  `yaml:"status_code" json:"status_code"`
-	RedirectURL string `yaml:"redirect_url" json:"redirect_url"`
-	Enabled     *bool  `yaml:"enabled,omitempty" json:"enabled,omitempty"`
+	Name               string `yaml:"name" json:"name"`
+	Expression         string `yaml:"expression" json:"expression"`
+	Action             string `yaml:"action" json:"action"`
+	Priority           int64  `yaml:"priority" json:"priority"`
+	StatusCode         int64  `yaml:"status_code" json:"status_code"`
+	RedirectURL        string `yaml:"redirect_url" json:"redirect_url"`
+	Enabled            *bool  `yaml:"enabled,omitempty" json:"enabled,omitempty"`
+	ContinueInspection *bool  `yaml:"continue_inspection,omitempty" json:"continue_inspection,omitempty"`
 }
 
 // Exception declares a parameter-level false-positive bypass.

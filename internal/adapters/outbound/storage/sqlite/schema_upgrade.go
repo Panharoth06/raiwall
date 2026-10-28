@@ -20,6 +20,7 @@ var additiveUpgrades = []string{
 	`ALTER TABLE raiwall_apps ADD COLUMN redirect_url TEXT NOT NULL DEFAULT ''`,
 	`ALTER TABLE raiwall_apps ADD COLUMN redirect_status INTEGER NOT NULL DEFAULT 302`,
 	`ALTER TABLE raiwall_apps ADD COLUMN load_balancing TEXT NOT NULL DEFAULT 'round_robin'`,
+	`ALTER TABLE raiwall_acl_rules ADD COLUMN continue_inspection INTEGER NOT NULL DEFAULT 0`,
 }
 
 // applyAdditiveUpgrades upgrades legacy databases in place.

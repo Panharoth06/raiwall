@@ -186,12 +186,13 @@ func (e *ACLEngine) Evaluate(reqCtx *waf.RequestContext, geo GeoData) (*ACLVerdi
 		matched, ok := out.(bool)
 		if ok && matched {
 			return &ACLVerdict{
-				Matched:     true,
-				RuleName:    rule.Name,
-				Action:      rule.Action,
-				StatusCode:  rule.StatusCode,
-				RedirectURL: rule.RedirectURL,
-				Reason:      fmt.Sprintf("ACL rule %q matched", rule.Name),
+				Matched:            true,
+				RuleName:           rule.Name,
+				Action:             rule.Action,
+				StatusCode:         rule.StatusCode,
+				RedirectURL:        rule.RedirectURL,
+				Reason:             fmt.Sprintf("ACL rule %q matched", rule.Name),
+				ContinueInspection: rule.ContinueInspection,
 			}, nil
 		}
 	}

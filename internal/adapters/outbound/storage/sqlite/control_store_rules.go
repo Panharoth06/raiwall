@@ -42,30 +42,32 @@ func (s *Store) GetACLRule(ctx context.Context, id string) (control.AclRule, err
 
 func (s *Store) CreateACLRule(ctx context.Context, rule control.AclRule) error {
 	return s.Queries.CreateACLRule(ctx, CreateACLRuleParams{
-		ID:          rule.ID,
-		Name:        rule.Name,
-		Expression:  rule.Expression,
-		Action:      rule.Action,
-		Priority:    rule.Priority,
-		StatusCode:  rule.StatusCode,
-		RedirectUrl: rule.RedirectUrl,
-		IsActive:    rule.IsActive,
-		CreatedAt:   rule.CreatedAt,
-		UpdatedAt:   rule.UpdatedAt,
+		ID:                 rule.ID,
+		Name:               rule.Name,
+		Expression:         rule.Expression,
+		Action:             rule.Action,
+		Priority:           rule.Priority,
+		StatusCode:         rule.StatusCode,
+		RedirectUrl:        rule.RedirectUrl,
+		IsActive:           rule.IsActive,
+		ContinueInspection: rule.ContinueInspection,
+		CreatedAt:          rule.CreatedAt,
+		UpdatedAt:          rule.UpdatedAt,
 	})
 }
 
 func (s *Store) UpdateACLRule(ctx context.Context, rule control.AclRule) error {
 	return s.Queries.UpdateACLRule(ctx, UpdateACLRuleParams{
-		ID:          rule.ID,
-		Name:        rule.Name,
-		Expression:  rule.Expression,
-		Action:      rule.Action,
-		Priority:    rule.Priority,
-		StatusCode:  rule.StatusCode,
-		RedirectUrl: rule.RedirectUrl,
-		IsActive:    rule.IsActive,
-		UpdatedAt:   rule.UpdatedAt,
+		ID:                 rule.ID,
+		Name:               rule.Name,
+		Expression:         rule.Expression,
+		Action:             rule.Action,
+		Priority:           rule.Priority,
+		StatusCode:         rule.StatusCode,
+		RedirectUrl:        rule.RedirectUrl,
+		IsActive:           rule.IsActive,
+		ContinueInspection: rule.ContinueInspection,
+		UpdatedAt:          rule.UpdatedAt,
 	})
 }
 

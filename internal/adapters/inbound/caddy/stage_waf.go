@@ -24,6 +24,7 @@ func (m *Middleware) inspectWAFRequest(
 	appCfg *control.AppConfig,
 	currentMode control.RunMode,
 	aclBypassWAF bool,
+	aclContinueInspection bool,
 	startTime time.Time,
 ) (*waf.Verdict, []byte, bool, error) {
 	var bodyBytes []byte
@@ -98,6 +99,40 @@ func (m *Middleware) inspectWAFRequest(
 	}
 
 	if verdict != nil && verdict.Action == waf.ActionBlock {
+		if aclContinueInspection {
+			eventID := uuid.New().String()
+			if m.logger != nil {
+				m.logger.Warn("WAF detected attack on whitelisted request (continue inspection audit)",
+					zap.String("event_id", eventID),
+					zap.String("client_ip", clientIP.String()),
+					zap.String("path", r.URL.Path),
+					zap.String("rule_id", verdict.RuleID),
+					zap.String("reason", verdict.Reason),
+				)
+			}
+			m.recordTelemetry(&telemetry.ForensicEvent{
+				EventID:          eventID,
+				Timestamp:        startTime,
+				Host:             r.Host,
+				Path:             r.URL.RequestURI(),
+				Method:           r.Method,
+				ClientIP:         clientIP.String(),
+				JA4:              ja4,
+				GeoData:          m.lookupGeo(clientIP),
+				RuleID:           verdict.RuleID,
+				Action:           "log",
+				Severity:         "high",
+				Headers:          extractHeadersMap(r.Header),
+				TruncatedPayload: string(bodyBytes),
+				Latency:          time.Since(startTime),
+				StatusCode:       http.StatusOK,
+				PayloadLocation:  normalizePayloadLocation(verdict.PayloadLocation),
+				MatchedToken:     verdict.MatchedToken,
+				AttackCategory:   verdict.AttackCategory,
+			})
+			return verdict, bodyBytes, false, nil
+		}
+
 		if currentMode == control.ModeDefense {
 			if m.tier2Limiter != nil {
 				_, _, _ = m.tier2Limiter.RecordAttack(r.Context(), clientIP, ja4, verdict.RuleID, verdict.Reason)

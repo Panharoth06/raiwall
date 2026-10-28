@@ -94,12 +94,13 @@ func handlerFromConfig(file *config.File) (*Middleware, error) {
 		}
 		for _, rule := range file.ACLs {
 			aclCfg.Rules = append(aclCfg.Rules, &acl.ACLRule{
-				Name:        rule.Name,
-				Expression:  rule.Expression,
-				Action:      acl.Action(strings.ToLower(rule.Action)),
-				Priority:    int(rule.Priority),
-				StatusCode:  int(rule.StatusCode),
-				RedirectURL: rule.RedirectURL,
+				Name:               rule.Name,
+				Expression:         rule.Expression,
+				Action:             acl.Action(strings.ToLower(rule.Action)),
+				Priority:           int(rule.Priority),
+				StatusCode:         int(rule.StatusCode),
+				RedirectURL:        rule.RedirectURL,
+				ContinueInspection: rule.ContinueInspection != nil && *rule.ContinueInspection,
 			})
 		}
 		m.ACLConfig = aclCfg

@@ -36,15 +36,17 @@ func (m *Middleware) provisionACL(_ caddy.Context) error {
 		m.ipGroupMgr = acl.NewIPGroupManager(m.bartTable)
 	}
 
-	if m.aclEngine == nil && m.ACLConfig != nil && len(m.ACLConfig.Rules) > 0 {
-		aclEng, err := acl.NewACLEngine(m.bartTable, m.geoIPReader, m.ACLConfig.Rules...)
-		if err != nil {
-			return fmt.Errorf("provision acl engine: %w", err)
+	if eng := m.aclEngine.Load(); eng == nil {
+		if m.ACLConfig != nil && len(m.ACLConfig.Rules) > 0 {
+			aclEng, err := acl.NewACLEngine(m.bartTable, m.geoIPReader, m.ACLConfig.Rules...)
+			if err != nil {
+				return fmt.Errorf("provision acl engine: %w", err)
+			}
+			aclEng.SetIPGroupManager(m.ipGroupMgr)
+			m.SetACLEngine(aclEng)
 		}
-		aclEng.SetIPGroupManager(m.ipGroupMgr)
-		m.aclEngine = aclEng
-	} else if m.aclEngine != nil {
-		m.aclEngine.SetIPGroupManager(m.ipGroupMgr)
+	} else {
+		eng.SetIPGroupManager(m.ipGroupMgr)
 	}
 
 	return nil

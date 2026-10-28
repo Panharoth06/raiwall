@@ -109,6 +109,10 @@ func (m *Middleware) provisionControl(ctx caddy.Context) error {
 	// Compile the portal-wide gate once the control store is available.
 	m.buildGlobalAuthGate()
 
+	// Access rules live in the versioned snapshot, so load them once here and
+	// rebuild on every deploy instead of freezing the boot-time rule set.
+	m.installACLEngineDeployHook()
+
 	return nil
 }
 

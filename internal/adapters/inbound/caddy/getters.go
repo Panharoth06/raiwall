@@ -44,8 +44,8 @@ func (m *Middleware) ExceptionEngine() *acl.ExceptionEngine {
 // SetBARTTable overrides the BARTTable (used for testing).
 func (m *Middleware) SetBARTTable(bt *acl.BARTTable) {
 	m.bartTable = bt
-	if m.aclEngine != nil {
-		m.aclEngine.SetBARTTable(bt)
+	if eng := m.aclEngine.Load(); eng != nil {
+		eng.SetBARTTable(bt)
 	}
 }
 
@@ -57,8 +57,8 @@ func (m *Middleware) BARTTable() *acl.BARTTable {
 // SetIPGroupManager overrides the IPGroupManager (used for testing).
 func (m *Middleware) SetIPGroupManager(mgr *acl.IPGroupManager) {
 	m.ipGroupMgr = mgr
-	if m.aclEngine != nil {
-		m.aclEngine.SetIPGroupManager(mgr)
+	if eng := m.aclEngine.Load(); eng != nil {
+		eng.SetIPGroupManager(mgr)
 	}
 	if m.controlAPI != nil {
 		m.controlAPI.SetIPGroupManager(mgr)
@@ -67,8 +67,8 @@ func (m *Middleware) SetIPGroupManager(mgr *acl.IPGroupManager) {
 
 // IPGroupManager returns the active IPGroupManager.
 func (m *Middleware) IPGroupManager() *acl.IPGroupManager {
-	if m.aclEngine != nil && m.aclEngine.IPGroupManager() != nil {
-		return m.aclEngine.IPGroupManager()
+	if eng := m.aclEngine.Load(); eng != nil && eng.IPGroupManager() != nil {
+		return eng.IPGroupManager()
 	}
 	return m.ipGroupMgr
 }
@@ -76,8 +76,8 @@ func (m *Middleware) IPGroupManager() *acl.IPGroupManager {
 // SetGeoIPReader overrides the GeoIPReader (used for testing).
 func (m *Middleware) SetGeoIPReader(r acl.GeoIPReader) {
 	m.geoIPReader = r
-	if m.aclEngine != nil {
-		m.aclEngine.SetGeoIPReader(r)
+	if eng := m.aclEngine.Load(); eng != nil {
+		eng.SetGeoIPReader(r)
 	}
 }
 
@@ -88,12 +88,12 @@ func (m *Middleware) GeoIPReader() acl.GeoIPReader {
 
 // SetACLEngine sets the active ACLEngine.
 func (m *Middleware) SetACLEngine(e *acl.ACLEngine) {
-	m.aclEngine = e
+	m.aclEngine.Store(e)
 }
 
 // ACLEngine returns the active ACLEngine.
 func (m *Middleware) ACLEngine() *acl.ACLEngine {
-	return m.aclEngine
+	return m.aclEngine.Load()
 }
 
 // SetGlobalAuthGate sets the portal-wide HTTP 467 gate built from the

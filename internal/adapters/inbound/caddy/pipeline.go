@@ -208,13 +208,13 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 	}
 
 	// 12. Pre-App Auth & Compiled Bytecode ACLs
-	aclBypassWAF, handledACL, err := m.evaluateAccessControl(w, r, clientIP, ja4, appCfg, currentMode, startTime)
+	aclBypassWAF, aclContinueInspection, handledACL, err := m.evaluateAccessControl(w, r, clientIP, ja4, appCfg, currentMode, startTime)
 	if handledACL {
 		return err
 	}
 
 	// 13. WAF Request Inspection
-	verdict, bodyBytes, handledWAF, _ := m.inspectWAFRequest(w, r, clientIP, ja4, appCfg, currentMode, aclBypassWAF, startTime)
+	verdict, bodyBytes, handledWAF, _ := m.inspectWAFRequest(w, r, clientIP, ja4, appCfg, currentMode, aclBypassWAF, aclContinueInspection, startTime)
 	if handledWAF {
 		return nil
 	}

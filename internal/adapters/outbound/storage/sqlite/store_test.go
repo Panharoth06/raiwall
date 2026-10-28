@@ -158,6 +158,22 @@ func TestStore_ACLRulesCRUD(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, rules, 1)
 
+	// Update rule: set continue_inspection to 1 and disable it
+	rule.ContinueInspection = 1
+	rule.IsActive = 0
+	err = store.UpdateACLRule(ctx, rule)
+	require.NoError(t, err)
+
+	updated, err := store.GetACLRule(ctx, "acl-1")
+	require.NoError(t, err)
+	require.Equal(t, int64(1), updated.ContinueInspection)
+	require.Equal(t, int64(0), updated.IsActive)
+
+	// Inactive rule should not appear in ListActiveACLRules
+	activeRules, err := store.ListActiveACLRules(ctx)
+	require.NoError(t, err)
+	require.Empty(t, activeRules)
+
 	err = store.DeleteACLRule(ctx, "acl-1")
 	require.NoError(t, err)
 }

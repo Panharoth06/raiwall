@@ -130,12 +130,13 @@ func CompileSnapshot(ctx context.Context, store ControlStore) (*ConfigSnapshot, 
 	aclRules := make([]*acl.ACLRule, 0, len(dbAcls))
 	for _, r := range dbAcls {
 		rule := &acl.ACLRule{
-			Name:        r.Name,
-			Expression:  r.Expression,
-			Action:      acl.Action(r.Action),
-			Priority:    int(r.Priority),
-			StatusCode:  int(r.StatusCode),
-			RedirectURL: r.RedirectUrl,
+			Name:               r.Name,
+			Expression:         r.Expression,
+			Action:             acl.Action(r.Action),
+			Priority:           int(r.Priority),
+			StatusCode:         int(r.StatusCode),
+			RedirectURL:        r.RedirectUrl,
+			ContinueInspection: r.ContinueInspection == 1,
 		}
 		aclRules = append(aclRules, rule)
 	}

@@ -13,21 +13,22 @@ import (
 
 const createACLRule = `-- name: CreateACLRule :exec
 INSERT INTO raiwall_acl_rules (
-    id, name, expression, action, priority, status_code, redirect_url, is_active, created_at, updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    id, name, expression, action, priority, status_code, redirect_url, is_active, continue_inspection, created_at, updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateACLRuleParams struct {
-	ID          string
-	Name        string
-	Expression  string
-	Action      string
-	Priority    int64
-	StatusCode  int64
-	RedirectUrl string
-	IsActive    int64
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID                 string
+	Name               string
+	Expression         string
+	Action             string
+	Priority           int64
+	StatusCode         int64
+	RedirectUrl        string
+	IsActive           int64
+	ContinueInspection int64
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
 }
 
 func (q *Queries) CreateACLRule(ctx context.Context, arg CreateACLRuleParams) error {
@@ -40,6 +41,7 @@ func (q *Queries) CreateACLRule(ctx context.Context, arg CreateACLRuleParams) er
 		arg.StatusCode,
 		arg.RedirectUrl,
 		arg.IsActive,
+		arg.ContinueInspection,
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)
@@ -535,7 +537,7 @@ func (q *Queries) FetchCertificates(ctx context.Context) ([]RaiwallCertificate, 
 }
 
 const getACLRule = `-- name: GetACLRule :one
-SELECT id, name, expression, "action", priority, status_code, redirect_url, is_active, created_at, updated_at FROM raiwall_acl_rules WHERE id = ? LIMIT 1
+SELECT id, name, expression, "action", priority, status_code, redirect_url, is_active, continue_inspection, created_at, updated_at FROM raiwall_acl_rules WHERE id = ? LIMIT 1
 `
 
 func (q *Queries) GetACLRule(ctx context.Context, id string) (RaiwallAclRule, error) {
@@ -550,6 +552,7 @@ func (q *Queries) GetACLRule(ctx context.Context, id string) (RaiwallAclRule, er
 		&i.StatusCode,
 		&i.RedirectUrl,
 		&i.IsActive,
+		&i.ContinueInspection,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -868,7 +871,7 @@ func (q *Queries) InsertCertificate(ctx context.Context, arg InsertCertificatePa
 }
 
 const listACLRules = `-- name: ListACLRules :many
-SELECT id, name, expression, "action", priority, status_code, redirect_url, is_active, created_at, updated_at FROM raiwall_acl_rules ORDER BY priority DESC, created_at ASC
+SELECT id, name, expression, "action", priority, status_code, redirect_url, is_active, continue_inspection, created_at, updated_at FROM raiwall_acl_rules ORDER BY priority DESC, created_at ASC
 `
 
 func (q *Queries) ListACLRules(ctx context.Context) ([]RaiwallAclRule, error) {
@@ -889,6 +892,7 @@ func (q *Queries) ListACLRules(ctx context.Context) ([]RaiwallAclRule, error) {
 			&i.StatusCode,
 			&i.RedirectUrl,
 			&i.IsActive,
+			&i.ContinueInspection,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -978,7 +982,7 @@ func (q *Queries) ListAPIResourcesByApp(ctx context.Context, appID string) ([]Ra
 }
 
 const listActiveACLRules = `-- name: ListActiveACLRules :many
-SELECT id, name, expression, "action", priority, status_code, redirect_url, is_active, created_at, updated_at FROM raiwall_acl_rules WHERE is_active = 1 ORDER BY priority DESC, created_at ASC
+SELECT id, name, expression, "action", priority, status_code, redirect_url, is_active, continue_inspection, created_at, updated_at FROM raiwall_acl_rules WHERE is_active = 1 ORDER BY priority DESC, created_at ASC
 `
 
 func (q *Queries) ListActiveACLRules(ctx context.Context) ([]RaiwallAclRule, error) {
@@ -999,6 +1003,7 @@ func (q *Queries) ListActiveACLRules(ctx context.Context) ([]RaiwallAclRule, err
 			&i.StatusCode,
 			&i.RedirectUrl,
 			&i.IsActive,
+			&i.ContinueInspection,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -1588,20 +1593,21 @@ func (q *Queries) RemoveCertificate(ctx context.Context, id string) error {
 const updateACLRule = `-- name: UpdateACLRule :exec
 UPDATE raiwall_acl_rules SET
     name = ?, expression = ?, action = ?, priority = ?, status_code = ?,
-    redirect_url = ?, is_active = ?, updated_at = ?
+    redirect_url = ?, is_active = ?, continue_inspection = ?, updated_at = ?
 WHERE id = ?
 `
 
 type UpdateACLRuleParams struct {
-	Name        string
-	Expression  string
-	Action      string
-	Priority    int64
-	StatusCode  int64
-	RedirectUrl string
-	IsActive    int64
-	UpdatedAt   time.Time
-	ID          string
+	Name               string
+	Expression         string
+	Action             string
+	Priority           int64
+	StatusCode         int64
+	RedirectUrl        string
+	IsActive           int64
+	ContinueInspection int64
+	UpdatedAt          time.Time
+	ID                 string
 }
 
 func (q *Queries) UpdateACLRule(ctx context.Context, arg UpdateACLRuleParams) error {
@@ -1613,6 +1619,7 @@ func (q *Queries) UpdateACLRule(ctx context.Context, arg UpdateACLRuleParams) er
 		arg.StatusCode,
 		arg.RedirectUrl,
 		arg.IsActive,
+		arg.ContinueInspection,
 		arg.UpdatedAt,
 		arg.ID,
 	)

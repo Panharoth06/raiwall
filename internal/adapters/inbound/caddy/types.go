@@ -2,6 +2,7 @@ package caddy
 
 import (
 	"sync"
+	"sync/atomic"
 
 	"github.com/Panharoth06/raiwall/internal/adapters/inbound/grpc"
 	"github.com/Panharoth06/raiwall/internal/adapters/inbound/http"
@@ -199,7 +200,9 @@ type Middleware struct {
 	bartTable       *acl.BARTTable
 	ipGroupMgr      *acl.IPGroupManager
 	geoIPReader     acl.GeoIPReader
-	aclEngine       *acl.ACLEngine
+	// aclEngine is swapped atomically on every configuration deploy so the
+	// hot path never takes a lock while the rule set changes.
+	aclEngine atomic.Pointer[acl.ACLEngine]
 	// globalAuthGate is the portal-wide gate built from the global `auth`
 	// block; it shares the HTTP 467 portal with per-site gates.
 	globalAuthGate  *auth.AppAuthGate

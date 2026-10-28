@@ -73,16 +73,17 @@ type ExceptionRule struct {
 
 // AclRule represents a compiled boolean access control rule.
 type AclRule struct {
-	ID          string    `json:"id"`
-	Name        string    `json:"name"`
-	Expression  string    `json:"expression"`
-	Action      string    `json:"action"`
-	Priority    int64     `json:"priority"`
-	StatusCode  int64     `json:"status_code"`
-	RedirectUrl string    `json:"redirect_url"`
-	IsActive    int64     `json:"is_active"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID                 string    `json:"id"`
+	Name               string    `json:"name"`
+	Expression         string    `json:"expression"`
+	Action             string    `json:"action"`
+	Priority           int64     `json:"priority"`
+	StatusCode         int64     `json:"status_code"`
+	RedirectUrl        string    `json:"redirect_url"`
+	IsActive           int64     `json:"is_active"`
+	ContinueInspection int64     `json:"continue_inspection"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
 }
 
 // RatePolicy represents tiered rate limiting configuration.

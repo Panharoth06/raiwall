@@ -11,12 +11,13 @@ import (
 
 // ACLRule represents an access control policy evaluated via compiled bytecode.
 type ACLRule struct {
-	Name        string `json:"name"`
-	Expression  string `json:"expression"`
-	Action      Action `json:"action"` // allow, block, challenge, redirect, audit
-	Priority    int    `json:"priority"`
-	StatusCode  int    `json:"status_code,omitempty"`
-	RedirectURL string `json:"redirect_url,omitempty"`
+	Name               string `json:"name"`
+	Expression         string `json:"expression"`
+	Action             Action `json:"action"` // allow, block, challenge, redirect, audit
+	Priority           int    `json:"priority"`
+	StatusCode         int    `json:"status_code,omitempty"`
+	RedirectURL        string `json:"redirect_url,omitempty"`
+	ContinueInspection bool   `json:"continue_inspection,omitempty"`
 
 	compiled        *vm.Program
 	tableProvider   func() *BARTTable

@@ -10,16 +10,17 @@ import (
 )
 
 type RaiwallAclRule struct {
-	ID          string
-	Name        string
-	Expression  string
-	Action      string
-	Priority    int64
-	StatusCode  int64
-	RedirectUrl string
-	IsActive    int64
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID                 string
+	Name               string
+	Expression         string
+	Action             string
+	Priority           int64
+	StatusCode         int64
+	RedirectUrl        string
+	IsActive           int64
+	ContinueInspection int64
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
 }
 
 type RaiwallApiKey struct {

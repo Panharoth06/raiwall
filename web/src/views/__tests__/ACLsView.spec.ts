@@ -109,7 +109,20 @@ describe('ACLsView.vue (SafeLine Allow & Deny Flow)', () => {
     await switchBtn.trigger('click');
     await nextTick();
 
-    expect(updateSpy).toHaveBeenCalledWith('acl-001', { enabled: false });
+    expect(updateSpy).toHaveBeenCalledWith('acl-001', { enabled: false, is_active: false });
+  });
+
+  it('renders Continue Detect badge when continue_inspection is true', () => {
+    const store = useConfigStore();
+    store.acls = [
+      {
+        ...sampleRules[0],
+        continue_inspection: true,
+      },
+    ];
+
+    const wrapper = mount(ACLsView);
+    expect(wrapper.text()).toContain('Continue Detect');
   });
 
   it('shows empty state when no rules exist for a tab', () => {

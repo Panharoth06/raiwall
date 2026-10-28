@@ -78,13 +78,13 @@ const formatDate = (dateStr?: string) => {
 
     <!-- Rules Table -->
     <div v-else class="flex-1 overflow-y-auto">
-      <Table container-class="overflow-visible">
+      <Table>
         <TableHeader>
           <TableRow>
             <TableHead class="w-16">Order</TableHead>
             <TableHead class="w-28">Rule ID</TableHead>
             <TableHead class="w-20">Status</TableHead>
-            <TableHead class="w-28">Type</TableHead>
+            <TableHead class="w-36">Type</TableHead>
             <TableHead class="w-48">Name</TableHead>
             <TableHead>Detail</TableHead>
             <TableHead class="w-24 text-right">Priority</TableHead>
@@ -131,16 +131,25 @@ const formatDate = (dateStr?: string) => {
             <!-- 3. Status Switch -->
             <TableCell>
               <Switch
-                :checked="rule.enabled"
+                :checked="rule.enabled !== false && rule.is_active !== false"
                 @update:checked="emit('toggle-status', rule)"
               />
             </TableCell>
 
             <!-- 4. Type -->
             <TableCell>
-              <Badge variant="outline" class="text-xs uppercase font-mono tracking-wider">
-                Custom Rule
-              </Badge>
+              <div class="flex flex-col gap-1 items-start">
+                <Badge variant="outline" class="text-xs uppercase font-mono whitespace-nowrap">
+                  Custom Rule
+                </Badge>
+                <Badge
+                  v-if="rule.continue_inspection"
+                  variant="outline"
+                  class="text-xs font-mono whitespace-nowrap border-primary/40 text-primary bg-primary/10"
+                >
+                  Continue Detect
+                </Badge>
+              </div>
             </TableCell>
 
             <!-- 5. Name -->

@@ -62,13 +62,13 @@ SELECT * FROM raiwall_acl_rules WHERE id = ? LIMIT 1;
 
 -- name: CreateACLRule :exec
 INSERT INTO raiwall_acl_rules (
-    id, name, expression, action, priority, status_code, redirect_url, is_active, created_at, updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    id, name, expression, action, priority, status_code, redirect_url, is_active, continue_inspection, created_at, updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: UpdateACLRule :exec
 UPDATE raiwall_acl_rules SET
     name = ?, expression = ?, action = ?, priority = ?, status_code = ?,
-    redirect_url = ?, is_active = ?, updated_at = ?
+    redirect_url = ?, is_active = ?, continue_inspection = ?, updated_at = ?
 WHERE id = ?;
 
 -- name: DeleteACLRule :exec

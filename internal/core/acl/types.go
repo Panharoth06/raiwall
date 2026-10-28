@@ -92,10 +92,11 @@ func (e FeedMetadata) HasFeed(feedName string) bool {
 
 // ACLVerdict represents the outcome of evaluating ACL rules against a request.
 type ACLVerdict struct {
-	Matched     bool   `json:"matched"`
-	RuleName    string `json:"rule_name,omitempty"`
-	Action      Action `json:"action"`
-	StatusCode  int    `json:"status_code,omitempty"`
-	RedirectURL string `json:"redirect_url,omitempty"`
-	Reason      string `json:"reason,omitempty"`
+	Matched            bool   `json:"matched"`
+	RuleName           string `json:"rule_name,omitempty"`
+	Action             Action `json:"action"`
+	StatusCode         int    `json:"status_code,omitempty"`
+	RedirectURL        string `json:"redirect_url,omitempty"`
+	Reason             string `json:"reason,omitempty"`
+	ContinueInspection bool   `json:"continue_inspection,omitempty"`
 }

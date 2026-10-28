@@ -56,16 +56,17 @@ func toControlExceptionRule(r RaiwallException) control.ExceptionRule {
 
 func toControlAclRule(r RaiwallAclRule) control.AclRule {
 	return control.AclRule{
-		ID:          r.ID,
-		Name:        r.Name,
-		Expression:  r.Expression,
-		Action:      r.Action,
-		Priority:    r.Priority,
-		StatusCode:  r.StatusCode,
-		RedirectUrl: r.RedirectUrl,
-		IsActive:    r.IsActive,
-		CreatedAt:   r.CreatedAt,
-		UpdatedAt:   r.UpdatedAt,
+		ID:                 r.ID,
+		Name:               r.Name,
+		Expression:         r.Expression,
+		Action:             r.Action,
+		Priority:           r.Priority,
+		StatusCode:         r.StatusCode,
+		RedirectUrl:        r.RedirectUrl,
+		IsActive:           r.IsActive,
+		ContinueInspection: r.ContinueInspection,
+		CreatedAt:          r.CreatedAt,
+		UpdatedAt:          r.UpdatedAt,
 	}
 }
 

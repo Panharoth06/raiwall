@@ -71,8 +71,11 @@ const executeDelete = async () => {
 }
 
 const handleToggleStatus = async (rule: ACLRule) => {
+  const currentEnabled = rule.enabled !== undefined ? rule.enabled : (rule.is_active !== undefined ? rule.is_active : true)
+  const nextEnabled = !currentEnabled
   await configStore.updateACL(rule.id, {
-    enabled: !rule.enabled,
+    enabled: nextEnabled,
+    is_active: nextEnabled,
   })
 }
 

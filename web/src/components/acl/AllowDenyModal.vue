@@ -54,6 +54,9 @@ watch(
     if (!isOpen) return;
     if (props.rule) {
       const parsedGroups = exprToGroups(props.rule.expression);
+      const isRuleEnabled = props.rule.enabled !== undefined
+        ? props.rule.enabled
+        : (props.rule.is_active !== undefined ? props.rule.is_active : true);
       form.value = {
         id: props.rule.id,
         action: props.rule.action === 'allow' ? 'allow' : 'block',
@@ -62,7 +65,7 @@ watch(
         priority: props.rule.priority,
         groups: parsedGroups || [createDefaultGroup(1)],
         continueInspection: !!props.rule.continue_inspection,
-        enabled: props.rule.enabled !== false,
+        enabled: isRuleEnabled,
         rawExpr: props.rule.expression,
         isAdvancedMode: !parsedGroups,
       };
@@ -151,6 +154,7 @@ const handleSubmit = () => {
     expression: expr,
     priority: calculatePriority(),
     enabled: form.value.enabled,
+    is_active: form.value.enabled,
     continue_inspection: form.value.continueInspection,
   });
   emit('close');
@@ -305,9 +309,13 @@ const handleSubmit = () => {
             <Checkbox
               id="continue-inspection"
               :checked="form.continueInspection"
-              @update:checked="form.continueInspection = $event"
+              @update:checked="(val) => (form.continueInspection = !!val)"
             />
-            <label for="continue-inspection" class="text-xs text-foreground cursor-pointer select-none">
+            <label
+              for="continue-inspection"
+              class="text-xs text-foreground cursor-pointer select-none"
+              @click.prevent="form.continueInspection = !form.continueInspection"
+            >
               Continue to detect and log attack requests even when {{ form.action === 'allow' ? 'whitelisting' : 'denying' }}.
             </label>
           </div>
@@ -316,9 +324,13 @@ const handleSubmit = () => {
             <Checkbox
               id="rule-enabled"
               :checked="form.enabled"
-              @update:checked="form.enabled = $event"
+              @update:checked="(val) => (form.enabled = !!val)"
             />
-            <label for="rule-enabled" class="text-xs text-foreground font-medium cursor-pointer select-none">
+            <label
+              for="rule-enabled"
+              class="text-xs text-foreground font-medium cursor-pointer select-none"
+              @click.prevent="form.enabled = !form.enabled"
+            >
               Enabled
             </label>
           </div>

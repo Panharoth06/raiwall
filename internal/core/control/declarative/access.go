@@ -125,16 +125,17 @@ func (s *syncer) syncACLs(rules []config.ACLRule) error {
 
 		now := time.Now().UTC()
 		rec := control.AclRule{
-			ID:          id,
-			Name:        rule.Name,
-			Expression:  rule.Expression,
-			Action:      strings.ToLower(rule.Action),
-			Priority:    rule.Priority,
-			StatusCode:  rule.StatusCode,
-			RedirectUrl: rule.RedirectURL,
-			IsActive:    boolToInt(enabled(rule.Enabled)),
-			CreatedAt:   now,
-			UpdatedAt:   now,
+			ID:                 id,
+			Name:               rule.Name,
+			Expression:         rule.Expression,
+			Action:             strings.ToLower(rule.Action),
+			Priority:           rule.Priority,
+			StatusCode:         rule.StatusCode,
+			RedirectUrl:        rule.RedirectURL,
+			IsActive:           boolToInt(enabled(rule.Enabled)),
+			ContinueInspection: boolToInt(rule.ContinueInspection != nil && *rule.ContinueInspection),
+			CreatedAt:          now,
+			UpdatedAt:          now,
 		}
 		if !prev.CreatedAt.IsZero() {
 			rec.CreatedAt = prev.CreatedAt
@@ -307,7 +308,8 @@ func sameException(a, b control.ExceptionRule) bool {
 func sameACL(a, b control.AclRule) bool {
 	return a.Name == b.Name && a.Expression == b.Expression && a.Action == b.Action &&
 		a.Priority == b.Priority && a.StatusCode == b.StatusCode &&
-		a.RedirectUrl == b.RedirectUrl && a.IsActive == b.IsActive
+		a.RedirectUrl == b.RedirectUrl && a.IsActive == b.IsActive &&
+		a.ContinueInspection == b.ContinueInspection
 }
 
 func enabled(v *bool) bool { return v == nil || *v }
