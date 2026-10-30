@@ -31,6 +31,10 @@ func (s *syncer) syncCertificates(certs []config.Certificate) error {
 	for _, cert := range certs {
 		id := namedID(KindCertificate, cert.Name)
 		declared[id] = struct{}{}
+		if _, ok := s.overrides[id]; ok {
+			s.result.Skipped++
+			continue
+		}
 
 		prev, exists := byID[id]
 		if !exists {

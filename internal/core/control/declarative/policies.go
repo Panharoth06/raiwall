@@ -31,6 +31,10 @@ func (s *syncer) syncRatePolicies(policies []config.RatePolicy) error {
 	for _, policy := range policies {
 		id := namedID(KindRatePolicy, policy.Name)
 		declared[id] = struct{}{}
+		if _, ok := s.overrides[id]; ok {
+			s.result.Skipped++
+			continue
+		}
 
 		prev, exists := byID[id]
 		if !exists {
@@ -115,6 +119,10 @@ func (s *syncer) syncBotPolicies(policies []config.BotPolicy) error {
 	for _, policy := range policies {
 		id := namedID(KindBotPolicy, policy.Name)
 		declared[id] = struct{}{}
+		if _, ok := s.overrides[id]; ok {
+			s.result.Skipped++
+			continue
+		}
 
 		prev, exists := byID[id]
 		if !exists {
@@ -194,6 +202,10 @@ func (s *syncer) syncIdentityProviders(providers []config.IdentityProvider) erro
 	for _, provider := range providers {
 		id := namedID(KindIdentityProvider, provider.Name)
 		declared[id] = struct{}{}
+		if _, ok := s.overrides[id]; ok {
+			s.result.Skipped++
+			continue
+		}
 
 		prev, exists := byID[id]
 		if !exists {
@@ -269,6 +281,10 @@ func (s *syncer) syncTemplates(templates []config.Template) error {
 		id := namedID(KindTemplate, fmt.Sprintf("%d", tmpl.StatusCode))
 		declared[id] = struct{}{}
 		declaredStatuses[tmpl.StatusCode] = struct{}{}
+		if _, ok := s.overrides[id]; ok {
+			s.result.Skipped++
+			continue
+		}
 
 		prev, exists := byStatus[tmpl.StatusCode]
 		if exists && !IsManaged(prev.ID) {
@@ -323,6 +339,9 @@ func (s *syncer) syncTemplates(templates []config.Template) error {
 		return nil
 	}
 	for status := range managedStatuses {
+		if _, ok := s.overrides[TemplateID(status)]; ok {
+			continue
+		}
 		if _, keep := declaredStatuses[status]; keep {
 			continue
 		}

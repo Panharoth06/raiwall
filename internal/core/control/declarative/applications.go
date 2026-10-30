@@ -42,6 +42,10 @@ func (s *syncer) syncApplications(apps []config.Application) error {
 	for _, app := range apps {
 		id := namedID(KindApplication, app.Name)
 		declared[id] = struct{}{}
+		if _, ok := s.overrides[id]; ok {
+			s.result.Skipped++
+			continue
+		}
 
 		prev, exists := byID[id]
 		if !exists {
@@ -232,6 +236,10 @@ func (s *syncer) syncForwarding(appID string, rules []config.ForwardingRule) err
 		}
 		id := hashedID(KindForwarding, appID, prefix)
 		declared[id] = struct{}{}
+		if _, ok := s.overrides[id]; ok {
+			s.result.Skipped++
+			continue
+		}
 
 		upstreams := make([]control.UpstreamTarget, 0, len(rule.Upstreams))
 		for _, up := range rule.Upstreams {

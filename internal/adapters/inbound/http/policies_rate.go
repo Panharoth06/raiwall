@@ -207,6 +207,7 @@ func (s *Server) handleUpdateRatePolicy(w http.ResponseWriter, r *http.Request) 
 		respondError(w, http.StatusInternalServerError, "failed to update rate policy: "+err.Error())
 		return
 	}
+	_ = declarative.Override(r.Context(), s.store, id)
 
 	req.ID = id
 	req.UpdatedAt = now
@@ -220,5 +221,6 @@ func (s *Server) handleDeleteRatePolicy(w http.ResponseWriter, r *http.Request) 
 		respondError(w, http.StatusInternalServerError, "failed to delete rate policy: "+err.Error())
 		return
 	}
+	_ = declarative.Override(r.Context(), s.store, id)
 	respondJSON(w, http.StatusOK, map[string]string{"status": "deleted", "id": id})
 }

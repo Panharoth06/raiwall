@@ -26,6 +26,10 @@ func (s *syncer) syncExceptions(exceptions []config.Exception) error {
 	for i, exc := range exceptions {
 		id := exceptionID(exc, i)
 		declared[id] = struct{}{}
+		if _, ok := s.overrides[id]; ok {
+			s.result.Skipped++
+			continue
+		}
 
 		prev, exists := byID[id]
 		if exists && !s.canWrite(true) {
@@ -109,6 +113,10 @@ func (s *syncer) syncACLs(rules []config.ACLRule) error {
 	for _, rule := range rules {
 		id := namedID(KindACL, rule.Name)
 		declared[id] = struct{}{}
+		if _, ok := s.overrides[id]; ok {
+			s.result.Skipped++
+			continue
+		}
 
 		prev, exists := byID[id]
 		if !exists {
@@ -186,6 +194,10 @@ func (s *syncer) syncIPGroups(groups []config.IPGroup) error {
 	for _, group := range groups {
 		id := namedID(KindIPGroup, group.Name)
 		declared[id] = struct{}{}
+		if _, ok := s.overrides[id]; ok {
+			s.result.Skipped++
+			continue
+		}
 
 		prev, exists := byID[id]
 		if !exists {

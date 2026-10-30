@@ -196,6 +196,7 @@ func (s *Server) handleUpdateIdentityProvider(w http.ResponseWriter, r *http.Req
 		respondError(w, http.StatusInternalServerError, "failed to update identity provider: "+err.Error())
 		return
 	}
+	_ = declarative.Override(r.Context(), s.store, found.ID)
 	respondJSON(w, http.StatusOK, providerRecordToDTO(*found))
 }
 
@@ -212,6 +213,7 @@ func (s *Server) handleDeleteIdentityProvider(w http.ResponseWriter, r *http.Req
 				respondError(w, http.StatusInternalServerError, "failed to delete identity provider: "+err.Error())
 				return
 			}
+			_ = declarative.Override(r.Context(), s.store, id)
 			respondJSON(w, http.StatusOK, map[string]string{"status": "deleted", "id": id})
 			return
 		}

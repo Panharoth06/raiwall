@@ -31,12 +31,13 @@ func (r Result) Changed() bool {
 }
 
 type syncer struct {
-	ctx    context.Context
-	store  control.ControlStore
-	mode   string
-	prune  bool
-	strict bool
-	result Result
+	ctx       context.Context
+	store     control.ControlStore
+	mode      string
+	prune     bool
+	strict    bool
+	overrides map[string]struct{}
+	result    Result
 }
 
 // Sync upserts every declared resource into the control store. Strict mode
@@ -51,11 +52,12 @@ func Sync(ctx context.Context, store control.ControlStore, res *config.Declarati
 	}
 
 	s := &syncer{
-		ctx:    ctx,
-		store:  store,
-		mode:   res.Mode,
-		prune:  res.Prune && res.Mode == "sync",
-		strict: res.Strict,
+		ctx:       ctx,
+		store:     store,
+		mode:      res.Mode,
+		prune:     res.Prune && res.Mode == "sync",
+		strict:    res.Strict,
+		overrides: LoadOverrides(ctx, store),
 	}
 
 	steps := []struct {
@@ -169,6 +171,9 @@ func (s *syncer) pruneIDs(kind string, declared map[string]struct{}, existing []
 	}
 	for _, id := range existing {
 		if !IsManaged(id) {
+			continue
+		}
+		if _, overridden := s.overrides[id]; overridden {
 			continue
 		}
 		if _, keep := declared[id]; keep {

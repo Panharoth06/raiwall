@@ -184,6 +184,7 @@ func (s *Server) handleUpdateIPGroup(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusInternalServerError, "failed to update IP group: "+err.Error())
 		return
 	}
+	_ = declarative.Override(r.Context(), s.store, grp.ID)
 
 	respondJSON(w, http.StatusOK, IPGroupDTO{
 		ID:          grp.ID,
@@ -209,6 +210,7 @@ func (s *Server) handleDeleteIPGroup(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusInternalServerError, "failed to delete IP group: "+err.Error())
 		return
 	}
+	_ = declarative.Override(r.Context(), s.store, grp.ID)
 
 	if s.ipGroupMgr != nil {
 		_ = s.ipGroupMgr.DeleteGroup(grp.Name)
@@ -255,6 +257,7 @@ func (s *Server) handleAddIPGroupEntry(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusInternalServerError, "failed to save IP group entry: "+err.Error())
 		return
 	}
+	_ = declarative.Override(r.Context(), s.store, grp.ID)
 
 	// Dynamically update in-memory BART table
 	if s.ipGroupMgr != nil {
@@ -294,6 +297,7 @@ func (s *Server) handleDeleteIPGroupEntry(w http.ResponseWriter, r *http.Request
 		respondError(w, http.StatusInternalServerError, "failed to delete entry: "+err.Error())
 		return
 	}
+	_ = declarative.Override(r.Context(), s.store, grp.ID)
 
 	// Dynamically remove from in-memory BART table
 	if s.ipGroupMgr != nil && targetCIDR != "" {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -26,10 +27,9 @@ func AuthFromContext(ctx context.Context) (*AuthContext, bool) {
 	return ac, ok && ac != nil
 }
 
-// DeclarativeGuardMiddleware rejects mutations of records owned by
-// raiwall.yaml. Operators change the file and redeploy instead of drifting the
-// database away from Git.
-func DeclarativeGuardMiddleware(next http.Handler) http.Handler {
+// DeclarativeGuardMiddleware intercepts mutations on declarative resources and
+// records an ownership override so declarative sync skips them on redeploy.
+func (s *Server) DeclarativeGuardMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet, http.MethodHead, http.MethodOptions:
@@ -38,14 +38,23 @@ func DeclarativeGuardMiddleware(next http.Handler) http.Handler {
 		}
 
 		for _, param := range []string{"id", "rule_id", "entryId"} {
-			if declarative.IsManaged(chi.URLParam(r, param)) {
-				respondError(w, http.StatusConflict,
-					"resource is managed by the declarative configuration file; edit raiwall.yaml and redeploy")
-				return
+			paramVal := chi.URLParam(r, param)
+			if declarative.IsManaged(paramVal) {
+				_ = declarative.Override(r.Context(), s.store, paramVal)
+			}
+		}
+		if codeStr := chi.URLParam(r, "statusCode"); codeStr != "" {
+			if code, err := strconv.Atoi(codeStr); err == nil {
+				_ = declarative.Override(r.Context(), s.store, declarative.TemplateID(code))
 			}
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// DeclarativeGuardMiddleware is a backwards-compatible package-level middleware.
+func DeclarativeGuardMiddleware(next http.Handler) http.Handler {
+	return next
 }
 
 // AuthMiddleware verifies API tokens or session cookies and enforces 2-tier RBAC.

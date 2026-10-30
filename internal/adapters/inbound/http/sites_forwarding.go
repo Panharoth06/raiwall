@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Panharoth06/raiwall/internal/core/control"
+	"github.com/Panharoth06/raiwall/internal/core/control/declarative"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
@@ -146,6 +147,7 @@ func (s *Server) handleUpdateForwardingRule(w http.ResponseWriter, r *http.Reque
 		respondError(w, http.StatusInternalServerError, "failed to update forwarding rule: "+err.Error())
 		return
 	}
+	_ = declarative.Override(r.Context(), s.store, ruleID)
 
 	req.ID = ruleID
 	req.UpdatedAt = now
@@ -159,6 +161,7 @@ func (s *Server) handleDeleteForwardingRule(w http.ResponseWriter, r *http.Reque
 		respondError(w, http.StatusInternalServerError, "failed to delete forwarding rule: "+err.Error())
 		return
 	}
+	_ = declarative.Override(r.Context(), s.store, ruleID)
 	respondJSON(w, http.StatusOK, map[string]string{"status": "deleted", "id": ruleID})
 }
 

@@ -161,6 +161,7 @@ func (s *Server) handleUpdateCertificate(w http.ResponseWriter, r *http.Request)
 		respondError(w, http.StatusInternalServerError, "failed to update certificate: "+err.Error())
 		return
 	}
+	_ = declarative.Override(r.Context(), s.store, existing.ID)
 	s.reloadCertificates(r.Context())
 	respondJSON(w, http.StatusOK, certificateDTO(existing, time.Now().UTC()))
 }
@@ -186,6 +187,7 @@ func (s *Server) handleDeleteCertificate(w http.ResponseWriter, r *http.Request)
 		respondError(w, http.StatusInternalServerError, "failed to delete certificate: "+err.Error())
 		return
 	}
+	_ = declarative.Override(r.Context(), s.store, id)
 	s.reloadCertificates(r.Context())
 	respondJSON(w, http.StatusOK, map[string]string{"status": "deleted", "id": id})
 }

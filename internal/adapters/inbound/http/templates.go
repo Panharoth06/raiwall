@@ -105,10 +105,6 @@ func (s *Server) handleUpdateTemplate(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusBadRequest, "invalid status code")
 		return
 	}
-	if managed, lookupErr := s.isManagedTemplate(r, code); lookupErr == nil && managed {
-		respondError(w, http.StatusConflict, "template is managed by the declarative configuration file; edit raiwall.yaml and redeploy")
-		return
-	}
 
 	var req struct {
 		Title       string `json:"title"`
@@ -145,7 +141,9 @@ func (s *Server) handleUpdateTemplate(w http.ResponseWriter, r *http.Request) {
 		CreatedAt:   t.CreatedAt,
 		UpdatedAt:   t.UpdatedAt,
 	}
+	_ = s.store.DeleteTemplate(r.Context(), code)
 	_ = s.store.UpsertTemplate(r.Context(), record)
+	_ = declarative.Override(r.Context(), s.store, declarative.TemplateID(code))
 
 	respondJSON(w, http.StatusOK, TemplateDTO{
 		ID:          t.ID,
@@ -198,10 +196,6 @@ func (s *Server) handleResetTemplate(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusBadRequest, "invalid status code")
 		return
 	}
-	if managed, lookupErr := s.isManagedTemplate(r, code); lookupErr == nil && managed {
-		respondError(w, http.StatusConflict, "template is managed by the declarative configuration file; edit raiwall.yaml and redeploy")
-		return
-	}
 
 	if s.templateMgr == nil {
 		s.templateMgr = templates.NewTemplateManager()
@@ -215,6 +209,7 @@ func (s *Server) handleResetTemplate(w http.ResponseWriter, r *http.Request) {
 
 	// Remove from SQLite
 	_ = s.store.DeleteTemplate(r.Context(), code)
+	_ = declarative.Override(r.Context(), s.store, declarative.TemplateID(code))
 
 	respondJSON(w, http.StatusOK, TemplateDTO{
 		ID:          t.ID,

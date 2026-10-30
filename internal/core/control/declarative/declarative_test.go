@@ -355,3 +355,68 @@ func TestIsManaged(t *testing.T) {
 	assert.True(t, IsManaged(IDPrefix))
 	assert.False(t, IsManaged("0c4f7e9a-1b2c-3d4e-5f60-718293a4b5c6"))
 }
+
+func TestSyncSkipsOverriddenResource(t *testing.T) {
+	store := testStore(t)
+	ctx := context.Background()
+
+	res := sampleResources()
+	_, err := Sync(ctx, store, res)
+	require.NoError(t, err)
+
+	aclID := "cfg:acl:block_bad_ip"
+	tmplID := TemplateID(403)
+
+	// User modifies ACL rule via UI and takes ownership.
+	rule, err := store.GetACLRule(ctx, aclID)
+	require.NoError(t, err)
+	rule.Expression = "client_ip == '1.2.3.4'"
+	rule.StatusCode = 418
+	require.NoError(t, store.UpdateACLRule(ctx, rule))
+	require.NoError(t, Override(ctx, store, aclID))
+
+	// User modifies template via UI and takes ownership.
+	tmpl, err := store.GetTemplate(ctx, 403)
+	require.NoError(t, err)
+	tmpl.Title = "Custom Blocked Page"
+	require.NoError(t, store.DeleteTemplate(ctx, 403))
+	require.NoError(t, store.UpsertTemplate(ctx, tmpl))
+	require.NoError(t, Override(ctx, store, tmplID))
+
+	// Non-declarative identifier is silently ignored.
+	require.NoError(t, Override(ctx, store, "random-uuid-1234"))
+
+	overrides := LoadOverrides(ctx, store)
+	assert.Contains(t, overrides, aclID)
+	assert.Contains(t, overrides, tmplID)
+	assert.NotContains(t, overrides, "random-uuid-1234")
+
+	// Re-running sync with the original YAML should skip the overridden resources.
+	result, err := Sync(ctx, store, res)
+	require.NoError(t, err)
+	assert.True(t, result.Skipped >= 2)
+
+	afterRule, err := store.GetACLRule(ctx, aclID)
+	require.NoError(t, err)
+	assert.Equal(t, "client_ip == '1.2.3.4'", afterRule.Expression)
+	assert.Equal(t, int64(418), afterRule.StatusCode)
+
+	afterTmpl, err := store.GetTemplate(ctx, 403)
+	require.NoError(t, err)
+	assert.Equal(t, "Custom Blocked Page", afterTmpl.Title)
+
+	// Pruning with nil resources should NOT delete overridden resources.
+	res.Prune = true
+	res.ACLs = nil
+	res.Templates = nil
+	_, err = Sync(ctx, store, res)
+	require.NoError(t, err)
+
+	keptRule, err := store.GetACLRule(ctx, aclID)
+	require.NoError(t, err)
+	assert.Equal(t, "client_ip == '1.2.3.4'", keptRule.Expression)
+
+	keptTmpl, err := store.GetTemplate(ctx, 403)
+	require.NoError(t, err)
+	assert.Equal(t, "Custom Blocked Page", keptTmpl.Title)
+}

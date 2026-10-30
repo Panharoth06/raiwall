@@ -148,6 +148,7 @@ func (s *Server) handleUpdateBotConfig(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusInternalServerError, "failed to update bot config: "+err.Error())
 		return
 	}
+	_ = declarative.Override(r.Context(), s.store, id)
 
 	req.ID = id
 	req.UpdatedAt = now
@@ -161,5 +162,6 @@ func (s *Server) handleDeleteBotConfig(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusInternalServerError, "failed to delete bot config: "+err.Error())
 		return
 	}
+	_ = declarative.Override(r.Context(), s.store, id)
 	respondJSON(w, http.StatusOK, map[string]string{"status": "deleted", "id": id})
 }

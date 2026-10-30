@@ -239,6 +239,7 @@ func (s *Server) handleUpdateACLRule(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusInternalServerError, "failed to update ACL rule: "+err.Error())
 		return
 	}
+	_ = declarative.Override(r.Context(), s.store, existing.ID)
 
 	respondJSON(w, http.StatusOK, ACLRuleDTO{
 		ID:                 existing.ID,
@@ -264,5 +265,6 @@ func (s *Server) handleDeleteACLRule(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusInternalServerError, "failed to delete ACL rule: "+err.Error())
 		return
 	}
+	_ = declarative.Override(r.Context(), s.store, id)
 	respondJSON(w, http.StatusOK, map[string]string{"status": "deleted", "id": id})
 }

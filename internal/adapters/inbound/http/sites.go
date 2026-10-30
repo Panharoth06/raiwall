@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Panharoth06/raiwall/internal/core/control"
+	"github.com/Panharoth06/raiwall/internal/core/control/declarative"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
@@ -143,6 +144,7 @@ func (s *Server) handleUpdateSite(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusInternalServerError, "failed to update site: "+err.Error())
 		return
 	}
+	_ = declarative.Override(r.Context(), s.store, id)
 	if record.SSLMode == control.SSLModeAuto {
 		if err := s.ensureAutoCertificate(r.Context(), siteDTOFromRecord(record).Hostnames); err != nil {
 			respondError(w, http.StatusInternalServerError, "site updated but certificate provisioning failed: "+err.Error())
@@ -161,6 +163,7 @@ func (s *Server) handleDeleteSite(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusInternalServerError, "failed to delete site: "+err.Error())
 		return
 	}
+	_ = declarative.Override(r.Context(), s.store, id)
 	_ = s.store.DeleteForwardingRulesByApp(r.Context(), id)
 	_ = s.store.DeleteAPIResourcesByApp(r.Context(), id)
 	respondJSON(w, http.StatusOK, map[string]string{"status": "deleted", "id": id})

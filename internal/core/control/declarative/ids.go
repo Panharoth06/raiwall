@@ -3,6 +3,7 @@ package declarative
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"strconv"
 	"strings"
 )
 
@@ -28,6 +29,13 @@ const (
 // IsManaged reports whether id belongs to the declarative configuration file.
 func IsManaged(id string) bool {
 	return strings.HasPrefix(id, IDPrefix)
+}
+
+// TemplateID returns the deterministic identifier of a declarative response
+// template. Templates are addressed by status code in the API, so callers need
+// the same mapping the syncer uses.
+func TemplateID(statusCode int) string {
+	return namedID(KindTemplate, strconv.Itoa(statusCode))
 }
 
 // namedID builds the stable identifier for a named resource.

@@ -235,6 +235,7 @@ func (s *Server) handleUpdateException(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusInternalServerError, "failed to update exception: "+err.Error())
 		return
 	}
+	_ = declarative.Override(r.Context(), s.store, id)
 
 	req.ID = id
 	req.UpdatedAt = now
@@ -248,5 +249,6 @@ func (s *Server) handleDeleteException(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusInternalServerError, "failed to delete exception: "+err.Error())
 		return
 	}
+	_ = declarative.Override(r.Context(), s.store, id)
 	respondJSON(w, http.StatusOK, map[string]string{"status": "deleted", "id": id})
 }
