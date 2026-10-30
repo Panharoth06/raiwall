@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo.png" alt="Raiwall Logo" width="180" />
+  <img src="assets/raiwall-logo.png" alt="Raiwall Logo" width="180" />
 </p>
 
 <h1 align="center">Raiwall</h1>

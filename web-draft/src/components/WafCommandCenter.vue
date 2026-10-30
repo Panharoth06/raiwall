@@ -532,7 +532,7 @@ const getRibbonShineOpacity = (ribbon: SankeyRibbon): number => {
       <!-- Top Brand Mark: Raiwall Shield Logo -->
       <div class="mt-4 mb-6 flex items-center justify-center">
         <img
-          src="/logo.png"
+          src="/raiwall-logo.png"
           alt="Raiwall Logo"
           class="w-7 h-7 object-contain drop-shadow-[0_0_8px_rgba(56,189,248,0.35)]"
         />

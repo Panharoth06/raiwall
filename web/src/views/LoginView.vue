@@ -55,7 +55,7 @@ const handleLogin = async () => {
     <div class="w-full max-w-md bg-card border border-border rounded-xl p-8 shadow-none">
       <div class="flex items-center justify-center space-x-3 mb-6">
         <img
-          src="/logo.png"
+          src="/raiwall-logo.png"
           alt="Raiwall Logo"
           class="w-10 h-10 object-contain"
           style="image-rendering: -webkit-optimize-contrast;"

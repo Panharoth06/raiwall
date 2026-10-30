@@ -64,7 +64,7 @@ describe('DashboardLayout.vue (Task 74)', () => {
     expect(brandLogo.exists()).toBe(true);
     const logoImg = brandLogo.find('img');
     expect(logoImg.exists()).toBe(true);
-    expect(logoImg.attributes('src')).toMatch(/logo\.png$/);
+    expect(logoImg.attributes('src')).toMatch(/raiwall-logo\.png$/);
 
     expect(wrapper.find('[data-testid="version-badge"]').exists()).toBe(false);
     expect(wrapper.text()).not.toContain('WAF v2.8.4');

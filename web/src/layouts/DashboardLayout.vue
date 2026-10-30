@@ -184,7 +184,7 @@ const handleLogout = async () => {
       <div class="h-14 px-4 border-b border-border flex items-center justify-between flex-shrink-0">
         <div data-testid="brand-logo" class="flex items-center gap-2.5">
           <img
-            src="/logo.png"
+            src="/raiwall-logo.png"
             alt="Raiwall"
             class="w-8 h-8 object-contain flex-shrink-0"
             style="image-rendering: -webkit-optimize-contrast;"
