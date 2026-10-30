@@ -192,7 +192,7 @@ func analyzeSQLUnquotedBreakout(query string) (bool, string) {
 	hasDangerousFunc := false
 	hasComment := false
 
-	for idx, tok := range afterEq {
+	for _, tok := range afterEq {
 		upper := strings.ToUpper(tok.val)
 
 		if tok.val == ";" {
@@ -204,12 +204,9 @@ func analyzeSQLUnquotedBreakout(query string) (bool, string) {
 		if upper == "UNION" {
 			hasUnion = true
 		}
-		if upper == "OR" || upper == "XOR" {
-			if idx+3 < len(afterEq) && afterEq[idx+2].val == "=" {
-				if afterEq[idx+1].val == afterEq[idx+3].val {
-					hasOrTautology = true
-				}
-			}
+		// Boolean operator in an unquoted position is a breakout signal for
+		// OR, XOR and AND alike (1 AND 1=1 is a standard tautology probe).
+		if upper == "OR" || upper == "XOR" || upper == "AND" {
 			hasOrTautology = true
 		}
 		if upper == "SLEEP" || upper == "BENCHMARK" || upper == "PG_SLEEP" || upper == "WAITFOR" {
@@ -224,7 +221,7 @@ func analyzeSQLUnquotedBreakout(query string) (bool, string) {
 		return true, "stacked query injection (;)"
 	}
 	if hasOrTautology {
-		return true, "unquoted boolean operator breakout (OR/XOR)"
+		return true, "unquoted boolean operator breakout (OR/AND/XOR)"
 	}
 	if hasDangerousFunc {
 		return true, "SQL injection time-delay function"

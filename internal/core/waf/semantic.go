@@ -332,18 +332,19 @@ func (s *SemanticEngine) InspectRequest(ctx *RequestContext) (*Verdict, error) {
 			continue
 		}
 
-		// Stage 1: Multi-pass recursive normalization (stabilize within <= 10 iterations)
-		normalized := s.normalizer.Normalize(param.Value)
+		// Stage 1: Multi-pass recursive normalization (stabilize within <= 10 iterations).
+		// Comment-obfuscated values yield several variants; the most suspicious
+		// one drives Stage 3 verification.
+		variants, normalized, triage, details := triageCandidates(s.normalizer, param.Value)
 		if len(normalized) == 0 {
 			continue
 		}
 
 		// Stage 2: Fast Lexical Triage (<2 µs)
-		triage, details := TriageWithDetails(normalized)
 		if triage == TriageBenign {
 			// Stage 2b: extended module detectors (code injection,
 			// deserialization, SSTI) for values the main triage passed.
-			verdict, handled := s.inspectExtendedModule(matrix, ctx, param, normalized)
+			verdict, handled := extendedModuleVerdict(s, matrix, ctx, param, variants)
 			if !handled {
 				continue
 			}
@@ -359,6 +360,18 @@ func (s *SemanticEngine) InspectRequest(ctx *RequestContext) (*Verdict, error) {
 
 		module := moduleForTriage(triage)
 		mode := matrix.Mode(module)
+
+		// Cross-module fallback: libinjection can fingerprint markup as SQLi
+		// (<iframe srcdoc=...>), so SQL verification alone would miss an
+		// executable HTML payload. Confirm HTML independently before the SQL
+		// module's matrix mode can short-circuit inspection.
+		if htmlVerdict, controlled := s.verifyHTMLFallback(matrix, ctx, reqCtx, param, normalized, triage, details); controlled && htmlVerdict != nil {
+			if htmlVerdict.Action == ActionAudit {
+				finding.record(htmlVerdict)
+			} else {
+				return htmlVerdict, nil
+			}
+		}
 
 		// Matrix gating: Disabled modules skip inspection entirely;
 		// Audit modules record the detection without interrupting traffic.

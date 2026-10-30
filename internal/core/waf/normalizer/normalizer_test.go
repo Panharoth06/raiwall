@@ -85,6 +85,43 @@ func TestNormalizer(t *testing.T) {
 			input:    "admin\x00'--",
 			expected: "admin'--",
 		},
+		{
+			name:  "Unterminated comment keeps payload visible",
+			input: "/*' OR 1=1--",
+			// The opener is rewritten to MySQL's # line comment rather than
+			// dropping the tail, so triage still sees the payload.
+			expected: "#' OR 1=1--",
+		},
+		{
+			name:     "Unterminated comment in benign glob",
+			input:    "src/*.go",
+			expected: "src#.go",
+		},
+		{
+			name:     "Unterminated comment mid value",
+			input:    "abc/*tail",
+			expected: "abc#tail",
+		},
+		{
+			name:     "Overlong UTF-8 two byte quote",
+			input:    "%c0%a7 OR 1=1",
+			expected: "' OR 1=1",
+		},
+		{
+			name:     "Overlong UTF-8 three byte traversal",
+			input:    "%e0%80%ae%e0%80%ae%e0%80%afetc/passwd",
+			expected: "../etc/passwd",
+		},
+		{
+			name:     "Overlong UTF-8 four byte dot",
+			input:    "%f0%80%80%ae%f0%80%80%afetc/passwd",
+			expected: "./etc/passwd",
+		},
+		{
+			name:     "Valid three byte UTF-8 is untouched",
+			input:    "ࠀtext",
+			expected: "ࠀtext",
+		},
 	}
 
 	for _, tt := range tests {
@@ -95,6 +132,41 @@ func TestNormalizer(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNormalizeVariants_CommentObfuscation(t *testing.T) {
+	t.Run("split keywords and separate words yield both views", func(t *testing.T) {
+		variants := NormalizeVariants("1'/**/UNION/**/SELECT/**/1,2,3--")
+		if len(variants) != 2 {
+			t.Fatalf("expected 2 variants, got %d: %q", len(variants), variants)
+		}
+		if variants[0] != "1' UNIONSELECT 1,2,3--" {
+			t.Errorf("join variant = %q", variants[0])
+		}
+		if variants[1] != "1' UNION SELECT 1,2,3--" {
+			t.Errorf("space variant = %q", variants[1])
+		}
+	})
+
+	t.Run("keyword split across comments is joined", func(t *testing.T) {
+		variants := NormalizeVariants("UN/**/ION")
+		if len(variants) != 2 {
+			t.Fatalf("expected 2 variants, got %d: %q", len(variants), variants)
+		}
+		if variants[0] != "UNION" {
+			t.Errorf("join variant = %q", variants[0])
+		}
+		if variants[1] != "UN ION" {
+			t.Errorf("space variant = %q", variants[1])
+		}
+	})
+
+	t.Run("values without comments yield a single variant", func(t *testing.T) {
+		variants := NormalizeVariants("plain value")
+		if len(variants) != 1 || variants[0] != "plain value" {
+			t.Errorf("variants = %q", variants)
+		}
+	})
 }
 
 func TestNormalizer_TerminationUnderInfiniteCycle(t *testing.T) {

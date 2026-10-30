@@ -46,6 +46,11 @@ var shellBinaries = [...]string{
 	"chmod", "chown", "sudo", "su", "id", "whoami", "uname",
 	"busybox", "exec", "eval", "system", "passthru", "touch", "rm",
 	"sleep", "kill", "killall", "ping", "traceroute", "ifconfig", "ip",
+	// Windows command interpreters and living-off-the-land binaries. These are
+	// unambiguous enough to list without tripping ordinary parameter values.
+	"cmd", "powershell", "pwsh", "certutil", "bitsadmin", "mshta",
+	"rundll32", "regsvr32", "wmic", "schtasks", "cscript", "wscript",
+	"netstat", "nslookup", "certreq",
 }
 
 var shellPaths = [...]string{
@@ -102,7 +107,7 @@ func ScanCmdI(s string) (bool, string) {
 				validBefore := (idx == 0) || isCmdBoundary(lower[idx-1])
 				// Check boundary after: must be end, whitespace, flag, slash, or metachar
 				endIdx := idx + len(bin)
-				validAfter := (endIdx == len(lower)) || isCmdBoundary(lower[endIdx])
+				validAfter := (endIdx == len(lower)) || isCmdBoundaryAfter(lower[endIdx])
 
 				if validBefore && validAfter {
 					return true, "shell command invocation: " + bin
@@ -126,6 +131,12 @@ func isCmdBoundary(b byte) bool {
 		b == ';' || b == '|' || b == '&' || b == '`' || b == '$' ||
 		b == '(' || b == ')' || b == '<' || b == '>' || b == '/' ||
 		b == '\\' || b == '"' || b == '\''
+}
+
+// isCmdBoundaryAfter also accepts '.' so Windows executables referenced with
+// an extension (curl.exe, powershell.exe) match their bare command name.
+func isCmdBoundaryAfter(b byte) bool {
+	return isCmdBoundary(b) || b == '.'
 }
 
 // Directory traversal sequence indicators
@@ -201,6 +212,146 @@ func ScanPathTraversal(s string) (bool, string) {
 	return false, ""
 }
 
+// hasSQLCommentBreakout reports whether a value closes a string literal and
+// immediately starts SQL comment syntax. libinjection misses several of these
+// shapes (admin'#, admin'-- followed only by whitespace), but bounded AST
+// verification confirms them once the value reaches Stage 3.
+//
+// The quote must follow a word byte, ')' or ']' so prose where the quote
+// follows whitespace (e.g. `the symbol '#'`) is not redirected.
+func hasSQLCommentBreakout(v string) bool {
+	for i := 0; i < len(v); i++ {
+		if v[i] != '\'' && v[i] != '"' {
+			continue
+		}
+		if i > 0 && !canPrecedeSQLBreakout(v[i-1]) {
+			continue
+		}
+
+		j := i + 1
+		for j < len(v) && isInlineSpace(v[j]) {
+			j++
+		}
+		if j >= len(v) {
+			continue
+		}
+
+		switch {
+		case v[j] == '#':
+			// A quote right after '#' is a literal mention (e.g. `'#'`).
+			if j+1 >= len(v) || (v[j+1] != '\'' && v[j+1] != '"') {
+				return true
+			}
+		case v[j] == '/' && j+1 < len(v) && v[j+1] == '*':
+			return true
+		case v[j] == '-' && j+1 < len(v) && v[j+1] == '-':
+			if startsSQLCommentTail(v[j+2:]) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// startsSQLCommentTail reports whether the text after `--` looks like a SQL
+// comment terminus (end of value, whitespace only, or a non-word token).
+// Prose such as "it's -- fine" is left alone.
+func startsSQLCommentTail(tail string) bool {
+	k := 0
+	for k < len(tail) && isInlineSpace(tail[k]) {
+		k++
+	}
+	if k >= len(tail) {
+		return true
+	}
+	return !isWordByte(tail[k])
+}
+
+func canPrecedeSQLBreakout(b byte) bool {
+	return isWordByte(b) || b == ')' || b == ']'
+}
+
+// xssGateTags lists element names that can execute script or load attacker
+// content. The gate only routes values to AST verification; XSSChop decides.
+var xssGateTags = [...]string{
+	"script", "iframe", "object", "embed", "applet", "svg", "math",
+	"img", "video", "audio", "source", "body", "frameset", "frame",
+	"meta", "link", "base", "form", "style", "xmp", "details", "marquee",
+	"input", "textarea",
+}
+
+// looksLikeHTMLInjection reports whether a value contains markup that merits
+// bounded HTML tokenization: a dangerous element name, srcdoc, or an event
+// handler attribute. libinjection misses slash-separated attributes and
+// srcdoc payloads; XSSChop confirms (or rejects) these shapes.
+func looksLikeHTMLInjection(v string) bool {
+	if !strings.ContainsAny(v, "<\"'=") {
+		return false
+	}
+
+	lower := strings.ToLower(v)
+	if strings.Contains(lower, "srcdoc=") || hasEventHandlerAttr(lower) {
+		return true
+	}
+
+	for i := 0; i < len(lower); i++ {
+		if lower[i] != '<' {
+			continue
+		}
+		j := i + 1
+		for j < len(lower) && (lower[j] == '/' || isInlineSpace(lower[j])) {
+			j++
+		}
+		for _, tag := range xssGateTags {
+			if !strings.HasPrefix(lower[j:], tag) {
+				continue
+			}
+			end := j + len(tag)
+			if end >= len(lower) || !isWordByte(lower[end]) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// hasEventHandlerAttr reports whether the value contains an on<name>= HTML
+// event handler attribute (whitespace before '=' is tolerated).
+func hasEventHandlerAttr(s string) bool {
+	for i := 0; i+3 < len(s); i++ {
+		if s[i] != 'o' || s[i+1] != 'n' {
+			continue
+		}
+		if i > 0 && isWordByte(s[i-1]) {
+			continue
+		}
+		j := i + 2
+		start := j
+		for j < len(s) && s[j] >= 'a' && s[j] <= 'z' {
+			j++
+		}
+		if j == start {
+			continue
+		}
+		for j < len(s) && isInlineSpace(s[j]) {
+			j++
+		}
+		if j < len(s) && s[j] == '=' {
+			return true
+		}
+	}
+	return false
+}
+
+func isWordByte(b byte) bool {
+	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') ||
+		(b >= '0' && b <= '9') || b == '_'
+}
+
+func isInlineSpace(b byte) bool {
+	return b == ' ' || b == '\t' || b == '\r' || b == '\n'
+}
+
 // Triage classifies a normalized string into Benign, SuspectSQLi, SuspectXSS, or SuspectCmdI in < 2 µs.
 func Triage(value string) TriageResult {
 	res, _ := TriageWithDetails(value)
@@ -223,6 +374,13 @@ func TriageWithDetails(value string) (TriageResult, string) {
 		return TriageSuspectSQLi, fingerprint
 	}
 
+	// 2b. Structural comment breakout that libinjection does not fingerprint
+	// (admin'#, admin'-- with trailing whitespace). Redirect to bounded AST
+	// verification instead of letting the value pass as benign.
+	if hasSQLCommentBreakout(value) {
+		return TriageSuspectSQLi, "quote_comment_breakout"
+	}
+
 	// 3. Fast Cross-Site Scripting Lexical Scan (<2 µs via pure-Go libinjection and script pseudo-protocols)
 	trimmed := strings.TrimSpace(value)
 	lowerTrimmed := strings.ToLower(trimmed)
@@ -234,6 +392,13 @@ func TriageWithDetails(value string) (TriageResult, string) {
 
 	if libinjection.IsXSS(value) {
 		return TriageSuspectXSS, "libinjection_xss"
+	}
+
+	// 3b. Structural HTML injection that libinjection does not fingerprint
+	// (<img/src=x/onerror=...>, <iframe srcdoc=...>). Route to bounded AST
+	// verification instead of letting the value pass as benign.
+	if looksLikeHTMLInjection(value) {
+		return TriageSuspectXSS, "html_injection_shape"
 	}
 
 	// 4. Fast Path Traversal & LFI Scan (<1 µs)

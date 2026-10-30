@@ -203,42 +203,117 @@ func isHexDigit(b byte) bool {
 }
 
 // stripComments removes inline C/SQL comments /* ... */ and collapses them cleanly.
-func stripComments(s string) string {
+//
+// When join is true, a comment between two letters is removed without inserting
+// a space so keyword splitting (UN/**/ION) is reconstructed. When join is false,
+// every comment collapses to a single space so unrelated words are not fused
+// (UNION/**/SELECT must not become UNIONSELECT).
+//
+// An unterminated comment is never allowed to truncate the value: the opener is
+// rewritten to MySQL's `#` line-comment marker and the remainder is preserved.
+// Dropping the tail would let an attacker hide a payload behind a dangling
+// /* opener, while preserving a bare /* would make libinjection flag benign
+// values such as glob patterns (src/*.go).
+func stripComments(s string, join bool) (string, bool) {
 	if !strings.Contains(s, "/*") {
+		return s, false
+	}
+
+	var sb strings.Builder
+	sb.Grow(len(s))
+	sawComment := false
+
+	for i := 0; i < len(s); {
+		if i+1 < len(s) && s[i] == '/' && s[i+1] == '*' {
+			sawComment = true
+			end := strings.Index(s[i+2:], "*/")
+			if end == -1 {
+				// Unterminated comment. Rewrite the opener to MySQL's `#`
+				// line-comment marker rather than dropping the tail: the
+				// payload stays visible to triage and AST verification, while
+				// benign values such as `src/*.go` are not mistaken for SQL
+				// comments by libinjection.
+				sb.WriteByte('#')
+				sb.WriteString(s[i+2:])
+				break
+			}
+
+			prevChar := byte(0)
+			if i > 0 {
+				prevChar = s[i-1]
+			}
+			nextIdx := i + 2 + end + 2
+			nextChar := byte(0)
+			if nextIdx < len(s) {
+				nextChar = s[nextIdx]
+			}
+
+			i = nextIdx
+
+			if join && isLetter(prevChar) && isLetter(nextChar) {
+				continue
+			}
+			sb.WriteByte(' ')
+			continue
+		}
+		sb.WriteByte(s[i])
+		i++
+	}
+	return sb.String(), sawComment
+}
+
+// decodeOverlongUTF8 rewrites overlong UTF-8 encodings to their canonical
+// runes. IIS and some legacy stacks accept overlong sequences, so %c0%af is
+// treated as "/" and %c0%a7 as "'". Go's UTF-8 decoders reject these forms,
+// which would otherwise leave the payload opaque to triage.
+func decodeOverlongUTF8(s string) string {
+	if !hasOverlongLead(s) {
 		return s
 	}
 
 	var sb strings.Builder
 	sb.Grow(len(s))
+
 	for i := 0; i < len(s); {
-		if i+1 < len(s) && s[i] == '/' && s[i+1] == '*' {
-			end := strings.Index(s[i+2:], "*/")
-			if end != -1 {
-				prevChar := byte(0)
-				if i > 0 {
-					prevChar = s[i-1]
-				}
-				nextIdx := i + 2 + end + 2
-				nextChar := byte(0)
-				if nextIdx < len(s) {
-					nextChar = s[nextIdx]
-				}
-
-				i = nextIdx
-
-				if isLetter(prevChar) && isLetter(nextChar) {
-					continue
-				}
-				sb.WriteByte(' ')
-				continue
-			} else {
-				break
-			}
+		b := s[i]
+		switch {
+		case (b == 0xC0 || b == 0xC1) && i+1 < len(s) && isContinuationByte(s[i+1]):
+			r := rune(b&0x1F)<<6 | rune(s[i+1]&0x3F)
+			sb.WriteRune(r)
+			i += 2
+			continue
+		case b == 0xE0 && i+2 < len(s) && s[i+1] >= 0x80 && s[i+1] < 0xA0 && isContinuationByte(s[i+2]):
+			r := rune(b&0x0F)<<12 | rune(s[i+1]&0x3F)<<6 | rune(s[i+2]&0x3F)
+			sb.WriteRune(r)
+			i += 3
+			continue
+		case b == 0xF0 && i+3 < len(s) && s[i+1] >= 0x80 && s[i+1] < 0x90 &&
+			isContinuationByte(s[i+2]) && isContinuationByte(s[i+3]):
+			r := rune(b&0x07)<<18 | rune(s[i+1]&0x3F)<<12 | rune(s[i+2]&0x3F)<<6 | rune(s[i+3]&0x3F)
+			sb.WriteRune(r)
+			i += 4
+			continue
 		}
-		sb.WriteByte(s[i])
+		sb.WriteByte(b)
 		i++
 	}
 	return sb.String()
+}
+
+// hasOverlongLead reports whether s contains a byte that can start an
+// overlong UTF-8 sequence.
+func hasOverlongLead(s string) bool {
+	for i := 0; i < len(s); i++ {
+		switch s[i] {
+		case 0xC0, 0xC1, 0xE0, 0xF0:
+			return true
+		}
+	}
+	return false
+}
+
+func isContinuationByte(b byte) bool {
+	return b >= 0x80 && b <= 0xBF
 }
 
 func isLetter(b byte) bool {

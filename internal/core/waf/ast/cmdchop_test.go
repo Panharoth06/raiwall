@@ -125,6 +125,34 @@ func TestCMDChop_32KBCap(t *testing.T) {
 	}
 }
 
+// TestCMDChop_TokenizerAlwaysTerminates guards against non-progress loops in
+// tokenizeShell. Parentheses and backticks are delimiters to the word scanner,
+// so an unhandled delimiter previously spun forever (reachable with `;id(`),
+// leaking a goroutine and burning a CPU core after the 5 ms deadline fired.
+func TestCMDChop_TokenizerAlwaysTerminates(t *testing.T) {
+	chop := NewCMDChop()
+	inputs := []string{";id(", ";id)", ";id`", ";id()", ";id((("}
+
+	for _, input := range inputs {
+		t.Run(input, func(t *testing.T) {
+			done := make(chan *Verdict, 1)
+			go func() {
+				v, _ := chop.Verify(context.Background(), input)
+				done <- v
+			}()
+
+			select {
+			case v := <-done:
+				if v.Action != ActionBlock {
+					t.Errorf("expected ActionBlock for %q, got %v", input, v.Action)
+				}
+			case <-time.After(time.Second):
+				t.Fatalf("tokenizer did not terminate for %q", input)
+			}
+		})
+	}
+}
+
 func TestCMDChop_Timeout(t *testing.T) {
 	chop := &CMDChop{
 		MaxParamSize: DefaultMaxParamSize,

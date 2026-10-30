@@ -73,7 +73,10 @@ func tokenizeShell(line string) []shToken {
 			}
 		}
 
-		// Single character structural operators
+		// Single character structural operators. Parentheses and backticks are
+		// emitted as words: they are delimiters to the word scanner, and without
+		// an explicit case the scanner makes no progress (infinite loop on
+		// inputs such as `;id(`).
 		switch b {
 		case ';':
 			tokens = append(tokens, shToken{typ: shSemicolon, val: ";"})
@@ -89,6 +92,10 @@ func tokenizeShell(line string) []shToken {
 			continue
 		case '>', '<':
 			tokens = append(tokens, shToken{typ: shRedirect, val: string(b)})
+			i++
+			continue
+		case '(', ')', '`':
+			tokens = append(tokens, shToken{typ: shWord, val: string(b)})
 			i++
 			continue
 		}
@@ -123,7 +130,10 @@ func tokenizeShell(line string) []shToken {
 		}
 		if i > start {
 			tokens = append(tokens, shToken{typ: shWord, val: line[start:i]})
+			continue
 		}
+		// Defensive: never spin if a delimiter is added without a switch case.
+		i++
 	}
 
 	return tokens
