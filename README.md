@@ -32,7 +32,7 @@
 
 ## Overview
 
-**Raiwall** is an open-source, SafeLine-class Web Application Firewall and reverse proxy gateway designed for modern web applications, APIs, and microservices. 
+**Raiwall** is an open-source, enterprise-grade Web Application Firewall and reverse proxy gateway designed for modern web applications, APIs, and microservices. 
 
 Built natively as a **Caddy v2** module, Raiwall combines extreme proxy throughput with multi-stage semantic threat inspection, stateless bot challenges, anti-CGNAT rate limiting, and real-time forensic visualization — all delivered in a **single, dependency-free binary** embedding a Vue 3 + TypeScript admin dashboard via `go:embed`.
 
@@ -415,21 +415,24 @@ secrets are accepted with a startup warning, or rejected outright when
 When `control.bootstrap_admin.password` is empty, Raiwall generates a random
 password on first start and logs it once at WARN level.
 
-### Declarative resources
+### Declarative resources & UI overrides
 
 File-declared resources receive deterministic IDs (`cfg:<kind>:<name>`), so the
-file and the database never drift:
+file and the database stay predictable:
 
 - `mode: seed` creates missing records only; UI edits are preserved.
-- `mode: sync` upserts every declared record and overwrites UI edits.
+- `mode: sync` upserts declared records.
 - `prune: true` deletes file-managed records that are no longer declared.
 - `strict: true` aborts startup on conflicts with API-managed records; otherwise
   conflicting resources are skipped with a warning.
 
-Records owned by the file are marked `managed: true` in the API and return
-**409 Conflict** when a mutation is attempted through the dashboard or REST API.
-A new snapshot is deployed only when the compiled content hash changes, so
-restarting with an unchanged file does not churn config versions.
+Records declared by the file are marked `managed: true` in the API. When edited
+or deleted through the web UI or REST API, Raiwall automatically records an
+ownership override (`declarative_overrides`). This allows dashboard adjustments
+to coexist seamlessly with `raiwall.yaml` without 409 Conflict errors or
+unexpected rollbacks on the next declarative sync. A new snapshot is deployed
+only when the compiled content hash changes, so restarting with an unchanged file
+does not churn config versions.
 
 ### Storage
 
