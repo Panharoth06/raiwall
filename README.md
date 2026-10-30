@@ -34,7 +34,7 @@
 
 **Raiwall** is an open-source, enterprise-grade Web Application Firewall and reverse proxy gateway designed for modern web applications, APIs, and microservices. 
 
-Built natively as a **Caddy v2** module, Raiwall combines extreme proxy throughput with multi-stage semantic threat inspection, stateless bot challenges, anti-CGNAT rate limiting, and real-time forensic visualization — all delivered in a **single, dependency-free binary** embedding a Vue 3 + TypeScript admin dashboard via `go:embed`.
+Built natively as a **Caddy v2** module, Raiwall combines extreme proxy throughput with multi-stage semantic threat inspection, stateless bot challenges, anti-CGNAT rate limiting, pluggable storage backends (SQLite, PostgreSQL, ClickHouse, Redis), and real-time forensic visualization — all delivered in a **single, dependency-free binary** embedding a Vue 3 + TypeScript admin dashboard via `go:embed`.
 
 ---
 
@@ -80,7 +80,14 @@ Built natively as a **Caddy v2** module, Raiwall combines extreme proxy throughp
 - **Visual Attack Map:** 3D threat origin arcs powered by Three.js / `globe.gl` and Apache ECharts.
 - **Multi-Channel ChatOps:** Instant push alerts to Telegram, Discord, Slack, and generic webhooks via Shoutrrr.
 
-### 🎛️ 7. Control Plane & Single-Binary Packaging
+### 💾 7. Pluggable Storage & Multi-Tier Persistence
+- **Decoupled Hexagonal Storage:** Clean separation of data concerns across independent domain ports (`ControlStorePort`, `ForensicStorePort`, `RateStoragePort`) and pluggable outbound adapters.
+- **Control Plane Store:** Zero-config embedded **SQLite** (pure Go with WAL mode) for lightweight, single-binary edge deployments, or **PostgreSQL** (`pgx`) for multi-instance HA clusters and shared configuration.
+- **Telemetry & Forensics Store:** Embedded **SQLite** for standalone setups or **ClickHouse** for high-ingestion columnar forensic events, automated retention pruning, and historical analytics.
+- **Rate Limiting & Ban Store:** In-memory **Ristretto** for microsecond-latency local GCRA token buckets or **Redis** for distributed multi-gateway cluster synchronization.
+- **Automated Schema Migrations:** Built-in schema migrator handles PostgreSQL and SQLite table upgrades transparently at startup.
+
+### 🎛️ 8. Control Plane & Single-Binary Packaging
 - **Unified Binary:** REST API (`huma` OpenAPI 3.1), Embedded Vue 3 Dashboard, and Caddy Data Plane ship in a single compact binary (~50 MB, not strictly bounded under 50 MB).
 - **Draft-First Administration:** Applications, certificates, exceptions, ACLs, and policies are staged as a draft with a pending-change banner, applied atomically to a new config version, and rollback-able by version.
 - **Portable Control Store:** Embedded SQLite in WAL mode by default, or PostgreSQL via `storage.database_url` / `RAIWALL_DATABASE_URL` for multi-instance deployments.
@@ -391,7 +398,7 @@ every key, default, and constraint is documented in
 | `server` | HTTP/HTTPS listeners, HTTP/3, TLS minimum, automatic HTTPS, ACME |
 | `caddy` | Caddy admin endpoint and certificate storage backend |
 | `logging` | Level (`debug`/`info`/`warn`/`error`), format (`json`/`console`), output |
-| `storage` | Shared `database_url` or named `stores` bound to `control` and `telemetry` roles |
+| `storage` | Pluggable `database_url` or named `stores` (`sqlite`, `postgres`, `clickhouse`) bound to `control` and `telemetry` roles |
 | `control` | Admin HMAC secret and bootstrap operator |
 | `security` | `strict_secrets` rejects inline plaintext secrets |
 | `waf` | Run mode, block/offline responses, AST timeout, parameter cap, stripped headers |
@@ -434,10 +441,28 @@ unexpected rollbacks on the next declarative sync. A new snapshot is deployed
 only when the compiled content hash changes, so restarting with an unchanged file
 does not churn config versions.
 
-### Storage
+### Pluggable Storage
 
-`storage.database_url` is a shortcut that binds both control and telemetry to
-one database. For split roles, declare named stores:
+Raiwall features a pluggable, multi-tier storage architecture that decouples control plane state, forensic telemetry logs, and rate limit counters into dedicated, role-bound stores:
+
+| Store Role | Supported Drivers | Description | Recommended Deployment |
+| :--- | :--- | :--- | :--- |
+| **Control Plane** (`control`) | `sqlite`, `postgres` | Applications, certificates, ACLs, exception rules, IP groups, policies, and users | Embedded SQLite for single-binary / edge; PostgreSQL for multi-gateway HA clusters |
+| **Telemetry & Forensics** (`telemetry`) | `sqlite`, `clickhouse` | High-frequency security event logs, audit records, and incident rollups | Embedded SQLite for standard traffic; ClickHouse for large-scale analytics & long retention |
+| **Rate Limiter & Bans** (`rate_limit`) | `memory`, `redis` | GCRA token buckets, sliding windows, and active IP bans | In-memory Ristretto for zero-latency local caching; Redis for cluster-wide synchronized bans |
+
+#### 1. Single Database Shortcut (`storage.database_url`)
+
+For lightweight or single-node deployments, `storage.database_url` (or the `RAIWALL_DATABASE_URL` environment variable) binds both the `control` and `telemetry` roles to a single database. The driver is automatically detected from the DSN (`postgres://` for PostgreSQL, otherwise SQLite):
+
+```yaml
+storage:
+  database_url: "${RAIWALL_DATABASE_URL:-file:/var/lib/raiwall/raiwall.db?_pragma=busy_timeout(5000)}"
+```
+
+#### 2. Split-Role Architecture (`storage.stores`)
+
+For production and enterprise setups, declare named stores with custom connection pooling, retention limits, and independent backends:
 
 ```yaml
 storage:
@@ -450,15 +475,18 @@ storage:
     telemetry:
       driver: clickhouse
       dsn: "${RAIWALL_TELEMETRY_DSN:?telemetry DSN required}"
-      retention: 720h
+      retention: 720h       # 30-day retention with automatic background pruning
       prune_interval: 1h
   control: control
   telemetry: telemetry
+
+rate_limit:
+  storage: redis           # memory (Ristretto) or redis (cluster-wide sync)
+  storage_addr: "redis:6379"
+  storage_password: "${REDIS_PASSWORD:-}"
 ```
 
-The bundled Compose stack sets `RAIWALL_DATABASE_URL` to its PostgreSQL service;
-the Helm chart always targets an external PostgreSQL instance and never bundles
-one.
+The bundled Docker Compose stack configures PostgreSQL via `RAIWALL_DATABASE_URL`, while the Helm chart connects to an external PostgreSQL instance. Automated schema migrations run transparently at startup for both SQLite and PostgreSQL.
 
 ### Applications, Routing & Certificates
 
