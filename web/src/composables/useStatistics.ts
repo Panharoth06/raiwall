@@ -1,7 +1,7 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { telemetryApi } from '@/api/telemetry';
 import { useEventStream } from '@/composables/useEventStream';
-import type { AggregateStats, ForensicEvent } from '@/types/telemetry';
+import type { AggregateStats, ForensicEvent, GeoIPStatus } from '@/types/telemetry';
 
 export type TimeRangePreset = '1h' | '6h' | '24h' | '7d' | '30d' | 'custom';
 
@@ -38,6 +38,7 @@ export function useStatistics() {
   const error = ref<string | null>(null);
   const liveQps = ref<number>(0);
   const lastUpdated = ref<Date>(new Date());
+  const geoipStatus = ref<GeoIPStatus | null>(null);
 
   const { isConnected, connect } = useEventStream();
   let pollInterval: ReturnType<typeof setInterval> | null = null;
@@ -69,9 +70,21 @@ export function useStatistics() {
     };
   }
 
+  async function fetchGeoIPStatus() {
+    try {
+      geoipStatus.value = await telemetryApi.getGeoIPStatus();
+    } catch {
+      // Status is advisory: a failure only hides the diagnostic empty state.
+      geoipStatus.value = null;
+    }
+  }
+
   async function fetchStats() {
     loading.value = true;
     error.value = null;
+    if (geoipStatus.value === null) {
+      void fetchGeoIPStatus();
+    }
     try {
       const { start, end } = getTimeBounds();
       const data = await telemetryApi.getStats({
@@ -162,7 +175,9 @@ export function useStatistics() {
     liveQps,
     isConnected,
     lastUpdated,
+    geoipStatus,
     fetchStats,
+    fetchGeoIPStatus,
     handleCountrySelect,
     clearCountryFilter,
   };

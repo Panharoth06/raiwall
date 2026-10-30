@@ -237,9 +237,27 @@ databases: `raiwall_control.db` and `raiwall_telemetry.db`, both under
 
 | Key | Notes |
 | :--- | :--- |
-| `geoip.country` | MaxMind `GeoLite2-Country.mmdb` path |
+| `geoip.country` | MaxMind `GeoLite2-Country.mmdb` path (country + continent) |
+| `geoip.city` | MaxMind `GeoLite2-City.mmdb` path (adds city, latitude, longitude) |
 | `geoip.asn` | MaxMind `GeoLite2-ASN.mmdb` path |
+| `geoip.auto_update` | Download missing/stale editions on boot; requires `RAIWALL_GEOIP_LICENSE_KEY` |
 | `threat_feeds.<name>` | Local file with one CIDR per line; exposed as `in_feed(client_ip, "<name>")` |
+
+Geo enrichment only runs for public client IPs: loopback and RFC1918 addresses are
+skipped. Behind a proxy set `proxy.client_ip_source: header` so the real client
+address is inspected instead of the load balancer's.
+
+To enable the Geo Location globe without managing files by hand, set a MaxMind
+licence key and let Raiwall fetch the databases at startup:
+
+```bash
+export RAIWALL_GEOIP_LICENSE_KEY=your_maxmind_key   # or RAIWALL_GEOIP_LICENSE_KEY_FILE
+raiwall run --config /etc/raiwall/raiwall.yaml
+```
+
+`GET /.raiwall/api/v1/telemetry/geoip` reports which databases are loaded
+(`country_db`, `city_db`, `asn_db`); the dashboard uses it to explain an empty
+country breakdown instead of silently rendering a bare globe.
 
 ### `declarative`
 

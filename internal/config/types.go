@@ -242,10 +242,16 @@ type Sidecar struct {
 	MaxBodySize int64  `yaml:"max_body_size" json:"max_body_size"`
 }
 
-// GeoIP points at MaxMind database files used by ACL expressions.
+// GeoIP points at MaxMind database files used by ACL expressions, telemetry
+// enrichment and the geo maps in the dashboard.
 type GeoIP struct {
 	Country string `yaml:"country" json:"country"`
+	City    string `yaml:"city" json:"city"`
 	ASN     string `yaml:"asn" json:"asn"`
+	// AutoUpdate downloads missing or stale databases on startup when
+	// RAIWALL_GEOIP_LICENSE_KEY is present. The key is never persisted in the
+	// configuration file so it cannot leak through the admin API.
+	AutoUpdate bool `yaml:"auto_update" json:"auto_update"`
 }
 
 // Declarative controls how file-declared resources are synced into the store.

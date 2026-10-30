@@ -246,8 +246,10 @@ config:
   threat_feeds: {}
 
   geoip:
-    country: ""
-    asn: ""
+    country: /usr/share/GeoIP/GeoLite2-Country.mmdb
+    city: /usr/share/GeoIP/GeoLite2-City.mmdb
+    asn: /usr/share/GeoIP/GeoLite2-ASN.mmdb
+    auto_update: false
 
   declarative:
     mode: sync

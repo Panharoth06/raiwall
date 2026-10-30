@@ -46,12 +46,17 @@ func TestGeoIPReader_NoopAndGracefulFallback(t *testing.T) {
 }
 
 func TestGeoIPReader_MissingDatabaseFiles(t *testing.T) {
-	_, err := NewGeoIPReader("/tmp/nonexistent_country_raiwall.mmdb", "")
+	_, err := NewGeoIPReader(Config{CountryPath: "/tmp/nonexistent_country_raiwall.mmdb"})
 	if err == nil {
 		t.Errorf("expected error for non-existent country mmdb file")
 	}
 
-	_, err = NewGeoIPReader("", "/tmp/nonexistent_asn_raiwall.mmdb")
+	_, err = NewGeoIPReader(Config{CityPath: "/tmp/nonexistent_city_raiwall.mmdb"})
+	if err == nil {
+		t.Errorf("expected error for non-existent city mmdb file")
+	}
+
+	_, err = NewGeoIPReader(Config{ASNPath: "/tmp/nonexistent_asn_raiwall.mmdb"})
 	if err == nil {
 		t.Errorf("expected error for non-existent asn mmdb file")
 	}
@@ -80,5 +85,38 @@ func TestGeoIPReader_LookupAddr_StaticOverride(t *testing.T) {
 	geo := reader.LookupAddr(addr)
 	if geo.Country != "US" || geo.ASN != 15169 {
 		t.Errorf("expected static override Country 'US', got %+v", geo)
+	}
+}
+
+func TestGeoIPReader_StatusReportsMissingDatabases(t *testing.T) {
+	reader := NewNoopGeoIPReader()
+	if reader.HasCountryDB() || reader.HasCityDB() || reader.HasASNDB() {
+		t.Errorf("expected no databases on a noop reader")
+	}
+
+	var nilReader *GeoIPReader
+	if nilReader.HasCountryDB() || nilReader.HasCityDB() || nilReader.HasASNDB() {
+		t.Errorf("expected no databases on a nil reader")
+	}
+}
+
+func TestGeoIPReader_StaticOverrideCarriesCityCoordinates(t *testing.T) {
+	reader := NewNoopGeoIPReader()
+	defer reader.Close()
+
+	reader.SetStaticLookup(net.ParseIP("203.0.113.9"), acl.GeoData{
+		Country:   "NL",
+		Continent: "EU",
+		City:      "Amsterdam",
+		Latitude:  52.3676,
+		Longitude: 4.9041,
+	})
+
+	geo := reader.Lookup(net.ParseIP("203.0.113.9"))
+	if geo.Country != "NL" {
+		t.Fatalf("expected static override Country 'NL', got %+v", geo)
+	}
+	if geo.City != "Amsterdam" || geo.Latitude != 52.3676 || geo.Longitude != 4.9041 {
+		t.Errorf("expected city coordinates, got %+v", geo)
 	}
 }

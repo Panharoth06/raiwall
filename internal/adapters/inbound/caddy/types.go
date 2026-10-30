@@ -57,10 +57,12 @@ type ExceptionSettings struct {
 
 // ACLSettings holds ACL rules, threat feeds, and GeoIP paths.
 type ACLSettings struct {
-	ThreatFeeds  map[string]string `json:"threat_feeds,omitempty"`
-	GeoIPCountry string            `json:"geoip_country,omitempty"`
-	GeoIPASN     string            `json:"geoip_asn,omitempty"`
-	Rules        []*acl.ACLRule    `json:"rules,omitempty"`
+	ThreatFeeds     map[string]string `json:"threat_feeds,omitempty"`
+	GeoIPCountry    string            `json:"geoip_country,omitempty"`
+	GeoIPCity       string            `json:"geoip_city,omitempty"`
+	GeoIPASN        string            `json:"geoip_asn,omitempty"`
+	GeoIPAutoUpdate bool              `json:"geoip_auto_update,omitempty"`
+	Rules           []*acl.ACLRule    `json:"rules,omitempty"`
 }
 
 // AuthSettings holds Pre-App Authentication Gateway configuration.
@@ -223,6 +225,7 @@ type Middleware struct {
 	alertEngine        *alerts.AlertEngine
 	metrics            *telemetry.Metrics
 	telemetryAPI       *api.TelemetryAPI
+	geoipAPI           *api.GeoIPStatusAPI
 	uiHandler          *UIHandler
 	controlStore       control.ControlStore
 	controlAPI         *api.Server

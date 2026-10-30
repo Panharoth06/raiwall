@@ -1,5 +1,7 @@
 // Geographical continent boundary coordinates and country origins for WAF Geo Location mapping.
 
+import { countryCentroids } from './country-coordinates';
+
 export interface ContinentOutline {
   name: string;
   points: [number, number][];
@@ -69,71 +71,36 @@ export const continents: ContinentOutline[] = [
   },
 ];
 
+// Country names and common aliases resolve to their ISO 3166-1 alpha-2 centroid
+// so telemetry keys work whether they are stored as "US" or "United States".
+const countryNameAliases: Record<string, string> = {
+  China: 'CN', India: 'IN', Japan: 'JP', 'South Korea': 'KR', Korea: 'KR',
+  Singapore: 'SG', Vietnam: 'VN', Indonesia: 'ID', Thailand: 'TH',
+  Malaysia: 'MY', Philippines: 'PH', Pakistan: 'PK', Bangladesh: 'BD',
+  'Hong Kong': 'HK', Taiwan: 'TW', Iran: 'IR', Israel: 'IL',
+  'Saudi Arabia': 'SA', 'United Arab Emirates': 'AE', UAE: 'AE',
+  Turkey: 'TR', Türkiye: 'TR',
+
+  'United Kingdom': 'GB', UK: 'GB', Germany: 'DE', France: 'FR',
+  Netherlands: 'NL', Italy: 'IT', Spain: 'ES', Russia: 'RU', Ukraine: 'UA',
+  Poland: 'PL', Sweden: 'SE', Norway: 'NO', Finland: 'FI', Denmark: 'DK',
+  Belgium: 'BE', Switzerland: 'CH', Austria: 'AT', Ireland: 'IE',
+  Portugal: 'PT', Greece: 'GR', 'Czech Republic': 'CZ', Czechia: 'CZ',
+  Romania: 'RO', Hungary: 'HU', Bulgaria: 'BG',
+
+  'United States': 'US', USA: 'US', Canada: 'CA', Mexico: 'MX', Brazil: 'BR',
+  Argentina: 'AR', Chile: 'CL', Colombia: 'CO', Peru: 'PE',
+
+  Australia: 'AU', 'New Zealand': 'NZ',
+
+  'South Africa': 'ZA', Egypt: 'EG', Nigeria: 'NG', Kenya: 'KE', Morocco: 'MA',
+};
+
 export const countryCoords: Record<string, { lat: number; lon: number }> = {
-  // Asia
-  CN: { lat: 35.86, lon: 104.19 }, China: { lat: 35.86, lon: 104.19 },
-  IN: { lat: 20.59, lon: 78.96 }, India: { lat: 20.59, lon: 78.96 },
-  JP: { lat: 36.2, lon: 138.25 }, Japan: { lat: 36.2, lon: 138.25 },
-  KR: { lat: 35.9, lon: 127.76 }, 'South Korea': { lat: 35.9, lon: 127.76 }, Korea: { lat: 35.9, lon: 127.76 },
-  SG: { lat: 1.35, lon: 103.82 }, Singapore: { lat: 1.35, lon: 103.82 },
-  VN: { lat: 14.05, lon: 108.27 }, Vietnam: { lat: 14.05, lon: 108.27 },
-  ID: { lat: -0.78, lon: 113.92 }, Indonesia: { lat: -0.78, lon: 113.92 },
-  TH: { lat: 15.87, lon: 100.99 }, Thailand: { lat: 15.87, lon: 100.99 },
-  MY: { lat: 4.21, lon: 101.97 }, Malaysia: { lat: 4.21, lon: 101.97 },
-  PH: { lat: 12.87, lon: 121.77 }, Philippines: { lat: 12.87, lon: 121.77 },
-  PK: { lat: 30.37, lon: 69.34 }, Pakistan: { lat: 30.37, lon: 69.34 },
-  BD: { lat: 23.68, lon: 90.35 }, Bangladesh: { lat: 23.68, lon: 90.35 },
-  HK: { lat: 22.39, lon: 114.1 }, 'Hong Kong': { lat: 22.39, lon: 114.1 },
-  TW: { lat: 23.69, lon: 120.96 }, Taiwan: { lat: 23.69, lon: 120.96 },
-  IR: { lat: 32.42, lon: 53.68 }, Iran: { lat: 32.42, lon: 53.68 },
-  IL: { lat: 31.04, lon: 34.85 }, Israel: { lat: 31.04, lon: 34.85 },
-  SA: { lat: 23.88, lon: 45.07 }, 'Saudi Arabia': { lat: 23.88, lon: 45.07 },
-  AE: { lat: 23.42, lon: 53.84 }, 'United Arab Emirates': { lat: 23.42, lon: 53.84 }, UAE: { lat: 23.42, lon: 53.84 },
-  TR: { lat: 38.96, lon: 35.24 }, Turkey: { lat: 38.96, lon: 35.24 },
-
-  // Europe
-  GB: { lat: 55.37, lon: -3.43 }, 'United Kingdom': { lat: 55.37, lon: -3.43 }, UK: { lat: 55.37, lon: -3.43 },
-  DE: { lat: 51.16, lon: 10.45 }, Germany: { lat: 51.16, lon: 10.45 },
-  FR: { lat: 46.22, lon: 2.21 }, France: { lat: 46.22, lon: 2.21 },
-  NL: { lat: 52.13, lon: 5.29 }, Netherlands: { lat: 52.13, lon: 5.29 },
-  IT: { lat: 41.87, lon: 12.56 }, Italy: { lat: 41.87, lon: 12.56 },
-  ES: { lat: 40.46, lon: -3.74 }, Spain: { lat: 40.46, lon: -3.74 },
-  RU: { lat: 61.52, lon: 105.31 }, Russia: { lat: 61.52, lon: 105.31 },
-  UA: { lat: 48.37, lon: 31.16 }, Ukraine: { lat: 48.37, lon: 31.16 },
-  PL: { lat: 51.91, lon: 19.14 }, Poland: { lat: 51.91, lon: 19.14 },
-  SE: { lat: 60.12, lon: 18.64 }, Sweden: { lat: 60.12, lon: 18.64 },
-  NO: { lat: 60.47, lon: 8.46 }, Norway: { lat: 60.47, lon: 8.46 },
-  FI: { lat: 61.92, lon: 25.74 }, Finland: { lat: 61.92, lon: 25.74 },
-  DK: { lat: 56.26, lon: 9.5 }, Denmark: { lat: 56.26, lon: 9.5 },
-  BE: { lat: 50.5, lon: 4.47 }, Belgium: { lat: 50.5, lon: 4.47 },
-  CH: { lat: 46.81, lon: 8.22 }, Switzerland: { lat: 46.81, lon: 8.22 },
-  AT: { lat: 47.51, lon: 14.55 }, Austria: { lat: 47.51, lon: 14.55 },
-  IE: { lat: 53.41, lon: -8.24 }, Ireland: { lat: 53.41, lon: -8.24 },
-  PT: { lat: 39.39, lon: -8.22 }, Portugal: { lat: 39.39, lon: -8.22 },
-  GR: { lat: 39.07, lon: 21.82 }, Greece: { lat: 39.07, lon: 21.82 },
-  CZ: { lat: 49.81, lon: 15.47 }, 'Czech Republic': { lat: 49.81, lon: 15.47 }, Czechia: { lat: 49.81, lon: 15.47 },
-  RO: { lat: 45.94, lon: 24.96 }, Romania: { lat: 45.94, lon: 24.96 },
-  HU: { lat: 47.16, lon: 19.5 }, Hungary: { lat: 47.16, lon: 19.5 },
-  BG: { lat: 42.73, lon: 25.48 }, Bulgaria: { lat: 42.73, lon: 25.48 },
-
-  // Americas
-  US: { lat: 37.09, lon: -95.71 }, 'United States': { lat: 37.09, lon: -95.71 }, USA: { lat: 37.09, lon: -95.71 },
-  CA: { lat: 56.13, lon: -106.34 }, Canada: { lat: 56.13, lon: -106.34 },
-  MX: { lat: 23.63, lon: -102.55 }, Mexico: { lat: 23.63, lon: -102.55 },
-  BR: { lat: -14.23, lon: -51.92 }, Brazil: { lat: -14.23, lon: -51.92 },
-  AR: { lat: -38.41, lon: -63.61 }, Argentina: { lat: -38.41, lon: -63.61 },
-  CL: { lat: -35.67, lon: -71.54 }, Chile: { lat: -35.67, lon: -71.54 },
-  CO: { lat: 4.57, lon: -74.29 }, Colombia: { lat: 4.57, lon: -74.29 },
-  PE: { lat: -9.18, lon: -75.01 }, Peru: { lat: -9.18, lon: -75.01 },
-
-  // Oceania
-  AU: { lat: -25.27, lon: 133.77 }, Australia: { lat: -25.27, lon: 133.77 },
-  NZ: { lat: -40.9, lon: 174.88 }, 'New Zealand': { lat: -40.9, lon: 174.88 },
-
-  // Africa
-  ZA: { lat: -30.55, lon: 22.93 }, 'South Africa': { lat: -30.55, lon: 22.93 },
-  EG: { lat: 26.82, lon: 30.8 }, Egypt: { lat: 26.82, lon: 30.8 },
-  NG: { lat: 9.08, lon: 8.67 }, Nigeria: { lat: 9.08, lon: 8.67 },
-  KE: { lat: -0.02, lon: 37.9 }, Kenya: { lat: -0.02, lon: 37.9 },
-  MA: { lat: 31.79, lon: -7.09 }, Morocco: { lat: 31.79, lon: -7.09 },
+  ...countryCentroids,
+  ...Object.fromEntries(
+    Object.entries(countryNameAliases)
+      .filter(([, iso]) => countryCentroids[iso] !== undefined)
+      .map(([name, iso]) => [name, countryCentroids[iso]]),
+  ),
 };

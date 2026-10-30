@@ -77,6 +77,13 @@ export interface TopCount {
   count: number;
 }
 
+/** Which MaxMind databases the gateway has loaded; drives geo empty states. */
+export interface GeoIPStatus {
+  country_db: boolean;
+  city_db: boolean;
+  asn_db: boolean;
+}
+
 export interface TimeBucketCount {
   bucket: string;
   total: number;

@@ -86,11 +86,14 @@ func handlerFromConfig(file *config.File) (*Middleware, error) {
 		m.ExceptionConfig = &ExceptionSettings{Rules: rules}
 	}
 
-	if len(file.ACLs) > 0 || len(file.ThreatFeeds) > 0 || file.GeoIP.Country != "" || file.GeoIP.ASN != "" {
+	if len(file.ACLs) > 0 || len(file.ThreatFeeds) > 0 || file.GeoIP.Country != "" ||
+		file.GeoIP.City != "" || file.GeoIP.ASN != "" || file.GeoIP.AutoUpdate {
 		aclCfg := &ACLSettings{
-			ThreatFeeds:  file.ThreatFeeds,
-			GeoIPCountry: file.GeoIP.Country,
-			GeoIPASN:     file.GeoIP.ASN,
+			ThreatFeeds:     file.ThreatFeeds,
+			GeoIPCountry:    file.GeoIP.Country,
+			GeoIPCity:       file.GeoIP.City,
+			GeoIPASN:        file.GeoIP.ASN,
+			GeoIPAutoUpdate: file.GeoIP.AutoUpdate,
 		}
 		for _, rule := range file.ACLs {
 			aclCfg.Rules = append(aclCfg.Rules, &acl.ACLRule{

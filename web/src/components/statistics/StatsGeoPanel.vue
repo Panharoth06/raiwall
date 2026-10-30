@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { Check, Globe } from 'lucide-vue-next'
+import { Check, Copy, Globe } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
@@ -9,13 +9,14 @@ import { countryCoords } from './geoData'
 import GlobeCdn from '@/components/GlobeCdn.vue'
 import AttackMap2D from './AttackMap2D.vue'
 import { type CdnMarker, type CdnArc } from '@/components/cobeDefaults'
-import type { TopCount } from '@/types/telemetry'
+import type { GeoIPStatus, TopCount } from '@/types/telemetry'
 
 const props = defineProps<{
   countries: TopCount[]
   selectedCountry?: string
   totalRequests: number
   totalBlocked: number
+  geoip?: GeoIPStatus | null
 }>()
 
 const emit = defineEmits<{
@@ -24,6 +25,28 @@ const emit = defineEmits<{
 
 const viewMode = ref<'3d' | '2d'>('3d')
 const dataMode = ref<'requests' | 'blocked'>('requests')
+const setupCopied = ref(false)
+
+const geoipDisabled = computed(() => props.geoip != null && !props.geoip.country_db)
+
+const geoipSetupSnippet = `export RAIWALL_GEOIP_LICENSE_KEY=<maxmind-license-key>
+
+# config/raiwall.yaml
+geoip:
+  country: /usr/share/GeoIP/GeoLite2-Country.mmdb
+  city: /usr/share/GeoIP/GeoLite2-City.mmdb
+  asn: /usr/share/GeoIP/GeoLite2-ASN.mmdb
+  auto_update: true`
+
+async function copyGeoIPSetup() {
+  try {
+    await navigator.clipboard.writeText(geoipSetupSnippet)
+    setupCopied.value = true
+    window.setTimeout(() => { setupCopied.value = false }, 2000)
+  } catch {
+    setupCopied.value = false
+  }
+}
 
 const maxCountryCount = computed(() => {
   let max = 1
@@ -79,6 +102,13 @@ function formatCount(num: number): string {
           <CardTitle class="text-base font-semibold text-foreground tracking-tight">
             Geo Location
           </CardTitle>
+          <span
+            v-if="geoipDisabled"
+            data-testid="geoip-disabled-badge"
+            class="text-xs font-mono px-1.5 py-0.5 rounded border border-warning/40 bg-warning/10 text-warning"
+          >
+            GEOIP OFF
+          </span>
         </div>
 
         <div class="flex items-center gap-2">
@@ -187,12 +217,28 @@ function formatCount(num: number): string {
             />
           </div>
 
-          <!-- Empty state: top-aligned -->
+          <!-- Empty state: GeoIP disabled is a configuration gap, not an empty window -->
           <EmptyState
-            v-if="countries.length === 0"
+            v-if="countries.length === 0 && geoipDisabled"
+            data-testid="geoip-disabled-empty"
+            :icon="Globe"
+            title="GeoIP lookup is disabled"
+            description="No MaxMind database is loaded, so every event is recorded without a country. Mount GeoLite2-Country.mmdb or enable auto-download with a licence key, then restart the gateway."
+            class="py-6 pt-4"
+          >
+            <Button size="sm" variant="outline" class="h-7 text-xs font-mono" @click="copyGeoIPSetup">
+              <Check v-if="setupCopied" class="w-3.5 h-3.5 text-success" />
+              <Copy v-else class="w-3.5 h-3.5" />
+              {{ setupCopied ? 'Copied' : 'Copy setup' }}
+            </Button>
+          </EmptyState>
+
+          <!-- Empty state: geo enrichment is active but no public IP was seen -->
+          <EmptyState
+            v-else-if="countries.length === 0"
             :icon="Globe"
             title="No geo distribution events recorded"
-            description="No international traffic telemetry captured for this time frame."
+            description="No public client IP was recorded for this time frame. Private and loopback addresses are never geolocated — behind a proxy set proxy.client_ip_source so the real address is inspected."
             class="py-6 pt-4"
           />
         </div>

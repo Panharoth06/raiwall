@@ -1,6 +1,7 @@
 package geoip
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"net/netip"
@@ -23,79 +24,114 @@ type mmdbCountryRecord struct {
 	} `maxminddb:"registered_country"`
 }
 
+type mmdbCityRecord struct {
+	Continent struct {
+		Code string `maxminddb:"code"`
+	} `maxminddb:"continent"`
+	Country struct {
+		IsoCode string `maxminddb:"iso_code"`
+	} `maxminddb:"country"`
+	RegisteredCountry struct {
+		IsoCode string `maxminddb:"iso_code"`
+	} `maxminddb:"registered_country"`
+	City struct {
+		Names map[string]string `maxminddb:"names"`
+	} `maxminddb:"city"`
+	Location struct {
+		Latitude  float64 `maxminddb:"latitude"`
+		Longitude float64 `maxminddb:"longitude"`
+	} `maxminddb:"location"`
+}
+
 type mmdbASNRecord struct {
 	AutonomousSystemNumber       uint   `maxminddb:"autonomous_system_number"`
 	AutonomousSystemOrganization string `maxminddb:"autonomous_system_organization"`
+}
+
+// Config identifies the MaxMind databases served by a GeoIPReader. Empty paths
+// disable the corresponding lookup, and the city database also supplies country
+// and continent when no dedicated country database is configured.
+type Config struct {
+	CountryPath string
+	CityPath    string
+	ASNPath     string
 }
 
 // GeoIPReader performs thread-safe geographic and autonomous system lookups
 // using MaxMind MMDB databases with safe zero-panic fallback.
 type GeoIPReader struct {
 	countryReader   *maxminddb.Reader
+	cityReader      *maxminddb.Reader
 	asnReader       *maxminddb.Reader
 	staticOverrides map[string]acl.GeoData
 	mu              sync.RWMutex
 }
 
-// NewGeoIPReader creates a GeoIPReader. If countryPath or asnPath are empty,
-// the corresponding database reader is omitted and queries return empty metadata safely.
-func NewGeoIPReader(countryPath, asnPath string) (*GeoIPReader, error) {
+// NewGeoIPReader opens the databases described by cfg. Databases that are not
+// configured are skipped; configured paths that do not exist are an error.
+func NewGeoIPReader(cfg Config) (*GeoIPReader, error) {
 	r := &GeoIPReader{}
 
-	if countryPath != "" {
-		if _, err := os.Stat(countryPath); err == nil {
-			cr, err := maxminddb.Open(countryPath)
-			if err != nil {
-				return nil, fmt.Errorf("open country mmdb %q: %w", countryPath, err)
-			}
-			r.countryReader = cr
-		} else {
-			return nil, fmt.Errorf("country mmdb file not found: %s", countryPath)
-		}
+	databases := []struct {
+		path  string
+		label string
+		dest  **maxminddb.Reader
+	}{
+		{cfg.CountryPath, "country", &r.countryReader},
+		{cfg.CityPath, "city", &r.cityReader},
+		{cfg.ASNPath, "asn", &r.asnReader},
 	}
 
-	if asnPath != "" {
-		if _, err := os.Stat(asnPath); err == nil {
-			ar, err := maxminddb.Open(asnPath)
-			if err != nil {
-				if r.countryReader != nil {
-					_ = r.countryReader.Close()
-				}
-				return nil, fmt.Errorf("open asn mmdb %q: %w", asnPath, err)
-			}
-			r.asnReader = ar
-		} else {
-			if r.countryReader != nil {
-				_ = r.countryReader.Close()
-			}
-			return nil, fmt.Errorf("asn mmdb file not found: %s", asnPath)
+	for _, db := range databases {
+		reader, err := openDatabase(db.path, db.label)
+		if err != nil {
+			_ = r.Close()
+			return nil, err
 		}
+		*db.dest = reader
 	}
 
 	return r, nil
 }
 
+func openDatabase(path, label string) (*maxminddb.Reader, error) {
+	if path == "" {
+		return nil, nil
+	}
+	if _, err := os.Stat(path); err != nil {
+		return nil, fmt.Errorf("%s mmdb file not found: %s", label, path)
+	}
+	reader, err := maxminddb.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("open %s mmdb %q: %w", label, path, err)
+	}
+	return reader, nil
+}
+
 // NewGeoIPReaderFromBytes initializes readers from in-memory byte buffers.
-func NewGeoIPReaderFromBytes(countryBytes, asnBytes []byte) (*GeoIPReader, error) {
+func NewGeoIPReaderFromBytes(countryBytes, cityBytes, asnBytes []byte) (*GeoIPReader, error) {
 	r := &GeoIPReader{}
 
-	if len(countryBytes) > 0 {
-		cr, err := maxminddb.FromBytes(countryBytes)
-		if err != nil {
-			return nil, fmt.Errorf("parse country mmdb bytes: %w", err)
-		}
-		r.countryReader = cr
+	databases := []struct {
+		data  []byte
+		label string
+		dest  **maxminddb.Reader
+	}{
+		{countryBytes, "country", &r.countryReader},
+		{cityBytes, "city", &r.cityReader},
+		{asnBytes, "asn", &r.asnReader},
 	}
 
-	if len(asnBytes) > 0 {
-		ar, err := maxminddb.FromBytes(asnBytes)
-		if err != nil {
-			if r.countryReader != nil {
-				_ = r.countryReader.Close()
-			}
-			return nil, fmt.Errorf("parse asn mmdb bytes: %w", err)
+	for _, db := range databases {
+		if len(db.data) == 0 {
+			continue
 		}
-		r.asnReader = ar
+		reader, err := maxminddb.FromBytes(db.data)
+		if err != nil {
+			_ = r.Close()
+			return nil, fmt.Errorf("parse %s mmdb bytes: %w", db.label, err)
+		}
+		*db.dest = reader
 	}
 
 	return r, nil
@@ -107,22 +143,33 @@ func NewNoopGeoIPReader() *GeoIPReader {
 }
 
 // NewGeoIPReaderOptional creates a GeoIPReader, ignoring missing files gracefully.
-func NewGeoIPReaderOptional(countryPath, asnPath string) *GeoIPReader {
-	r, err := NewGeoIPReader(countryPath, asnPath)
+func NewGeoIPReaderOptional(cfg Config) *GeoIPReader {
+	r, err := NewGeoIPReader(cfg)
 	if err != nil {
 		return &GeoIPReader{}
 	}
 	return r
 }
 
-// HasCountryDB reports whether a country database is active.
+// HasCountryDB reports whether a country database (or a city database, which
+// carries country data) is active.
 func (r *GeoIPReader) HasCountryDB() bool {
 	if r == nil {
 		return false
 	}
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	return r.countryReader != nil
+	return r.countryReader != nil || r.cityReader != nil
+}
+
+// HasCityDB reports whether a city database is active.
+func (r *GeoIPReader) HasCityDB() bool {
+	if r == nil {
+		return false
+	}
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.cityReader != nil
 }
 
 // HasASNDB reports whether an ASN database is active.
@@ -193,16 +240,26 @@ func (r *GeoIPReader) Lookup(ip net.IP) acl.GeoData {
 
 	var geo acl.GeoData
 
+	var cityRec mmdbCityRecord
+	cityDecoded := false
+	if r.cityReader != nil {
+		if err := r.cityReader.Lookup(queryIP, &cityRec); err == nil {
+			cityDecoded = true
+			geo.City = cityRec.City.Names["en"]
+			geo.Latitude = cityRec.Location.Latitude
+			geo.Longitude = cityRec.Location.Longitude
+		}
+	}
+
 	if r.countryReader != nil {
 		var rec mmdbCountryRecord
 		if err := r.countryReader.Lookup(queryIP, &rec); err == nil {
 			geo.Continent = rec.Continent.Code
-			if rec.Country.IsoCode != "" {
-				geo.Country = rec.Country.IsoCode
-			} else {
-				geo.Country = rec.RegisteredCountry.IsoCode
-			}
+			geo.Country = firstNonEmpty(rec.Country.IsoCode, rec.RegisteredCountry.IsoCode)
 		}
+	} else if cityDecoded {
+		geo.Continent = cityRec.Continent.Code
+		geo.Country = firstNonEmpty(cityRec.Country.IsoCode, cityRec.RegisteredCountry.IsoCode)
 	}
 
 	if r.asnReader != nil {
@@ -216,6 +273,15 @@ func (r *GeoIPReader) Lookup(ip net.IP) acl.GeoData {
 	return geo
 }
 
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
 // Close closes open MMDB database readers.
 func (r *GeoIPReader) Close() error {
 	if r == nil {
@@ -225,21 +291,18 @@ func (r *GeoIPReader) Close() error {
 	defer r.mu.Unlock()
 
 	var errs []error
-	if r.countryReader != nil {
-		if err := r.countryReader.Close(); err != nil {
+	for _, reader := range []**maxminddb.Reader{&r.countryReader, &r.cityReader, &r.asnReader} {
+		if *reader == nil {
+			continue
+		}
+		if err := (*reader).Close(); err != nil {
 			errs = append(errs, err)
 		}
-		r.countryReader = nil
-	}
-	if r.asnReader != nil {
-		if err := r.asnReader.Close(); err != nil {
-			errs = append(errs, err)
-		}
-		r.asnReader = nil
+		*reader = nil
 	}
 
 	if len(errs) > 0 {
-		return fmt.Errorf("close geoip readers: %v", errs)
+		return errors.Join(errs...)
 	}
 	return nil
 }

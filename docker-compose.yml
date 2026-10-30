@@ -63,10 +63,16 @@ services:
       RAIWALL_HMAC_SECRET: ${RAIWALL_HMAC_SECRET:-}
       RAIWALL_POW_SECRET: ${RAIWALL_POW_SECRET:-}
       RAIWALL_LOG_LEVEL: ${RAIWALL_LOG_LEVEL:-info}
+      # MaxMind licence key for geoip.auto_update (leave empty to mount your own
+      # databases in ./data/geoip instead).
+      RAIWALL_GEOIP_LICENSE_KEY: ${RAIWALL_GEOIP_LICENSE_KEY:-}
     volumes:
       - raiwall_data:/var/lib/raiwall
       - ./config/raiwall.yaml:/etc/raiwall/raiwall.yaml:ro
       - ./examples/feeds:/etc/raiwall/feeds:ro
+      # GeoLite2-Country/City/ASN.mmdb land here, either mounted manually or
+      # downloaded at boot when RAIWALL_GEOIP_LICENSE_KEY is set.
+      - ${RAIWALL_GEOIP_DIR:-./data/geoip}:/usr/share/GeoIP
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/.raiwall/api/openapi.json"]
       interval: 10s

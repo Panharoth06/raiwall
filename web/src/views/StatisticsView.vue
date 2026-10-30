@@ -25,6 +25,7 @@ const {
   error,
   liveQps,
   isConnected,
+  geoipStatus,
   fetchStats,
   handleCountrySelect,
   clearCountryFilter,
@@ -92,6 +93,7 @@ onMounted(() => {
             :selected-country="selectedCountry"
             :total-requests="stats.total_requests"
             :total-blocked="stats.total_blocked"
+            :geoip="geoipStatus"
             @select-country="handleCountrySelect"
           />
         </div>

@@ -58,8 +58,8 @@ FROM alpine:3.21
 RUN apk --no-cache add ca-certificates tzdata curl \
     && addgroup -S -g 1000 raiwall \
     && adduser -S -u 1000 -G raiwall -s /bin/sh raiwall \
-    && mkdir -p /etc/raiwall /var/lib/raiwall /var/log/raiwall \
-    && chown -R raiwall:raiwall /etc/raiwall /var/lib/raiwall /var/log/raiwall
+    && mkdir -p /etc/raiwall /var/lib/raiwall /var/log/raiwall /usr/share/GeoIP \
+    && chown -R raiwall:raiwall /etc/raiwall /var/lib/raiwall /var/log/raiwall /usr/share/GeoIP
 
 COPY --from=backend-builder /bin/raiwall /usr/local/bin/raiwall
 COPY --chown=raiwall:raiwall config/raiwall.yaml /etc/raiwall/raiwall.yaml

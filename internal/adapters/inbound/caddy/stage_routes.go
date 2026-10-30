@@ -11,6 +11,12 @@ import (
 // serveInternalRoutes intercepts requests to Raiwall internal endpoints (telemetry, API, UI).
 // Returns true if the request was handled internally and requires no further processing.
 func (m *Middleware) serveInternalRoutes(w http.ResponseWriter, r *http.Request) bool {
+	// Internal WAF routes: GeoIP database status for the dashboard
+	if m.geoipAPI != nil && isGeoIPStatusPath(r.URL.Path) {
+		m.geoipAPI.ServeHTTP(w, r)
+		return true
+	}
+
 	// Internal WAF routes: Metrics & Telemetry API
 	if m.telemetryAPI != nil && isTelemetryPath(r.URL.Path) {
 		m.telemetryAPI.ServeHTTP(w, r)
@@ -35,6 +41,17 @@ func (m *Middleware) serveInternalRoutes(w http.ResponseWriter, r *http.Request)
 		}
 	}
 
+	return false
+}
+
+// isGeoIPStatusPath reports whether a request targets the GeoIP status endpoint.
+func isGeoIPStatusPath(p string) bool {
+	switch strings.TrimSuffix(p, "/") {
+	case "/.raiwall/api/telemetry/geoip",
+		"/api/v1/telemetry/geoip",
+		"/.raiwall/api/v1/telemetry/geoip":
+		return true
+	}
 	return false
 }
 

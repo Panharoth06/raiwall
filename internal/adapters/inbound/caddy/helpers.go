@@ -134,8 +134,11 @@ func (m *Middleware) lookupGeo(ip net.IP) telemetry.GeoData {
 	return telemetry.GeoData{
 		Country:   g.Country,
 		Continent: g.Continent,
+		City:      g.City,
 		ASN:       g.ASN,
 		ASOrg:     g.ASOrg,
+		Latitude:  g.Latitude,
+		Longitude: g.Longitude,
 	}
 }
 

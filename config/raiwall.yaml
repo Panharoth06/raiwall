@@ -136,8 +136,15 @@ telemetry:
   #     cooldown: 5m
 
 geoip:
-  country: ""
-  asn: ""
+  # Mount MaxMind GeoLite2 databases here (docker-compose mounts ./data/geoip).
+  # Without a database every event carries an empty country and the Geo Location
+  # globe has nothing to plot.
+  country: /usr/share/GeoIP/GeoLite2-Country.mmdb
+  city: /usr/share/GeoIP/GeoLite2-City.mmdb
+  asn: /usr/share/GeoIP/GeoLite2-ASN.mmdb
+  # Download missing or stale databases on boot. Requires the MaxMind license
+  # key in RAIWALL_GEOIP_LICENSE_KEY (never stored in this file).
+  auto_update: true
 
 # How file-declared resources are reconciled into the control store:
 #   seed -> create missing records only

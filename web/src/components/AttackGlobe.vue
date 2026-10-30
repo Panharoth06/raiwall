@@ -68,27 +68,8 @@ watch(
 );
 
 onMounted(() => {
-  // Pre-populate with sample attack arcs for demonstration
-  activeArcs.value.push(
-    {
-      id: 'demo-1',
-      startLat: 39.9042,
-      startLon: 116.4074,
-      endLat: props.gatewayLat,
-      endLon: props.gatewayLon,
-      region: 'CN',
-      ruleID: 'SQLI_ATTACK',
-    },
-    {
-      id: 'demo-2',
-      startLat: 55.7558,
-      startLon: 37.6173,
-      endLat: props.gatewayLat,
-      endLon: props.gatewayLon,
-      region: 'RU',
-      ruleID: 'RATE_LIMIT_TIER2',
-    }
-  );
+  // Arcs are rendered only from real geolocated telemetry delivered via the
+  // events prop; no synthetic demo traffic is drawn on the globe.
 });
 
 const dynamicMarkers = computed<CdnMarker[]>(() => {
@@ -116,7 +97,6 @@ const dynamicArcs = computed<CdnArc[]>(() => {
     id: arc.id,
     from: [arc.startLat, arc.startLon],
     to: [arc.endLat, arc.endLon],
-    value: Math.floor(Math.random() * 50) + 120,
   }));
 });
 </script>

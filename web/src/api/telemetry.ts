@@ -1,5 +1,5 @@
 import { request } from './client';
-import type { IncidentQueryResult, IPGroupOption, AggregateStats } from '@/types/telemetry';
+import type { IncidentQueryResult, IPGroupOption, AggregateStats, GeoIPStatus } from '@/types/telemetry';
 
 export interface StatsQueryParams {
   start_time?: string;
@@ -49,6 +49,9 @@ export const telemetryApi = {
     request<CurlExport>(`/telemetry/events/${encodeURIComponent(eventId)}/curl`),
 
   listIPGroups: () => request<IPGroupOption[]>('/ip-groups'),
+
+  /** GeoIP database availability, used to explain an empty country breakdown. */
+  getGeoIPStatus: () => request<GeoIPStatus>('/telemetry/geoip'),
 
   addIPGroupEntry: (groupId: string, cidr: string, comment: string) =>
     request<{ id: string; group_id: string; cidr: string }>(

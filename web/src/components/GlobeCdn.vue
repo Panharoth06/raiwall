@@ -3,7 +3,7 @@ import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
 import createGlobe from 'cobe';
 import { useTheme } from '@/composables/useTheme';
 import { tokenRgb01 } from '@/lib/theme-colors';
-import { defaultMarkers, defaultArcs, type CdnMarker, type CdnArc } from './cobeDefaults';
+import { type CdnMarker, type CdnArc } from './cobeDefaults';
 
 export interface GlobeCdnProps {
   markers?: CdnMarker[];
@@ -14,8 +14,8 @@ export interface GlobeCdnProps {
 }
 
 const props = withDefaults(defineProps<GlobeCdnProps>(), {
-  markers: () => defaultMarkers,
-  arcs: () => defaultArcs,
+  markers: () => [],
+  arcs: () => [],
   className: '',
   speed: 0.003,
   dataTestId: 'globe-cdn-canvas',
@@ -31,22 +31,9 @@ const phiOffsetRef = ref(0);
 const thetaOffsetRef = ref(0);
 const isPausedRef = ref(false);
 
-const defaultTrafficValues = [420, 380, 290, 185, 156, 134];
-
-const traffic = ref<{ id: string; value: number }[]>(
-  props.arcs.map((a, i) => ({
-    id: a.id,
-    value: a.value ?? (defaultTrafficValues[i % defaultTrafficValues.length] || 100),
-  }))
-);
-
 watch(
   () => props.arcs,
   (newArcs) => {
-    traffic.value = newArcs.map((a, i) => ({
-      id: a.id,
-      value: a.value ?? (defaultTrafficValues[i % defaultTrafficValues.length] || 100),
-    }));
     globe?.update({
       arcs: newArcs.map((a) => ({ from: a.from, to: a.to, id: a.id })),
     });
@@ -64,7 +51,6 @@ watch(
   { deep: true }
 );
 
-let trafficInterval: ReturnType<typeof setInterval> | null = null;
 let globe: ReturnType<typeof createGlobe> | null = null;
 let animationId = 0;
 let phi = 0;
@@ -158,13 +144,6 @@ watch(colorScheme, (newScheme) => {
 });
 
 onMounted(() => {
-  trafficInterval = setInterval(() => {
-    traffic.value = traffic.value.map((t) => ({
-      ...t,
-      value: Math.max(50, t.value + Math.floor(Math.random() * 21) - 10),
-    }));
-  }, 250);
-
   if (typeof window !== 'undefined') {
     window.addEventListener('pointermove', handlePointerMove, { passive: true });
     window.addEventListener('pointerup', handlePointerUp, { passive: true });
@@ -188,7 +167,6 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
-  if (trafficInterval) clearInterval(trafficInterval);
   if (animationId) cancelAnimationFrame(animationId);
   globe?.destroy();
   resizeObserver?.disconnect();
@@ -271,25 +249,6 @@ function pyramidFaceStyle(nth: number) {
       </span>
     </div>
 
-    <!-- Anchored Dynamic Traffic Values -->
-    <div
-      v-for="t in traffic"
-      :key="t.id"
-      class="cobe-traffic-anchor font-mono text-xs text-popover-foreground bg-popover/90 border border-border px-2 py-0.5 rounded shadow-xs whitespace-nowrap pointer-events-none transition-all duration-300"
-      :style="{
-        position: 'absolute',
-        // @ts-expect-error CSS Anchor Positioning
-        positionAnchor: `--cobe-arc-${t.id}`,
-        'position-anchor': `--cobe-arc-${t.id}`,
-        bottom: 'anchor(top)',
-        left: 'anchor(center)',
-        translate: '-50% 0',
-        opacity: `var(--cobe-visible-arc-${t.id}, 0)`,
-        filter: `blur(calc((1 - var(--cobe-visible-arc-${t.id}, 0)) * 8px))`,
-      }"
-    >
-      {{ t.value }}k req/s
-    </div>
   </div>
 </template>
 

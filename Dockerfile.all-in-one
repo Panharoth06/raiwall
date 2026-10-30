@@ -48,7 +48,7 @@ FROM postgres:18-alpine
 RUN apk add --no-cache ca-certificates tzdata curl su-exec
 
 ENV PGDATA=/var/lib/postgresql/data/pgdata
-RUN mkdir -p /var/lib/postgresql/data /run/postgresql /etc/raiwall /var/lib/raiwall /var/log/raiwall \
+RUN mkdir -p /var/lib/postgresql/data /run/postgresql /etc/raiwall /var/lib/raiwall /var/log/raiwall /usr/share/GeoIP \
     && chown -R postgres:postgres /var/lib/postgresql /run/postgresql
 
 COPY --from=backend-builder /bin/raiwall /usr/local/bin/raiwall

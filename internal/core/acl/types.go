@@ -29,10 +29,13 @@ const (
 
 // GeoData contains geographical and autonomous system intelligence for an IP address.
 type GeoData struct {
-	Country   string `json:"country,omitempty"`   // ISO 3166-1 alpha-2 (e.g. "US", "DE")
-	Continent string `json:"continent,omitempty"` // Continent code (e.g. "NA", "EU")
-	ASN       uint   `json:"asn,omitempty"`       // Autonomous System Number (e.g. 15169)
-	ASOrg     string `json:"as_org,omitempty"`    // Autonomous System Organization name
+	Country   string  `json:"country,omitempty"`   // ISO 3166-1 alpha-2 (e.g. "US", "DE")
+	Continent string  `json:"continent,omitempty"` // Continent code (e.g. "NA", "EU")
+	City      string  `json:"city,omitempty"`      // City name from the GeoLite2-City database
+	ASN       uint    `json:"asn,omitempty"`       // Autonomous System Number (e.g. 15169)
+	ASOrg     string  `json:"as_org,omitempty"`    // Autonomous System Organization name
+	Latitude  float64 `json:"latitude,omitempty"`  // City latitude for map plotting
+	Longitude float64 `json:"longitude,omitempty"` // City longitude for map plotting
 
 	// Lowercase expr aliases for expr expressions (e.g. geo.country, geo.continent, geo.asn, geo.as_org)
 	Country_   string `json:"-" expr:"country"`

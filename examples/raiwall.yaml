@@ -130,7 +130,10 @@ threat_feeds:
 
 geoip:
   country: /usr/share/GeoIP/GeoLite2-Country.mmdb
+  city: /usr/share/GeoIP/GeoLite2-City.mmdb
   asn: /usr/share/GeoIP/GeoLite2-ASN.mmdb
+  # Downloads missing/stale editions on boot when RAIWALL_GEOIP_LICENSE_KEY is set.
+  auto_update: true
 
 # seed -> create missing records only (safe for a first rollout).
 # sync -> upsert and let the file own every declared record.
