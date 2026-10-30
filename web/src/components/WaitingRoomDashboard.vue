@@ -113,89 +113,25 @@ onUnmounted(() => {
 
 // Build surge sessions list
 const sessions = computed<WaitingRoomSessionItem[]>(() => {
-  const currentApp = configStore.sites[0]?.name || 'Waiting Room Demo';
-  const currentHost = configStore.sites[0]?.hostnames?.join(', ') || 'Match All Host';
-  const currentSiteId = configStore.sites[0]?.id;
+  if (!configStore.sites.length) {
+    return [];
+  }
+
   const cap = props.policy.waiting_room_max_concurrent || 1;
-
-  const list: WaitingRoomSessionItem[] = [
-    {
-      id: 'active-session',
-      siteId: currentSiteId,
-      appName: currentApp,
-      hostPattern: currentHost,
-      activeAllowed: cap,
-      totalWaiting: metrics.value.total_waiting,
-      peakWaiting: metrics.value.peak_queue_depth || metrics.value.total_waiting || 1,
-      avgWaitSeconds: metrics.value.avg_wait_seconds,
-      bounceRate: metrics.value.bounce_rate,
-      durationSeconds: 40,
-      startAt: '2026-10-21 04:27:17',
-      isActive: props.policy.waiting_room_enabled,
-    },
-    {
-      id: 'session-2',
-      appName: 'Waiting Room Demo',
-      hostPattern: 'Match All Host',
-      activeAllowed: 1,
-      totalWaiting: 1,
-      peakWaiting: 1,
-      avgWaitSeconds: 0,
-      bounceRate: 100,
-      durationSeconds: 40,
-      startAt: '2026-10-20 03:51:09',
-    },
-    {
-      id: 'session-3',
-      appName: 'Waiting Room Demo',
-      hostPattern: 'Match All Host',
-      activeAllowed: 1,
-      totalWaiting: 1,
-      peakWaiting: 1,
-      avgWaitSeconds: 22,
-      bounceRate: 0,
-      durationSeconds: 25,
-      startAt: '2026-10-15 17:34:37',
-    },
-    {
-      id: 'session-4',
-      appName: 'Waiting Room Demo',
-      hostPattern: 'Match All Host',
-      activeAllowed: 1,
-      totalWaiting: 1,
-      peakWaiting: 1,
-      avgWaitSeconds: 0,
-      bounceRate: 100,
-      durationSeconds: 40,
-      startAt: '2026-10-15 16:00:40',
-    },
-    {
-      id: 'session-5',
-      appName: 'Waiting Room Demo',
-      hostPattern: 'Match All Host',
-      activeAllowed: 1,
-      totalWaiting: 1,
-      peakWaiting: 1,
-      avgWaitSeconds: 0,
-      bounceRate: 100,
-      durationSeconds: 41,
-      startAt: '2026-10-15 03:50:50',
-    },
-    {
-      id: 'session-6',
-      appName: 'Waiting Room Demo',
-      hostPattern: 'Match All Host',
-      activeAllowed: 1,
-      totalWaiting: 1,
-      peakWaiting: 1,
-      avgWaitSeconds: 0,
-      bounceRate: 100,
-      durationSeconds: 40,
-      startAt: '2026-10-09 23:56:35',
-    },
-  ];
-
-  return list;
+  return configStore.sites.map((site) => ({
+    id: site.id,
+    siteId: site.id,
+    appName: site.name,
+    hostPattern: site.hostnames?.join(', ') || 'Match All Host',
+    activeAllowed: cap,
+    totalWaiting: metrics.value.total_waiting,
+    peakWaiting: metrics.value.peak_queue_depth || metrics.value.total_waiting,
+    avgWaitSeconds: metrics.value.avg_wait_seconds,
+    bounceRate: metrics.value.bounce_rate,
+    durationSeconds: 0,
+    startAt: site.created_at ? new Date(site.created_at).toISOString().replace('T', ' ').slice(0, 19) : '—',
+    isActive: props.policy.waiting_room_enabled,
+  }));
 });
 
 const filteredSessions = computed(() => {
@@ -251,7 +187,6 @@ const handleSavePolicy = (updated: PolicySettings) => {
               >
                 {{ site.name }}
               </SelectItem>
-              <SelectItem value="Waiting Room Demo">Waiting Room Demo</SelectItem>
             </SelectContent>
           </Select>
         </div>
