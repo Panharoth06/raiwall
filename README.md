@@ -339,9 +339,10 @@ Validate any document before deploying:
 ./bin/raiwall config print --config config/raiwall.yaml   # adapted Caddy JSON
 ```
 
-### Example
+### Example (`raiwall.yaml`)
 
 ```yaml
+# raiwall.yaml
 version: 1
 
 server:
