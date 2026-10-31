@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { computed, ref, onMounted } from 'vue';
 import { useRouter } from '@/router';
+import { useAuthStore } from '@/stores/auth';
 import { useConfigStore } from '@/stores/config';
 import { useTheme } from '@/composables/useTheme';
 import { api } from '@/api/client';
@@ -30,19 +31,24 @@ import {
 import { Tabs, type Tab } from '@/components/ui/tabs';
 
 const router = useRouter();
+const authStore = useAuthStore();
 const configStore = useConfigStore();
 const { theme, setTheme } = useTheme();
 
 type SettingsSubTab = 'cluster' | 'certificates' | 'apikeys' | 'users' | 'audit';
 const activeTab = ref<SettingsSubTab>('cluster');
 
-const tabs: (Tab & { id: SettingsSubTab })[] = [
+const allTabs: (Tab & { id: SettingsSubTab; adminOnly?: boolean })[] = [
   { id: 'cluster', label: 'Cluster Synchronization', icon: Network },
   { id: 'certificates', label: 'TLS Certificates', icon: Lock },
   { id: 'apikeys', label: 'API Keys & Access', icon: Key },
-  { id: 'users', label: 'Operators', icon: Users },
-  { id: 'audit', label: 'Audit Log', icon: History },
+  { id: 'users', label: 'Operators', icon: Users, adminOnly: true },
+  { id: 'audit', label: 'Audit Log', icon: History, adminOnly: true },
 ];
+
+// Operator management and the audit log are admin-only on the API. Hide the
+// tabs from viewers rather than rendering controls that always return 403.
+const tabs = computed(() => allTabs.filter((tab) => !tab.adminOnly || authStore.isAdmin));
 
 const handleTabChange = (tabId: string) => {
   activeTab.value = tabId as SettingsSubTab;

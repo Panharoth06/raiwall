@@ -4,6 +4,7 @@ import { setActivePinia, createPinia } from 'pinia';
 import { nextTick } from 'vue';
 import SettingsView from '../SettingsView.vue';
 import { useConfigStore } from '@/stores/config';
+import { useAuthStore } from '@/stores/auth';
 
 class MockResizeObserver {
   observe() {}
@@ -13,6 +14,7 @@ class MockResizeObserver {
 
 beforeEach(() => {
   setActivePinia(createPinia());
+  useAuthStore().user = { username: 'admin', role: 'admin' };
   vi.restoreAllMocks();
   global.ResizeObserver = MockResizeObserver as unknown as typeof ResizeObserver;
 });
@@ -100,6 +102,16 @@ describe('SettingsView.vue', () => {
     await nextTick();
 
     expect(wrapper.find('[data-testid="users-subview"]').exists()).toBe(true);
+  });
+
+  it('hides admin-only tabs from viewers', () => {
+    useAuthStore().user = { username: 'viewer', role: 'viewer' };
+    const wrapper = mount(SettingsView, { global: { stubs } });
+
+    const labels = wrapper.findAll('[data-testid="tab-item"]').map((tab) => tab.text());
+    expect(labels).toHaveLength(3);
+    expect(labels.join(' ')).not.toContain('Operators');
+    expect(labels.join(' ')).not.toContain('Audit Log');
   });
 
   it('switches to the audit tab', async () => {
