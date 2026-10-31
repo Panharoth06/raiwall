@@ -31,6 +31,7 @@ const props = defineProps<{
   open: boolean;
   target: BotPolicyTarget | null;
   config?: BotConfig | null;
+  globalConfig?: BotConfig | null;
   inherited?: boolean;
   custom?: boolean;
   saving?: boolean;
@@ -67,7 +68,7 @@ function reset() {
   powEnabled.value = config?.pow_enabled ?? true;
   const storedDifficulty = config?.pow_difficulty || DEFAULT_DIFFICULTY;
   difficulty.value = Math.min(Math.max(storedDifficulty, MIN_DIFFICULTY), MAX_DIFFICULTY);
-  trapsEnabled.value = (config?.trap_urls?.length ?? 0) > 0;
+  trapsEnabled.value = (config?.trap_urls?.length ?? 0) > 0 || (Boolean(props.inherited) && (props.globalConfig?.trap_urls?.length ?? 0) > 0);
   trapsText.value = (config?.trap_urls ?? []).join('\n');
   localError.value = '';
 }
@@ -231,24 +232,51 @@ function handleSave() {
             />
           </div>
 
-          <div v-if="trapsEnabled" class="border-t border-border/60 px-3 py-3">
-            <label
-              for="bot-protect-traps"
-              class="block mb-1 text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground"
+          <div v-if="trapsEnabled" class="border-t border-border/60 px-3 py-3 space-y-3">
+            <!-- Inherited Global Traps for Applications -->
+            <div
+              v-if="!target?.global && (globalConfig?.trap_urls?.length || 0) > 0"
+              class="rounded-md border border-border bg-muted/40 p-2.5 space-y-1.5"
+              data-testid="bot-inherited-traps-panel"
             >
-              Trap URLs
-            </label>
-            <textarea
-              id="bot-protect-traps"
-              v-model="trapsText"
-              rows="3"
-              placeholder="/.raiwall/trap/honeypot&#10;/admin/login.php"
-              class="w-full rounded-md border border-input bg-card px-3 py-2 font-mono text-xs text-foreground placeholder:text-muted-foreground shadow-none focus-visible:outline-none focus-visible:border-primary transition-colors resize-y"
-              data-testid="bot-traps-input"
-            />
-            <p class="mt-1 text-xs text-muted-foreground">
-              One path per line. Each must start with <code class="font-mono">/</code>.
-            </p>
+              <div class="flex items-center gap-1.5 text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+                <ShieldAlert class="w-3.5 h-3.5 text-primary" />
+                <span>Inherited Global Traps (Active on this Site)</span>
+              </div>
+              <div class="flex flex-wrap gap-1.5">
+                <span
+                  v-for="trap in globalConfig?.trap_urls"
+                  :key="trap"
+                  class="inline-flex items-center px-2 py-0.5 rounded font-mono text-xs bg-card border border-border text-foreground"
+                  data-testid="inherited-trap-tag"
+                >
+                  {{ trap }}
+                </span>
+              </div>
+              <p class="text-xs text-muted-foreground">
+                These baseline traps are active globally. Add custom app-specific traps below to extend protection for routes unique to this application.
+              </p>
+            </div>
+
+            <div>
+              <label
+                for="bot-protect-traps"
+                class="block mb-1 text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground"
+              >
+                {{ target?.global ? 'Global Baseline Trap URLs (Inherited by all sites)' : 'App-Specific Custom Trap URLs' }}
+              </label>
+              <textarea
+                id="bot-protect-traps"
+                v-model="trapsText"
+                rows="3"
+                :placeholder="target?.global ? '/.raiwall/trap/honeypot\n/admin/login.php\n/wp-login.php' : '/secret-admin\n/internal-login'"
+                class="w-full rounded-md border border-input bg-card px-3 py-2 font-mono text-xs text-foreground placeholder:text-muted-foreground shadow-none focus-visible:outline-none focus-visible:border-primary transition-colors resize-y"
+                data-testid="bot-traps-input"
+              />
+              <p class="mt-1 text-xs text-muted-foreground">
+                {{ target?.global ? 'One path per line. Every application automatically inherits these trap paths.' : 'One path per line. Each must start with /. These traps extend the global baseline traps for this host.' }}
+              </p>
+            </div>
           </div>
         </section>
 

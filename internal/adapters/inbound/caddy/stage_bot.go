@@ -15,9 +15,48 @@ import (
 	"go.uber.org/zap"
 )
 
+// isTrapRequestForHost checks if a request path targets the built-in honeypot
+// or any Global / host-specific crawler trap URLs configured in the active snapshot.
+func isTrapRequestForHost(snap *control.ConfigSnapshot, host, path string) bool {
+	if bot.IsTrapRequest(path) {
+		return true
+	}
+	if snap == nil {
+		return false
+	}
+	cleanHost := host
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		cleanHost = h
+	}
+	cleanPath := strings.TrimRight(path, "/")
+	if cleanPath == "" {
+		cleanPath = "/"
+	}
+
+	for _, bc := range snap.BotConfigs {
+		// Both Global (*) and exact host trap URLs are evaluated (inheritance model)
+		if bc.Host == "*" || strings.EqualFold(bc.Host, cleanHost) {
+			for _, trap := range bc.TrapURLs {
+				if trap == "" {
+					continue
+				}
+				trimmedTrap := strings.TrimRight(trap, "/")
+				if trimmedTrap == "" {
+					trimmedTrap = "/"
+				}
+				if path == trap || cleanPath == trimmedTrap || strings.HasPrefix(path, trimmedTrap+"/") {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
 // handleHoneypotTrap handles requests targeted at hidden trap endpoints.
 func (m *Middleware) handleHoneypotTrap(w http.ResponseWriter, r *http.Request, clientIP net.IP, ja4 string, startTime time.Time) bool {
-	if !bot.IsTrapRequest(r.URL.Path) {
+	snap := control.GetActiveSnapshot()
+	if !isTrapRequestForHost(snap, r.Host, r.URL.Path) {
 		return false
 	}
 	if m.trapCtrl != nil {

@@ -3,6 +3,7 @@ package waf
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/Panharoth06/raiwall/internal/core/waf/ast"
@@ -16,7 +17,7 @@ type SemanticOption func(*SemanticEngine)
 // WithExceptionEngine configures an ExceptionMatcher (e.g. *acl.ExceptionEngine) on the SemanticEngine.
 func WithExceptionEngine(matcher ExceptionMatcher) SemanticOption {
 	return func(s *SemanticEngine) {
-		s.exceptionMatcher = matcher
+		s.SetExceptionEngine(matcher)
 	}
 }
 
@@ -49,15 +50,22 @@ func WithMaxParamSize(size int) SemanticOption {
 // Stage 2: Pure-Go lexical triage (< 2 µs)
 // Stage 3: Bounded AST context verification (SQL, Shell, XSS) with 32 KB cap and 5 ms timeout.
 type SemanticEngine struct {
-	normalizer       *normalizer.Normalizer
-	sqlChop          *ast.SQLChop
-	cmdChop          *ast.CMDChop
-	xssChop          *ast.XSSChop
-	exceptionMatcher ExceptionMatcher
-	matrixSource     MatrixSource
-	innerRules       *cve.Engine
+	normalizer   *normalizer.Normalizer
+	sqlChop      *ast.SQLChop
+	cmdChop      *ast.CMDChop
+	xssChop      *ast.XSSChop
+	matrixSource MatrixSource
+	// exceptionMatcher and innerRules are swapped atomically on every
+	// configuration deploy; the request path never takes a lock.
+	exceptionMatcher atomic.Pointer[matcherHolder]
+	innerRules       atomic.Pointer[cve.Engine]
 	maxParamSize     int
 	astTimeout       time.Duration
+}
+
+// matcherHolder wraps an interface value for atomic storage.
+type matcherHolder struct {
+	matcher ExceptionMatcher
 }
 
 // auditFinding collects the first audit-level finding across all parameters so
@@ -68,12 +76,19 @@ type auditFinding struct {
 
 // SetExceptionEngine dynamically updates the ExceptionMatcher.
 func (s *SemanticEngine) SetExceptionEngine(matcher ExceptionMatcher) {
-	s.exceptionMatcher = matcher
+	if matcher == nil {
+		s.exceptionMatcher.Store(nil)
+		return
+	}
+	s.exceptionMatcher.Store(&matcherHolder{matcher: matcher})
 }
 
 // ExceptionEngine returns the active ExceptionMatcher.
 func (s *SemanticEngine) ExceptionEngine() ExceptionMatcher {
-	return s.exceptionMatcher
+	if holder := s.exceptionMatcher.Load(); holder != nil {
+		return holder.matcher
+	}
+	return nil
 }
 
 // WithMatrixSource configures the per-application semantic matrix resolver.
@@ -258,8 +273,8 @@ func (a *auditFinding) record(v *Verdict) {
 	a.verdict = v
 }
 
-// downgradeToAudit converts a would-be block verdict into an audit-record verdict.
-func downgradeToAudit(v *Verdict) *Verdict {
+// DowngradeToAudit converts a would-be block verdict into an audit-record verdict.
+func DowngradeToAudit(v *Verdict) *Verdict {
 	if v == nil {
 		return nil
 	}
@@ -270,10 +285,11 @@ func downgradeToAudit(v *Verdict) *Verdict {
 
 // excepted is a nil-safe wrapper over the exception matcher.
 func (s *SemanticEngine) excepted(host, path, method, location, paramName, ruleID string) bool {
-	if s.exceptionMatcher == nil {
+	matcher := s.ExceptionEngine()
+	if matcher == nil {
 		return false
 	}
-	return s.exceptionMatcher.Matches(host, path, method, location, paramName, ruleID)
+	return matcher.Matches(host, path, method, location, paramName, ruleID)
 }
 
 // InspectRequest coordinates Stage 1 -> Stage 2 -> Stage 3 inspection across all parameters,

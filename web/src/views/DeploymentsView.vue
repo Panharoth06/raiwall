@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { useRouter } from '@/router'
 import { useConfigStore } from '@/stores/config'
 import { useAuthStore } from '@/stores/auth'
 import { api } from '@/api/client'
 import ConfigDiffViewer from '@/components/ConfigDiffViewer.vue'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/empty-state'
+import { TablePagination } from '@/components/ui/table-pagination'
 import AdminOnly from '@/components/auth/AdminOnly.vue'
 import {
   Table,
@@ -22,8 +25,9 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { Rocket, RotateCcw, History, Zap } from 'lucide-vue-next'
+import { Rocket, RotateCcw, History, Zap, Settings, GitCommit, CheckCircle2 } from 'lucide-vue-next'
 
+const router = useRouter()
 const configStore = useConfigStore()
 const authStore = useAuthStore()
 
@@ -39,6 +43,14 @@ const rollbackModalOpen = ref(false)
 const selectedRollbackVersion = ref<number | null>(null)
 const rollingBack = ref(false)
 const rollbackError = ref<string | null>(null)
+
+const page = ref(1)
+const pageSize = ref(20)
+
+const paginatedHistory = computed(() => {
+  const start = (page.value - 1) * pageSize.value
+  return configStore.history.slice(start, start + pageSize.value)
+})
 
 const refresh = async () => {
   loading.value = true
@@ -110,14 +122,24 @@ const handleRollback = async () => {
 </script>
 
 <template>
-  <div class="h-full flex flex-col space-y-6 p-6 bg-card text-card-foreground rounded-xl border border-border shadow-none font-sans overflow-hidden">
+  <div class="space-y-6 font-sans">
     <!-- Header -->
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-border shrink-0">
       <div>
-        <h1 class="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
-          <Rocket class="w-5 h-5 text-primary" />
-          <span>Deployments & Rollback History</span>
-        </h1>
+        <div class="flex items-center gap-2.5 flex-wrap">
+          <h1 class="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
+            <Rocket class="w-5 h-5 text-primary" />
+            <span>Deployments & Rollback History</span>
+          </h1>
+          <Badge
+            variant="outline"
+            class="font-mono text-xs uppercase"
+            :class="autoApply ? 'border-primary/40 text-primary bg-primary/10' : 'border-warning/40 text-warning bg-warning/10'"
+            data-testid="deployment-mode-badge"
+          >
+            {{ autoApply ? 'Live Hot-Swap' : 'Manual Staging' }}
+          </Badge>
+        </div>
         <p class="text-sm text-muted-foreground mt-1 leading-relaxed">
           {{ autoApply
             ? 'Every saved change is compiled and hot-swapped immediately. Snapshot history supports 1-click rollback.'
@@ -129,6 +151,17 @@ const handleRollback = async () => {
         <Button
           variant="outline"
           size="sm"
+          class="h-8 text-xs gap-1"
+          data-testid="settings-policy-link"
+          @click="router.push('/settings')"
+        >
+          <Settings class="w-3.5 h-3.5 text-muted-foreground" />
+          <span>Policy</span>
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          class="h-8 text-xs"
           :disabled="loading"
           @click="refresh"
         >
@@ -140,7 +173,7 @@ const handleRollback = async () => {
             data-testid="manual-deploy-btn"
             size="sm"
             @click="openDeployModal"
-            class="gap-1.5"
+            class="gap-1.5 h-8 text-xs"
           >
             <Rocket class="w-4 h-4" />
             <span>{{ autoApply ? 'Retry Apply' : `Deploy ${configStore.diffs.length} Changes` }}</span>
@@ -163,9 +196,36 @@ const handleRollback = async () => {
           only appear when an apply needs operator attention.
         </p>
       </div>
+      <!-- Manual staging notice -->
+      <div
+        v-else
+        data-testid="manual-staging-notice"
+        class="flex items-start gap-2 rounded-md border border-warning/30 bg-warning/10 px-3 py-2"
+      >
+        <GitCommit class="w-4 h-4 text-warning mt-0.5 shrink-0" />
+        <div class="grow flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+          <p class="text-xs text-warning leading-relaxed font-medium">
+            Manual staging is on. Saves are held in draft; click Deploy below or in the header to compile and hot-swap to the live data plane.
+          </p>
+        </div>
+      </div>
 
-      <!-- Staged Changes Section -->
-      <div class="space-y-3">
+      <!-- In Auto-Apply mode when diffs is 0, show a sleek inline sync indicator -->
+      <div
+        v-if="autoApply && configStore.diffs.length === 0"
+        class="flex items-center justify-between rounded-lg border border-border bg-card/60 px-4 py-3"
+        data-testid="auto-apply-synced-box"
+      >
+        <div class="flex items-center gap-2.5">
+          <CheckCircle2 class="w-4 h-4 text-success" />
+          <span class="text-xs text-foreground font-medium">Data plane synchronized</span>
+          <span class="text-xs text-muted-foreground">All active policies match live snapshot v{{ configStore.activeVersion }}</span>
+        </div>
+        <span class="text-xs font-mono text-muted-foreground">0 staged deltas</span>
+      </div>
+
+      <!-- Staged Changes Section (Shown when manual staging or when diffs exist in auto-apply) -->
+      <div v-else class="space-y-3">
         <div class="flex items-center justify-between">
           <h2 class="text-base font-semibold text-foreground flex items-center gap-2">
             <span>Staged Changes vs. Active Snapshot</span>
@@ -176,6 +236,17 @@ const handleRollback = async () => {
               {{ configStore.diffs.length }}
             </span>
           </h2>
+          <AdminOnly>
+            <Button
+              v-if="!autoApply && configStore.hasDraftChanges"
+              size="sm"
+              class="h-7 text-xs gap-1"
+              @click="openDeployModal"
+            >
+              <Rocket class="w-3.5 h-3.5" />
+              <span>Deploy Changes</span>
+            </Button>
+          </AdminOnly>
         </div>
 
         <ConfigDiffViewer :diffs="configStore.diffs" />
@@ -241,7 +312,7 @@ const handleRollback = async () => {
             </TableHeader>
             <TableBody>
               <TableRow
-                v-for="snap in configStore.history"
+                v-for="snap in paginatedHistory"
                 :key="snap.version"
                 data-testid="snapshot-row"
                 :class="{ 'bg-primary/5': snap.version === configStore.activeVersion }"
@@ -283,6 +354,16 @@ const handleRollback = async () => {
               </TableRow>
             </TableBody>
           </Table>
+
+          <TablePagination
+            :page="page"
+            :page-size="pageSize"
+            :total="configStore.history.length"
+            :page-size-options="[10, 20, 50, 100]"
+            item-label="snapshots"
+            @update:page="(p) => page = p"
+            @update:page-size="(s) => { pageSize = s; page = 1; }"
+          />
         </div>
       </div>
     </div>

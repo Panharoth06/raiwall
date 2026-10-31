@@ -59,18 +59,14 @@ test.describe('Telemetry Persistence and HTTP Flood View E2E', () => {
     await expect(page.locator('th', { hasText: 'Action' })).toBeVisible();
     await expect(page.locator('tbody tr').first()).toBeVisible();
 
-    // Verify sub-tabs exist
-    await expect(page.locator('[data-testid="tab-http-flood-limits"]')).toBeVisible();
-    await expect(page.locator('[data-testid="tab-http-flood-waiting-room"]')).toBeVisible();
-
-    // Switch to Waiting Room tab
-    await page.locator('[data-testid="tab-http-flood-waiting-room"]').click();
+    // Switch to Waiting Room via sidebar navigation
+    await page.locator('[data-testid="nav-http-flood-waiting-room"]').click();
     await page.waitForURL('**/#/http-flood/waiting-room');
     await expect(page.locator('h2', { hasText: 'Virtual Waiting Room Engine' })).toHaveCount(1);
     await expect(page.getByRole('button', { name: 'SETTINGS', exact: true })).toBeVisible();
 
-    // Switch back to Rate Limiting tab
-    await page.locator('[data-testid="tab-http-flood-limits"]').click();
+    // Switch back to Rate Limiting via sidebar navigation
+    await page.locator('[data-testid="nav-http-flood-limits"]').click();
     await expect(page.locator('th', { hasText: 'IP Addr' })).toBeVisible();
     await expect(page.locator('tbody tr').first()).toBeVisible();
   });

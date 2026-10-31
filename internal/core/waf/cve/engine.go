@@ -175,6 +175,11 @@ func (e *Engine) SetEnabled(disabled map[string]struct{}) {
 	e.state.Store(st)
 }
 
+// IsAudit reports whether a rule is configured alert-only.
+func (e *Engine) IsAudit(id string) bool {
+	return e.currentState().IsAudit(id)
+}
+
 // Evaluate runs the fast path: narrow candidates by method bucket and URI
 // prefix, then match compiled tokens across the pre-lowered request surfaces.
 // Returns the first fired signature.

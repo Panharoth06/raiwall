@@ -53,10 +53,11 @@ type Input struct {
 	Body     []byte
 }
 
-// RuleState holds per-rule enable/disable overrides keyed by rule ID.
-// Read-only at evaluation time via atomic snapshot semantics.
+// RuleState holds per-rule enable/disable and alert-only overrides keyed by
+// rule ID. Read-only at evaluation time via atomic snapshot semantics.
 type RuleState struct {
 	Disabled map[string]struct{}
+	Audit    map[string]struct{}
 }
 
 // IsDisabled reports whether the rule is withheld at runtime.
@@ -65,6 +66,15 @@ func (s *RuleState) IsDisabled(id string) bool {
 		return false
 	}
 	_, ok := s.Disabled[id]
+	return ok
+}
+
+// IsAudit reports whether the rule records detections without blocking.
+func (s *RuleState) IsAudit(id string) bool {
+	if s == nil {
+		return false
+	}
+	_, ok := s.Audit[id]
 	return ok
 }
 

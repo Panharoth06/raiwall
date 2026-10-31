@@ -230,6 +230,24 @@ func CompileSnapshot(ctx context.Context, store ControlStore) (*ConfigSnapshot, 
 		appSemOverrides[rec.AppID] = overrides
 	}
 
+	// 6b. Load imported rule packs, per-rule overrides, and detection policies.
+	rulePacks, err := compileRulePacks(ctx, store)
+	if err != nil {
+		return nil, err
+	}
+	dbDisabledRules, err := store.ListDisabledInnerRules(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load disabled inner rules: %w", err)
+	}
+	ruleOverrides, innerRulesDisabled, err := compileRuleOverrides(ctx, store, dbDisabledRules)
+	if err != nil {
+		return nil, err
+	}
+	globalWAFPolicy, appWAFPolicies, err := compileWAFPolicies(ctx, store)
+	if err != nil {
+		return nil, err
+	}
+
 	// Determine next version or initial version 1
 	var version uint64 = 1
 	latest, err := store.GetLatestSnapshot(ctx)
@@ -243,16 +261,9 @@ func CompileSnapshot(ctx context.Context, store ControlStore) (*ConfigSnapshot, 
 	snap.RatePolicies = ratePolicies
 	snap.BotConfigs = botConfigs
 	snap.SemanticDefaults = semanticDefaults
-
-	// 7. Load disabled inner rules (virtual-patch toggles)
-	dbDisabledRules, err := store.ListDisabledInnerRules(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load disabled inner rules: %w", err)
-	}
-	innerRulesDisabled := make(map[string]struct{}, len(dbDisabledRules))
-	for _, id := range dbDisabledRules {
-		innerRulesDisabled[id] = struct{}{}
-	}
+	snap.WAFPolicy = globalWAFPolicy
+	snap.RulePacks = rulePacks
+	snap.RuleOverrides = ruleOverrides
 	snap.InnerRulesDisabled = innerRulesDisabled
 
 	// 8. Load portal-wide settings (clearance-cookie signing secret).
@@ -264,6 +275,12 @@ func CompileSnapshot(ctx context.Context, store ControlStore) (*ConfigSnapshot, 
 	for appID, overrides := range appSemOverrides {
 		if app, ok := snap.Apps[appID]; ok && app != nil {
 			app.SemanticPolicy = overrides
+		}
+	}
+	// Join per-site detection policies after apps exist.
+	for appID, policy := range appWAFPolicies {
+		if app, ok := snap.Apps[appID]; ok && app != nil {
+			app.WAFPolicy = policy
 		}
 	}
 

@@ -41,6 +41,7 @@ func (s *Server) routes() {
 
 			// Status & Cluster
 			api.Get("/status", s.handleStatus)
+			api.Put("/system/auto-apply", s.handleUpdateAutoApply)
 			api.Get("/cluster/status", s.handleClusterStatus)
 
 			// Synthetic request evaluation against the live WAF engine.
@@ -52,8 +53,34 @@ func (s *Server) routes() {
 			api.Get("/detector/apps/{id}", s.handleGetAppPolicy)
 			api.Put("/detector/apps/{id}", s.handleUpdateAppPolicy)
 
-			// Inner Rules (CVE virtual patches)
+			// Detection workspace: posture, presets, and global/per-site policies.
+			api.Get("/detection/status", s.handleGetDetectionStatus)
+			api.Get("/detection/presets", s.handleListDetectionPresets)
+			api.Get("/detection/policy", s.handleGetDetectionPolicy)
+			api.Put("/detection/policy", s.handleUpdateDetectionPolicy)
+			api.Get("/detection/policies/apps", s.handleListAppDetectionPolicies)
+			api.Get("/detection/policies/apps/{id}", s.handleGetAppDetectionPolicy)
+			api.Put("/detection/policies/apps/{id}", s.handleUpdateAppDetectionPolicy)
+			api.Delete("/detection/policies/apps/{id}", s.handleDeleteAppDetectionPolicy)
+
+			// Unified rule catalog and per-rule overrides.
+			api.Get("/detection/rules", s.handleListDetectionRules)
+			api.Post("/detection/rules/bulk", s.handleBulkDetectionRules)
+			api.Get("/detection/rules/{id}", s.handleGetDetectionRule)
+			api.Patch("/detection/rules/{id}", s.handleUpdateDetectionRule)
+			api.Delete("/detection/rules/{id}/override", s.handleResetDetectionRuleOverride)
+
+			// Imported rule packs.
+			api.Get("/detection/packs", s.handleListDetectionPacks)
+			api.Post("/detection/packs/validate", s.handleValidateDetectionPack)
+			api.Post("/detection/packs", s.handleCreateDetectionPack)
+			api.Put("/detection/packs/{id}", s.handleUpdateDetectionPack)
+			api.Delete("/detection/packs/{id}", s.handleDeleteDetectionPack)
+
+			// Inner Rules (CVE virtual patches & external plugin feeds)
 			api.Get("/inner-rules", s.handleListInnerRules)
+			api.Get("/inner-rules/plugins", s.handleListInnerRulePlugins)
+			api.Post("/inner-rules/import", s.handleImportInnerRules)
 			api.Put("/inner-rules/{id}", s.handleUpdateInnerRule)
 			api.Put("/inner-rules/categories/{category}", s.handleUpdateInnerRuleCategory)
 

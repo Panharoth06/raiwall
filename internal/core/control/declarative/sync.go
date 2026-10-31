@@ -74,6 +74,7 @@ func Sync(ctx context.Context, store control.ControlStore, res *config.Declarati
 		{KindIdentityProvider, func() error { return s.syncIdentityProviders(res.IdentityProviders) }},
 		{KindTemplate, func() error { return s.syncTemplates(res.Templates) }},
 		{"detector", func() error { return s.syncDetector(res.Detector) }},
+		{"detection", func() error { return s.syncWAFConfig(res.Detector) }},
 	}
 
 	for _, step := range steps {

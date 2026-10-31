@@ -7,7 +7,7 @@ import (
 
 // OpenAPISpec returns the complete OpenAPI 3.1 JSON document for Raiwall Control Plane.
 func OpenAPISpec() map[string]any {
-	return map[string]any{
+	return mergeDetectionOpenAPI(map[string]any{
 		"openapi": "3.1.0",
 		"info": map[string]any{
 			"title":       "Raiwall Control Plane API",
@@ -219,7 +219,7 @@ func OpenAPISpec() map[string]any {
 				"delete": map[string]any{"summary": "Revoke API key (admin only)"},
 			},
 		},
-	}
+	})
 }
 
 // ServeOpenAPISpec writes the OpenAPI 3.1 JSON specification to the response.

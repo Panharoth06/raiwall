@@ -6,7 +6,6 @@ import AllowDenyTable from '@/components/acl/AllowDenyTable.vue'
 import AllowDenyModal from '@/components/acl/AllowDenyModal.vue'
 import { Button } from '@/components/ui/button'
 import AdminOnly from '@/components/auth/AdminOnly.vue'
-import { Badge } from '@/components/ui/badge'
 import { ConfirmDialog } from '@/components/ui/dialog'
 import { Plus, ShieldCheck } from 'lucide-vue-next'
 
@@ -102,7 +101,7 @@ const handleMoveDown = async (rule: ACLRule, index: number) => {
 </script>
 
 <template>
-  <div class="h-full flex flex-col space-y-6 p-6 bg-card text-card-foreground rounded-xl border border-border font-sans overflow-hidden">
+  <div class="space-y-6 font-sans">
     <!-- Standard View Header -->
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-border shrink-0">
       <div class="min-w-0">
@@ -116,9 +115,6 @@ const handleMoveDown = async (rule: ACLRule, index: number) => {
       </div>
 
       <div class="flex items-center gap-3">
-        <Badge variant="outline" class="font-mono text-xs uppercase">
-          Bytecode Engine · expr-lang · CIDR
-        </Badge>
         <AdminOnly>
           <Button
             @click="openAddRule"

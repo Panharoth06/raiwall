@@ -1,14 +1,17 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
-import { useRouter } from '@/router'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRoute } from '@/router'
 import { useConfigStore } from '@/stores/config'
 import type { ExceptionRule } from '@/api/client'
 import ExceptionTestModal from '@/components/ExceptionTestModal.vue'
+import DetectionHeroBanner from '@/components/detection/DetectionHeroBanner.vue'
+import { useHeroBanner } from '@/components/detection/useHeroBanner'
 import { Button } from '@/components/ui/button'
 import AdminOnly from '@/components/auth/AdminOnly.vue'
 import { Input } from '@/components/ui/input'
 import { ConfirmDialog } from '@/components/ui/dialog'
 import { EmptyState } from '@/components/ui/empty-state'
+import { TablePagination } from '@/components/ui/table-pagination'
 import {
   Tooltip,
   TooltipContent,
@@ -37,12 +40,12 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { Plus, Shield, ShieldCheck, Trash2, Play } from 'lucide-vue-next'
+import { HelpCircle, Plus, Shield, ShieldCheck, ShieldOff, Trash2, Play } from 'lucide-vue-next'
 
-const router = useRouter()
-const route = router.currentRoute
+const route = useRoute()
 const configStore = useConfigStore()
 
+const { showHero, toggleHero, dismissHero } = useHeroBanner('detection-exceptions')
 const showAddModal = ref(false)
 const addError = ref<string | null>(null)
 const newHost = ref('*')
@@ -58,6 +61,14 @@ const selectedRuleForTest = ref<ExceptionRule | null>(null)
 const deleteRuleId = ref<string | null>(null)
 const showDeleteConfirm = ref(false)
 
+const page = ref(1)
+const pageSize = ref(20)
+
+const paginatedExceptions = computed(() => {
+  const start = (page.value - 1) * pageSize.value
+  return configStore.exceptions.slice(start, start + pageSize.value)
+})
+
 const openAddModal = () => {
   newHost.value = '*'
   newPath.value = ''
@@ -71,7 +82,7 @@ const openAddModal = () => {
 }
 
 const checkQueryAndOpen = () => {
-  const q = route.value?.query
+  const q = route?.value?.query
   if (q && (q.path || q.param_name || q.rule_id)) {
     newHost.value = (q.host as string) || '*'
     newPath.value = (q.path as string) || ''
@@ -89,7 +100,7 @@ onMounted(() => {
   checkQueryAndOpen()
 })
 
-watch(() => route.value?.query, () => {
+watch(() => route?.value?.query, () => {
   checkQueryAndOpen()
 })
 
@@ -132,32 +143,61 @@ const executeDelete = async () => {
 </script>
 
 <template>
-  <div class="h-full flex flex-col space-y-6 p-6 bg-card text-card-foreground rounded-xl border border-border shadow-none font-sans overflow-hidden">
+  <div class="space-y-4 font-sans">
     <!-- Header -->
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-border shrink-0">
       <div>
         <h1 class="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
           <Shield class="w-5 h-5 text-primary" />
-          <span>False-Positive Exception Rules</span>
+          <span>False-Positive Exceptions</span>
         </h1>
         <p class="text-sm text-muted-foreground mt-1 leading-relaxed">
-          Granular parameter-level bypasses: Host + Path + Method + Location + Param Name.
+          Safely whitelist specific parameters, webhooks, or paths that contain legitimate symbols without lowering security globally.
         </p>
       </div>
 
-      <AdminOnly>
+      <div class="flex items-center gap-2 shrink-0">
         <Button
-          @click="openAddModal"
-          class="gap-1.5"
+          size="sm"
+          variant="outline"
+          class="h-8 text-xs gap-1.5"
+          :data-testid="'hero-toggle-exceptions'"
+          @click="toggleHero"
         >
-          <Plus class="w-4 h-4" />
-          <span>Add Exception Rule</span>
+          <HelpCircle class="w-3.5 h-3.5 text-primary" />
+          <span>{{ showHero ? 'Hide Guide' : 'Explain feature' }}</span>
         </Button>
-      </AdminOnly>
+        <AdminOnly>
+          <Button
+            @click="openAddModal"
+            size="sm"
+            class="h-8 text-xs gap-1.5"
+          >
+            <Plus class="w-4 h-4" />
+            <span>Add Exception Rule</span>
+          </Button>
+        </AdminOnly>
+      </div>
     </div>
 
+    <!-- Prominent Hero Section with Low-Opacity Background Icon -->
+    <DetectionHeroBanner
+      storage-key="detection-exceptions"
+      title="False-Positive Suppression & Parameter Exceptions"
+      badge="GRANULAR BYPASSES"
+      description="When legitimate traffic (such as webhook callbacks, Base64 payment tokens, or markdown editor inputs) contains characters that trigger WAF alerts, do not disable the WAF. Instead, create an exception rule to selectively bypass inspection for that specific Host, Path, Method, Location, and Parameter Name."
+      :icon="ShieldOff"
+      :highlights="[
+        { label: 'Surgical Precision', text: 'Whitelist exact parameters (query, body, header, cookie) without opening the route.' },
+        { label: 'Highest Priority Layer', text: 'Exceptions evaluate before all AST parsers and CRS anomaly checks.' },
+        { label: 'Forensic Linkage', text: '1-click exception generation directly from blocked attack logs under Attacks.' },
+      ]"
+      v-model:open="showHero"
+      @dismiss="dismissHero"
+    />
+
     <!-- Exceptions Table Container -->
-    <div class="flex-1 min-h-0 bg-card border border-border rounded-lg overflow-y-auto">
+    <div class="flex-1 min-h-0 bg-card border border-border rounded-lg overflow-auto">
       <EmptyState
         v-if="configStore.exceptions.length === 0"
         :icon="ShieldCheck"
@@ -189,7 +229,7 @@ const executeDelete = async () => {
           </TableRow>
         </TableHeader>
         <TableBody>
-          <TableRow v-for="rule in configStore.exceptions" :key="rule.id">
+          <TableRow v-for="rule in paginatedExceptions" :key="rule.id">
             <TableCell>
               <span class="text-foreground font-medium block font-mono text-sm">{{ rule.path }}</span>
               <span class="text-xs text-muted-foreground font-mono">{{ rule.host || '*' }}</span>
@@ -251,6 +291,16 @@ const executeDelete = async () => {
           </TableRow>
         </TableBody>
       </Table>
+
+      <TablePagination
+        :page="page"
+        :page-size="pageSize"
+        :total="configStore.exceptions.length"
+        :page-size-options="[10, 20, 50, 100]"
+        item-label="exceptions"
+        @update:page="(p) => page = p"
+        @update:page-size="(s) => { pageSize = s; page = 1; }"
+      />
     </div>
 
     <!-- Add Exception Modal -->

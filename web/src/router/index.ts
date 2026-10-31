@@ -38,6 +38,9 @@ export class SimpleRouter {
     params: {},
     query: {},
   });
+  public get currentRoute() {
+    return this.current;
+  }
   public activeComponent = shallowRef<Component | null>(null);
 
   constructor(routes: RouteRecord[]) {
@@ -234,10 +237,12 @@ import AntiBotView from '@/views/AntiBotView.vue';
 import HttpFloodView from '@/views/HttpFloodView.vue';
 import SettingsView from '@/views/SettingsView.vue';
 import DeploymentsView from '@/views/DeploymentsView.vue';
-import RulesView from '@/views/RulesView.vue';
 import BlockPagesView from '@/views/BlockPagesView.vue';
+import DetectionOverviewView from '@/views/detection/DetectionOverviewView.vue';
+import RuleCatalogView from '@/views/detection/RuleCatalogView.vue';
+import RulePacksView from '@/views/detection/RulePacksView.vue';
+import RuleTesterView from '@/views/detection/RuleTesterView.vue';
 import SemanticsView from '@/views/SemanticsView.vue';
-import InnerRulesView from '@/views/InnerRulesView.vue';
 import AuthGatewayView from '@/views/AuthGatewayView.vue';
 
 export const router = createSimpleRouter([
@@ -270,10 +275,18 @@ export const router = createSimpleRouter([
   { path: '/auth', name: 'auth', component: SettingsView },
   { path: '/system', name: 'system', component: SettingsView },
   { path: '/settings', name: 'settings', component: SettingsView },
-  { path: '/rules', name: 'rules', component: RulesView },
-  { path: '/exceptions', name: 'exceptions', component: ExceptionsView },
-  { path: '/semantics', name: 'semantics', component: SemanticsView },
-  { path: '/inner-rules', name: 'inner-rules', component: InnerRulesView },
+  // Detection workspace: one section, canonical paths. Legacy paths remain as
+  // aliases so old bookmarks and deep links keep working.
+  { path: '/detection', name: 'detection-overview', component: DetectionOverviewView },
+  { path: '/detection/rules', name: 'detection-rules', component: RuleCatalogView },
+  { path: '/detection/packs', name: 'detection-packs', component: RulePacksView },
+  { path: '/detection/modules', name: 'detection-modules', component: SemanticsView },
+  { path: '/detection/exceptions', name: 'detection-exceptions', component: ExceptionsView },
+  { path: '/detection/tester', name: 'detection-tester', component: RuleTesterView },
+  { path: '/rules', name: 'rules-alias', component: DetectionOverviewView },
+  { path: '/exceptions', name: 'exceptions-alias', component: ExceptionsView },
+  { path: '/semantics', name: 'semantics-alias', component: SemanticsView },
+  { path: '/inner-rules', name: 'inner-rules-alias', component: RuleCatalogView },
   { path: '/deployments', name: 'deployments', component: DeploymentsView },
   { path: '/snapshots', name: 'snapshots', component: DeploymentsView },
   { path: '/login', name: 'login', component: LoginView },

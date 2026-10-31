@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import type { ACLRule } from '@/api/client';
 import { formatConditionDetail } from './aclRuleTranspiler';
 import { Badge } from '@/components/ui/badge';
@@ -13,6 +13,7 @@ import {
   TableRow,
   TableCell,
 } from '@/components/ui/table';
+import { TablePagination } from '@/components/ui/table-pagination';
 import {
   Plus,
   Edit2,
@@ -37,6 +38,18 @@ const emit = defineEmits<{
   (e: 'move-down', rule: ACLRule, index: number): void;
   (e: 'add-rule'): void;
 }>();
+
+const page = ref(1);
+const pageSize = ref(20);
+
+watch(() => props.rules, () => {
+  page.value = 1;
+});
+
+const paginatedRules = computed(() => {
+  const start = (page.value - 1) * pageSize.value;
+  return props.rules.slice(start, start + pageSize.value);
+});
 
 const formatDate = (dateStr?: string) => {
   if (!dateStr) return '—';
@@ -93,18 +106,18 @@ const formatDate = (dateStr?: string) => {
           </TableRow>
         </TableHeader>
         <TableBody>
-          <TableRow v-for="(rule, idx) in rules" :key="rule.id">
+          <TableRow v-for="(rule, idx) in paginatedRules" :key="rule.id">
             <!-- 1. Order with Up/Down buttons -->
             <TableCell>
               <div class="flex items-center gap-1">
                 <span class="font-mono text-xs text-muted-foreground tabular-nums w-4">
-                  {{ idx + 1 }}
+                  {{ (page - 1) * pageSize + idx + 1 }}
                 </span>
                 <div class="flex flex-col">
                   <button
                     type="button"
-                    :disabled="idx === 0"
-                    @click="emit('move-up', rule, idx)"
+                    :disabled="(page - 1) * pageSize + idx === 0"
+                    @click="emit('move-up', rule, (page - 1) * pageSize + idx)"
                     class="text-muted-foreground hover:text-foreground disabled:opacity-20 cursor-pointer p-0.5"
                     title="Move up in priority"
                   >
@@ -112,8 +125,8 @@ const formatDate = (dateStr?: string) => {
                   </button>
                   <button
                     type="button"
-                    :disabled="idx === rules.length - 1"
-                    @click="emit('move-down', rule, idx)"
+                    :disabled="(page - 1) * pageSize + idx === rules.length - 1"
+                    @click="emit('move-down', rule, (page - 1) * pageSize + idx)"
                     class="text-muted-foreground hover:text-foreground disabled:opacity-20 cursor-pointer p-0.5"
                     title="Move down in priority"
                   >
@@ -215,6 +228,16 @@ const formatDate = (dateStr?: string) => {
           </TableRow>
         </TableBody>
       </Table>
+
+      <TablePagination
+        :page="page"
+        :page-size="pageSize"
+        :total="rules.length"
+        :page-size-options="[10, 20, 50, 100]"
+        item-label="rules"
+        @update:page="(p) => page = p"
+        @update:page-size="(s) => { pageSize = s; page = 1; }"
+      />
     </div>
   </div>
 </template>

@@ -116,6 +116,21 @@ type ControlStore interface {
 	ListDisabledInnerRules(ctx context.Context) ([]string, error)
 	SetInnerRuleDisabled(ctx context.Context, ruleID string, disabled bool) error
 	ClearDisabledInnerRules(ctx context.Context) error
+
+	// WAF Rule Catalog & Detection Policies
+	ListRulePacks(ctx context.Context) ([]RulePackRecord, error)
+	GetRulePack(ctx context.Context, id string) (RulePackRecord, error)
+	UpsertRulePack(ctx context.Context, rec RulePackRecord) error
+	DeleteRulePack(ctx context.Context, id string) error
+	ListRuleOverrides(ctx context.Context) ([]RuleOverrideRecord, error)
+	GetRuleOverride(ctx context.Context, canonicalID string) (RuleOverrideRecord, error)
+	UpsertRuleOverride(ctx context.Context, rec RuleOverrideRecord) error
+	DeleteRuleOverride(ctx context.Context, canonicalID string) error
+	ClearRuleOverrides(ctx context.Context) error
+	GetWAFPolicy(ctx context.Context, scope, appID string) (WAFPolicyRecord, error)
+	ListWAFPolicies(ctx context.Context) ([]WAFPolicyRecord, error)
+	UpsertWAFPolicy(ctx context.Context, rec WAFPolicyRecord) error
+	DeleteWAFPolicy(ctx context.Context, scope, appID string) error
 	ListIdentityUsers(ctx context.Context) ([]IdentityUserRecord, error)
 	GetIdentityUserByID(ctx context.Context, id string) (IdentityUserRecord, error)
 	GetIdentityUserByUsername(ctx context.Context, username string) (IdentityUserRecord, error)

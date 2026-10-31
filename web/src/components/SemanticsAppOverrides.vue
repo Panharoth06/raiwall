@@ -131,11 +131,23 @@ onMounted(loadSites);
     <!-- Empty state -->
     <div
       v-if="!selectedAppID"
-      class="grow flex flex-col items-center justify-start pt-10 pb-8 gap-1 text-muted-foreground text-center"
+      class="grow flex flex-col items-center justify-start pt-10 pb-8 gap-1.5 text-muted-foreground text-center px-4"
       data-testid="override-empty"
     >
+      <FileSliders class="w-8 h-8 text-muted-foreground/40 mb-2" />
       <p class="text-base font-semibold text-foreground">No site selected</p>
-      <p class="text-xs">Pick a site to shape its detection posture independently of the global matrix.</p>
+      <p class="text-xs max-w-sm">Pick a site to shape its detection posture independently of the global matrix.</p>
+      <div v-if="filteredSites.length > 0" class="flex flex-wrap items-center justify-center gap-1.5 mt-3 max-w-md">
+        <button
+          v-for="site in filteredSites.slice(0, 10)"
+          :key="site.id"
+          type="button"
+          class="px-2.5 py-1 text-xs font-mono rounded-md border border-border bg-card hover:border-primary text-foreground transition-colors cursor-pointer"
+          @click="selectApp(site.id)"
+        >
+          {{ site.name }}
+        </button>
+      </div>
     </div>
 
     <!-- Overrides table -->

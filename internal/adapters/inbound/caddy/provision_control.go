@@ -56,6 +56,11 @@ func (m *Middleware) provisionControl(ctx caddy.Context) error {
 		if m.ControlConfig != nil {
 			m.controlAPI.SetAutoApply(m.ControlConfig.AutoApply)
 		}
+		m.controlAPI.SetCRSDefaults(
+			m.CRSEnabled, m.CRSMode,
+			m.CRSParanoiaLevel, m.CRSInboundThreshold, m.CRSOutboundThreshold,
+		)
+		m.controlAPI.SetCRSEngineAvailable(m.crsEngine != nil)
 		m.ensureInitialAdminUser(m.controlStore)
 	}
 
@@ -128,6 +133,13 @@ func (m *Middleware) provisionControl(ctx caddy.Context) error {
 	// Access rules live in the versioned snapshot, so load them once here and
 	// rebuild on every deploy instead of freezing the boot-time rule set.
 	m.installACLEngineDeployHook()
+
+	// Detection exceptions and imported signatures are also snapshot-derived.
+	// Only install the hook when a control store exists; otherwise the YAML
+	// provisioning path remains authoritative.
+	if m.controlStore != nil {
+		m.installWAFEngineDeployHook()
+	}
 
 	return nil
 }

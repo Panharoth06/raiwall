@@ -82,6 +82,12 @@ func isSnapshotMutation(method, path string) bool {
 		return true
 	case path == "/detector", strings.HasPrefix(path, "/detector/"):
 		return true
+	case path == "/detection/status", path == "/detection/presets",
+		path == "/detection/packs/validate",
+		strings.HasPrefix(path, "/detection/policies/preview"):
+		return false
+	case path == "/detection", strings.HasPrefix(path, "/detection/"):
+		return true
 	case path == "/inner-rules", strings.HasPrefix(path, "/inner-rules/"):
 		return true
 	default:

@@ -9,7 +9,6 @@ import BotAppTable from '@/components/anti-bot/BotAppTable.vue';
 import BotProtectDialog from '@/components/anti-bot/BotProtectDialog.vue';
 import ChallengeActivity from '@/components/anti-bot/ChallengeActivity.vue';
 import type { BotAppRow } from '@/components/anti-bot/types';
-import { Badge } from '@/components/ui/badge';
 import { Bot, CheckCircle2, AlertTriangle } from 'lucide-vue-next';
 
 const route = useRoute();
@@ -131,6 +130,8 @@ function openFromQuery() {
   }
 }
 
+const activeSubTab = ref<'policies' | 'telemetry'>('policies');
+
 onMounted(async () => {
   void loadActivity();
   await loadConfigs();
@@ -139,9 +140,9 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="h-full flex flex-col space-y-6 p-6 bg-card text-card-foreground rounded-xl border border-border shadow-none font-sans overflow-hidden">
-    <div class="flex flex-wrap items-start justify-between gap-3 shrink-0">
-      <div class="min-w-0">
+  <div class="space-y-6 font-sans">
+    <div class="border-b border-border pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div>
         <h1 class="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
           <Bot class="w-5 h-5 text-muted-foreground" />
           <span>Anti-Bot Defense</span>
@@ -151,9 +152,28 @@ onMounted(async () => {
           challenge telemetry.
         </p>
       </div>
-      <Badge variant="outline" class="font-mono text-xs uppercase">
-        Application-scoped · PoW · JA4
-      </Badge>
+
+      <!-- Sub-Tab Switcher -->
+      <div class="flex items-center gap-1.5 p-1 bg-muted/40 border border-border rounded-lg shrink-0">
+        <button
+          type="button"
+          class="px-3 py-1.5 text-xs font-mono uppercase rounded-md transition-colors cursor-pointer"
+          :class="activeSubTab === 'policies' ? 'bg-background text-foreground font-semibold shadow-xs' : 'text-muted-foreground hover:text-foreground'"
+          data-testid="tab-bot-policies"
+          @click="activeSubTab = 'policies'"
+        >
+          Applications ({{ rows.length }})
+        </button>
+        <button
+          type="button"
+          class="px-3 py-1.5 text-xs font-mono uppercase rounded-md transition-colors cursor-pointer"
+          :class="activeSubTab === 'telemetry' ? 'bg-background text-foreground font-semibold shadow-xs' : 'text-muted-foreground hover:text-foreground'"
+          data-testid="tab-bot-telemetry"
+          @click="activeSubTab = 'telemetry'"
+        >
+          Challenge Telemetry ({{ challengeTotal }})
+        </button>
+      </div>
     </div>
 
     <div
@@ -173,29 +193,29 @@ onMounted(async () => {
     </div>
 
     <div class="flex-1 min-h-0 overflow-y-auto pr-1">
-      <div class="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
-        <div class="xl:col-span-2 min-w-0">
-          <BotAppTable
-            :rows="rows"
-            :loading="configsLoading"
-            :error="configsError"
-            @configure="openProtect"
-            @retry="loadConfigs"
-          />
-        </div>
+      <!-- Full-Width Application Policies View -->
+      <div v-show="activeSubTab === 'policies'" class="w-full">
+        <BotAppTable
+          :rows="rows"
+          :loading="configsLoading"
+          :error="configsError"
+          @configure="openProtect"
+          @retry="loadConfigs"
+        />
+      </div>
 
-        <div class="min-w-0">
-          <ChallengeActivity
-            :events="recentChallenges"
-            :challenge-total="challengeTotal"
-            :trap-total="trapTotal"
-            :spoof-total="spoofTotal"
-            :unique-ja4="uniqueJA4"
-            :loading="activityLoading"
-            :error="activityError"
-            @refresh="loadActivity"
-          />
-        </div>
+      <!-- Full-Width Challenge Telemetry View -->
+      <div v-show="activeSubTab === 'telemetry'" class="w-full">
+        <ChallengeActivity
+          :events="recentChallenges"
+          :challenge-total="challengeTotal"
+          :trap-total="trapTotal"
+          :spoof-total="spoofTotal"
+          :unique-ja4="uniqueJA4"
+          :loading="activityLoading"
+          :error="activityError"
+          @refresh="loadActivity"
+        />
       </div>
     </div>
 
@@ -203,6 +223,7 @@ onMounted(async () => {
       :open="dialogOpen"
       :target="dialogTarget"
       :config="dialogConfig"
+      :global-config="globalConfig"
       :inherited="dialogInherited"
       :custom="dialogCustom"
       :saving="dialogSaving"

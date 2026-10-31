@@ -102,5 +102,24 @@ func SnapshotInnerRuleState() *cve.RuleState {
 	if snap == nil {
 		return nil
 	}
-	return &cve.RuleState{Disabled: snap.InnerRulesDisabled}
+	state := &cve.RuleState{Disabled: snap.InnerRulesDisabled}
+	for canonical, override := range snap.RuleOverrides {
+		if override == nil || NormalizePolicyValue(override.Action) != RuleActionAlert {
+			continue
+		}
+		source, id, err := ParseCanonicalRuleID(canonical)
+		if err != nil {
+			continue
+		}
+		// Imported native rules are namespaced as <packID>:<ruleID> in the
+		// engine; the canonical ID carries exactly that suffix.
+		if source != RuleSourceCVE && source != RuleSourcePack {
+			continue
+		}
+		if state.Audit == nil {
+			state.Audit = make(map[string]struct{})
+		}
+		state.Audit[id] = struct{}{}
+	}
+	return state
 }

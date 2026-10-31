@@ -9,6 +9,7 @@ import (
 
 	"github.com/Panharoth06/raiwall/internal/core/acl"
 	"github.com/Panharoth06/raiwall/internal/core/waf"
+	"github.com/Panharoth06/raiwall/internal/core/waf/cve"
 )
 
 // RunMode represents the WAF and gateway operational protection mode.
@@ -210,6 +211,45 @@ type AppConfig struct {
 	RedirectStatus int    `json:"redirect_status,omitempty"`
 	// LoadBalancing selects the upstream selection policy.
 	LoadBalancing string `json:"load_balancing,omitempty"`
+	// WAFPolicy carries per-site detection overrides layered over the global policy.
+	WAFPolicy *WAFPolicySnapshot `json:"waf_policy,omitempty"`
+}
+
+// WAFPolicySnapshot is a global or per-site detection policy. Empty values
+// inherit from the enclosing scope; "inherit" is normalized to empty.
+type WAFPolicySnapshot struct {
+	DetectionMode        string                        `json:"detection_mode,omitempty"`
+	Sensitivity          string                        `json:"sensitivity,omitempty"`
+	SemanticOverrides    map[waf.Module]waf.ModuleMode `json:"semantic_overrides,omitempty"`
+	CRSEnabled           *bool                         `json:"crs_enabled,omitempty"`
+	CRSParanoiaLevel     int                           `json:"crs_paranoia_level,omitempty"`
+	CRSInboundThreshold  int                           `json:"crs_inbound_threshold,omitempty"`
+	CRSOutboundThreshold int                           `json:"crs_outbound_threshold,omitempty"`
+	DisabledPacks        []string                      `json:"disabled_packs,omitempty"`
+}
+
+// RulePackSnapshot is a self-contained imported rule pack. Files are retained
+// so a rollback reproduces the exact ruleset that was compiled.
+type RulePackSnapshot struct {
+	ID             string            `json:"id"`
+	Name           string            `json:"name"`
+	Version        string            `json:"version"`
+	Type           string            `json:"type"`
+	Priority       int               `json:"priority,omitempty"`
+	Enabled        bool              `json:"enabled"`
+	ReplaceBuiltin bool              `json:"replace_builtin,omitempty"`
+	Rules          []cve.Signature   `json:"rules,omitempty"`
+	Directives     string            `json:"directives,omitempty"`
+	Files          map[string]string `json:"files,omitempty"`
+	Checksum       string            `json:"checksum,omitempty"`
+}
+
+// RuleOverrideSnapshot is a per-rule catalog override. Nil Enabled and empty
+// Action/Severity mean the rule inherits its source default.
+type RuleOverrideSnapshot struct {
+	Enabled  *bool  `json:"enabled,omitempty"`
+	Severity string `json:"severity,omitempty"`
+	Action   string `json:"action,omitempty"`
 }
 
 // RatePolicySnapshot holds compiled rate limiting configuration for a host or global (*).
@@ -253,6 +293,12 @@ type ConfigSnapshot struct {
 	// InnerRulesDisabled holds virtual-patch (inner rule) signatures switched
 	// off at runtime; every bundled rule is enabled unless listed here.
 	InnerRulesDisabled map[string]struct{} `json:"inner_rules_disabled,omitempty"`
+	// WAFPolicy is the global detection policy (mode, sensitivity, CRS, packs).
+	WAFPolicy *WAFPolicySnapshot `json:"waf_policy,omitempty"`
+	// RulePacks contains every imported pack, self-contained for rollback.
+	RulePacks []*RulePackSnapshot `json:"rule_packs,omitempty"`
+	// RuleOverrides maps canonical rule IDs (source:id) to catalog overrides.
+	RuleOverrides map[string]*RuleOverrideSnapshot `json:"rule_overrides,omitempty"`
 	// AppAuthSessionSecret signs the per-site clearance cookie (sl_jwt_session)
 	// for zero-trust HTTP 467 gates; unified SSO across authorized sites.
 	AppAuthSessionSecret string `json:"app_auth_session_secret,omitempty"`
@@ -349,14 +395,13 @@ func (s *ConfigSnapshot) SemanticMatrixFor(appID string) waf.SemanticMatrix {
 		return waf.DefaultMatrix()
 	}
 
-	base := waf.DefaultMatrix().ApplyOverrides(s.SemanticDefaults)
-	if appID == "" {
-		return base
+	policy := s.ResolveWAFPolicyFor(appID)
+	base := waf.MatrixForSensitivity(policy.Sensitivity)
+	base = base.ApplyOverrides(s.SemanticDefaults)
+	if app, ok := s.Apps[appID]; ok && app != nil {
+		base = base.ApplyOverrides(app.SemanticPolicy)
 	}
-	if app, ok := s.Apps[appID]; ok && app != nil && len(app.SemanticPolicy) > 0 {
-		return base.ApplyOverrides(app.SemanticPolicy)
-	}
-	return base
+	return base.ApplyOverrides(policy.SemanticOverrides)
 }
 
 // GetRatePolicyForHost resolves a RatePolicySnapshot matching the incoming Host header, or falls back to wildcard (*).

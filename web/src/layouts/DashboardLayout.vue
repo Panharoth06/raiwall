@@ -13,7 +13,6 @@ import {
   Braces,
   Lock,
   Settings,
-  LogOut,
   AlertTriangle,
   Sun,
   Moon,
@@ -22,8 +21,13 @@ import {
   Rocket,
   Menu,
   X,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-vue-next';
 import { useTheme } from '@/composables/useTheme';
+import BreadcrumbNav from '@/components/navigation/BreadcrumbNav.vue';
+import NavbarSearchMenu from '@/components/navigation/NavbarSearchMenu.vue';
+import NavbarAdminProfile from '@/components/navigation/NavbarAdminProfile.vue';
 
 const router = useRouter();
 const route = useRoute();
@@ -74,12 +78,16 @@ const navItems: NavItem[] = [
   { name: 'Anti-Bot', path: '/anti-bot', icon: Bot, testId: 'nav-anti-bot' },
   {
     name: 'Detection',
-    path: '/semantics',
+    path: '/detection',
     icon: Braces,
     testId: 'nav-detection',
     children: [
-      { name: 'Semantic Matrix', path: '/semantics', testId: 'nav-semantic-matrix' },
-      { name: 'Inner Rules', path: '/inner-rules', testId: 'nav-inner-rules' },
+      { name: 'Overview & Policy', path: '/detection', testId: 'nav-detection-overview' },
+      { name: 'Rule Catalog', path: '/detection/rules', testId: 'nav-rule-catalog' },
+      { name: 'Rule Packs', path: '/detection/packs', testId: 'nav-rule-packs' },
+      { name: 'Semantic Matrix', path: '/detection/modules', testId: 'nav-semantic-matrix' },
+      { name: 'Exceptions', path: '/detection/exceptions', testId: 'nav-detection-exceptions' },
+      { name: 'Rule Tester', path: '/detection/tester', testId: 'nav-detection-tester' },
     ],
   },
   { name: 'Block Pages', path: '/block-pages', icon: FileCode, testId: 'nav-block-pages' },
@@ -101,6 +109,22 @@ const navItems: NavItem[] = [
 
 const expandedMenus = ref<Record<string, boolean>>({});
 const mobileNavOpen = ref(false);
+const isCollapsed = ref<boolean>(
+  typeof localStorage !== 'undefined'
+    ? localStorage.getItem('raiwall_sidebar_collapsed') === 'true'
+    : false
+);
+
+const toggleSidebar = () => {
+  isCollapsed.value = !isCollapsed.value;
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem('raiwall_sidebar_collapsed', String(isCollapsed.value));
+  }
+};
+
+const handleCollapsedNavClick = (item: NavItem) => {
+  navigateTo(item.children?.[0]?.path || item.path);
+};
 
 const isExpanded = (path: string): boolean => {
   if (expandedMenus.value[path] !== undefined) {
@@ -130,12 +154,24 @@ const isChildActive = (childPath: string): boolean => {
       currentPath.value.startsWith('/http-flood/limits')
     );
   }
+  if (childPath === '/detection') {
+    return currentPath.value === '/detection' || currentPath.value === '/rules';
+  }
   return currentPath.value.startsWith(childPath);
 };
 
 const isItemActive = (path: string): boolean => {
   if (path === '/statistics') {
     return currentPath.value === '/' || currentPath.value.startsWith('/statistics');
+  }
+  if (path === '/detection') {
+    return (
+      currentPath.value.startsWith('/detection') ||
+      currentPath.value.startsWith('/semantics') ||
+      currentPath.value.startsWith('/inner-rules') ||
+      currentPath.value.startsWith('/exceptions') ||
+      currentPath.value === '/rules'
+    );
   }
   if (path === '/allow-deny') {
     return currentPath.value.startsWith('/allow-deny') || currentPath.value.startsWith('/acls');
@@ -153,12 +189,6 @@ const navigateTo = (path: string) => {
   mobileNavOpen.value = false;
   router.push(path);
 };
-
-const handleLogout = async () => {
-  mobileNavOpen.value = false;
-  await authStore.logout();
-  router.push('/login');
-};
 </script>
 
 <template>
@@ -174,24 +204,39 @@ const handleLogout = async () => {
     <!-- Persistent Left Sidebar with Command Center Theme -->
     <aside
       data-testid="nav-rail"
-      class="fixed inset-y-0 left-0 z-40 w-60 h-full bg-card border-r border-border flex flex-col flex-shrink-0 select-none overflow-hidden transition-transform duration-150 lg:static lg:translate-x-0"
-      :class="mobileNavOpen ? 'translate-x-0' : '-translate-x-full'"
+      class="fixed inset-y-0 left-0 z-40 h-full bg-card border-r border-border flex flex-col flex-shrink-0 select-none overflow-hidden transition-[width,transform] duration-200 ease-in-out lg:static"
+      :class="[
+        mobileNavOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
+        isCollapsed ? 'w-60 lg:w-[68px]' : 'w-60',
+      ]"
     >
       <!-- Brand Header with Crisp High-Resolution PNG Logo -->
-      <div class="h-14 px-4 border-b border-border flex items-center justify-between flex-shrink-0">
-        <div data-testid="brand-logo" class="flex items-center gap-2.5">
+      <div
+        class="h-14 border-b border-border flex items-center flex-shrink-0 transition-all duration-200"
+        :class="isCollapsed ? 'px-3 justify-center' : 'px-4 justify-between'"
+      >
+        <div
+          data-testid="brand-logo"
+          class="flex items-center gap-2.5 min-w-0"
+        >
           <img
             src="/raiwall-logo.png"
             alt="Raiwall"
             class="w-8 h-8 object-contain flex-shrink-0"
             style="image-rendering: -webkit-optimize-contrast;"
           />
-          <span class="font-bold text-foreground text-base tracking-tight block">Raiwall</span>
+          <span
+            v-if="!isCollapsed"
+            class="font-bold text-foreground text-base tracking-tight block truncate animate-in fade-in-0 duration-150"
+          >
+            Raiwall
+          </span>
         </div>
+
         <button
           type="button"
           data-testid="nav-mobile-close"
-          class="lg:hidden flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+          class="lg:hidden flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer shrink-0"
           aria-label="Close navigation"
           @click="mobileNavOpen = false"
         >
@@ -199,12 +244,45 @@ const handleLogout = async () => {
         </button>
       </div>
 
+      <!-- Searchbar in Sidebar -->
+      <div
+        class="pb-1 flex-shrink-0 transition-all duration-200"
+        :class="isCollapsed ? 'px-2 pt-2.5 flex justify-center' : 'px-3 pt-3'"
+      >
+        <NavbarSearchMenu :collapsed="isCollapsed" />
+      </div>
+
       <!-- Navigation Links with Vertical Auto-Scroll -->
-      <nav class="flex-1 min-h-0 px-3 py-2 space-y-1 overflow-y-auto">
+      <nav
+        class="flex-1 min-h-0 py-2 space-y-1 overflow-y-auto"
+        :class="isCollapsed ? 'px-2' : 'px-3'"
+      >
         <div v-for="item in navItems" :key="item.path" class="space-y-0.5">
-          <!-- Standard Nav Item (without children) -->
+          <!-- Collapsed Mode: Centered Icon Button with Tooltip -->
           <button
-            v-if="!item.children"
+            v-if="isCollapsed"
+            :data-testid="item.testId"
+            type="button"
+            @click="handleCollapsedNavClick(item)"
+            :title="item.name"
+            :aria-label="item.name"
+            :class="[
+              'w-full flex items-center justify-center p-2.5 rounded-lg text-[15px] font-medium transition-colors cursor-pointer',
+              isItemActive(item.path)
+                ? 'bg-primary/10 text-primary font-semibold'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+            ]"
+          >
+            <component
+              :is="item.icon"
+              class="w-[18px] h-[18px] flex-shrink-0"
+              :class="isItemActive(item.path) ? 'text-primary' : 'text-muted-foreground'"
+            />
+          </button>
+
+          <!-- Expanded Mode: Standard Nav Item (without children) -->
+          <button
+            v-else-if="!item.children"
             :data-testid="item.testId"
             type="button"
             @click="navigateTo(item.path)"
@@ -223,7 +301,7 @@ const handleLogout = async () => {
             <span class="truncate" :class="isItemActive(item.path) ? 'text-foreground font-semibold' : 'text-muted-foreground'">{{ item.name }}</span>
           </button>
 
-          <!-- Nav Item with Nested Children (dropdown with arrow toggle) -->
+          <!-- Expanded Mode: Nav Item with Nested Children (dropdown with arrow toggle) -->
           <div
             v-else
             :class="[
@@ -265,8 +343,9 @@ const handleLogout = async () => {
             </button>
           </div>
 
-          <!-- Dropped Nested Sub-Menu with Animation -->
+          <!-- Dropped Nested Sub-Menu with Animation (Expanded Mode Only) -->
           <Transition
+            v-if="!isCollapsed"
             enter-active-class="transition-all duration-200 ease-out overflow-hidden"
             enter-from-class="opacity-0 max-h-0"
             enter-to-class="opacity-100 max-h-40"
@@ -298,28 +377,20 @@ const handleLogout = async () => {
         </div>
       </nav>
 
-      <!-- Bottom User Profile & Session Controls with Pinned mt-auto -->
-      <div class="p-3 border-t border-border bg-card flex items-center justify-between mt-auto flex-shrink-0">
-        <div class="flex items-center gap-2.5 min-w-0">
-          <div class="h-8 w-8 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0">
-            {{ authStore.user?.username?.slice(0, 2).toUpperCase() || 'AD' }}
-          </div>
-          <div class="min-w-0">
-            <span class="text-sm font-medium text-foreground block truncate">
-              {{ authStore.user?.username || 'Operator' }}
-            </span>
-            <span class="text-xs text-primary uppercase tracking-wider block font-semibold font-mono">
-              {{ authStore.user?.role || 'admin' }}
-            </span>
-          </div>
-        </div>
+      <!-- Footer Collapse/Expand Toggle Button (Desktop) - The ONE and only sidebar collapse toggle -->
+      <div class="p-2 border-t border-border flex-shrink-0 hidden lg:flex items-center justify-center">
         <button
-          data-testid="logout-btn"
-          @click="handleLogout"
-          title="Sign out"
-          class="p-1.5 text-muted-foreground hover:text-threat hover:bg-muted rounded-md transition-colors cursor-pointer"
+          type="button"
+          data-testid="sidebar-collapse-toggle"
+          @click="toggleSidebar"
+          class="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+          :class="isCollapsed ? 'justify-center' : 'justify-start'"
+          :title="isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+          :aria-label="isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
         >
-          <LogOut class="w-4 h-4" />
+          <PanelLeftOpen v-if="isCollapsed" class="w-4 h-4 shrink-0" />
+          <PanelLeftClose v-else class="w-4 h-4 shrink-0" />
+          <span v-if="!isCollapsed" class="truncate font-medium">Collapse</span>
         </button>
       </div>
     </aside>
@@ -327,12 +398,14 @@ const handleLogout = async () => {
     <!-- Main Content Canvas Area -->
     <div class="flex-1 h-full flex flex-col min-w-0 min-h-0 bg-background overflow-hidden">
       <!-- Top Action Bar -->
-      <header class="h-14 bg-card border-b border-border px-5 flex items-center justify-between flex-shrink-0">
-        <div class="flex items-center gap-3">
+      <header class="h-14 bg-card border-b border-border px-3 sm:px-5 flex items-center justify-between gap-2 sm:gap-4 flex-shrink-0">
+        <!-- Left Side: Mobile Toggle + Breadcrumb Navigation -->
+        <div class="flex-1 min-w-0 flex items-center gap-2 sm:gap-3">
+          <!-- Mobile Sidebar Toggle -->
           <button
             type="button"
             data-testid="nav-mobile-toggle"
-            class="lg:hidden flex items-center justify-center w-8 h-8 rounded-md border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+            class="lg:hidden flex items-center justify-center w-8 h-8 rounded-md border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer shrink-0"
             :aria-label="mobileNavOpen ? 'Close navigation' : 'Open navigation'"
             :aria-expanded="mobileNavOpen"
             @click="mobileNavOpen = !mobileNavOpen"
@@ -340,36 +413,45 @@ const handleLogout = async () => {
             <X v-if="mobileNavOpen" class="w-4 h-4" />
             <Menu v-else class="w-4 h-4" />
           </button>
+
+          <!-- Route Breadcrumb Navigation -->
+          <BreadcrumbNav />
+
           <!-- Staged Deployment Alert Banner -->
           <button
             v-if="configStore.hasDraftChanges"
             data-testid="staged-changes-banner"
             @click="navigateTo('/deployments')"
-            class="flex items-center gap-1.5 px-2.5 py-1 bg-warning/10 border border-warning/30 rounded-md text-xs text-warning hover:bg-warning/20 transition-colors cursor-pointer font-medium"
+            class="hidden 2xl:flex items-center gap-1.5 px-2.5 py-1 bg-warning/10 border border-warning/30 rounded-md text-xs text-warning hover:bg-warning/20 transition-colors cursor-pointer font-medium shrink-0"
           >
             <AlertTriangle class="w-3.5 h-3.5 text-warning" />
             <span>{{ configStore.diffs.length }} staged changes ready to deploy</span>
           </button>
         </div>
 
-        <!-- Right Side Controls (Circular Theme Toggle) -->
-        <div class="flex items-center gap-3">
+        <!-- Right Side Controls (Circular Theme Toggle + Admin Profile) -->
+        <div class="flex items-center justify-end gap-2 sm:gap-3 shrink-0">
           <button
             data-testid="theme-toggle-btn"
             type="button"
             @click="toggleTheme"
-            class="flex items-center justify-center w-8 h-8 rounded-full border border-border bg-card text-foreground hover:bg-muted transition-colors cursor-pointer"
+            class="flex items-center justify-center w-8 h-8 rounded-full border border-border bg-card text-foreground hover:bg-muted transition-colors cursor-pointer shrink-0"
             :title="isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'"
             :aria-label="isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'"
           >
             <Sun v-if="isDark" class="w-4 h-4 text-warning" />
             <Moon v-else class="w-4 h-4 text-primary" />
           </button>
+
+          <div class="h-4 w-px bg-border shrink-0 hidden sm:block" />
+
+          <!-- Admin Profile moved to navbar -->
+          <NavbarAdminProfile />
         </div>
       </header>
 
       <!-- View Slot Content -->
-      <main class="flex-1 min-h-0 overflow-y-auto p-4 bg-background flex flex-col">
+      <main class="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 bg-background flex flex-col">
         <div
           v-if="!authStore.isAdmin"
           data-testid="viewer-banner"

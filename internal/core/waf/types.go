@@ -41,6 +41,7 @@ type Verdict struct {
 	MatchedToken    string      `json:"matched_token,omitempty"`
 	AttackCategory  string      `json:"attack_category,omitempty"`
 	Engine          string      `json:"engine,omitempty"`
+	Severity        string      `json:"severity,omitempty"`
 	AnomalyScore    float64     `json:"anomaly_score,omitempty"`
 	ParanoiaLevel   int         `json:"paranoia_level,omitempty"`
 	MatchedRules    []RuleMatch `json:"matched_rules,omitempty"`

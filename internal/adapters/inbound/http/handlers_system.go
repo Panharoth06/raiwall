@@ -29,6 +29,24 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+type updateAutoApplyRequest struct {
+	AutoApply bool `json:"auto_apply"`
+}
+
+func (s *Server) handleUpdateAutoApply(w http.ResponseWriter, r *http.Request) {
+	var req updateAutoApplyRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
+		return
+	}
+
+	s.SetAutoApply(req.AutoApply)
+	respondJSON(w, http.StatusOK, map[string]any{
+		"success":    true,
+		"auto_apply": s.AutoApplyEnabled(),
+	})
+}
+
 func (s *Server) handleClusterStatus(w http.ResponseWriter, r *http.Request) {
 	snap := control.GetActiveSnapshot()
 	var ver uint64 = 1

@@ -408,15 +408,7 @@ func (f *File) validateResources(v *validator) {
 		}
 	}
 
-	if f.Detector != nil {
-		for module, mode := range f.Detector.Modules {
-			switch strings.ToLower(mode) {
-			case "disabled", "audit", "balance", "strict":
-			default:
-				v.add("detector.modules.%s mode %q must be disabled, audit, balance, or strict", module, mode)
-			}
-		}
-	}
+	validateDetectorConfig(v, f.Detector)
 }
 
 func enabled(v *bool) bool { return v == nil || *v }

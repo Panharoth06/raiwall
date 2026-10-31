@@ -11,6 +11,7 @@ import (
 	"github.com/Panharoth06/raiwall/internal/core/rate"
 	"github.com/Panharoth06/raiwall/internal/core/telemetry"
 	"github.com/Panharoth06/raiwall/internal/core/waf"
+	"github.com/Panharoth06/raiwall/internal/core/waf/cve"
 )
 
 // SetEngine overrides the inspection engine (used for testing or custom engine injection).
@@ -28,17 +29,26 @@ func (m *Middleware) RunMode() control.RunMode {
 	return m.runMode
 }
 
-// SetExceptionEngine overrides the ExceptionEngine (used for testing).
+// SetExceptionEngine overrides the ExceptionEngine and pushes it into the live
+// inspection engine atomically (used by deploys and tests).
 func (m *Middleware) SetExceptionEngine(ee *acl.ExceptionEngine) {
-	m.exceptionEngine = ee
-	if sem, ok := m.engine.(*waf.SemanticEngine); ok {
-		sem.SetExceptionEngine(ee)
+	m.exceptionEngine.Store(ee)
+	if setter, ok := m.engine.(interface{ SetExceptionEngine(waf.ExceptionMatcher) }); ok {
+		setter.SetExceptionEngine(ee)
 	}
 }
 
 // ExceptionEngine returns the configured ExceptionEngine.
 func (m *Middleware) ExceptionEngine() *acl.ExceptionEngine {
-	return m.exceptionEngine
+	return m.exceptionEngine.Load()
+}
+
+// SetInnerRules swaps the virtual-patch engine inside the live inspection
+// engine. The swap is atomic, so requests never observe a partial rule set.
+func (m *Middleware) SetInnerRules(engine *cve.Engine) {
+	if setter, ok := m.engine.(interface{ SetInnerRules(*cve.Engine) }); ok {
+		setter.SetInnerRules(engine)
+	}
 }
 
 // SetBARTTable overrides the BARTTable (used for testing).

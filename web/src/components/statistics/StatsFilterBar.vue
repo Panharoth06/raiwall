@@ -23,7 +23,7 @@ const props = defineProps<{
   selectedCountry: string
   sites: Site[]
   loading: boolean
-  isConnected: boolean
+  isConnected?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -134,17 +134,6 @@ function applyCustomRange() {
           >
             <X class="w-3 h-3" />
           </Button>
-        </div>
-
-        <!-- Live SSE Stream Status -->
-        <div class="flex items-center gap-1.5 px-2.5 py-1 text-xs font-mono rounded-lg border border-border bg-card text-muted-foreground">
-          <span
-            :class="[
-              'w-2 h-2 rounded-full transition-colors',
-              isConnected ? 'bg-success animate-pulse' : 'bg-muted-foreground/50',
-            ]"
-          />
-          <span class="hidden sm:inline">{{ isConnected ? 'LIVE' : 'SYNC' }}</span>
         </div>
 
         <!-- Refresh Button -->

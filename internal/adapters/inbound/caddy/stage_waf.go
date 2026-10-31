@@ -76,9 +76,17 @@ func (m *Middleware) inspectWAFRequest(
 			m.engine = waf.NewPassthroughEngine()
 		}
 
-		verdict, err = m.engine.InspectRequest(reqContext)
-		if err != nil && m.logger != nil {
-			m.logger.Error("WAF inspection error", zap.Error(err))
+		policyMode := detectionModeFor(appCfg)
+		if policyMode == control.DetectionModeOff {
+			verdict = waf.VerdictAllow
+		} else {
+			verdict, err = m.engine.InspectRequest(reqContext)
+			if err != nil && m.logger != nil {
+				m.logger.Error("WAF inspection error", zap.Error(err))
+			}
+			if policyMode == control.DetectionModeAlert {
+				verdict = waf.DowngradeToAudit(verdict)
+			}
 		}
 	}
 
@@ -105,7 +113,7 @@ func (m *Middleware) inspectWAFRequest(
 				GeoData:          m.lookupGeo(clientIP),
 				RuleID:           verdict.RuleID,
 				Action:           "log",
-				Severity:         "high",
+				Severity:         severityForVerdict(verdict),
 				Headers:          extractHeadersMap(r.Header),
 				TruncatedPayload: string(bodyBytes),
 				Latency:          time.Since(startTime),
@@ -160,7 +168,7 @@ func (m *Middleware) inspectWAFRequest(
 				GeoData:          m.lookupGeo(clientIP),
 				RuleID:           verdict.RuleID,
 				Action:           "block",
-				Severity:         "critical",
+				Severity:         severityForVerdict(verdict),
 				Headers:          extractHeadersMap(r.Header),
 				TruncatedPayload: string(bodyBytes),
 				Latency:          time.Since(startTime),
@@ -189,4 +197,41 @@ func (m *Middleware) inspectWAFRequest(
 	}
 
 	return verdict, bodyBytes, false, err
+}
+
+// severityForVerdict applies per-rule severity overrides to telemetry.
+func severityForVerdict(verdict *waf.Verdict) string {
+	if verdict == nil {
+		return "high"
+	}
+	if verdict.Severity != "" {
+		return verdict.Severity
+	}
+	if snap := control.GetActiveSnapshot(); snap != nil {
+		candidates := []string{
+			control.CanonicalRuleID(control.RuleSourceCVE, verdict.RuleID),
+			control.CanonicalRuleID(control.RuleSourcePack, verdict.RuleID),
+			control.CanonicalRuleID(control.RuleSourceCRS, strings.TrimPrefix(verdict.RuleID, "CRS_")),
+		}
+		for _, canonical := range candidates {
+			if override := snap.RuleOverrides[canonical]; override != nil && override.Severity != "" {
+				return override.Severity
+			}
+		}
+	}
+	return "critical"
+}
+
+// detectionModeFor resolves the snapshot detection mode for an application.
+// An empty result means no explicit policy: the run mode remains authoritative.
+func detectionModeFor(appCfg *control.AppConfig) string {
+	snap := control.GetActiveSnapshot()
+	if snap == nil {
+		return ""
+	}
+	appID := ""
+	if appCfg != nil {
+		appID = appCfg.ID
+	}
+	return snap.DetectionModeFor(appID)
 }

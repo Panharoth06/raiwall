@@ -333,6 +333,8 @@ func ValidateSnapshot(snap *ConfigSnapshot) error {
 		}
 	}
 
+	errs = append(errs, validateWAFConfig(snap)...)
+
 	if len(errs) > 0 {
 		return &ValidationErrors{Errors: errs}
 	}

@@ -105,4 +105,36 @@ describe('DashboardLayout.vue (Task 74)', () => {
     await themeBtn.trigger('click');
     expect(document.documentElement.classList.contains('light') || document.documentElement.classList.contains('dark')).toBe(true);
   });
+
+  it('renders breadcrumbs, sidebar search menu, and admin profile in the navbar', () => {
+    const wrapper = mount(DashboardLayout);
+
+    // Breadcrumbs in navbar
+    expect(wrapper.find('[data-testid="navbar-breadcrumbs"]').exists()).toBe(true);
+
+    // Search menu in sidebar
+    expect(wrapper.find('[data-testid="navbar-search-menu"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="navbar-search-trigger"]').exists()).toBe(true);
+
+    // Admin profile in navbar
+    expect(wrapper.find('[data-testid="navbar-admin-profile"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="logout-btn"]').exists()).toBe(true);
+  });
+
+  it('toggles sidebar collapse state on desktop', async () => {
+    const wrapper = mount(DashboardLayout);
+    const rail = wrapper.find('[data-testid="nav-rail"]');
+    expect(rail.classes()).toContain('w-60');
+
+    // Toggle collapse via single collapse button in sidebar footer
+    const collapseToggle = wrapper.find('[data-testid="sidebar-collapse-toggle"]');
+    expect(collapseToggle.exists()).toBe(true);
+
+    await collapseToggle.trigger('click');
+    expect(rail.classes()).toContain('lg:w-[68px]');
+
+    // Toggle expand via the same collapse button
+    await collapseToggle.trigger('click');
+    expect(rail.classes()).toContain('w-60');
+  });
 });

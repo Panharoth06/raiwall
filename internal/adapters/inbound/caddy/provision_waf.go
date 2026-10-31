@@ -15,15 +15,16 @@ import (
 
 func (m *Middleware) provisionWAF(_ caddy.Context) error {
 	// Provision Exception Engine early so it can be wired into SemanticEngine
-	if m.exceptionEngine == nil {
+	if m.exceptionEngine.Load() == nil {
 		if m.ExceptionConfig != nil && len(m.ExceptionConfig.Rules) > 0 {
 			eng, err := acl.NewExceptionEngine(m.ExceptionConfig.Rules...)
 			if err != nil {
 				return fmt.Errorf("provision exception engine: %w", err)
 			}
-			m.exceptionEngine = eng
+			m.exceptionEngine.Store(eng)
 		} else {
-			m.exceptionEngine, _ = acl.NewExceptionEngine()
+			eng, _ := acl.NewExceptionEngine()
+			m.exceptionEngine.Store(eng)
 		}
 	}
 
@@ -35,8 +36,8 @@ func (m *Middleware) provisionWAF(_ caddy.Context) error {
 		if m.MaxParamSize > 0 {
 			opts = append(opts, waf.WithMaxParamSize(m.MaxParamSize))
 		}
-		if m.exceptionEngine != nil {
-			opts = append(opts, waf.WithExceptionEngine(m.exceptionEngine))
+		if ee := m.exceptionEngine.Load(); ee != nil {
+			opts = append(opts, waf.WithExceptionEngine(ee))
 		}
 		// Resolve per-app semantic matrices live from the atomic config snapshot.
 		opts = append(opts, waf.WithMatrixSource(control.SnapshotMatrixSource{}))
@@ -64,6 +65,7 @@ func (m *Middleware) provisionWAF(_ caddy.Context) error {
 			if err != nil {
 				return fmt.Errorf("provision OWASP CRS engine: %w", err)
 			}
+			m.crsEngine = crsEngine
 			m.engine = waf.NewCompositeEngine(semantic, crsEngine)
 			if m.logger != nil {
 				m.logger.Info("OWASP CRS enabled",
@@ -72,8 +74,8 @@ func (m *Middleware) provisionWAF(_ caddy.Context) error {
 				)
 			}
 		}
-	} else if sem, ok := m.engine.(*waf.SemanticEngine); ok {
-		sem.SetExceptionEngine(m.exceptionEngine)
+	} else if setter, ok := m.engine.(interface{ SetExceptionEngine(waf.ExceptionMatcher) }); ok {
+		setter.SetExceptionEngine(m.exceptionEngine.Load())
 	}
 
 	return nil

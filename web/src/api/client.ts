@@ -474,6 +474,11 @@ export const api = {
   getClusterStatus: () =>
     request<{ mode: string; redis_connected: boolean; active_version: number; channel: string }>('/cluster/status'),
   getStatus: () => request<SystemStatus>('/status'),
+  setAutoApply: (enabled: boolean) =>
+    request<{ success: boolean; auto_apply: boolean }>('/system/auto-apply', {
+      method: 'PUT',
+      body: JSON.stringify({ auto_apply: enabled }),
+    }),
 
   // Telemetry
   listEvents: (params?: EventQueryParams) => {

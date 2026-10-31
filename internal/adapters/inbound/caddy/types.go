@@ -17,6 +17,7 @@ import (
 	"github.com/Panharoth06/raiwall/internal/core/rate"
 	"github.com/Panharoth06/raiwall/internal/core/telemetry"
 	"github.com/Panharoth06/raiwall/internal/core/waf"
+	"github.com/Panharoth06/raiwall/internal/core/waf/crs"
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 	"go.uber.org/zap"
@@ -203,10 +204,13 @@ type Middleware struct {
 	waitingRoom  *rate.WaitingRoomManager
 	rateStorage  rate.RateStorage
 
-	exceptionEngine *acl.ExceptionEngine
-	bartTable       *acl.BARTTable
-	ipGroupMgr      *acl.IPGroupManager
-	geoIPReader     acl.GeoIPReader
+	exceptionEngine atomic.Pointer[acl.ExceptionEngine]
+	// crsEngine is the reloadable Coraza ruleset engine (embedded CRS plus
+	// imported ModSecurity packs). Nil when CRS is disabled at provision time.
+	crsEngine   *crs.Engine
+	bartTable   *acl.BARTTable
+	ipGroupMgr  *acl.IPGroupManager
+	geoIPReader acl.GeoIPReader
 	// aclEngine is swapped atomically on every configuration deploy so the
 	// hot path never takes a lock while the rule set changes.
 	aclEngine atomic.Pointer[acl.ACLEngine]

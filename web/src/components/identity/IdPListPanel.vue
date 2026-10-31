@@ -111,10 +111,16 @@ const configSummary = (provider: IdentityProvider): string => {
       <span>Loading connectors…</span>
     </div>
 
-    <div v-else-if="providers.length === 0" class="flex-1 flex flex-col items-center justify-start pt-10 pb-12 space-y-1 text-center" data-testid="idp-empty">
-      <PlugZap class="w-8 h-8 text-muted-foreground/60 mb-2" />
-      <span class="text-base font-semibold text-foreground">No external directory connected</span>
-      <span class="text-xs text-muted-foreground">The built-in account directory serves logins. OIDC, LDAP, and GitHub OAuth2 are supported.</span>
+    <div v-else-if="providers.length === 0" class="flex-1 rounded-lg border border-border bg-card p-12 text-center flex flex-col items-center justify-center space-y-2" data-testid="idp-empty">
+      <div class="w-10 h-10 rounded-full bg-muted/50 flex items-center justify-center mb-1">
+        <PlugZap class="w-5 h-5 text-muted-foreground/60" />
+      </div>
+      <span class="text-sm font-semibold text-foreground">No external directory connected</span>
+      <span class="text-xs text-muted-foreground max-w-sm">The built-in account directory serves logins. OIDC, LDAP, and GitHub OAuth2 are supported.</span>
+      <Button size="sm" variant="outline" class="mt-2 text-xs gap-1.5" @click="openCreate">
+        <Plus class="w-3.5 h-3.5" />
+        Add Provider
+      </Button>
     </div>
 
     <div v-else class="space-y-2 overflow-auto flex-1">

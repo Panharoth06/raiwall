@@ -236,4 +236,35 @@ describe('AntiBotView.vue', () => {
     expect(error.text()).toContain('control plane unavailable');
     expect(error.text()).toContain('Retry');
   });
+
+  it('switches between Applications and Challenge Telemetry tabs', async () => {
+    const view = await mountView();
+
+    const telemetryTab = view.get('[data-testid="tab-bot-telemetry"]');
+    expect(telemetryTab.exists()).toBe(true);
+    await telemetryTab.trigger('click');
+    await flushPromises();
+
+    expect(view.find('[data-testid="bot-activity-card"]').isVisible()).toBe(true);
+
+    const policiesTab = view.get('[data-testid="tab-bot-policies"]');
+    await policiesTab.trigger('click');
+    await flushPromises();
+
+    expect(view.find('[data-testid="bot-app-table"]').isVisible()).toBe(true);
+  });
+
+  it('displays inherited global trap URLs in the BOT Protect dialog for applications', async () => {
+    const view = await mountView();
+
+    const appCRow = view
+      .findAll('[data-testid="bot-app-row"]')
+      .find((row) => row.text().includes('App C'));
+    await appCRow!.get('[data-testid="bot-configure-app"]').trigger('click');
+    await flushPromises();
+
+    const inheritedTrapsPanel = bodyEl('bot-inherited-traps-panel');
+    expect(inheritedTrapsPanel).toBeTruthy();
+    expect(inheritedTrapsPanel?.textContent).toContain('/.raiwall/trap/honeypot');
+  });
 });

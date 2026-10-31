@@ -410,3 +410,34 @@ detector:
     mal_http: strict
   inner_rules_disabled:
     - CVE-2021-44228
+  policy:
+    mode: block            # inherit | off | alert | block
+    sensitivity: medium    # inherit | low | medium | high
+    crs:
+      enabled: true
+      paranoia_level: 1
+      inbound_threshold: 5
+      outbound_threshold: 4
+    disabled_packs: []
+  rule_overrides:
+    - id: "942100"
+      source: crs
+      action: alert
+      severity: high
+    - id: CVE-2021-44228
+      source: cve
+      enabled: false
+  rule_packs:
+    - name: company-modsec
+      version: "1.0.0"
+      type: modsec
+      relation: additive
+      priority: 100
+      directives: |
+        SecRule REQUEST_URI "@contains /internal-only" \
+          "id:10001,phase:1,deny,status:403,msg:'Internal path block'"
+  app_policies:
+    - app: portal
+      policy:
+        mode: alert
+        sensitivity: high

@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/select';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { SearchInput } from '@/components/ui/search-input';
+import { TablePagination } from '@/components/ui/table-pagination';
 
 const props = withDefaults(
   defineProps<{
@@ -49,6 +50,7 @@ const error = ref<string | null>(null);
 const searchQuery = ref<string>('');
 const selectedAction = ref<string>(props.initialAction);
 const currentPage = ref<number>(1);
+const pageSize = ref<number>(props.pageSize || 20);
 const activeEvent = ref<ForensicEvent | null>(null);
 
 async function fetchLogs() {
@@ -56,9 +58,9 @@ async function fetchLogs() {
   error.value = null;
 
   try {
-    const offset = (currentPage.value - 1) * props.pageSize;
+    const offset = (currentPage.value - 1) * pageSize.value;
     const res = await api.listEvents({
-      limit: props.pageSize,
+      limit: pageSize.value,
       offset,
       action: selectedAction.value !== 'all' ? selectedAction.value : undefined,
       client_ip: searchQuery.value.trim() ? searchQuery.value.trim() : undefined,
@@ -97,24 +99,13 @@ watch(searchQuery, () => {
   }, 300);
 });
 
-const totalPages = computed(() => {
-  const pages = Math.ceil(totalLogs.value / props.pageSize);
-  return pages > 0 ? pages : 1;
+watch(() => props.pageSize, (newSize) => {
+  if (newSize && newSize !== pageSize.value) {
+    pageSize.value = newSize;
+    currentPage.value = 1;
+    fetchLogs();
+  }
 });
-
-function prevPage() {
-  if (currentPage.value > 1) {
-    currentPage.value--;
-    fetchLogs();
-  }
-}
-
-function nextPage() {
-  if (currentPage.value < totalPages.value) {
-    currentPage.value++;
-    fetchLogs();
-  }
-}
 
 const filteredLogs = computed(() => {
   if (!searchQuery.value) return logs.value;
@@ -407,49 +398,18 @@ function getPayloadOrQuery(ev: ForensicEvent): string {
     </div>
 
     <!-- Pagination Footer -->
-    <div class="flex items-center justify-between px-5 py-2.5 border-t border-border bg-card text-xs text-muted-foreground font-sans">
-      <div>
-        <span>Showing </span>
-        <span class="font-mono text-foreground font-medium">
-          {{ totalLogs > 0 ? (currentPage - 1) * props.pageSize + 1 : 0 }}
-        </span>
-        <span> to </span>
-        <span class="font-mono text-foreground font-medium">
-          {{ Math.min(currentPage * props.pageSize, totalLogs) }}
-        </span>
-        <span> of </span>
-        <span class="font-mono text-foreground font-medium">{{ totalLogs }}</span>
-        <span> records</span>
-      </div>
-
-      <div class="flex items-center gap-2">
-        <button
-          type="button"
-          data-testid="logs-prev-page-btn"
-          @click="prevPage"
-          :disabled="currentPage <= 1 || isLoading"
-          class="flex items-center gap-1 px-2.5 py-1 rounded border border-border bg-muted text-foreground hover:bg-muted/80 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
-        >
-          <ChevronLeft class="w-3.5 h-3.5" />
-          <span>Previous</span>
-        </button>
-
-        <span class="px-2 font-mono text-foreground font-medium">
-          Page {{ currentPage }} / {{ totalPages }}
-        </span>
-
-        <button
-          type="button"
-          data-testid="logs-next-page-btn"
-          @click="nextPage"
-          :disabled="currentPage >= totalPages || isLoading"
-          class="flex items-center gap-1 px-2.5 py-1 rounded border border-border bg-muted text-foreground hover:bg-muted/80 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
-        >
-          <span>Next</span>
-          <ChevronRight class="w-3.5 h-3.5" />
-        </button>
-      </div>
-    </div>
+    <TablePagination
+      :page="currentPage"
+      :page-size="pageSize"
+      :total="totalLogs"
+      :page-size-options="[10, 20, 50, 100]"
+      :disabled="isLoading"
+      item-label="records"
+      prev-test-id="logs-prev-page-btn"
+      next-test-id="logs-next-page-btn"
+      @update:page="(p) => { currentPage = p; fetchLogs(); }"
+      @update:page-size="(s) => { pageSize = s; currentPage = 1; fetchLogs(); }"
+    />
 
     <!-- Forensic Detail Modal -->
     <div

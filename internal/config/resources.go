@@ -1,5 +1,7 @@
 package config
 
+import "github.com/Panharoth06/raiwall/internal/core/waf/cve"
+
 // Application declares a protected application (protected site) and how traffic
 // for its hostnames is routed.
 type Application struct {
@@ -173,8 +175,57 @@ type Template struct {
 	LogoURL     string `yaml:"logo_url" json:"logo_url"`
 }
 
-// Detector declares semantic module modes and disabled virtual patches.
+// Detector declares semantic module modes, detection policy, per-rule
+// overrides, imported packs, and disabled virtual patches.
 type Detector struct {
-	Modules            map[string]string `yaml:"modules" json:"modules"`
-	InnerRulesDisabled []string          `yaml:"inner_rules_disabled" json:"inner_rules_disabled"`
+	Modules            map[string]string   `yaml:"modules" json:"modules"`
+	InnerRulesDisabled []string            `yaml:"inner_rules_disabled" json:"inner_rules_disabled"`
+	Policy             *DetectorPolicy     `yaml:"policy,omitempty" json:"policy,omitempty"`
+	RuleOverrides      []RuleOverride      `yaml:"rule_overrides,omitempty" json:"rule_overrides,omitempty"`
+	RulePacks          []RulePack          `yaml:"rule_packs,omitempty" json:"rule_packs,omitempty"`
+	AppPolicies        []AppDetectorPolicy `yaml:"app_policies,omitempty" json:"app_policies,omitempty"`
+}
+
+// DetectorPolicy is the global or per-site detection policy.
+type DetectorPolicy struct {
+	Mode          string            `yaml:"mode" json:"mode"`
+	Sensitivity   string            `yaml:"sensitivity" json:"sensitivity"`
+	CRS           *CRSPolicy        `yaml:"crs,omitempty" json:"crs,omitempty"`
+	DisabledPacks []string          `yaml:"disabled_packs,omitempty" json:"disabled_packs,omitempty"`
+	Semantic      map[string]string `yaml:"semantic,omitempty" json:"semantic,omitempty"`
+}
+
+// CRSPolicy tunes the Coraza ruleset inside a detection policy.
+type CRSPolicy struct {
+	Enabled           *bool `yaml:"enabled,omitempty" json:"enabled,omitempty"`
+	ParanoiaLevel     int   `yaml:"paranoia_level,omitempty" json:"paranoia_level,omitempty"`
+	InboundThreshold  int   `yaml:"inbound_threshold,omitempty" json:"inbound_threshold,omitempty"`
+	OutboundThreshold int   `yaml:"outbound_threshold,omitempty" json:"outbound_threshold,omitempty"`
+}
+
+// RuleOverride changes one catalog rule from the declarative file.
+type RuleOverride struct {
+	ID       string `yaml:"id" json:"id"`
+	Source   string `yaml:"source" json:"source"`
+	Enabled  *bool  `yaml:"enabled,omitempty" json:"enabled,omitempty"`
+	Action   string `yaml:"action,omitempty" json:"action,omitempty"`
+	Severity string `yaml:"severity,omitempty" json:"severity,omitempty"`
+}
+
+// RulePack declares an imported native, ModSecurity, or CRS bundle.
+type RulePack struct {
+	Name       string            `yaml:"name" json:"name"`
+	Version    string            `yaml:"version" json:"version"`
+	Type       string            `yaml:"type" json:"type"`
+	Relation   string            `yaml:"relation" json:"relation"`
+	Priority   int               `yaml:"priority,omitempty" json:"priority,omitempty"`
+	Rules      []cve.Signature   `yaml:"rules,omitempty" json:"rules,omitempty"`
+	Directives string            `yaml:"directives,omitempty" json:"directives,omitempty"`
+	Files      map[string]string `yaml:"files,omitempty" json:"files,omitempty"`
+}
+
+// AppDetectorPolicy attaches a detection policy to a declared application.
+type AppDetectorPolicy struct {
+	App    string         `yaml:"app" json:"app"`
+	Policy DetectorPolicy `yaml:"policy" json:"policy"`
 }

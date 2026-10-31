@@ -165,4 +165,34 @@ describe('LogsViewer.vue', () => {
       rule_id: 'SEMANTIC_SQLI',
     });
   });
+
+  it('renders table pagination and responds to page size changes', async () => {
+    const wrapper = mount(LogsViewer, {
+      props: {
+        pageSize: 20,
+      },
+    });
+
+    await vi.waitFor(() => {
+      expect(api.listEvents).toHaveBeenCalled();
+    });
+
+    const pagination = wrapper.find('[data-testid="table-pagination"]');
+    expect(pagination.exists()).toBe(true);
+    expect(wrapper.find('[data-testid="pagination-page-size-trigger"]').exists()).toBe(true);
+
+    // Emulating page size change through TablePagination
+    const paginationComponent = wrapper.findComponent({ name: 'TablePagination' });
+    expect(paginationComponent.exists()).toBe(true);
+    paginationComponent.vm.$emit('update:pageSize', 50);
+
+    await vi.waitFor(() => {
+      expect(api.listEvents).toHaveBeenCalledWith(
+        expect.objectContaining({
+          limit: 50,
+          offset: 0,
+        })
+      );
+    });
+  });
 });

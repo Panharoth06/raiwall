@@ -133,8 +133,8 @@ const portsDetail = (current: Site): string =>
 </script>
 
 <template>
-  <div class="h-full flex flex-col space-y-6 p-6 bg-card text-card-foreground rounded-xl border border-border shadow-none font-sans overflow-hidden">
-    <div class="shrink-0">
+  <div class="space-y-6 font-sans">
+    <div class="border-b border-border pb-4">
       <button class="text-xs uppercase tracking-wider text-muted-foreground hover:text-foreground flex items-center gap-1 mb-2 cursor-pointer" data-testid="site-back" @click="router.push('/sites')">
         <ArrowLeft class="w-3.5 h-3.5" />
         All Sites

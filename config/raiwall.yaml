@@ -293,3 +293,6 @@ detector:
     ssti: balance
     ssrf: balance
   inner_rules_disabled: []
+  policy:
+    mode: inherit
+    sensitivity: inherit

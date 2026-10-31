@@ -1,5 +1,7 @@
 package waf
 
+import "github.com/Panharoth06/raiwall/internal/core/waf/cve"
+
 // CompositeEngine runs a fast primary engine (the semantic funnel) and a
 // secondary engine (OWASP CRS) over the same request. A block from either
 // wins; otherwise the first audit verdict is surfaced so operators see what
@@ -18,6 +20,25 @@ func NewCompositeEngine(primary, secondary WAFEnginePort) *CompositeEngine {
 // Name returns the identifier for this engine.
 func (c *CompositeEngine) Name() string {
 	return "composite"
+}
+
+// SetExceptionEngine forwards a live exception matcher to child engines that
+// support it. This keeps the composite's public surface aligned with
+// SemanticEngine for configuration deploys.
+func (c *CompositeEngine) SetExceptionEngine(matcher ExceptionMatcher) {
+	if setter, ok := c.primary.(interface{ SetExceptionEngine(ExceptionMatcher) }); ok {
+		setter.SetExceptionEngine(matcher)
+	}
+	if setter, ok := c.secondary.(interface{ SetExceptionEngine(ExceptionMatcher) }); ok {
+		setter.SetExceptionEngine(matcher)
+	}
+}
+
+// SetInnerRules forwards a rebuilt virtual-patch engine to the primary engine.
+func (c *CompositeEngine) SetInnerRules(engine *cve.Engine) {
+	if setter, ok := c.primary.(interface{ SetInnerRules(*cve.Engine) }); ok {
+		setter.SetInnerRules(engine)
+	}
 }
 
 // InspectRequest evaluates both engines in order.

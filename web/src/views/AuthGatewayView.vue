@@ -1,18 +1,15 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { useRoute, useRouter } from '@/router';
+import { useRoute } from '@/router';
 import AuthLogsTable from '@/components/identity/AuthLogsTable.vue';
 import UserDirectoryTable from '@/components/UserDirectoryTable.vue';
 import SsoPortalPanel from '@/components/identity/SsoPortalPanel.vue';
 import IdPListPanel from '@/components/identity/IdPListPanel.vue';
-import { Tabs, type Tab } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
-import { KeyRound, Lock, MonitorDot, ScrollText, Users } from 'lucide-vue-next';
+import { Lock, Users, KeyRound, ScrollText } from 'lucide-vue-next';
 
 type AuthTab = 'logs' | 'users' | 'sso' | 'idp';
 
 const route = useRoute();
-const router = useRouter();
 
 const activeTab = computed<AuthTab>(() => {
   const path = route.value.path || '';
@@ -22,74 +19,61 @@ const activeTab = computed<AuthTab>(() => {
   return 'logs';
 });
 
-const tabs: (Tab & { id: AuthTab })[] = [
-  {
-    id: 'logs',
-    label: 'Authentication Logs',
-    icon: ScrollText,
-    description: 'Login attempts across every protected site — newest first',
-    testId: 'tab-auth-logs',
-  },
-  {
-    id: 'users',
-    label: 'User Management',
-    icon: Users,
-    description: 'Directory accounts, app bindings, passwords, and 2FA',
-    testId: 'tab-auth-users',
-  },
-  {
-    id: 'sso',
-    label: 'Single Sign-On',
-    icon: MonitorDot,
-    description: 'Per-site portal enforcement and shared clearance binding',
-    testId: 'tab-auth-sso',
-  },
-  {
-    id: 'idp',
-    label: 'Login Configuration',
-    icon: KeyRound,
-    description: 'External directory connectors: OIDC, LDAP, GitHub OAuth2',
-    testId: 'tab-auth-idp',
-  },
-];
-
-const handleTabChange = (tabId: string) => {
-  const map: Record<AuthTab, string> = {
-    logs: '/auth-gateway/logs',
-    users: '/auth-gateway/users',
-    sso: '/auth-gateway/sso',
-    idp: '/auth-gateway/idp',
-  };
-  router.push(map[tabId as AuthTab] ?? '/auth-gateway/logs');
-};
+const headerInfo = computed(() => {
+  switch (activeTab.value) {
+    case 'users':
+      return {
+        title: 'User Management',
+        description: 'Directory user accounts, operator credentials, roles, and two-factor authentication devices.',
+        icon: Users,
+      };
+    case 'sso':
+      return {
+        title: 'Single Sign-On',
+        description: 'HTTP 467 pre-application portal bindings, session durations, and per-site clearance rules.',
+        icon: KeyRound,
+      };
+    case 'idp':
+      return {
+        title: 'Login Configuration',
+        description: 'External identity providers (IdP) via OpenID Connect (OIDC), LDAP, and OAuth2 federation.',
+        icon: Lock,
+      };
+    case 'logs':
+    default:
+      if (route.value.path === '/auth-gateway') {
+        return {
+          title: 'Auth Gateway',
+          description: 'Unified directory identity for protected sites — HTTP 467 portal, app bindings, 2FA, and external IdPs.',
+          icon: Lock,
+        };
+      }
+      return {
+        title: 'Authentication Logs',
+        description: 'Real-time and historical directory authentication attempts, MFA challenges, and clearance records.',
+        icon: ScrollText,
+      };
+  }
+});
 </script>
 
 <template>
-  <div class="h-full flex flex-col space-y-6 p-6 bg-card text-card-foreground rounded-xl border border-border shadow-none font-sans overflow-hidden">
-    <div class="flex flex-wrap items-start justify-between gap-3 shrink-0">
-      <div class="min-w-0">
-        <h1 class="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
-          <Lock class="w-5 h-5 text-muted-foreground" />
-          <span>Auth Gateway</span>
-        </h1>
-        <p class="text-sm text-muted-foreground mt-1 leading-relaxed">
-          Unified directory identity for protected sites — HTTP 467 portal, app bindings, 2FA, and external IdPs.
-        </p>
-      </div>
-      <Badge variant="outline" class="font-mono text-xs uppercase">
-        Pre-App Auth · OIDC · MFA · RBAC
-      </Badge>
-    </div>
-
-    <div class="border-b border-border pb-1.5 shrink-0">
-      <Tabs :tabs="tabs" :active-tab="activeTab" @tab-change="handleTabChange" />
+  <div class="space-y-6 font-sans">
+    <div class="border-b border-border pb-4">
+      <h1 class="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
+        <component :is="headerInfo.icon" class="w-5 h-5 text-muted-foreground" />
+        <span>{{ headerInfo.title }}</span>
+      </h1>
+      <p class="text-sm text-muted-foreground mt-1 leading-relaxed">
+        {{ headerInfo.description }}
+      </p>
     </div>
 
     <div class="flex-1 min-h-0 overflow-y-auto pr-1">
-      <AuthLogsTable v-if="activeTab === 'logs'" data-testid="auth-panel-logs" />
-      <UserDirectoryTable v-else-if="activeTab === 'users'" data-testid="auth-panel-users" />
-      <SsoPortalPanel v-else-if="activeTab === 'sso'" data-testid="auth-panel-sso" />
-      <IdPListPanel v-else data-testid="auth-panel-idp" />
+      <AuthLogsTable v-if="activeTab === 'logs'" key="panel-logs" data-testid="auth-panel-logs" />
+      <UserDirectoryTable v-else-if="activeTab === 'users'" key="panel-users" data-testid="auth-panel-users" />
+      <SsoPortalPanel v-else-if="activeTab === 'sso'" key="panel-sso" data-testid="auth-panel-sso" />
+      <IdPListPanel v-else key="panel-idp" data-testid="auth-panel-idp" />
     </div>
   </div>
 </template>

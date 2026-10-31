@@ -11,13 +11,17 @@ import (
 // ahead of the triage funnel and independent of the semantic matrix.
 func WithInnerRules(e *cve.Engine) SemanticOption {
 	return func(s *SemanticEngine) {
-		s.innerRules = e
+		s.SetInnerRules(e)
 	}
 }
 
 // SetInnerRules swaps the virtual-patching engine at runtime.
 func (s *SemanticEngine) SetInnerRules(e *cve.Engine) {
-	s.innerRules = e
+	if e == nil {
+		s.innerRules.Store(nil)
+		return
+	}
+	s.innerRules.Store(e)
 }
 
 // locationFor maps a detection surface to a verdict PayloadLocation.
@@ -39,11 +43,12 @@ func locationFor(field, header string) string {
 // inspectInnerRules runs Stage 0: virtual-patch signature evaluation.
 // (nil, false): no signature fired; (nil, true): engine disabled; verdict: block.
 func (s *SemanticEngine) inspectInnerRules(ctx *RequestContext) (*Verdict, bool) {
-	if s.innerRules == nil {
+	innerRules := s.innerRules.Load()
+	if innerRules == nil {
 		return nil, false
 	}
 
-	match, fired := s.innerRules.Evaluate(&cve.Input{
+	match, fired := innerRules.Evaluate(&cve.Input{
 		Method:   ctx.Method,
 		Path:     cve.DecodePath(ctx.Path),
 		RawQuery: ctx.Query,
@@ -54,12 +59,23 @@ func (s *SemanticEngine) inspectInnerRules(ctx *RequestContext) (*Verdict, bool)
 		return nil, false
 	}
 
+	location := locationFor(match.Field, match.Header)
+	// Rule-level exceptions suppress virtual patches too, then normal semantic
+	// inspection continues so adjacent parameters are still evaluated.
+	if s.excepted(ctx.Host, ctx.Path, ctx.Method, location, "*", match.Rule.ID) {
+		return nil, false
+	}
+
+	action := ActionBlock
+	if innerRules.IsAudit(match.Rule.ID) {
+		action = ActionAudit
+	}
 	return &Verdict{
-		Action:          ActionBlock,
+		Action:          action,
 		RuleID:          match.Rule.ID,
-		Reason:          fmt.Sprintf("Virtual patch %s: %s (matched %s %q)", match.Rule.ID, match.Rule.Name, locationFor(match.Field, match.Header), match.Token),
+		Reason:          fmt.Sprintf("Virtual patch %s: %s (matched %s %q)", match.Rule.ID, match.Rule.Name, location, match.Token),
 		AttackCategory:  "cve/" + match.Category,
 		MatchedToken:    match.Token,
-		PayloadLocation: locationFor(match.Field, match.Header),
+		PayloadLocation: location,
 	}, true
 }

@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import { ref, computed, watch } from 'vue'
 import type { ManagedCertificate, Site } from '@/api/client'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { TablePagination } from '@/components/ui/table-pagination'
 import {
   Table,
   TableHeader,
@@ -40,6 +42,18 @@ const emit = defineEmits<{
   (e: 'delete', siteId: string): void
   (e: 'bot-protect', site: Site): void
 }>()
+
+const page = ref(1)
+const pageSize = ref(20)
+
+watch(() => props.sites, () => {
+  page.value = 1
+})
+
+const paginatedSites = computed(() => {
+  const start = (page.value - 1) * pageSize.value
+  return props.sites.slice(start, start + pageSize.value)
+})
 
 const routeLabels: Record<string, string> = {
   proxy: 'Reverse Proxy',
@@ -89,7 +103,7 @@ const certificateName = (id?: string) => {
       </TableRow>
     </TableHeader>
     <TableBody>
-      <TableRow v-for="site in props.sites" :key="site.id">
+      <TableRow v-for="site in paginatedSites" :key="site.id">
         <TableCell class="max-w-[220px]">
           <div class="font-medium text-foreground text-sm truncate">{{ site.name }}</div>
           <div v-if="site.description" class="text-xs text-muted-foreground truncate">
@@ -211,4 +225,14 @@ const certificateName = (id?: string) => {
       </TableRow>
     </TableBody>
   </Table>
+
+  <TablePagination
+    :page="page"
+    :page-size="pageSize"
+    :total="sites.length"
+    :page-size-options="[10, 20, 50, 100]"
+    item-label="sites"
+    @update:page="(p) => page = p"
+    @update:page-size="(s) => { pageSize = s; page = 1; }"
+  />
 </template>

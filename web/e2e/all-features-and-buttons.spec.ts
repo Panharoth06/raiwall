@@ -45,7 +45,7 @@ test.describe('Comprehensive End-to-End Feature & Interactive Button Audit', () 
 
   // 2. Rule Tester: evaluates a CRS-only probe against the live engine
   test('2. Rule Tester: evaluates a CRS-only protocol violation', async ({ page }) => {
-    await page.goto('#/rules?tab=tester');
+    await page.goto('#/detection/tester');
     await page.waitForSelector('text=Request Probe');
 
     // A POST body without Content-Type triggers CRS rule 920640 at PL1.
@@ -151,26 +151,31 @@ test.describe('Comprehensive End-to-End Feature & Interactive Button Audit', () 
     await expect(exceptionRow).toHaveCount(0, { timeout: 10000 });
   });
 
-  // 6. RulesView Subtab switching
-  test('6. RulesView: Subtab switching maintains persistent tab headers', async ({ page }) => {
-    await page.goto('#/rules');
+  // 6. Detection workspace navigation
+  test('6. Detection: section tabs navigate between workspace pages', async ({ page }) => {
+    await page.goto('#/detection');
     await page.waitForTimeout(400);
+    await expect(page.locator('h1')).toContainText('Detection');
 
-    // Subtabs: Exceptions Gate, ACL Bytecode Rules, Rate Limits
-    const aclsTab = page.locator('[role="tab"]:has-text("ACL Bytecode Rules")');
-    await aclsTab.click();
+    await page.locator('[role="tab"]:has-text("Semantic Matrix")').click();
     await page.waitForTimeout(300);
-    expect(await page.locator('[role="tab"]:has-text("Exceptions Gate")').isVisible()).toBe(true);
+    await expect(page.locator('h1')).toContainText('Semantic Detection Matrix');
 
-    const policiesTab = page.locator('[role="tab"]:has-text("Rate Limits")');
-    await policiesTab.click();
+    await page.locator('[role="tab"]:has-text("Exceptions")').click();
     await page.waitForTimeout(300);
-    expect(await page.locator('[role="tab"]:has-text("Exceptions Gate")').isVisible()).toBe(true);
+    await expect(page.locator('h1')).toContainText('False-Positive Exception Rules');
 
-    const exceptionsTab = page.locator('[role="tab"]:has-text("Exceptions Gate")');
-    await exceptionsTab.click();
+    await page.locator('[role="tab"]:has-text("Rule Tester")').click();
     await page.waitForTimeout(300);
-    expect(await page.locator('[role="tab"]:has-text("ACL Bytecode Rules")').isVisible()).toBe(true);
+    await expect(page.locator('h1')).toContainText('Rule Tester');
+
+    await page.locator('[role="tab"]:has-text("Rule Catalog")').click();
+    await page.waitForTimeout(300);
+    await expect(page.locator('h1')).toContainText('Rule Catalog');
+
+    await page.locator('[role="tab"]:has-text("Rule Packs")').click();
+    await page.waitForTimeout(300);
+    await expect(page.locator('h1')).toContainText('Rule Packs');
   });
 
   // 7. Volumetric Defense, Active Bans & Waiting Room

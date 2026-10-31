@@ -40,6 +40,15 @@ type Server struct {
 	ruleTester       func(*waf.RequestContext) (*waf.Verdict, error)
 	autoApply        bool
 	applyMu          sync.Mutex
+
+	// Coraza process defaults, injected by the Caddy data plane. The detection
+	// status/policy endpoints use these when no explicit policy row exists.
+	crsEngineAvailable bool
+	crsDefaultEnabled  bool
+	crsDefaultMode     string
+	crsDefaultParanoia int
+	crsDefaultInbound  int
+	crsDefaultOutbound int
 }
 
 // NewServer initializes a new Control Plane API server with Chi routing.
@@ -69,6 +78,22 @@ func (s *Server) SetClusterPublisher(pub ClusterPublisher) {
 // configuration mutation. It must be called before routes start serving.
 func (s *Server) SetAutoApply(enabled bool) {
 	s.autoApply = enabled
+}
+
+// SetCRSDefaults records the process-level CRS configuration so the detection
+// endpoints can resolve policy when no explicit override exists.
+func (s *Server) SetCRSDefaults(enabled bool, mode string, paranoia, inbound, outbound int) {
+	s.crsDefaultEnabled = enabled
+	s.crsDefaultMode = mode
+	s.crsDefaultParanoia = paranoia
+	s.crsDefaultInbound = inbound
+	s.crsDefaultOutbound = outbound
+}
+
+// SetCRSEngineAvailable reports whether the Coraza engine is provisioned in
+// this data plane (waf.crs.enabled is true).
+func (s *Server) SetCRSEngineAvailable(available bool) {
+	s.crsEngineAvailable = available
 }
 
 // AutoApplyEnabled reports whether mutations are committed automatically.

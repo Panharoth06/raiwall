@@ -197,14 +197,14 @@ describe('SafeLine HTTP Flood Workflow', () => {
       expect(wrapper.find('[data-testid="nav-http-flood-waiting-room"]').exists()).toBe(true);
     });
 
-    it('renders sub-tabs for Rate Limiting and Waiting Room inside HttpFloodView', async () => {
+    it('renders HTTP Flood view header and renders views based on route navigation', async () => {
       await router.navigate('/http-flood/limits');
       const wrapper = mount(HttpFloodView);
       await nextTick();
 
-      expect(wrapper.find('[data-testid="tab-http-flood-limits"]').exists()).toBe(true);
-      expect(wrapper.find('[data-testid="tab-http-flood-waiting-room"]').exists()).toBe(true);
       expect(wrapper.text()).toContain('HTTP Flood & Rate Limiting Defense');
+      expect(wrapper.find('[data-testid="tab-http-flood-limits"]').exists()).toBe(false);
+      expect(wrapper.find('[data-testid="tab-http-flood-waiting-room"]').exists()).toBe(false);
     });
   });
 });

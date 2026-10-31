@@ -39,7 +39,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="h-full w-full flex flex-col p-6 space-y-6 bg-background font-sans overflow-y-auto">
+  <div class="space-y-6 font-sans">
     <!-- Filter Bar (Tabs, App Selector, Time Presets, SSE live indicator, Refresh) -->
     <StatsFilterBar
       :active-tab="activeTab"

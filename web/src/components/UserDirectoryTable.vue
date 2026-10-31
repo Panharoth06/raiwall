@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { identityApi, type IdentityUser } from '@/api/identity';
 import { api } from '@/api/client';
 import UserDialog, { type UserDialogResult } from '@/components/identity/UserDialog.vue';
@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { SearchInput } from '@/components/ui/search-input';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
+import { TablePagination } from '@/components/ui/table-pagination';
 import { KeyRound, Loader2, Plus, ShieldOff, Trash2, UserRound } from 'lucide-vue-next';
 
 const users = ref<IdentityUser[]>([]);
@@ -18,6 +19,8 @@ const pending = ref<Set<string>>(new Set());
 const dialogOpen = ref(false);
 const editingUser = ref<IdentityUser | null>(null);
 const enrollment = ref<{ secret?: string; uri?: string } | null>(null);
+const page = ref(1);
+const pageSize = ref(20);
 
 const loadUsers = async () => {
   try {
@@ -49,6 +52,15 @@ const filtered = computed(() => {
   return users.value.filter((u) =>
     `${u.username} ${u.email} ${u.display_name}`.toLowerCase().includes(q),
   );
+});
+
+watch(search, () => {
+  page.value = 1;
+});
+
+const paginatedUsers = computed(() => {
+  const start = (page.value - 1) * pageSize.value;
+  return filtered.value.slice(start, start + pageSize.value);
 });
 
 const siteName = (id: string) => apps.value.find((a) => a.id === id)?.name ?? id;
@@ -119,17 +131,22 @@ const removeUser = async (user: IdentityUser) => {
 </script>
 
 <template>
-  <div class="flex flex-col h-full space-y-3">
-    <div class="flex items-center justify-between gap-2 shrink-0">
-      <SearchInput
-        v-model="search"
-        clearable
-        placeholder="Search users…"
-        class="flex-1 max-w-64"
-        data-testid="user-search"
-      />
-      <span class="text-xs text-muted-foreground" data-testid="user-summary">{{ users.length }} / 5000 accounts</span>
-      <Button size="sm" data-testid="user-add" @click="openCreate">
+  <div class="flex flex-col h-full space-y-4">
+    <!-- Action Toolbar -->
+    <div class="flex items-center justify-between gap-4 shrink-0">
+      <div class="flex items-center gap-3">
+        <SearchInput
+          v-model="search"
+          clearable
+          placeholder="Search users…"
+          class="w-64"
+          data-testid="user-search"
+        />
+        <span class="text-xs text-muted-foreground font-mono" data-testid="user-summary">
+          {{ users.length }} {{ users.length === 1 ? 'account' : 'accounts' }}
+        </span>
+      </div>
+      <Button size="sm" class="gap-1.5" data-testid="user-add" @click="openCreate">
         <Plus class="w-3.5 h-3.5" />
         Add User
       </Button>
@@ -137,38 +154,58 @@ const removeUser = async (user: IdentityUser) => {
 
     <p v-if="error" class="text-xs text-destructive shrink-0" data-testid="user-error">{{ error }}</p>
 
-    <div v-if="loading" class="flex-1 min-h-[200px] flex items-center justify-center space-x-2 text-xs text-muted-foreground" data-testid="user-loading">
-      <Loader2 class="w-4 h-4 animate-spin" />
-      <span>Loading directory…</span>
-    </div>
-
-    <div v-else-if="filtered.length === 0" class="flex-1 flex flex-col items-center justify-start pt-10 pb-12 space-y-1 text-center" data-testid="user-empty">
-      <UserRound class="w-8 h-8 text-muted-foreground/60 mb-2" />
-      <span v-if="search" class="text-base font-semibold text-foreground">No users match the search</span>
-      <span v-else class="text-base font-semibold text-foreground">Directory is empty</span>
-      <span class="text-xs text-muted-foreground">Add user accounts to grant application access credentials.</span>
-    </div>
-
-    <div v-else class="flex-1 overflow-auto rounded-lg border border-border bg-card">
+    <!-- Table Container (Always rendered with header & borders) -->
+    <div class="flex-1 overflow-auto rounded-lg border border-border bg-card">
       <Table data-testid="user-table" container-class="overflow-visible">
         <TableHeader>
           <TableRow>
-            <TableHead>Account</TableHead>
-            <TableHead>Email</TableHead>
+            <TableHead class="w-56">Account</TableHead>
+            <TableHead class="w-64">Email</TableHead>
             <TableHead>Apps</TableHead>
-            <TableHead>2FA</TableHead>
-            <TableHead>Enabled</TableHead>
-            <TableHead class="text-right">Actions</TableHead>
+            <TableHead class="w-24">2FA</TableHead>
+            <TableHead class="w-28">Status</TableHead>
+            <TableHead class="w-32 text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody class="font-mono tabular-nums">
-          <TableRow v-for="(u, i) in filtered" :key="u.id" :data-testid="`user-row-${i}`">
-            <TableCell>
-              <span class="font-medium font-sans">{{ u.display_name || u.username }}</span>
-              <span class="ml-2 text-muted-foreground text-xs">{{ u.username }}</span>
+          <!-- Loading State -->
+          <TableRow v-if="loading">
+            <TableCell colspan="6" class="h-64 text-center text-muted-foreground">
+              <div class="flex flex-col items-center justify-center p-8 space-y-2" data-testid="user-loading">
+                <Loader2 class="w-5 h-5 animate-spin text-primary mx-auto" />
+                <span class="text-xs">Loading directory…</span>
+              </div>
             </TableCell>
-            <TableCell class="text-muted-foreground">{{ u.email || '—' }}</TableCell>
-            <TableCell class="max-w-40 truncate" :title="u.app_ids.map(siteName).join(', ')">
+          </TableRow>
+
+          <!-- Empty State -->
+          <TableRow v-else-if="filtered.length === 0">
+            <TableCell colspan="6" class="h-64 text-center align-middle">
+              <div class="flex flex-col items-center justify-center py-10 px-4 space-y-2 text-center" data-testid="user-empty">
+                <div class="w-10 h-10 rounded-full bg-muted/50 flex items-center justify-center mb-1">
+                  <UserRound class="w-5 h-5 text-muted-foreground/60" />
+                </div>
+                <div v-if="search" class="text-sm font-semibold text-foreground">No users match the search</div>
+                <div v-else class="text-sm font-semibold text-foreground">Directory is empty</div>
+                <div class="text-xs text-muted-foreground max-w-sm">
+                  {{ search ? 'Try adjusting your search query or clear the filter.' : 'Add user accounts to grant application access credentials.' }}
+                </div>
+                <Button v-if="!search" size="sm" variant="outline" class="mt-2 text-xs gap-1.5" @click="openCreate">
+                  <Plus class="w-3.5 h-3.5" />
+                  Add First User
+                </Button>
+              </div>
+            </TableCell>
+          </TableRow>
+
+          <!-- User Rows -->
+          <TableRow v-else v-for="(u, i) in paginatedUsers" :key="u.id" :data-testid="`user-row-${i}`">
+            <TableCell>
+              <span class="font-medium font-sans text-foreground">{{ u.display_name || u.username }}</span>
+              <span class="ml-2 text-muted-foreground text-xs font-mono">{{ u.username }}</span>
+            </TableCell>
+            <TableCell class="text-muted-foreground text-xs">{{ u.email || '—' }}</TableCell>
+            <TableCell class="max-w-40 truncate text-xs" :title="u.app_ids.map(siteName).join(', ')">
               {{ u.app_ids.map(siteName).join(', ') || '—' }}
             </TableCell>
             <TableCell>
@@ -179,8 +216,8 @@ const removeUser = async (user: IdentityUser) => {
             <TableCell>
               <button
                 :data-testid="`user-toggle-${i}`"
-                class="text-xs font-sans px-2 py-0.5 rounded border"
-                :class="u.enabled ? 'border-transparent bg-secondary text-secondary-foreground' : 'border-border text-muted-foreground'"
+                class="text-xs font-sans px-2 py-0.5 rounded border cursor-pointer transition-colors"
+                :class="u.enabled ? 'border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80' : 'border-border text-muted-foreground hover:bg-muted'"
                 :disabled="pending.has(u.id)"
                 @click="toggleEnabled(u, !u.enabled)"
               >
@@ -188,19 +225,30 @@ const removeUser = async (user: IdentityUser) => {
               </button>
             </TableCell>
             <TableCell class="text-right whitespace-nowrap">
-              <Button variant="ghost" size="sm" class="h-6 px-1.5" :data-testid="`user-edit-${i}`" @click="openEdit(u)">
+              <Button variant="ghost" size="sm" class="h-6 px-1.5" title="Edit user" :data-testid="`user-edit-${i}`" @click="openEdit(u)">
                 <KeyRound class="w-3.5 h-3.5" />
               </Button>
-              <Button variant="ghost" size="sm" class="h-6 px-1.5" :data-testid="`user-totp-reset-${i}`" :disabled="pending.has(u.id)" @click="resetTOTP(u)">
+              <Button variant="ghost" size="sm" class="h-6 px-1.5" title="Reset 2FA" :data-testid="`user-totp-reset-${i}`" :disabled="pending.has(u.id)" @click="resetTOTP(u)">
                 <ShieldOff class="w-3.5 h-3.5" />
               </Button>
-              <Button variant="ghost" size="sm" class="h-6 px-1.5 text-destructive" :data-testid="`user-delete-${i}`" :disabled="pending.has(u.id)" @click="removeUser(u)">
+              <Button variant="ghost" size="sm" class="h-6 px-1.5 text-destructive hover:text-destructive" title="Delete user" :data-testid="`user-delete-${i}`" :disabled="pending.has(u.id)" @click="removeUser(u)">
                 <Trash2 class="w-3.5 h-3.5" />
               </Button>
             </TableCell>
           </TableRow>
         </TableBody>
       </Table>
+
+      <!-- Pagination Footer -->
+      <TablePagination
+        :page="page"
+        :page-size="pageSize"
+        :total="filtered.length"
+        :page-size-options="[10, 20, 50, 100]"
+        item-label="users"
+        @update:page="(p) => page = p"
+        @update:page-size="(s) => { pageSize = s; page = 1; }"
+      />
     </div>
 
     <UserDialog

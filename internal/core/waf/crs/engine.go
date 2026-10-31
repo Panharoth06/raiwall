@@ -1,23 +1,18 @@
-// Package crs runs the OWASP Core Rule Set through Coraza behind the WAF
-// engine port. CRS performs its own transformations and anomaly scoring; the
-// semantic engine's normalizer is intentionally not applied to its input.
+// Package crs runs OWASP CRS and imported ModSecurity rules through Coraza
+// behind the WAF engine port. Coraza performs its own transformations and
+// anomaly scoring; the semantic engine's normalizer is intentionally not
+// applied to its input.
 package crs
 
 import (
-	"embed"
 	"fmt"
 	"net/url"
-	"strconv"
 	"strings"
+	"sync/atomic"
 
 	"github.com/Panharoth06/raiwall/internal/core/waf"
 	"github.com/corazawaf/coraza/v3"
-	"github.com/corazawaf/coraza/v3/experimental/plugins/plugintypes"
-	ctypes "github.com/corazawaf/coraza/v3/types"
 )
-
-//go:embed crs-setup.conf rules/*.conf rules/*.data
-var rulesFS embed.FS
 
 // Default anomaly thresholds mirror the CRS defaults.
 const (
@@ -28,7 +23,7 @@ const (
 	MaxMatchedRules          = 16
 )
 
-// Mode selects whether CRS interruptions block or only audit.
+// Mode selects whether Coraza interruptions block or only audit.
 type Mode string
 
 const (
@@ -36,28 +31,73 @@ const (
 	ModeAudit Mode = "audit"
 )
 
-// Config controls a compiled CRS policy.
+// Pack is one imported directive bundle. Files are mounted under
+// packs/<safe ID>/ and every .conf file is included in lexical order.
+type Pack struct {
+	ID             string
+	ReplaceBuiltin bool
+	Directives     string
+	Files          map[string]string
+}
+
+// Override changes one compiled rule after the ruleset is loaded.
+type Override struct {
+	RuleID   int
+	Disabled bool
+	Alert    bool
+	Severity string
+}
+
+// Config controls a compiled Coraza policy.
 type Config struct {
 	Mode              Mode
 	ParanoiaLevel     int
 	InboundThreshold  int
 	OutboundThreshold int
 	MaxBodySize       int
+	// Disabled skips inspection entirely without recompiling.
+	Disabled  bool
+	Packs     []Pack
+	Overrides []Override
 }
 
-// Engine is a compiled Coraza WAF configured with OWASP CRS.
+// compiledSet is one immutable Coraza instance and its associated policy.
+type compiledSet struct {
+	waf      coraza.WAF
+	conf     Config
+	alert    map[int]struct{}
+	severity map[int]string
+}
+
+// Engine is a compiled Coraza WAF. Deploys compile a new set and swap the
+// pointer atomically, so requests never observe a partial ruleset.
 type Engine struct {
-	waf  coraza.WAF
-	conf Config
+	set atomic.Pointer[compiledSet]
 }
 
-// New compiles the embedded CRS for one policy. Compilation happens once at
-// provisioning; transactions are created per request and are cheap.
+// New compiles the configured ruleset once.
 func New(conf Config) (*Engine, error) {
-	conf = normalizeConfig(conf)
+	engine := &Engine{}
+	if err := engine.Reload(conf); err != nil {
+		return nil, err
+	}
+	return engine, nil
+}
 
+// Reload compiles a new ruleset and swaps it in only on success.
+func (e *Engine) Reload(conf Config) error {
+	conf = normalizeConfig(conf)
+	set, err := compile(conf)
+	if err != nil {
+		return err
+	}
+	e.set.Store(set)
+	return nil
+}
+
+func compile(conf Config) (*compiledSet, error) {
 	cfg := coraza.NewWAFConfig().
-		WithRootFS(rulesFS).
+		WithRootFS(buildOverlayFS(conf)).
 		WithRequestBodyAccess().
 		WithRequestBodyLimit(conf.MaxBodySize).
 		WithRequestBodyInMemoryLimit(conf.MaxBodySize).
@@ -65,9 +105,22 @@ func New(conf Config) (*Engine, error) {
 
 	instance, err := coraza.NewWAF(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("compile OWASP CRS (PL%d): %w", conf.ParanoiaLevel, err)
+		return nil, fmt.Errorf("compile Coraza ruleset (PL%d): %w", conf.ParanoiaLevel, err)
 	}
-	return &Engine{waf: instance, conf: conf}, nil
+	alert := make(map[int]struct{})
+	severity := make(map[int]string)
+	for _, override := range conf.Overrides {
+		if override.Disabled {
+			continue
+		}
+		if override.Alert {
+			alert[override.RuleID] = struct{}{}
+		}
+		if value := strings.ToLower(strings.TrimSpace(override.Severity)); value != "" {
+			severity[override.RuleID] = value
+		}
+	}
+	return &compiledSet{waf: instance, conf: conf, alert: alert, severity: severity}, nil
 }
 
 func normalizeConfig(conf Config) Config {
@@ -92,35 +145,21 @@ func normalizeConfig(conf Config) Config {
 	return conf
 }
 
-// directives sets the paranoia level and thresholds before REQUEST-901
-// initializes defaults, then loads the vendored CRS.
-func directives(conf Config) string {
-	return fmt.Sprintf(`
-SecRuleEngine On
-SecAction "id:900000,phase:1,pass,nolog,t:none,tag:'OWASP_CRS',setvar:tx.blocking_paranoia_level=%d"
-SecAction "id:900001,phase:1,pass,nolog,t:none,tag:'OWASP_CRS',setvar:tx.detection_paranoia_level=%d"
-SecAction "id:900110,phase:1,pass,nolog,t:none,setvar:tx.inbound_anomaly_score_threshold=%d"
-SecAction "id:900120,phase:1,pass,nolog,t:none,setvar:tx.outbound_anomaly_score_threshold=%d"
-Include crs-setup.conf
-Include rules/REQUEST-*.conf
-Include rules/RESPONSE-*.conf
-`, conf.ParanoiaLevel, conf.ParanoiaLevel, conf.InboundThreshold, conf.OutboundThreshold)
-}
-
 // Name returns the identifier for this engine.
 func (e *Engine) Name() string {
 	return "crs"
 }
 
 // InspectRequest feeds the request into Coraza and maps the interruption to a
-// Raivall verdict. The transaction runs all request phases, including body
+// Raiwall verdict. The transaction runs all request phases, including body
 // inspection, before the verdict is produced.
 func (e *Engine) InspectRequest(ctx *waf.RequestContext) (*waf.Verdict, error) {
-	if ctx == nil {
+	set := e.set.Load()
+	if set == nil || set.conf.Disabled || ctx == nil {
 		return waf.VerdictAllow, nil
 	}
 
-	tx := e.waf.NewTransaction()
+	tx := set.waf.NewTransaction()
 	defer func() { _ = tx.Close() }()
 
 	client := ""
@@ -155,7 +194,7 @@ func (e *Engine) InspectRequest(ctx *waf.RequestContext) (*waf.Verdict, error) {
 	}
 
 	if it := tx.ProcessRequestHeaders(); it != nil {
-		return e.verdict(tx, it), nil
+		return verdict(set, tx, it), nil
 	}
 
 	if len(ctx.Body) > 0 {
@@ -164,7 +203,7 @@ func (e *Engine) InspectRequest(ctx *waf.RequestContext) (*waf.Verdict, error) {
 			return nil, fmt.Errorf("crs request body: %w", err)
 		}
 		if it != nil {
-			return e.verdict(tx, it), nil
+			return verdict(set, tx, it), nil
 		}
 	}
 
@@ -178,84 +217,11 @@ func (e *Engine) InspectRequest(ctx *waf.RequestContext) (*waf.Verdict, error) {
 	if it == nil {
 		return waf.VerdictAllow, nil
 	}
-	return e.verdict(tx, it), nil
+	return verdict(set, tx, it), nil
 }
 
 // InspectResponse is intentionally disabled until response inspection is
-// implemented as a paired request/response transaction (Phase 1B).
-//
-// A standalone transaction skips phase-1 CRS initialization, leaving
-// tx.outbound_anomaly_score_threshold unset; rule 959100 then matches every
-// response (0 >= 0). Returning allow is safer than emitting a false positive
-// for every request.
+// implemented as a paired request/response transaction.
 func (e *Engine) InspectResponse(_ *waf.ResponseContext) (*waf.Verdict, error) {
 	return waf.VerdictAllow, nil
-}
-
-func (e *Engine) verdict(tx ctypes.Transaction, it *ctypes.Interruption) *waf.Verdict {
-	action := waf.ActionBlock
-	if e.conf.Mode == ModeAudit {
-		action = waf.ActionAudit
-	}
-
-	v := &waf.Verdict{
-		Action:         action,
-		RuleID:         fmt.Sprintf("CRS_%d", it.RuleID),
-		Reason:         fmt.Sprintf("OWASP CRS rule %d (%s)", it.RuleID, it.Action),
-		AttackCategory: "crs",
-		Engine:         "crs",
-		AnomalyScore:   anomalyScore(tx),
-		ParanoiaLevel:  e.conf.ParanoiaLevel,
-	}
-	if it.Status > 0 {
-		v.StatusCode = it.Status
-	}
-
-	for _, match := range tx.MatchedRules() {
-		meta := match.Rule()
-		severity := meta.Severity().String()
-		// Setup and initialization rules have no severity and match on every
-		// transaction; keep only detection rules and the interrupting rule so
-		// the matched-rule list is actionable.
-		if severity == "unknown" && meta.ID() != it.RuleID {
-			continue
-		}
-		v.MatchedRules = append(v.MatchedRules, waf.RuleMatch{
-			RuleID:   strconv.Itoa(meta.ID()),
-			Message:  match.Message(),
-			Severity: severity,
-			Engine:   "crs",
-		})
-		if len(v.MatchedRules) >= MaxMatchedRules {
-			break
-		}
-	}
-	return v
-}
-
-// txVariables is implemented by Coraza's concrete transaction. The public
-// types.Transaction interface does not expose variables, but the method set
-// does, so a narrow assertion reads the anomaly score without importing
-// Coraza internals.
-type txVariables interface {
-	Variables() plugintypes.TransactionVariables
-}
-
-func anomalyScore(tx ctypes.Transaction) float64 {
-	vars, ok := tx.(txVariables)
-	if !ok {
-		return 0
-	}
-	txVars := vars.Variables().TX()
-	for _, key := range []string{"blocking_inbound_anomaly_score", "anomaly_score"} {
-		values := txVars.Get(key)
-		if len(values) == 0 {
-			continue
-		}
-		score, err := strconv.ParseFloat(values[0], 64)
-		if err == nil {
-			return score
-		}
-	}
-	return 0
 }

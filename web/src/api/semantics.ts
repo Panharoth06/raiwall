@@ -25,6 +25,9 @@ export interface InnerRule {
   id: string;
   name: string;
   category: string;
+  severity?: string;
+  methods?: string[];
+  prefix?: string;
   enabled: boolean;
 }
 
@@ -32,6 +35,23 @@ export interface InnerRuleCategory {
   category: string;
   count: number;
   disabled: number;
+}
+
+export interface InnerRulePlugin {
+  id: string;
+  name: string;
+  version: string;
+  type: string;
+  rules_count: number;
+  updated_at: string;
+  status: string;
+}
+
+export interface RulePackImportPayload {
+  name: string;
+  version?: string;
+  source?: string;
+  rules: any[];
 }
 
 export interface InnerRulesLibrary {
@@ -85,6 +105,12 @@ export const semanticsApi = {
 
   // CVE virtual patches (inner rules)
   listInnerRules: () => request<InnerRulesLibrary>('/inner-rules'),
+  listPlugins: () => request<{ plugins: InnerRulePlugin[] }>('/inner-rules/plugins'),
+  importRules: (payload: RulePackImportPayload) =>
+    request<{ success: boolean; plugin: InnerRulePlugin; imported_rules: number; message: string }>('/inner-rules/import', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
   setInnerRuleEnabled: (ruleID: string, enabled: boolean) =>
     request<{ success: boolean }>(`/inner-rules/${ruleID}`, {
       method: 'PUT',

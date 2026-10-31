@@ -158,6 +158,35 @@ func DefaultMatrix() SemanticMatrix {
 	return sm
 }
 
+// Sensitivity presets select how aggressively the semantic funnel enforces.
+const (
+	SensitivityLow    = "low"
+	SensitivityMedium = "medium"
+	SensitivityHigh   = "high"
+)
+
+// MatrixForSensitivity expands a named sensitivity preset into a module matrix.
+// Unknown or empty sensitivity resolves to the production default.
+func MatrixForSensitivity(sensitivity string) SemanticMatrix {
+	switch sensitivity {
+	case SensitivityLow:
+		m := DefaultMatrix()
+		// Heuristic logic/protocol detectors are noisy on non-browser traffic;
+		// keep them visible in telemetry but do not block at low sensitivity.
+		m[ModuleIndex(ModuleCSRF)] = ModeAudit
+		m[ModuleIndex(ModuleMalHTTP)] = ModeAudit
+		return m
+	case SensitivityHigh:
+		var m SemanticMatrix
+		for i := range m {
+			m[i] = ModeStrict
+		}
+		return m
+	default:
+		return DefaultMatrix()
+	}
+}
+
 // Mode returns the configured operating mode for the given module.
 func (sm SemanticMatrix) Mode(m Module) ModuleMode {
 	idx := ModuleIndex(m)
@@ -221,13 +250,12 @@ func (s StaticMatrixSource) MatrixFor(string) SemanticMatrix {
 // defaultMatrixPool is the zero-dependency fallback used when no source is wired.
 var defaultMatrixPool = DefaultMatrix()
 
-// matrixForApp resolves the effective matrix via the source, falling back to defaults.
+// matrixForApp resolves the effective matrix via the source, falling back to
+// defaults only when no source is installed. An all-Disabled matrix is a valid
+// operator choice and must not be treated as "unset".
 func matrixForApp(src MatrixSource, appID string) SemanticMatrix {
 	if src == nil {
 		return defaultMatrixPool
 	}
-	if m := src.MatrixFor(appID); m != (SemanticMatrix{}) {
-		return m
-	}
-	return defaultMatrixPool
+	return src.MatrixFor(appID)
 }
