@@ -1,6 +1,6 @@
 # Raiwall Enterprise Roadmap
 
-Living document. Last updated: **2026-10-31** (commit `34ea459`).
+Living document. Last updated: **2026-10-31** (commit `5d14d49`).
 
 This is the authoritative roadmap for turning Raiwall into an enterprise-grade,
 self-hosted WAF. It records the current capability matrix, the gap-closure
@@ -41,7 +41,7 @@ Priority: **P0** blocks enterprise use, **P1** major capability, **P2** maturity
 
 ---
 
-## 2. Current State (commit `34ea459`)
+## 2. Current State (commit `5d14d49`)
 
 ### Implemented
 
@@ -252,10 +252,10 @@ traffic; app-auth bypass tests pass; audit-mode events appear; docs match code.
 | ID | Deliverable | Targets | Size | Status |
 |---|---|---|---|---|
 | 1A.1 | Embed Coraza v3 + OWASP CRS 4.x behind `WAFEnginePort`; compiled policy cache | `core/waf/crs/*`, `core/waf/ports.go` | XL | **Done** `aaa12f3` |
-| 1A.2 | Composite engine + extended verdict + event schema/storage | `core/waf/composite.go`, `core/telemetry/event.go`, SQLite/PG/CH schemas | M | **Partial** (`34ea459`: SQLite/PG, verdict; ClickHouse pending) |
+| 1A.2 | Composite engine + extended verdict + event schema/storage | `core/waf/composite.go`, `core/telemetry/event.go`, SQLite/PG/CH schemas | M | **Done** (`aaa12f3`, `34ea459`, `5d14d49`) |
 | 1A.3 | Per-site detection policy: CRS off/audit/block, PL1–4, thresholds; API + UI | `core/control/models.go`, `compiler.go`, `http/detector.go`, `web/` | M | **Pending** |
 | 1A.4 | Exception → CRS exclusion translation; rule catalog/tags/severity | `core/acl/exception.go`, `core/waf/crs/exceptions.go` | M | **Pending** |
-| 1A.5 | Rule test playground + go-ftw harness | `http/rules.go`, `tests/crs/` | M | **Partial** (`34ea459`: API; go-ftw pending) |
+| 1A.5 | Rule test playground + go-ftw harness | `http/rules.go`, `tests/crs/` | M | **Partial** (`34ea459` API, `5d14d49` UI; go-ftw pending) |
 | 1A.6 | Performance: semantic-first, static exclusions, body pre-caps, benchmarks | `caddy/stage_waf.go`, `core/waf/benchmark_test.go` | M | **Pending** |
 
 #### 1B Detection depth (10–12 weeks)
@@ -477,7 +477,7 @@ single-node; multi-replica requires PostgreSQL + Redis + shared cert storage.
 | `13e8678` | Phase 0 security: telemetry auth, body prefix/decompression, Envoy wire format, app-auth bypass, client IP/trusted proxies, audit telemetry, response sanitization |
 | `aaa12f3` | Phase 1A.1: Coraza + OWASP CRS 4.30, composite engine, CRS config |
 | `34ea459` | Phase 1A.2/1A.5: CRS event metadata (SQLite/PG), rule-test playground, matched-rule filtering |
-| _unreleased_ | ClickHouse repair (schema/retention/columns/lookup), Rule Tester UI, CRS metadata in the forensic drawer, viewer write-action guard, mock Command Center removed |
+| `5d14d49` | ClickHouse repair (schema/retention/columns/lookup), Rule Tester UI, CRS metadata in the forensic drawer, viewer write-action guard, mock Command Center removed |
 
 ## 9. Change Control
 

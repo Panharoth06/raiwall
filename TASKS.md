@@ -1,7 +1,7 @@
 # Raiwall Enterprise Tasks
 
 Actionable breakdown for [`ROADMAP.md`](ROADMAP.md). Last updated: **2026-10-31**
-(commit `34ea459`).
+(commit `5d14d49`).
 
 Use this file as the working checklist. Each task is self-contained: implement,
 test, update `ROADMAP.md` status, run `graphify update .`, and commit with a
@@ -129,14 +129,14 @@ Status legend: `[x]` done · `[~]` partial · `[ ]` pending.
 - [x] Unit tests: SQLi/XSS/LFI, scanner UA, audit mode, response disabled.
 - [ ] Response rules require paired transactions (1B.1).
 
-### 1A.2 Composite engine + verdict/event schema `[~]`
-**Done:** composite engine, verdict metadata, SQLite/PG event columns
-(`aaa12f3`, `34ea459`).
+### 1A.2 Composite engine + verdict/event schema `[x]`
+**Done:** composite engine, verdict metadata, SQLite/PG/ClickHouse event
+columns (`aaa12f3`, `34ea459`, `5d14d49`).
 - [x] Semantic first, CRS second; block wins; audit surfaces.
 - [x] Extend `Verdict` with engine, anomaly score, PL, matched rules.
 - [x] Persist metadata in SQLite and PostgreSQL (migration 0010).
 - [x] Sanitize rule messages.
-- [ ] Persist metadata in ClickHouse (0.4).
+- [x] Persist metadata in ClickHouse (0.4).
 - [ ] Add engine/score filters to the events API and UI.
 - [ ] Gate: CRS events are distinguishable and queryable.
 
@@ -163,7 +163,7 @@ Status legend: `[x]` done · `[~]` partial · `[ ]` pending.
 - [ ] Gate: one DB exception row drives both engines.
 
 ### 1A.5 Rule test playground + go-ftw `[~]`
-**Done:** `/rules/test` API (`34ea459`).
+**Done:** `/rules/test` API (`34ea459`) and UI (`5d14d49`).
 - [x] Synthetic request evaluation against the live engine.
 - [x] Returns verdict, anomaly score, PL, matched rules, latency.
 - [x] OpenAPI entry and unit tests.
