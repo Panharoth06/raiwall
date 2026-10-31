@@ -203,6 +203,8 @@ config:
       secure: true
       allow_basic_auth: false
     auto_apply: true
+    snapshot_retention: 200
+    audit_retention: 8760h
     bootstrap_admin:
       username: admin
       password: "${RAIWALL_ADMIN_PASSWORD}"

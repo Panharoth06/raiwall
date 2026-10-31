@@ -77,6 +77,15 @@ type ControlStore interface {
 	RevokeAdminSessionsForUser(ctx context.Context, userID string, revokedAt time.Time) error
 	DeleteExpiredAdminSessions(ctx context.Context, now time.Time) (int64, error)
 
+	// Audit log (append-only; only retention pruning deletes rows).
+	CreateAuditEvent(ctx context.Context, event AuditEvent) error
+	ListAuditEvents(ctx context.Context, filter AuditFilter) ([]AuditEvent, error)
+	DeleteAuditEventsBefore(ctx context.Context, cutoff time.Time) (int64, error)
+
+	// Retention: delete snapshots outside the newest keep entries, except the
+	// active version, which must always remain rollback-able.
+	PruneSnapshots(ctx context.Context, keep int, activeVersion uint64) (int64, error)
+
 	// API Keys
 	ListAPIKeys(ctx context.Context) ([]ApiKeyRecord, error)
 	GetAPIKeyByID(ctx context.Context, id string) (ApiKeyRecord, error)

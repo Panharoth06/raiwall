@@ -283,18 +283,27 @@ CI gate, and OpenAPI base in the current change.
 - [ ] Bounded disk spool, retry/backoff, dedupe by `event_id`.
 - [ ] Tests: encoder fixtures, outage replay, duplicate suppression.
 
-### 2.3 Administrative audit log `[ ]`
-- [ ] Append-only table: `seq`, actor, action, resource, request ID, IP/UA,
-      before/after hashes, `prev_hash`, `entry_hash`.
-- [ ] Server-derived actor only (never client body).
+### 2.3 Administrative audit log `[~]`
+- [~] Append-only table with id, time, actor (server-derived), action, target,
+      method/path, status, request ID, client IP/UA, snapshot version. Hash
+      chain (`prev_hash`/`entry_hash`) and before/after hashes are pending.
+- [x] Server-derived actor only; request bodies and credentials are never
+      recorded.
 - [ ] Ed25519 anchors every N entries or T.
-- [ ] Verify API and tamper tests.
-- [ ] Gate: forged author ignored; chain tamper detected.
+- [x] Read API (`GET /audit`, admin-only, time/actor/action filters and
+      pagination) and a read-only Settings → Audit Log table. No update/delete
+      path exists.
+- [~] Gate: forged authors are impossible by construction; cryptographic
+      tamper evidence (hash chain) remains pending.
 
-### 2.4 Retention, legal hold, WORM `[ ]`
+### 2.4 Retention, legal hold, WORM `[~]`
+- [x] Retention config and prune worker for configuration snapshots
+      (`control.snapshot_retention`, active version always retained), operator
+      sessions, and audit rows (`control.audit_retention`).
 - [ ] Retention policy UI/API and prune dry-run.
 - [ ] Legal hold that blocks pruning.
 - [ ] S3 Object Lock export; ClickHouse TTL.
+- [x] Tests: snapshot keep-N + active; audit cutoff; expired session removal.
 - [ ] Tests: hold survives prune; WORM retention enforced.
 
 ### 2.5 Reports `[ ]`

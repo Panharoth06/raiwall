@@ -21,6 +21,7 @@ func (m *Middleware) Cleanup() error {
 	if m.waitingRoom != nil {
 		_ = m.waitingRoom.Close()
 	}
+	m.stopRetention()
 	if m.banManager != nil {
 		_ = m.banManager.Close()
 	}

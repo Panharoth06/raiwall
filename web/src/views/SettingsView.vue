@@ -6,6 +6,7 @@ import { useTheme } from '@/composables/useTheme';
 import { api } from '@/api/client';
 import ApiKeysManager from '@/components/ApiKeysManager.vue';
 import UsersPanel from '@/components/settings/UsersPanel.vue';
+import AuditPanel from '@/components/settings/AuditPanel.vue';
 import CertificatesPanel from '@/components/certificates/CertificatesPanel.vue';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -32,7 +33,7 @@ const router = useRouter();
 const configStore = useConfigStore();
 const { theme, setTheme } = useTheme();
 
-type SettingsSubTab = 'cluster' | 'certificates' | 'apikeys' | 'users';
+type SettingsSubTab = 'cluster' | 'certificates' | 'apikeys' | 'users' | 'audit';
 const activeTab = ref<SettingsSubTab>('cluster');
 
 const tabs: (Tab & { id: SettingsSubTab })[] = [
@@ -40,6 +41,7 @@ const tabs: (Tab & { id: SettingsSubTab })[] = [
   { id: 'certificates', label: 'TLS Certificates', icon: Lock },
   { id: 'apikeys', label: 'API Keys & Access', icon: Key },
   { id: 'users', label: 'Operators', icon: Users },
+  { id: 'audit', label: 'Audit Log', icon: History },
 ];
 
 const handleTabChange = (tabId: string) => {
@@ -326,6 +328,11 @@ onMounted(() => {
       <!-- Operator accounts -->
       <Card v-else-if="activeTab === 'users'" class="p-4">
         <UsersPanel />
+      </Card>
+
+      <!-- Audit log -->
+      <Card v-else-if="activeTab === 'audit'" class="p-4">
+        <AuditPanel />
       </Card>
     </div>
   </div>

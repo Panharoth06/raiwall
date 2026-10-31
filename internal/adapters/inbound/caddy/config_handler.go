@@ -147,14 +147,16 @@ func handlerFromConfig(file *config.File) (*Middleware, error) {
 
 	m.StorageConfig = storageSettings(file.Storage)
 	m.ControlConfig = &ControlSettings{
-		HMACSecret:      file.Control.HMACSecret,
-		AutoApply:       file.Control.AutoApply,
-		PublicURL:       file.Control.PublicURL,
-		AllowedNetworks: file.Control.AllowedNetworks,
-		SessionIdle:     caddy.Duration(file.Control.Session.IdleTimeout),
-		SessionAbsolute: caddy.Duration(file.Control.Session.AbsoluteTimeout),
-		SessionSecure:   file.Control.Session.Secure,
-		AllowBasicAuth:  file.Control.Session.AllowBasicAuth,
+		HMACSecret:        file.Control.HMACSecret,
+		AutoApply:         file.Control.AutoApply,
+		PublicURL:         file.Control.PublicURL,
+		AllowedNetworks:   file.Control.AllowedNetworks,
+		SessionIdle:       caddy.Duration(file.Control.Session.IdleTimeout),
+		SessionAbsolute:   caddy.Duration(file.Control.Session.AbsoluteTimeout),
+		SessionSecure:     file.Control.Session.Secure,
+		AllowBasicAuth:    file.Control.Session.AllowBasicAuth,
+		SnapshotRetention: file.Control.SnapshotRetention,
+		AuditRetention:    caddy.Duration(file.Control.AuditRetention),
 		BootstrapAdmin: &BootstrapAdminSettings{
 			Username: file.Control.BootstrapAdmin.Username,
 			Password: file.Control.BootstrapAdmin.Password,

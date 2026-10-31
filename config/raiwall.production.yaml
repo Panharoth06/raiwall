@@ -61,6 +61,10 @@ control:
     secure: true
     allow_basic_auth: false
   auto_apply: true
+  # Keep the newest N configuration snapshots plus the active version.
+  snapshot_retention: 200
+  # Prune control-plane audit rows older than this (0 = keep forever).
+  audit_retention: 8760h
   bootstrap_admin:
     username: "${RAIWALL_ADMIN_USERNAME:-admin}"
     # Empty generates a one-time password logged at WARN.

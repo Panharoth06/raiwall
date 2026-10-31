@@ -73,6 +73,7 @@ func (m *Middleware) provisionControl(ctx caddy.Context) error {
 			m.adminNetworks = networks
 		}
 		m.controlAPI.SetReadinessProvider(m)
+		m.startRetention()
 		m.controlAPI.SetCRSDefaults(
 			m.CRSEnabled, m.CRSMode,
 			m.CRSParanoiaLevel, m.CRSInboundThreshold, m.CRSOutboundThreshold,

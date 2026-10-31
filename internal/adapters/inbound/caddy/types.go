@@ -130,16 +130,18 @@ type StorageSettings struct {
 
 // ControlSettings configures the Control Plane database and management API.
 type ControlSettings struct {
-	DBPath          string                  `json:"db_path,omitempty"`
-	HMACSecret      string                  `json:"hmac_secret,omitempty"`
-	AutoApply       bool                    `json:"auto_apply,omitempty"`
-	BootstrapAdmin  *BootstrapAdminSettings `json:"bootstrap_admin,omitempty"`
-	PublicURL       string                  `json:"public_url,omitempty"`
-	AllowedNetworks []string                `json:"allowed_networks,omitempty"`
-	SessionIdle     caddy.Duration          `json:"session_idle_timeout,omitempty"`
-	SessionAbsolute caddy.Duration          `json:"session_absolute_timeout,omitempty"`
-	SessionSecure   *bool                   `json:"session_secure,omitempty"`
-	AllowBasicAuth  bool                    `json:"allow_basic_auth,omitempty"`
+	DBPath            string                  `json:"db_path,omitempty"`
+	HMACSecret        string                  `json:"hmac_secret,omitempty"`
+	AutoApply         bool                    `json:"auto_apply,omitempty"`
+	BootstrapAdmin    *BootstrapAdminSettings `json:"bootstrap_admin,omitempty"`
+	PublicURL         string                  `json:"public_url,omitempty"`
+	AllowedNetworks   []string                `json:"allowed_networks,omitempty"`
+	SessionIdle       caddy.Duration          `json:"session_idle_timeout,omitempty"`
+	SessionAbsolute   caddy.Duration          `json:"session_absolute_timeout,omitempty"`
+	SessionSecure     *bool                   `json:"session_secure,omitempty"`
+	AllowBasicAuth    bool                    `json:"allow_basic_auth,omitempty"`
+	SnapshotRetention int                     `json:"snapshot_retention,omitempty"`
+	AuditRetention    caddy.Duration          `json:"audit_retention,omitempty"`
 }
 
 // BootstrapAdminSettings provisions the first operator account when the store
@@ -272,7 +274,11 @@ type Middleware struct {
 	controlAPI      *api.Server
 	// adminNetworks restricts /.raiwall and telemetry to these CIDRs. Empty
 	// means unrestricted.
-	adminNetworks      []netip.Prefix
+	adminNetworks []netip.Prefix
+	// retentionStop stops the hourly audit/session/snapshot cleanup worker.
+	retentionStop chan struct{}
+	retentionWG   sync.WaitGroup
+
 	templateManager    *templates.TemplateManager
 	sidecarServer      *grpc.ExtProcServer
 	upstreamRegistry   *UpstreamRegistry

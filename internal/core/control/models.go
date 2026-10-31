@@ -282,3 +282,49 @@ type IdentityProviderRecord struct {
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
+
+// AuditEvent is one append-only control-plane audit record. Detail may carry
+// structured context but never request bodies or secrets.
+type AuditEvent struct {
+	ID              string    `json:"id"`
+	OccurredAt      time.Time `json:"occurred_at"`
+	ActorType       string    `json:"actor_type"`
+	ActorID         string    `json:"actor_id,omitempty"`
+	ActorName       string    `json:"actor_name,omitempty"`
+	Role            string    `json:"role,omitempty"`
+	Action          string    `json:"action"`
+	TargetType      string    `json:"target_type,omitempty"`
+	TargetID        string    `json:"target_id,omitempty"`
+	Method          string    `json:"method,omitempty"`
+	Path            string    `json:"path,omitempty"`
+	StatusCode      int       `json:"status_code,omitempty"`
+	RequestID       string    `json:"request_id,omitempty"`
+	ClientIP        string    `json:"client_ip,omitempty"`
+	UserAgent       string    `json:"user_agent,omitempty"`
+	SnapshotVersion uint64    `json:"snapshot_version,omitempty"`
+	Detail          string    `json:"detail,omitempty"`
+}
+
+// AuditFilter selects audit records for the read API.
+type AuditFilter struct {
+	From   time.Time
+	To     time.Time
+	Actor  string
+	Action string
+	Limit  int
+	Offset int
+}
+
+// Normalized applies pagination bounds.
+func (f AuditFilter) Normalized() AuditFilter {
+	if f.Limit <= 0 {
+		f.Limit = 50
+	}
+	if f.Limit > 500 {
+		f.Limit = 500
+	}
+	if f.Offset < 0 {
+		f.Offset = 0
+	}
+	return f
+}

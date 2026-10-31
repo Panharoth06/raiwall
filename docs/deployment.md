@@ -118,8 +118,8 @@ Notes:
 
 ## 4. Operator accounts
 
-Create additional admins/viewers with the CLI until the Settings → Users page
-lands (next milestone):
+Use **Settings → Operators** to create admins/viewers, change roles, reset
+passwords, revoke sessions, or deactivate an account. The CLI remains available:
 
 ```bash
 docker compose -f docker-compose.prod.yml exec raiwall \
@@ -155,6 +155,10 @@ next request (sessions are revalidated against the database).
 | `/.raiwall/api/v1/status` | Authenticated status with the same component checks |
 | `/.raiwall/metrics` | Authenticated Prometheus metrics |
 
+The dashboard's **Settings → Audit Log** shows the append-only record of
+sign-ins and control-plane changes (actor, action, target, status, IP). Audit
+rows never contain request bodies or credentials.
+
 Probes are wired in Compose and Helm. Alert channels are configured under
 `telemetry.alert_channels`; they require authentication only if the webhook does.
 
@@ -171,9 +175,10 @@ docker compose -f docker-compose.prod.yml exec -T postgres \
   pg_dump -U raiwall -Fc raiwall > raiwall-$(date +%F).dump
 ```
 
-Forensic events honor `telemetry.retention` (default 30 days). Configuration
-snapshots are retained for rollback; set `control.snapshot_retention` (planned)
-to cap growth when `auto_apply` is on.
+Forensic events honor `telemetry.retention` (default 30 days). The cleanup
+worker enforces `control.snapshot_retention` (default 200, always keeping the
+active version), `control.audit_retention` (default 365 days), and expired
+operator sessions.
 
 Test a restore into a scratch database before relying on a backup.
 

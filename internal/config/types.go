@@ -141,6 +141,12 @@ type Control struct {
 	AllowedNetworks []string `yaml:"allowed_networks" json:"allowed_networks"`
 	// Session controls dashboard operator sessions.
 	Session Session `yaml:"session" json:"session"`
+	// SnapshotRetention keeps at most this many configuration snapshots
+	// (newest first plus the active version). 0 disables pruning.
+	SnapshotRetention int `yaml:"snapshot_retention" json:"snapshot_retention"`
+	// AuditRetention prunes control-plane audit rows older than this. 0 keeps
+	// them forever.
+	AuditRetention Duration `yaml:"audit_retention" json:"audit_retention"`
 }
 
 // Session configures opaque dashboard operator sessions.

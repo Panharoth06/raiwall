@@ -83,6 +83,10 @@ control:
   # Commit and hot-swap a new snapshot after every successful configuration
   # change. Set false to stage changes and deploy them from the Deployments page.
   auto_apply: true
+  # Keep the newest N configuration snapshots plus the active version.
+  snapshot_retention: 200
+  # Prune control-plane audit rows older than this (0 = keep forever).
+  audit_retention: 8760h
   bootstrap_admin:
     username: "${RAIWALL_ADMIN_USERNAME:-admin}"
     # Empty = a random password is generated and logged once at WARN level.

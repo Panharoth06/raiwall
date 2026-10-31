@@ -37,6 +37,8 @@ const (
 
 	defaultSessionIdleTimeout     = 8 * time.Hour
 	defaultSessionAbsoluteTimeout = 24 * time.Hour
+	defaultSnapshotRetention      = 200
+	defaultAuditRetention         = 365 * 24 * time.Hour
 )
 
 // applyDefaults fills unset fields so a minimal document is deployable. All
@@ -99,6 +101,12 @@ func applyDefaults(f *File) {
 	}
 	if f.Control.Session.Secure == nil {
 		f.Control.Session.Secure = boolPtr(true)
+	}
+	if f.Control.SnapshotRetention == 0 {
+		f.Control.SnapshotRetention = defaultSnapshotRetention
+	}
+	if f.Control.AuditRetention == 0 {
+		f.Control.AuditRetention = Duration(defaultAuditRetention)
 	}
 
 	if f.WAF.Mode == "" {

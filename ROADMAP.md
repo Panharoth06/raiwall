@@ -280,8 +280,8 @@ corpora; WS/gRPC/PROXY/mTLS; no uninspected body path; CRS PL1 p99 ≤ 1.5 ms fo
 |---|---|---|---|
 | 2.1 | OTel traces (request, WAF phases, upstream, response), OTLP export, sampling | `core/observability/tracing.go`, `caddy/pipeline.go` | M |
 | 2.2 | SIEM pipeline: RFC5424, CEF, LEEF, Splunk HEC, Sentinel DCR, Elastic, spool/retry | `adapters/outbound/siem/*` | L |
-| 2.3 | Admin audit log: append-only, hash chain, Ed25519 anchors, verify API, server-derived actor | `core/audit/*`, migration `0011+` | L |
-| 2.4 | Retention, legal hold, WORM (S3 Object Lock), prune UI, ClickHouse TTL | `storage/*`, `adapters/outbound/audit/s3worm.go` | L |
+| 2.3 | Admin audit log: append-only, hash chain, Ed25519 anchors, verify API, server-derived actor | `core/audit/*`, migration `0011+` | L | **Partial** (append-only API/UI + server-derived actor; hash chain/anchors pending) |
+| 2.4 | Retention, legal hold, WORM (S3 Object Lock), prune UI, ClickHouse TTL | `storage/*`, `adapters/outbound/audit/s3worm.go` | L | **Partial** (snapshot/session/audit retention worker; UI/hold/WORM pending) |
 | 2.5 | Reports: CSV/JSON, printable HTML, PCI/SOC2/GDPR evidence mappings | `core/reports/*`, `http/reports.go` | L |
 | 2.6 | Alerting: CRUD, test-send, delivery history, retry/backoff, dedupe | `adapters/outbound/alerts/*`, `web/` | M |
 | 2.7 | Telemetry/DLP completeness, ClickHouse dashboards, per-site/rule metrics | `core/telemetry/*`, `web/` | M |

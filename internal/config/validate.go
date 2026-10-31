@@ -151,6 +151,12 @@ func (f *File) validateControl(v *validator) {
 			v.add("control.allowed_networks entry %q is not a valid CIDR", network)
 		}
 	}
+	if f.Control.SnapshotRetention < 0 {
+		v.add("control.snapshot_retention must be zero or positive")
+	}
+	if f.Control.AuditRetention < 0 {
+		v.add("control.audit_retention must be zero or positive")
+	}
 }
 
 // validateSecurity enforces the public-exposure gate. It runs only when

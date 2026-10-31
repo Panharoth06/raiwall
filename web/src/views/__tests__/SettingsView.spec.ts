@@ -22,6 +22,7 @@ describe('SettingsView.vue', () => {
     ApiKeysManager: { template: '<div data-testid="apikeys-subview">API Keys Manager</div>' },
     CertificatesPanel: { template: '<div data-testid="certificates-subview">Certificates</div>' },
     UsersPanel: { template: '<div data-testid="users-subview">Operators</div>' },
+    AuditPanel: { template: '<div data-testid="audit-subview">Audit</div>' },
   };
 
   it('renders cluster, certificates, and apikeys sub-tabs and defaults to cluster', () => {
@@ -38,11 +39,12 @@ describe('SettingsView.vue', () => {
     });
 
     const tabItems = wrapper.findAll('[data-testid="tab-item"]');
-    expect(tabItems.length).toBe(4);
+    expect(tabItems.length).toBe(5);
     expect(tabItems[0].text()).toContain('Cluster Synchronization');
     expect(tabItems[1].text()).toContain('TLS Certificates');
     expect(tabItems[2].text()).toContain('API Keys & Access');
     expect(tabItems[3].text()).toContain('Operators');
+    expect(tabItems[4].text()).toContain('Audit Log');
 
     expect(wrapper.text()).toContain('Cluster Node & State Synchronization');
     expect(wrapper.find('[data-testid="apikeys-subview"]').exists()).toBe(false);
@@ -98,5 +100,17 @@ describe('SettingsView.vue', () => {
     await nextTick();
 
     expect(wrapper.find('[data-testid="users-subview"]').exists()).toBe(true);
+  });
+
+  it('switches to the audit tab', async () => {
+    const store = useConfigStore();
+    store.cluster = { mode: 'standalone', redis_connected: false, active_version: 1, channel: '' };
+
+    const wrapper = mount(SettingsView, { global: { stubs } });
+    const tabItems = wrapper.findAll('[data-testid="tab-item"]');
+    await tabItems[4].trigger('click');
+    await nextTick();
+
+    expect(wrapper.find('[data-testid="audit-subview"]').exists()).toBe(true);
   });
 });

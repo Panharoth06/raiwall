@@ -196,6 +196,35 @@ export interface AdminUserResponse {
   password?: string;
 }
 
+export interface AuditEvent {
+  id: string;
+  occurred_at: string;
+  actor_type: string;
+  actor_id?: string;
+  actor_name?: string;
+  role?: string;
+  action: string;
+  target_type?: string;
+  target_id?: string;
+  method?: string;
+  path?: string;
+  status_code?: number;
+  request_id?: string;
+  client_ip?: string;
+  user_agent?: string;
+  snapshot_version?: number;
+  detail?: string;
+}
+
+export interface AuditQuery {
+  from?: string;
+  to?: string;
+  actor?: string;
+  action?: string;
+  limit?: number;
+  offset?: number;
+}
+
 export interface ConfigDiffItem {
   type: 'site' | 'exception' | 'acl' | 'policy';
   action: 'added' | 'modified' | 'deleted';
@@ -495,6 +524,21 @@ export const api = {
     request<AdminUserResponse>(`/users/${id}`, {
       method: 'DELETE',
     }),
+
+  // Audit log
+  listAuditEvents: (query: AuditQuery = {}) => {
+    const params = new URLSearchParams();
+    if (query.from) params.set('from', query.from);
+    if (query.to) params.set('to', query.to);
+    if (query.actor) params.set('actor', query.actor);
+    if (query.action) params.set('action', query.action);
+    if (query.limit) params.set('limit', String(query.limit));
+    if (query.offset) params.set('offset', String(query.offset));
+    const suffix = params.toString();
+    return request<{ events: AuditEvent[]; limit: number; offset: number }>(
+      `/audit${suffix ? `?${suffix}` : ''}`
+    );
+  },
 
   // Deployments & Config
   getDraftDiff: () => request<{ has_changes: boolean; diffs: ConfigDiffItem[] }>('/config/draft/diff'),

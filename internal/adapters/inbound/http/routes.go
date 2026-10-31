@@ -2,10 +2,12 @@ package api
 
 import (
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 )
 
 func (s *Server) routes() {
 	r := s.router
+	r.Use(middleware.RequestID)
 
 	// OpenAPI 3.1 & Interactive Documentation (Public)
 	r.Get("/.raiwall/api/openapi.json", ServeOpenAPISpec)
@@ -32,6 +34,7 @@ func (s *Server) routes() {
 
 		sub.Group(func(api chi.Router) {
 			api.Use(s.authMgr.AuthMiddleware)
+			api.Use(s.AuditMiddleware)
 			api.Use(s.DeclarativeGuardMiddleware)
 			api.Use(s.AutoApplyMiddleware)
 
@@ -39,8 +42,9 @@ func (s *Server) routes() {
 			api.Post("/auth/logout", s.handleLogout)
 			api.Get("/auth/me", s.handleAuthMe)
 
-			// Status & Cluster
+			// Status, audit, and cluster
 			api.Get("/status", s.handleStatus)
+			api.Get("/audit", s.handleListAuditEvents)
 			api.Put("/system/auto-apply", s.handleUpdateAutoApply)
 			api.Get("/cluster/status", s.handleClusterStatus)
 

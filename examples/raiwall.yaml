@@ -50,6 +50,10 @@ control:
   # true = every saved change is compiled and hot-swapped immediately.
   # false = changes stay staged until committed from the Deployments page.
   auto_apply: true
+  # Keep the newest N configuration snapshots plus the active version.
+  snapshot_retention: 200
+  # Prune control-plane audit rows older than this (0 = keep forever).
+  audit_retention: 8760h
   bootstrap_admin:
     username: admin
     password: "${RAIWALL_ADMIN_PASSWORD:-}"
