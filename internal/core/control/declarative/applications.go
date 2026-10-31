@@ -166,6 +166,7 @@ func buildApplication(app config.Application, id string, prev control.SiteApp, c
 	if app.Proxy != nil {
 		raw, _ := json.Marshal(control.ProxySettings{
 			ClientIPSource:    app.Proxy.ClientIPSource,
+			TrustedProxies:    app.Proxy.TrustedProxies,
 			RewriteXFF:        app.Proxy.RewriteXFF,
 			HSTS:              app.Proxy.HSTS,
 			EnableSSE:         app.Proxy.EnableSSE,

@@ -31,9 +31,12 @@ func (m *Middleware) evaluateAuthGate(
 }
 
 // evaluateAppAuthGate serves the per-site zero-trust HTTP 467 challenge.
-// API transports (Bearer, JSON, /api/*) and operator-configured bypass
-// prefixes pass through transparently; browsers without a valid
-// sl_jwt_session clearance cookie receive the branded login portal.
+//
+// API transports (Bearer, JSON negotiation, XHR, /api/*) receive a JSON 401
+// instead of the browser portal, but they are NOT allowed through without a
+// valid session/token. Previously any Authorization header or Accept:
+// application/json bypassed the gate entirely. Operators who need
+// upstream-authenticated API endpoints must list them in AuthBypassPaths.
 func (m *Middleware) evaluateAppAuthGate(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -53,26 +56,26 @@ func (m *Middleware) evaluateAppAuthGate(
 		return true, nil
 	}
 
-	// 2. Transport fast-paths bypass the interactive challenge entirely.
+	// 2. Site-configured path bypasses are an explicit operator opt-out.
+	if auth.PathBypassed(r.URL.Path, appCfg.AuthBypassPaths) {
+		return false, nil
+	}
+
+	// 3. Cleared session (cookie or Authorization: Bearer session token):
+	// inject verified identity headers upstream.
+	if gate.Claims(r) != nil {
+		return false, nil
+	}
+
+	// 4. API clients without a valid credential get JSON 401, not the portal.
 	if auth.IsAPITransport(
 		r.URL.Path,
 		r.Header.Get("Accept"),
 		r.Header.Get("Authorization"),
 		r.Header.Get("X-Requested-With"),
 	) {
-		// Keep already-cleared identity claims for API callers too.
-		gate.Claims(r)
-		return false, nil
-	}
-
-	// 3. Site-configured path bypasses.
-	if auth.PathBypassed(r.URL.Path, appCfg.AuthBypassPaths) {
-		return false, nil
-	}
-
-	// 4. Cleared session: inject verified identity headers upstream.
-	if gate.Claims(r) != nil {
-		return false, nil
+		auth.WriteUnauthorizedAPI(w, auth.AppAuthLoginPath)
+		return true, nil
 	}
 
 	// 5. Unauthenticated browser: serve the HTTP 467 branded challenge.

@@ -4,6 +4,7 @@ go 1.27.0
 
 require (
 	github.com/altcha-org/altcha-lib-go v1.0.0
+	github.com/andybalholm/brotli v1.1.0
 	github.com/caddyserver/caddy/v2 v2.8.4
 	github.com/caddyserver/certmagic v0.21.3
 	github.com/corazawaf/libinjection-go v0.3.5
@@ -27,6 +28,7 @@ require (
 	golang.org/x/net v0.61.0
 	golang.org/x/oauth2 v0.36.0
 	google.golang.org/grpc v1.63.2
+	google.golang.org/protobuf v1.34.1
 	gopkg.in/yaml.v3 v3.0.1
 	modernc.org/sqlite v1.61.0
 )
@@ -178,7 +180,6 @@ require (
 	golang.org/x/tools v0.52.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240506185236-b8a5c65736ae // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240429193739-8cf5692501f6 // indirect
-	google.golang.org/protobuf v1.34.1 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	howett.net/plist v1.0.0 // indirect
 	modernc.org/libc v1.79.0 // indirect

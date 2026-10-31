@@ -4,6 +4,7 @@ import (
 	"context"
 	"net"
 	"net/http"
+	"net/netip"
 	"strings"
 )
 
@@ -11,83 +12,133 @@ type contextKey string
 
 const clientIPContextKey contextKey = "raiwall.client_ip"
 
-// ExtractClientIP determines the real client IP using priority-based header extraction:
-// 1. CF-Connecting-IP (Cloudflare)
-// 2. X-Real-IP (Nginx / standard proxies)
-// 3. X-Forwarded-For (left-most client IP in chain)
-// 4. RemoteAddr (direct socket connection)
+// ExtractClientIP returns the direct socket peer. Forwarded headers are only
+// honored when the application explicitly configures a source, so a client
+// cannot spoof its address (and therefore its geo, ACL, rate-limit, and ban
+// keys) by sending CF-Connecting-IP/X-Real-IP/X-Forwarded-For.
 func ExtractClientIP(r *http.Request) net.IP {
 	return ExtractClientIPWithSource(r, "")
 }
 
 // ExtractClientIPWithSource extracts the client IP using a configured source:
-// "socket" / "remoteaddr" -> socket RemoteAddr only
-// "xff" / "x-forwarded-for" -> X-Forwarded-For header
-// custom header -> specified header
-// "" / default -> priority-based extraction (CF, X-Real-IP, XFF, RemoteAddr)
+//
+//	"" / "socket" / "remoteaddr" / "remote" -> socket RemoteAddr only
+//	"header" / "xff" / "x-forwarded-for"     -> X-Forwarded-For
+//	"x-real-ip" / "cf-connecting-ip"        -> that header
+//	any other value                          -> treated as a header name
+//
+// Header-based sources trust the forwarding chain. Operators behind a proxy
+// must opt in explicitly; use ExtractClientIPWithTrustedProxies to restrict
+// which peers may assert the header.
 func ExtractClientIPWithSource(r *http.Request, source string) net.IP {
+	return ExtractClientIPWithTrustedProxies(r, source, nil)
+}
+
+// ExtractClientIPWithTrustedProxies resolves the client IP with a trusted-proxy
+// allowlist. When the direct peer is not trusted, forwarded headers are ignored
+// entirely. When it is trusted, X-Forwarded-For is walked right-to-left,
+// skipping trusted hops, so the first untrusted address is the client.
+func ExtractClientIPWithTrustedProxies(r *http.Request, source string, trustedProxies []string) net.IP {
 	if r == nil {
 		return nil
 	}
 
+	socketIP := parseRemoteAddr(r.RemoteAddr)
 	src := strings.ToLower(strings.TrimSpace(source))
+
+	var headerName string
 	switch src {
-	case "socket", "remoteaddr":
-		return parseRemoteAddr(r.RemoteAddr)
-	case "xff", "x-forwarded-for":
-		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-			parts := strings.Split(xff, ",")
-			for _, part := range parts {
-				clean := strings.TrimSpace(part)
-				if clean == "" {
-					continue
-				}
-				if ip := parseValidIP(clean); ip != nil {
-					return ip
-				}
-			}
-		}
-		return parseRemoteAddr(r.RemoteAddr)
+	case "", "socket", "remoteaddr", "remote":
+		return socketIP
+	case "header", "xff", "x-forwarded-for":
+		headerName = "X-Forwarded-For"
+	case "x-real-ip":
+		headerName = "X-Real-IP"
+	case "cf-connecting-ip":
+		headerName = "CF-Connecting-IP"
 	default:
-		if source != "" {
-			if val := strings.TrimSpace(r.Header.Get(source)); val != "" {
-				if ip := parseValidIP(val); ip != nil {
-					return ip
-				}
-			}
-		}
+		headerName = source
 	}
 
-	// 1. Cloudflare header
-	if cfIP := strings.TrimSpace(r.Header.Get("CF-Connecting-IP")); cfIP != "" {
-		if ip := parseValidIP(cfIP); ip != nil {
+	trusted := parseTrustedPrefixes(trustedProxies)
+	if len(trusted) > 0 && !ipInPrefixes(socketIP, trusted) {
+		// The immediate peer may not assert a client address.
+		return socketIP
+	}
+
+	if strings.EqualFold(headerName, "X-Forwarded-For") {
+		return forwardedClientIP(r.Header.Get(headerName), socketIP, trusted)
+	}
+	if val := strings.TrimSpace(r.Header.Get(headerName)); val != "" {
+		if ip := parseValidIP(val); ip != nil {
 			return ip
 		}
 	}
+	return socketIP
+}
 
-	// 2. X-Real-IP header
-	if realIP := strings.TrimSpace(r.Header.Get("X-Real-IP")); realIP != "" {
-		if ip := parseValidIP(realIP); ip != nil {
-			return ip
+// forwardedClientIP selects the client address from an XFF chain.
+//
+// With no trusted proxies, the legacy left-most behavior applies (the operator
+// opted into header trust). With trusted proxies, walk right-to-left and skip
+// hops that are trusted; the first untrusted hop is the client.
+func forwardedClientIP(xff string, socketIP net.IP, trusted []netip.Prefix) net.IP {
+	var parts []net.IP
+	for _, part := range strings.Split(xff, ",") {
+		if ip := parseValidIP(part); ip != nil {
+			parts = append(parts, ip)
 		}
 	}
-
-	// 3. X-Forwarded-For (first valid IP in comma-separated list)
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		parts := strings.Split(xff, ",")
-		for _, part := range parts {
-			clean := strings.TrimSpace(part)
-			if clean == "" {
-				continue
-			}
-			if ip := parseValidIP(clean); ip != nil {
-				return ip
-			}
-		}
+	if len(parts) == 0 {
+		return socketIP
+	}
+	if len(trusted) == 0 {
+		return parts[0]
 	}
 
-	// 4. Fallback to RemoteAddr
-	return parseRemoteAddr(r.RemoteAddr)
+	chain := append(parts, socketIP)
+	for i := len(chain) - 1; i >= 0; i-- {
+		if chain[i] == nil || ipInPrefixes(chain[i], trusted) {
+			continue
+		}
+		return chain[i]
+	}
+	return parts[0]
+}
+
+func parseTrustedPrefixes(raw []string) []netip.Prefix {
+	if len(raw) == 0 {
+		return nil
+	}
+	out := make([]netip.Prefix, 0, len(raw))
+	for _, entry := range raw {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
+		}
+		if prefix, err := netip.ParsePrefix(entry); err == nil {
+			out = append(out, prefix)
+			continue
+		}
+		if addr, err := netip.ParseAddr(entry); err == nil {
+			out = append(out, netip.PrefixFrom(addr, addr.BitLen()))
+		}
+	}
+	return out
+}
+
+func ipInPrefixes(ip net.IP, prefixes []netip.Prefix) bool {
+	addr, ok := netip.AddrFromSlice(ip)
+	if !ok {
+		return false
+	}
+	addr = addr.Unmap()
+	for _, prefix := range prefixes {
+		if prefix.Contains(addr) {
+			return true
+		}
+	}
+	return false
 }
 
 // WithClientIP injects the extracted client net.IP into context.

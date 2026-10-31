@@ -1,16 +1,14 @@
 package caddy
 
 import (
-	"bytes"
-	"io"
 	"net"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/Panharoth06/raiwall/internal/core/control"
 	"github.com/Panharoth06/raiwall/internal/core/telemetry"
 	"github.com/Panharoth06/raiwall/internal/core/waf"
+	"github.com/Panharoth06/raiwall/internal/core/waf/bodyinspect"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
@@ -27,45 +25,21 @@ func (m *Middleware) inspectWAFRequest(
 	aclContinueInspection bool,
 	startTime time.Time,
 ) (*waf.Verdict, []byte, bool, error) {
-	var bodyBytes []byte
-	if r.Body != nil {
-		if r.ContentLength > MaxInspectionBodySize {
-			// Payload exceeds inspection limit: selective streaming directly to upstream
+	// Inspect a bounded prefix of the body. Oversized bodies are no longer
+	// skipped entirely (a padding byte past 1 MB used to hide every payload),
+	// and the reconstructed body streams the remainder to the upstream.
+	bodyBytes, readErr := readInspectableBody(r, MaxInspectionBodySize)
+	if readErr != nil && m.logger != nil {
+		m.logger.Warn("Failed to buffer request body for inspection", zap.Error(readErr))
+	}
+	if len(bodyBytes) > 0 {
+		decoded, decodeErr := bodyinspect.Decode(bodyBytes, r.Header.Get("Content-Encoding"), bodyinspect.MaxDecodedSize)
+		if decodeErr != nil {
+			if m.logger != nil {
+				m.logger.Warn("Failed to decompress request body for inspection", zap.Error(decodeErr))
+			}
 		} else {
-			if m.bufferPool == nil {
-				m.bufferPool = &sync.Pool{
-					New: func() any { return new(bytes.Buffer) },
-				}
-			}
-			buf := m.bufferPool.Get().(*bytes.Buffer)
-			buf.Reset()
-
-			var readErr error
-			if r.ContentLength > 0 {
-				_, readErr = io.Copy(buf, r.Body)
-				_ = r.Body.Close()
-			} else if r.ContentLength < 0 {
-				// Chunked or unknown length: read up to MaxInspectionBodySize + 1
-				lr := io.LimitReader(r.Body, MaxInspectionBodySize+1)
-				_, readErr = io.Copy(buf, lr)
-			}
-
-			if readErr == nil {
-				if buf.Len() <= MaxInspectionBodySize {
-					bodyBytes = make([]byte, buf.Len())
-					copy(bodyBytes, buf.Bytes())
-					r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
-				} else {
-					// Exceeded MaxInspectionBodySize while reading chunked stream:
-					// Stream remaining to upstream
-					bodyBytes = nil
-					r.Body = io.NopCloser(io.MultiReader(bytes.NewReader(buf.Bytes()), r.Body))
-				}
-			}
-
-			if buf.Cap() <= MaxInspectionBodySize*2 {
-				m.bufferPool.Put(buf)
-			}
+			bodyBytes = decoded
 		}
 	}
 

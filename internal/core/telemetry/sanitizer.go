@@ -111,6 +111,25 @@ func (s *Sanitizer) Sanitize(event *ForensicEvent) {
 			event.TruncatedPayload = truncateUTF8(event.TruncatedPayload, MaxPayloadBytes)
 		}
 	}
+
+	// 4. Redact sensitive response headers (upstream Set-Cookie, auth tokens).
+	for key := range event.ResponseHeaders {
+		if s.isSensitiveHeader(strings.ToLower(key)) {
+			event.ResponseHeaders[key] = []string{RedactedValue}
+		}
+	}
+
+	// 5. Scrub and truncate response body using the same rules as request payloads.
+	if len(event.ResponseBody) > 0 {
+		if len(event.ResponseBody) > MaxPayloadBytes*2 {
+			event.ResponseBody = []byte(truncateUTF8(string(event.ResponseBody), MaxPayloadBytes*2))
+		}
+		body := s.SanitizePayload(string(event.ResponseBody))
+		if len(body) > MaxPayloadBytes {
+			body = truncateUTF8(body, MaxPayloadBytes)
+		}
+		event.ResponseBody = []byte(body)
+	}
 }
 
 // Sanitize calls DefaultSanitizer.Sanitize.

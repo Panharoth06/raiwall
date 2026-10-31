@@ -244,8 +244,12 @@ databases: `raiwall_control.db` and `raiwall_telemetry.db`, both under
 | `threat_feeds.<name>` | Local file with one CIDR per line; exposed as `in_feed(client_ip, "<name>")` |
 
 Geo enrichment only runs for public client IPs: loopback and RFC1918 addresses are
-skipped. Behind a proxy set `proxy.client_ip_source: header` so the real client
-address is inspected instead of the load balancer's.
+skipped. By default Raiwall uses the direct socket peer and ignores forwarded
+headers, so clients cannot spoof their address. Behind a proxy/CDN set
+`proxy.client_ip_source: header` and list the proxy networks in
+`proxy.trusted_proxies`; forwarded headers are then honored only when the direct
+peer is in that allowlist, and `X-Forwarded-For` is walked right-to-left past
+trusted hops.
 
 To enable the Geo Location globe without managing files by hand, set a MaxMind
 licence key and let Raiwall fetch the databases at startup:
@@ -301,7 +305,7 @@ deployed when the compiled content hash changes.
 | `ssl_mode` | `none`, `auto`, `manual` |
 | `certificate` | Required for `manual` |
 | `ports[]` | `port`, `scheme` (`http`/`https`) metadata |
-| `proxy` | `client_ip_source`, `rewrite_xff`, `hsts`, `enable_sse`, `enable_compression`, `enable_ipv6`, `redirect_http` |
+| `proxy` | `client_ip_source`, `trusted_proxies`, `rewrite_xff`, `hsts`, `enable_sse`, `enable_compression`, `enable_ipv6`, `redirect_http` |
 | `custom_headers` | Map of response headers |
 | `auth` | `enabled`, `bypass_paths` |
 | `forwarding[]` | `prefix`, `upstreams`, `strip_prefix`, `host_header_override`, `comment` |

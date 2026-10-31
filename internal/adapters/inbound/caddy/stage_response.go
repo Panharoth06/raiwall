@@ -145,12 +145,23 @@ func (m *Middleware) forwardAndInspectResponse(
 	}
 
 	respVerdict, _ := m.engine.InspectResponse(respContext)
-	if respVerdict != nil && respVerdict.Action == waf.ActionBlock {
-		if m.logger != nil {
-			m.logger.Warn("WAF response verdict block",
-				zap.Int("status_code", interceptor.StatusCode()),
-				zap.String("rule_id", respVerdict.RuleID),
-			)
+	if respVerdict != nil {
+		switch respVerdict.Action {
+		case waf.ActionBlock:
+			if m.logger != nil {
+				m.logger.Warn("WAF response verdict block",
+					zap.Int("status_code", interceptor.StatusCode()),
+					zap.String("rule_id", respVerdict.RuleID),
+				)
+			}
+		case waf.ActionAudit:
+			if m.logger != nil {
+				m.logger.Info("WAF response audit verdict",
+					zap.Int("status_code", interceptor.StatusCode()),
+					zap.String("rule_id", respVerdict.RuleID),
+					zap.String("reason", respVerdict.Reason),
+				)
+			}
 		}
 	}
 
@@ -161,10 +172,21 @@ func (m *Middleware) forwardAndInspectResponse(
 	if verdict != nil {
 		location, token, category = verdict.PayloadLocation, verdict.MatchedToken, verdict.AttackCategory
 	}
-	if verdict != nil && verdict.Action == waf.ActionBlock && currentMode == control.ModeAudit {
+	switch {
+	case verdict != nil && verdict.Action == waf.ActionBlock && currentMode == control.ModeAudit:
 		action = "audit"
 		severity = "medium"
 		ruleID = verdict.RuleID
+	case verdict != nil && verdict.Action == waf.ActionAudit:
+		// Module audit mode and parser-timeout verdicts must still reach the
+		// forensic pipeline; previously they were silently discarded.
+		action = "audit"
+		severity = "low"
+		ruleID = verdict.RuleID
+	case respVerdict != nil && respVerdict.Action == waf.ActionAudit:
+		action = "audit"
+		severity = "low"
+		ruleID = respVerdict.RuleID
 	}
 	m.recordTelemetry(&telemetry.ForensicEvent{
 		EventID:          uuid.New().String(),

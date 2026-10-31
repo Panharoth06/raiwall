@@ -196,7 +196,7 @@ func (m *Middleware) PoWEngine() *bot.PoWEngine {
 func (m *Middleware) SetTelemetryStore(s telemetry.ForensicStore) {
 	m.telemetryStore = s
 	if m.telemetryAPI != nil {
-		m.telemetryAPI = api.NewTelemetryAPI(s, m.streamer, m.metrics)
+		m.telemetryAPI = m.newTelemetryAPI()
 	}
 }
 
@@ -219,7 +219,7 @@ func (m *Middleware) RingBuffer() *telemetry.RingBuffer {
 func (m *Middleware) SetEventStreamer(s *api.EventStreamer) {
 	m.streamer = s
 	if m.telemetryAPI != nil {
-		m.telemetryAPI = api.NewTelemetryAPI(m.telemetryStore, s, m.metrics)
+		m.telemetryAPI = m.newTelemetryAPI()
 	}
 }
 
@@ -242,7 +242,7 @@ func (m *Middleware) AlertEngine() *alerts.AlertEngine {
 func (m *Middleware) SetMetrics(met *telemetry.Metrics) {
 	m.metrics = met
 	if m.telemetryAPI != nil {
-		m.telemetryAPI = api.NewTelemetryAPI(m.telemetryStore, m.streamer, met)
+		m.telemetryAPI = m.newTelemetryAPI()
 	}
 }
 

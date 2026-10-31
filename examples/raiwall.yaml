@@ -190,7 +190,11 @@ applications:
         health_check_path: /healthz
         health_check_interval: 15s
     proxy:
+      # Direct deployment: use the socket peer. Behind a load balancer/CDN set
+      # client_ip_source: header and list the proxy CIDRs in trusted_proxies so
+      # forwarded headers are only honored from those peers.
       client_ip_source: remote
+      trusted_proxies: []
       rewrite_xff: true
       hsts: true
       enable_compression: false

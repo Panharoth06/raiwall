@@ -57,7 +57,7 @@ func TestTelemetryAPI_Endpoints(t *testing.T) {
 	streamer := NewEventStreamer()
 	metrics := telemetry.NewMetrics(nil)
 	metrics.RecordRequest("GET", "200", "allow", 5*time.Millisecond)
-	api := NewTelemetryAPI(store, streamer, metrics)
+	api := NewTelemetryAPI(store, streamer, metrics, func(*http.Request) error { return nil })
 
 	// 1. Test GET /.raiwall/api/events
 	reqEvents := httptest.NewRequest(http.MethodGet, "/.raiwall/api/events?action=block", nil)
@@ -159,7 +159,7 @@ func TestTelemetryAPI_IncidentsAndCurl(t *testing.T) {
 		t.Fatalf("seed events: %v", err)
 	}
 
-	api := NewTelemetryAPI(store, nil, nil)
+	api := NewTelemetryAPI(store, nil, nil, func(*http.Request) error { return nil })
 	window := fmt.Sprintf("start_time=%s&end_time=%s",
 		url.QueryEscape(base.Add(-time.Hour).Format(time.RFC3339)),
 		url.QueryEscape(base.Add(time.Hour).Format(time.RFC3339)))
@@ -234,7 +234,7 @@ func TestTelemetryAPI_IncidentsAndCurl(t *testing.T) {
 
 func TestTelemetryAPI_SSEStream(t *testing.T) {
 	streamer := NewEventStreamer()
-	api := NewTelemetryAPI(nil, streamer, nil)
+	api := NewTelemetryAPI(nil, streamer, nil, func(*http.Request) error { return nil })
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 

@@ -184,6 +184,65 @@ func TestSidecar_LargeBodyPassthrough(t *testing.T) {
 	require.NotNil(t, resp.GetRequestBody())
 }
 
+// TestSidecar_OversizedBodyPrefixInspected guards the previous fail-open: when
+// a request body exceeded MaxBodySize the sidecar discarded the buffer and
+// skipped inspection entirely. The bounded prefix must still be inspected.
+func TestSidecar_OversizedBodyPrefixInspected(t *testing.T) {
+	lis := bufconn.Listen(1024 * 1024)
+	defer lis.Close()
+
+	srv := NewServer(ExtProcConfig{MaxBodySize: 1024})
+	go func() {
+		_ = srv.ServeListener(lis)
+	}()
+	defer srv.Stop()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	conn, err := grpc.DialContext(ctx, "bufnet",
+		grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
+			return lis.Dial()
+		}),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	require.NoError(t, err)
+	defer conn.Close()
+
+	stream, err := NewExternalProcessorClient(conn).Process(ctx)
+	require.NoError(t, err)
+
+	_ = stream.Send(&ProcessingRequest{
+		Request: &ProcessingRequest_RequestHeaders{
+			RequestHeaders: &HttpHeaders{
+				Headers: &HeaderMap{
+					Headers: []*HeaderValue{
+						{Key: ":method", Value: "POST"},
+						{Key: ":path", Value: "/upload"},
+						{Key: ":authority", Value: "upload.example.com"},
+						{Key: "content-type", Value: "application/x-www-form-urlencoded"},
+					},
+				},
+			},
+		},
+	})
+	_, err = stream.Recv()
+	require.NoError(t, err)
+
+	payload := append([]byte("username=admin' OR 1=1--"), make([]byte, 64*1024)...)
+	require.NoError(t, stream.Send(&ProcessingRequest{
+		Request: &ProcessingRequest_RequestBody{
+			RequestBody: &HttpBody{Body: payload, EndOfStream: true},
+		},
+	}))
+
+	resp, err := stream.Recv()
+	require.NoError(t, err)
+	imm := resp.GetImmediateResponse()
+	require.NotNil(t, imm, "oversized body prefix must still be inspected")
+	require.Equal(t, StatusCode_Forbidden, imm.Status.Code)
+}
+
 func init() {
 	control.StoreSnapshot(control.NewConfigSnapshot(1, control.ModeDefense, nil))
 	_ = waf.NewSemanticEngine()

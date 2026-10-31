@@ -148,7 +148,8 @@ func (s *EventStreamer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
+	// Same-origin only: the dashboard's EventSource sends the session cookie.
+	// A wildcard CORS header would expose the live attack stream to any page.
 
 	q := r.URL.Query()
 	filter := EventFilter{

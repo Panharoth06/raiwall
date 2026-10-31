@@ -162,13 +162,14 @@ type ForwardingRule struct {
 
 // ProxySettings configures granular per-site reverse proxy parameters.
 type ProxySettings struct {
-	ClientIPSource    string `json:"client_ip_source,omitempty"`
-	RewriteXFF        bool   `json:"rewrite_xff,omitempty"`
-	HSTS              bool   `json:"hsts,omitempty"`
-	EnableSSE         bool   `json:"enable_sse,omitempty"`
-	EnableCompression bool   `json:"enable_compression,omitempty"`
-	EnableIPv6        bool   `json:"enable_ipv6,omitempty"`
-	RedirectHTTP      bool   `json:"redirect_http,omitempty"`
+	ClientIPSource    string   `json:"client_ip_source,omitempty"`
+	TrustedProxies    []string `json:"trusted_proxies,omitempty"`
+	RewriteXFF        bool     `json:"rewrite_xff,omitempty"`
+	HSTS              bool     `json:"hsts,omitempty"`
+	EnableSSE         bool     `json:"enable_sse,omitempty"`
+	EnableCompression bool     `json:"enable_compression,omitempty"`
+	EnableIPv6        bool     `json:"enable_ipv6,omitempty"`
+	RedirectHTTP      bool     `json:"redirect_http,omitempty"`
 }
 
 // AppConfig represents configuration for a protected application domain.

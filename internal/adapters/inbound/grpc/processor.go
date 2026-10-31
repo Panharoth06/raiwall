@@ -11,6 +11,7 @@ import (
 	"github.com/Panharoth06/raiwall/internal/core/acl"
 	"github.com/Panharoth06/raiwall/internal/core/control"
 	"github.com/Panharoth06/raiwall/internal/core/waf"
+	"github.com/Panharoth06/raiwall/internal/core/waf/bodyinspect"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -127,16 +128,24 @@ func (s *ExtProcServer) Process(stream ExternalProcessor_ProcessServer) error {
 			chunk := bReq.Body
 			if !bodyTooLarge {
 				if len(bodyBuf)+len(chunk) > s.cfg.MaxBodySize {
+					// Keep the bounded prefix for inspection instead of
+					// discarding it (oversized bodies used to bypass the WAF).
+					if remaining := s.cfg.MaxBodySize - len(bodyBuf); remaining > 0 {
+						bodyBuf = append(bodyBuf, chunk[:remaining]...)
+					}
 					bodyTooLarge = true
-					bodyBuf = nil
 				} else {
 					bodyBuf = append(bodyBuf, chunk...)
 				}
 			}
 
 			if bReq.EndOfStream {
-				if !bodyTooLarge && len(bodyBuf) > 0 {
-					if blocked, err := s.inspectWAF(ctx, stream, host, path, method, clientIP, headers, bodyBuf); blocked || err != nil {
+				if len(bodyBuf) > 0 {
+					inspectBody := bodyBuf
+					if decoded, decodeErr := bodyinspect.Decode(bodyBuf, headers.Get("Content-Encoding"), bodyinspect.MaxDecodedSize); decodeErr == nil {
+						inspectBody = decoded
+					}
+					if blocked, err := s.inspectWAF(ctx, stream, host, path, method, clientIP, headers, inspectBody); blocked || err != nil {
 						return err
 					}
 				}

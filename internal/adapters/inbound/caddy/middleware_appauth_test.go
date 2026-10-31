@@ -108,19 +108,27 @@ func TestMiddleware_AppAuthGate_FullFlow(t *testing.T) {
 	require.NoError(t, f.mw.ServeHTTP(rec, req, next))
 	require.True(t, next.invoked, "bypass prefix must reach upstream")
 
-	// 3. API transports bypass transparently.
-	next = &mockNextHandler{}
-	req = httptest.NewRequest(http.MethodGet, "http://app.example.com/api/things", nil)
-	rec = httptest.NewRecorder()
-	require.NoError(t, f.mw.ServeHTTP(rec, req, next))
-	require.True(t, next.invoked, "API path must bypass the challenge")
-
-	next = &mockNextHandler{}
-	req = httptest.NewRequest(http.MethodGet, "http://app.example.com/data", nil)
-	req.Header.Set("Authorization", "Bearer tok")
-	rec = httptest.NewRecorder()
-	require.NoError(t, f.mw.ServeHTTP(rec, req, next))
-	require.True(t, next.invoked, "Bearer callers must bypass the 467 challenge")
+	// 3. API transports no longer bypass authentication: without a valid
+	// session they receive JSON 401 and never reach the upstream.
+	apiCases := []struct {
+		name   string
+		path   string
+		mutate func(*http.Request)
+	}{
+		{"api prefix", "/api/things", func(*http.Request) {}},
+		{"spoofed bearer", "/data", func(r *http.Request) { r.Header.Set("Authorization", "Bearer tok") }},
+		{"json negotiation", "/data", func(r *http.Request) { r.Header.Set("Accept", "application/json") }},
+		{"xhr marker", "/data", func(r *http.Request) { r.Header.Set("X-Requested-With", "XMLHttpRequest") }},
+	}
+	for _, tc := range apiCases {
+		next = &mockNextHandler{}
+		req = httptest.NewRequest(http.MethodGet, "http://app.example.com"+tc.path, nil)
+		tc.mutate(req)
+		rec = httptest.NewRecorder()
+		require.NoError(t, f.mw.ServeHTTP(rec, req, next))
+		require.False(t, next.invoked, tc.name+": unauthenticated API client reached upstream")
+		require.Equal(t, http.StatusUnauthorized, rec.Code, tc.name)
+	}
 
 	// 4. Wrong password re-renders the challenge (no cookie issued).
 	form := url.Values{"username": {"walter"}, "password": {"wrong"}, "redirect": {"/dashboard"}}
@@ -142,6 +150,14 @@ func TestMiddleware_AppAuthGate_FullFlow(t *testing.T) {
 	require.Equal(t, "/dashboard", rec.Header().Get("Location"))
 	clearance := cookiesNamed(rec, auth.AppAuthCookieName)
 	require.Len(t, clearance, 1)
+
+	// 5b. A valid session token presented as Bearer authenticates API clients.
+	next = &mockNextHandler{}
+	req = httptest.NewRequest(http.MethodGet, "http://app.example.com/api/things", nil)
+	req.Header.Set("Authorization", "Bearer "+clearance[0].Value)
+	rec = httptest.NewRecorder()
+	require.NoError(t, f.mw.ServeHTTP(rec, req, next))
+	require.True(t, next.invoked, "valid bearer session must reach upstream")
 
 	// 6. Cleared browser reaches upstream with identity headers injected.
 	next = &mockNextHandler{}

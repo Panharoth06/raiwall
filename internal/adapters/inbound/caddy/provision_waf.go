@@ -1,9 +1,7 @@
 package caddy
 
 import (
-	"bytes"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/Panharoth06/raiwall/internal/core/acl"
@@ -53,10 +51,5 @@ func (m *Middleware) provisionWAF(_ caddy.Context) error {
 		sem.SetExceptionEngine(m.exceptionEngine)
 	}
 
-	m.bufferPool = &sync.Pool{
-		New: func() any {
-			return new(bytes.Buffer)
-		},
-	}
 	return nil
 }

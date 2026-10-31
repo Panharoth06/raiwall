@@ -13,25 +13,54 @@ import (
 
 // TelemetryAPI exposes REST and streaming endpoints for forensic events and analytics.
 type TelemetryAPI struct {
-	store    telemetry.ForensicStore
-	streamer *EventStreamer
-	metrics  *telemetry.Metrics
+	store        telemetry.ForensicStore
+	streamer     *EventStreamer
+	metrics      *telemetry.Metrics
+	authenticate func(*http.Request) error
 }
 
-// NewTelemetryAPI constructs a TelemetryAPI controller.
-func NewTelemetryAPI(store telemetry.ForensicStore, streamer *EventStreamer, metrics *telemetry.Metrics) *TelemetryAPI {
+// NewTelemetryAPI constructs a TelemetryAPI controller. authenticate is
+// required: telemetry carries client IPs, headers, and payload excerpts, so an
+// unconfigured authenticator fails closed rather than exposing the surface.
+func NewTelemetryAPI(store telemetry.ForensicStore, streamer *EventStreamer, metrics *telemetry.Metrics, authenticate func(*http.Request) error) *TelemetryAPI {
 	if metrics == nil {
 		metrics = telemetry.DefaultMetrics
 	}
 	return &TelemetryAPI{
-		store:    store,
-		streamer: streamer,
-		metrics:  metrics,
+		store:        store,
+		streamer:     streamer,
+		metrics:      metrics,
+		authenticate: authenticate,
 	}
+}
+
+// SetAuthenticator replaces the credential check used for every telemetry
+// endpoint. A nil authenticator denies all requests.
+func (api *TelemetryAPI) SetAuthenticator(fn func(*http.Request) error) {
+	api.authenticate = fn
+}
+
+// authorized enforces authentication before any event, metric, or stream data
+// is served. It fails closed when no authenticator is wired.
+func (api *TelemetryAPI) authorized(w http.ResponseWriter, r *http.Request) bool {
+	if api.authenticate == nil {
+		http.Error(w, "Telemetry authentication is not configured", http.StatusServiceUnavailable)
+		return false
+	}
+	if err := api.authenticate(r); err != nil {
+		w.Header().Set("WWW-Authenticate", `Bearer realm="raiwall"`)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return false
+	}
+	return true
 }
 
 // ServeHTTP routes management API requests under /.raiwall/.
 func (api *TelemetryAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if !api.authorized(w, r) {
+		return
+	}
+
 	cleanPath := strings.TrimSuffix(r.URL.Path, "/")
 
 	switch cleanPath {

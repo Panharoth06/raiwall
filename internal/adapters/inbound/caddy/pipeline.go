@@ -60,10 +60,12 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 
 	// 3. Extract real client IP and JA4 fingerprint
 	clientIPSource := ""
+	var trustedProxies []string
 	if appCfg != nil && appCfg.ProxySettings != nil {
 		clientIPSource = appCfg.ProxySettings.ClientIPSource
+		trustedProxies = appCfg.ProxySettings.TrustedProxies
 	}
-	clientIP := ExtractClientIPWithSource(r, clientIPSource)
+	clientIP := ExtractClientIPWithTrustedProxies(r, clientIPSource, trustedProxies)
 	ja4 := bot.ExtractJA4(r)
 	ctx := WithClientIP(r.Context(), clientIP)
 	if ja4 != "" {

@@ -3,6 +3,7 @@ package caddy
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -120,8 +121,25 @@ func (m *Middleware) provisionTelemetry(_ caddy.Context) error {
 	}
 
 	if m.telemetryAPI == nil {
-		m.telemetryAPI = api.NewTelemetryAPI(m.telemetryStore, m.streamer, m.metrics)
+		m.telemetryAPI = m.newTelemetryAPI()
 	}
 
 	return nil
+}
+
+// newTelemetryAPI builds the telemetry handler with the shared control-plane
+// credential check. The func value is evaluated per request, so it works even
+// though telemetry is provisioned before the control plane.
+func (m *Middleware) newTelemetryAPI() *api.TelemetryAPI {
+	return api.NewTelemetryAPI(m.telemetryStore, m.streamer, m.metrics, m.authenticateControlRequest)
+}
+
+// authenticateControlRequest validates control-plane credentials for the
+// telemetry surface. It fails closed when the control plane is unavailable.
+func (m *Middleware) authenticateControlRequest(r *http.Request) error {
+	if m.controlAPI == nil {
+		return fmt.Errorf("control plane authentication unavailable")
+	}
+	_, err := m.controlAPI.AuthenticateRequest(r)
+	return err
 }

@@ -179,10 +179,9 @@ type Middleware struct {
 	// consumed once per process during provisioning.
 	DeclarativeConfig *DeclarativeSettings `json:"declarative,omitempty"`
 
-	engine     waf.WAFEnginePort
-	logger     *zap.Logger
-	bufferPool *sync.Pool
-	runMode    control.RunMode
+	engine  waf.WAFEnginePort
+	logger  *zap.Logger
+	runMode control.RunMode
 
 	botClassifier *bot.BotClassifier
 	routeClass    *bot.RouteClassifier

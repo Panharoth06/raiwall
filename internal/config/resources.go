@@ -49,13 +49,14 @@ type Port struct {
 
 // AppProxy configures per-application reverse proxy behavior.
 type AppProxy struct {
-	ClientIPSource    string `yaml:"client_ip_source" json:"client_ip_source"`
-	RewriteXFF        bool   `yaml:"rewrite_xff" json:"rewrite_xff"`
-	HSTS              bool   `yaml:"hsts" json:"hsts"`
-	EnableSSE         bool   `yaml:"enable_sse" json:"enable_sse"`
-	EnableCompression bool   `yaml:"enable_compression" json:"enable_compression"`
-	EnableIPv6        bool   `yaml:"enable_ipv6" json:"enable_ipv6"`
-	RedirectHTTP      bool   `yaml:"redirect_http" json:"redirect_http"`
+	ClientIPSource    string   `yaml:"client_ip_source" json:"client_ip_source"`
+	TrustedProxies    []string `yaml:"trusted_proxies" json:"trusted_proxies"`
+	RewriteXFF        bool     `yaml:"rewrite_xff" json:"rewrite_xff"`
+	HSTS              bool     `yaml:"hsts" json:"hsts"`
+	EnableSSE         bool     `yaml:"enable_sse" json:"enable_sse"`
+	EnableCompression bool     `yaml:"enable_compression" json:"enable_compression"`
+	EnableIPv6        bool     `yaml:"enable_ipv6" json:"enable_ipv6"`
+	RedirectHTTP      bool     `yaml:"redirect_http" json:"redirect_http"`
 }
 
 // AppAuth enables the per-site zero-trust gate.

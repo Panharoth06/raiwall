@@ -92,10 +92,10 @@ type ProcessingRequest_RequestHeaders struct {
 	RequestHeaders *HttpHeaders `protobuf:"bytes,2,opt,name=request_headers,json=requestHeaders,oneof"`
 }
 type ProcessingRequest_RequestBody struct {
-	RequestBody *HttpBody `protobuf:"bytes,3,opt,name=request_body,json=requestBody,oneof"`
+	RequestBody *HttpBody `protobuf:"bytes,4,opt,name=request_body,json=requestBody,oneof"`
 }
 type ProcessingRequest_ResponseHeaders struct {
-	ResponseHeaders *HttpHeaders `protobuf:"bytes,4,opt,name=response_headers,json=responseHeaders,oneof"`
+	ResponseHeaders *HttpHeaders `protobuf:"bytes,3,opt,name=response_headers,json=responseHeaders,oneof"`
 }
 type ProcessingRequest_ResponseBody struct {
 	ResponseBody *HttpBody `protobuf:"bytes,5,opt,name=response_body,json=responseBody,oneof"`
@@ -206,16 +206,16 @@ type ProcessingResponse_RequestHeaders struct {
 	RequestHeaders *HeadersResponse `protobuf:"bytes,1,opt,name=request_headers,json=requestHeaders,oneof"`
 }
 type ProcessingResponse_RequestBody struct {
-	RequestBody *BodyResponse `protobuf:"bytes,2,opt,name=request_body,json=requestBody,oneof"`
+	RequestBody *BodyResponse `protobuf:"bytes,3,opt,name=request_body,json=requestBody,oneof"`
 }
 type ProcessingResponse_ResponseHeaders struct {
-	ResponseHeaders *HeadersResponse `protobuf:"bytes,3,opt,name=response_headers,json=responseHeaders,oneof"`
+	ResponseHeaders *HeadersResponse `protobuf:"bytes,2,opt,name=response_headers,json=responseHeaders,oneof"`
 }
 type ProcessingResponse_ResponseBody struct {
 	ResponseBody *BodyResponse `protobuf:"bytes,4,opt,name=response_body,json=responseBody,oneof"`
 }
 type ProcessingResponse_ImmediateResponse struct {
-	ImmediateResponse *ImmediateResponse `protobuf:"bytes,5,opt,name=immediate_response,json=immediateResponse,oneof"`
+	ImmediateResponse *ImmediateResponse `protobuf:"bytes,7,opt,name=immediate_response,json=immediateResponse,oneof"`
 }
 
 func (*ProcessingResponse_RequestHeaders) isProcessingResponse_Response()    {}

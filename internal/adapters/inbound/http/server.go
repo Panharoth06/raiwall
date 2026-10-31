@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/Panharoth06/raiwall/internal/adapters/inbound/mcp"
@@ -166,6 +167,16 @@ func (s *Server) Router() *chi.Mux {
 // ServeHTTP delegates request handling to the Chi router.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.router.ServeHTTP(w, r)
+}
+
+// AuthenticateRequest resolves the request principal using the control-plane
+// auth manager. Adjacent surfaces (telemetry, metrics, SSE) share credentials
+// but are dispatched before the chi router, so they call this directly.
+func (s *Server) AuthenticateRequest(r *http.Request) (*AuthContext, error) {
+	if s == nil || s.authMgr == nil {
+		return nil, errors.New("control plane authentication unavailable")
+	}
+	return s.authMgr.Authenticate(r)
 }
 
 func respondJSON(w http.ResponseWriter, status int, data any) {

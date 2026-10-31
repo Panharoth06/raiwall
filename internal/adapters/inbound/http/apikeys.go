@@ -84,6 +84,10 @@ func (s *Server) handleCreateAPIKey(w http.ResponseWriter, r *http.Request) {
 	if req.Role == "" {
 		req.Role = RoleViewer
 	}
+	if req.Role != RoleAdmin && req.Role != RoleViewer {
+		respondError(w, http.StatusBadRequest, `role must be "admin" or "viewer"`)
+		return
+	}
 	if req.Name == "" {
 		req.Name = "API Key"
 	}

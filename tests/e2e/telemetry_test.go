@@ -55,6 +55,14 @@ func TestEndToEndTelemetry(t *testing.T) {
 	mw := &caddy.Middleware{
 		Mode:            "defense",
 		BlockStatusCode: http.StatusForbidden,
+		ControlConfig: &caddy.ControlSettings{
+			DBPath: "file:" + filepath.Join(t.TempDir(), "control-e2e.db"),
+			BootstrapAdmin: &caddy.BootstrapAdminSettings{
+				Username: "admin",
+				Password: "e2e-admin-pass",
+				Role:     "admin",
+			},
+		},
 		TelemetryConfig: &caddy.TelemetrySettings{
 			StorageType:   "sqlite",
 			StoragePath:   dbPath,
@@ -240,7 +248,17 @@ func TestEndToEndTelemetry(t *testing.T) {
 
 	// 12. Test internal Prometheus Metrics endpoint (/.raiwall/metrics)
 	{
+		unauth := httptest.NewRequest(http.MethodGet, "http://example.com/.raiwall/metrics", nil)
+		unauthRec := httptest.NewRecorder()
+		if err := mw.ServeHTTP(unauthRec, unauth, next); err != nil {
+			t.Fatalf("metrics endpoint error: %v", err)
+		}
+		if unauthRec.Code != http.StatusUnauthorized {
+			t.Errorf("expected 401 for unauthenticated /metrics, got %d", unauthRec.Code)
+		}
+
 		req := httptest.NewRequest(http.MethodGet, "http://example.com/.raiwall/metrics", nil)
+		req.SetBasicAuth("admin", "e2e-admin-pass")
 		rec := httptest.NewRecorder()
 
 		err := mw.ServeHTTP(rec, req, next)
@@ -262,6 +280,7 @@ func TestEndToEndTelemetry(t *testing.T) {
 	// 13. Test internal REST API Stats endpoint (/.raiwall/api/events/stats)
 	{
 		req := httptest.NewRequest(http.MethodGet, "http://example.com/.raiwall/api/events/stats", nil)
+		req.SetBasicAuth("admin", "e2e-admin-pass")
 		rec := httptest.NewRecorder()
 
 		err := mw.ServeHTTP(rec, req, next)
