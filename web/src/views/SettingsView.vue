@@ -5,6 +5,7 @@ import { useConfigStore } from '@/stores/config';
 import { useTheme } from '@/composables/useTheme';
 import { api } from '@/api/client';
 import ApiKeysManager from '@/components/ApiKeysManager.vue';
+import UsersPanel from '@/components/settings/UsersPanel.vue';
 import CertificatesPanel from '@/components/certificates/CertificatesPanel.vue';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,6 +14,7 @@ import {
   Settings,
   Network,
   Key,
+  Users,
   Palette,
   Moon,
   Sun,
@@ -30,13 +32,14 @@ const router = useRouter();
 const configStore = useConfigStore();
 const { theme, setTheme } = useTheme();
 
-type SettingsSubTab = 'cluster' | 'certificates' | 'apikeys';
+type SettingsSubTab = 'cluster' | 'certificates' | 'apikeys' | 'users';
 const activeTab = ref<SettingsSubTab>('cluster');
 
 const tabs: (Tab & { id: SettingsSubTab })[] = [
   { id: 'cluster', label: 'Cluster Synchronization', icon: Network },
   { id: 'certificates', label: 'TLS Certificates', icon: Lock },
   { id: 'apikeys', label: 'API Keys & Access', icon: Key },
+  { id: 'users', label: 'Operators', icon: Users },
 ];
 
 const handleTabChange = (tabId: string) => {
@@ -318,6 +321,11 @@ onMounted(() => {
       <!-- API Keys Manager -->
       <Card v-else-if="activeTab === 'apikeys'" class="p-4">
         <ApiKeysManager />
+      </Card>
+
+      <!-- Operator accounts -->
+      <Card v-else-if="activeTab === 'users'" class="p-4">
+        <UsersPanel />
       </Card>
     </div>
   </div>

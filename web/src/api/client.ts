@@ -182,6 +182,20 @@ export interface ApiKeyItem {
   expires_at?: string;
 }
 
+export interface AdminUser {
+  id: string;
+  username: string;
+  role: 'admin' | 'viewer';
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdminUserResponse {
+  user: AdminUser;
+  password?: string;
+}
+
 export interface ConfigDiffItem {
   type: 'site' | 'exception' | 'acl' | 'policy';
   action: 'added' | 'modified' | 'deleted';
@@ -453,6 +467,32 @@ export const api = {
     }),
   deleteApiKey: (id: string) =>
     request<void>(`/apikeys/${id}`, {
+      method: 'DELETE',
+    }),
+
+  // Operators (dashboard users)
+  listAdminUsers: () => request<AdminUser[]>('/users'),
+  createAdminUser: (payload: { username: string; password?: string; role: 'admin' | 'viewer' }) =>
+    request<AdminUserResponse>('/users', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  updateAdminUser: (id: string, payload: { role?: 'admin' | 'viewer'; is_active?: boolean }) =>
+    request<AdminUserResponse>(`/users/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
+  resetAdminUserPassword: (id: string, password?: string) =>
+    request<AdminUserResponse>(`/users/${id}/password`, {
+      method: 'POST',
+      body: JSON.stringify({ password: password ?? '' }),
+    }),
+  revokeAdminUserSessions: (id: string) =>
+    request<{ status: string }>(`/users/${id}/sessions/revoke`, {
+      method: 'POST',
+    }),
+  deactivateAdminUser: (id: string) =>
+    request<AdminUserResponse>(`/users/${id}`, {
       method: 'DELETE',
     }),
 

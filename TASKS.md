@@ -339,8 +339,11 @@ CI gate, and OpenAPI base in the current change.
 - [ ] Roles admin/operator/analyst/viewer/auditor with `resource:verb`.
 - [ ] Per-route permission middleware; remove method-only checks.
 - [ ] API keys: scopes, expiry, tenant, validated role, prefix+hash.
-- [ ] Admin user CRUD/UI.
-- [ ] Tests: five-role authz matrix; viewer mutation denied.
+- [x] Admin operator CRUD/UI: list/create/change role/reset
+      password/deactivate/revoke sessions, admin-only, last-active-admin and
+      self-deactivation guards; sessions revoked on every change.
+- [~] Tests: operator lifecycle, viewer mutation denied, last-admin guard; the
+      five-role authorization matrix remains pending (only admin/viewer exist).
 
 ### 3.4 Secrets keyring `[ ]`
 - [ ] AES-GCM key IDs; env/Vault Transit/KMS providers.

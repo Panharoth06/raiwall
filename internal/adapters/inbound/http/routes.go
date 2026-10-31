@@ -84,6 +84,14 @@ func (s *Server) routes() {
 			api.Put("/inner-rules/{id}", s.handleUpdateInnerRule)
 			api.Put("/inner-rules/categories/{category}", s.handleUpdateInnerRuleCategory)
 
+			// Operator accounts (dashboard users)
+			api.Get("/users", s.handleListAdminUsers)
+			api.Post("/users", s.handleCreateAdminUser)
+			api.Patch("/users/{id}", s.handleUpdateAdminUser)
+			api.Post("/users/{id}/password", s.handleResetAdminUserPassword)
+			api.Post("/users/{id}/sessions/revoke", s.handleRevokeAdminUserSessions)
+			api.Delete("/users/{id}", s.handleDeactivateAdminUser)
+
 			// Identity Directory (end-user accounts + external IdPs)
 			api.Get("/identity/users", s.handleListIdentityUsers)
 			api.Post("/identity/users", s.handleCreateIdentityUser)

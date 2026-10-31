@@ -130,7 +130,7 @@ const executeRevokeKey = async () => {
         v-if="keys.length === 0"
         :icon="Key"
         title="No active API keys found"
-        description="Generate a key to access the Huma REST API or MCP server."
+        description="Generate a key to access the control-plane REST API or MCP server."
         class="py-8"
       />
 

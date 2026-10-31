@@ -295,7 +295,7 @@ legal-hold/WORM/prune drill; report reconciliation; alert retry/history.
 |---|---|---|---|
 | 3.1 | DB-backed sessions, idle/absolute expiry, revocation, CSRF, `__Host-` cookie, lockout | `core/control/sessions.go`, `http/auth.go` | M | **Done** |
 | 3.2 | Operator OIDC (state/nonce/PKCE, group→role) + TOTP/recovery codes | `http/auth_oidc.go`, `auth_totp.go` | M |
-| 3.3 | Permission-based RBAC (admin/operator/analyst/viewer/auditor), scoped API keys, user CRUD/UI | `http/rbac.go`, `web/` | L |
+| 3.3 | Permission-based RBAC (admin/operator/analyst/viewer/auditor), scoped API keys, user CRUD/UI | `http/rbac.go`, `web/` | L | **Partial** (operator CRUD/UI done; five-role matrix and scoped keys pending) |
 | 3.4 | Secret keyring (AES-GCM key IDs, Vault Transit, cloud KMS), write-only fields | `core/crypto/keyring.go`, `adapters/outbound/secrets/*` | M |
 | 3.5 | Multi-tenancy: `tenant_id` row scoping, tenant stores, quotas, migrate to `default` | all stores, `http/tenants.go` | L |
 | 3.6 | Separate admin listener with mTLS/IP allowlist | `caddy/stage_routes.go`, Helm | S/M | **Partial** (CIDR allowlist + public_url redirect gate; split listener pending) |
