@@ -1,0 +1,16 @@
+# go-ftw test-ID exclusions (one Go regex per line, matched against IDs such
+# as 942100-3). Blank lines and comments are ignored. Every entry must be
+# justified here or in README.md; the parity gate treats these as
+# "not applicable" rather than passing.
+#
+# Response inspection is deferred to TASKS.md 1B.1; request-only parity is
+# what this gate measures today.
+^95
+
+# Protocol-edge tests that assert Apache's HTTP-parser behavior rather than a
+# CRS rule: CONNECT handling, HTTP/0.8-0.9 and version-less request lines,
+# control characters in Host, raw URL fragments, duplicate/empty Content-Type.
+# Caddy parses, normalizes, or rejects these before the WAF handler runs, so
+# Raiwall cannot reproduce Apache's exact status. Tracked by TASKS.md 1B.5
+# ("document the Caddy boundary").
+^(920100-[458]|920270-4|920274-1|920280-3|920290-1|920430-[359]|920610-2|920620-1|920640-4)$

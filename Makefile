@@ -5,7 +5,7 @@ COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_DATE := $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 LDFLAGS := -ldflags "-s -w -X main.Version=$(VERSION) -X main.Commit=$(COMMIT) -X main.BuildDate=$(BUILD_DATE)"
 
-.PHONY: all build test test-race test-integration test-all lint run validate-config clean web-dev web-build web-test
+.PHONY: all build test test-race test-integration test-all test-crs lint run validate-config clean web-dev web-build web-test
 
 DATA_DIR ?= $(CURDIR)/data
 
@@ -23,6 +23,10 @@ test-race:
 
 test-integration:
 	go test -v -race -tags=integration ./tests/e2e/...
+
+# OWASP CRS regression parity (see tests/crs/README.md).
+test-crs:
+	./tests/crs/run.sh
 
 test-all:
 	go test -v -race -tags=integration ./...

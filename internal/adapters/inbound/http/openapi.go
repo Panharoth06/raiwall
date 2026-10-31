@@ -15,7 +15,7 @@ func OpenAPISpec() map[string]any {
 			"description": "Enterprise-grade WAF & Gateway Control Plane REST API with 2-tier RBAC, staged deployments, and 1-click rollback.",
 		},
 		"servers": []map[string]any{
-			{"url": "/api/v1", "description": "Raiwall API v1 Gateway"},
+			{"url": "/.raiwall/api/v1", "description": "Raiwall Control Plane API (mounted under the reserved /.raiwall prefix)"},
 		},
 		"components": map[string]any{
 			"securitySchemes": map[string]any{

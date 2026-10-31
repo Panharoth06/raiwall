@@ -1,0 +1,90 @@
+# FTW parity target: Raiwall with OWASP CRS in block mode (PL1).
+#
+# The harness in run.sh starts this instance on 127.0.0.1:18080 in front of a
+# local echo upstream on 127.0.0.1:19090, then runs the CRS regression suite.
+# Hostnames are the distinct Host headers used by the regression corpus; Raiwall
+# matches hosts exactly and has no catch-all.
+
+version: 1
+
+server:
+  http:
+    listen: "127.0.0.1:18080"
+  https:
+    enabled: false
+  auto_https: false
+
+caddy:
+  admin:
+    listen: "off"
+
+waf:
+  mode: defense
+  crs:
+    enabled: true
+    mode: block
+    paranoia_level: 1
+    inbound_threshold: 5
+    outbound_threshold: 4
+
+bot:
+  defense: off
+  honeypot_trap: false
+
+# Keep rate limiting out of the measurement: the suite sends thousands of
+# requests from one address.
+rate_limit:
+  storage: memory
+  tier1_rate: 0
+  tier2_threshold: 0
+  tier3_threshold: 0
+
+declarative:
+  mode: sync
+  strict: true
+
+applications:
+  - name: ftw-target
+    description: CRS regression target
+    hostnames:
+      - localhost
+      - 127.0.0.1
+      - 1.2.3.4
+      - "::1"
+      - "fe80::f1:01:fe01:1"
+      - example.com
+      - api.example.com
+      - app.example.com
+      - myapp.com
+      - phpapp.com
+      - koaapp.com
+      - webapp.com
+      - nextjs.example
+      - nextjs-app.com
+      - javaapp.com
+      - coldapp.com
+      - deadbeef.de
+      - nodeapp.io
+      - flaskapp.com
+      - meteorapp.com
+      - rubyapp.com
+      - playapp.com
+      - sailsapp.com
+      - cakeapp.com
+      - ciapp.com
+      - cfapp.com
+      - zendapp.com
+      - shinyapp.com
+      - weblogicapp.com
+      - aspapp.com
+      - genericapp.com
+      - railsapp.com
+    mode: defense
+    routing_type: proxy
+    ports:
+      - port: 80
+        scheme: http
+    ssl_mode: none
+    load_balancing: round_robin
+    upstreams:
+      - dial: "127.0.0.1:19090"

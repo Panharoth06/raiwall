@@ -1,0 +1,44 @@
+name: CRS parity
+
+on:
+  schedule:
+    # Nightly at 03:00 UTC.
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "internal/core/waf/**"
+      - "internal/adapters/inbound/caddy/**"
+      - "tests/crs/**"
+      - ".github/workflows/crs-parity.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  crs-parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install go-ftw
+        run: go install github.com/coreruleset/go-ftw@v1.3.0
+
+      - name: Run CRS parity gate
+        run: ./tests/crs/run.sh
+        env:
+          ARTIFACTS_DIR: ${{ runner.temp }}/crs-artifacts
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: crs-parity-reports
+          path: ${{ runner.temp }}/crs-artifacts
+          if-no-files-found: ignore

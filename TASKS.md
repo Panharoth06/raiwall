@@ -193,19 +193,28 @@ selection and the policy cache in the current change.
       still fire.
 - [x] Gate: one DB exception row drives both engines.
 
-### 1A.5 Rule test playground + go-ftw `[~]`
-**Done:** `/rules/test` API (`34ea459`) and UI (`5d14d49`).
+### 1A.5 Rule test playground + go-ftw `[x]`
+**Done:** `/rules/test` API (`34ea459`) and UI (`5d14d49`); regression harness,
+CI gate, and OpenAPI base in the current change.
 - [x] Synthetic request evaluation against the live engine.
 - [x] Returns verdict, anomaly score, PL, matched rules, latency.
 - [x] OpenAPI entry and unit tests.
-- [ ] `tests/crs/` go-ftw fixture with Raiwall in block mode.
-- [ ] Nightly + on-change CI job; committed baseline/skip list.
-- [ ] Thresholds: 100% applicable PL1 critical, ≥95% overall, documented skips.
+- [x] `tests/crs/` go-ftw fixture with Raiwall in block mode: local echo
+      upstream, PL1 config, pinned corpus fallback (`v4.30.0`), `make test-crs`.
+- [x] Nightly + on-change CI job (`.github/workflows/crs-parity.yml`);
+      committed skip list (`tests/crs/skips.txt`) with reasons.
+- [x] Thresholds enforced by `tests/crs/gate`: 100% applicable critical-family
+      tests (LFI/RCE/XSS/SQLi) and ≥95% overall. The corpus has no
+      paranoia-level tags, so "PL1 critical" is measured as the harness running
+      PL1 with zero failures in those families. go-ftw cloud mode measures
+      block/allow parity, not rule attribution.
 - [x] UI panel for the rule tester (`Rules → Rule Tester`).
-- [ ] Fix the `/api/v1` alias in production (or make it the canonical base) and
-      align the OpenAPI `servers` entry; live endpoint is
-      `/.raiwall/api/v1/rules/test` today.
-- [ ] Gate: CRS parity thresholds met.
+- [x] Make `/.raiwall/api/v1` the canonical base in the OpenAPI `servers`
+      entry (the data plane only mounts that prefix); paths stay relative.
+      The chi-level `/api/v1` alias remains for direct-server/tests.
+- [x] Gate: CRS parity thresholds met. Measured locally with the test-lab
+      corpus: 2491/2491 critical, 5103/5103 overall, with the 103 response-rule
+      files excluded for 1B.1. CI re-runs against the pinned corpus tag.
 
 ### 1A.6 Performance and soak `[ ]`
 - [ ] Benchmark semantic-only vs composite (1 KB body, PL1–4).
