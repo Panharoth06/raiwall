@@ -1,7 +1,7 @@
 # Raiwall Enterprise Tasks
 
 Actionable breakdown for [`ROADMAP.md`](ROADMAP.md). Last updated: **2026-10-31**
-(commit `3055841`).
+(commit `c4af3e8`).
 
 Use this file as the working checklist. Each task is self-contained: implement,
 test, update `ROADMAP.md` status, run `graphify update .`, and commit with a
