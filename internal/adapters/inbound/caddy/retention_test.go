@@ -44,8 +44,8 @@ func TestPruneRetention(t *testing.T) {
 	mw := &Middleware{
 		controlStore: store,
 		ControlConfig: &ControlSettings{
-			SnapshotRetention: 2,
-			AuditRetention:    caddy.Duration(24 * time.Hour),
+			SnapshotRetention: intPtrSetting(2),
+			AuditRetention:    durationPtrSetting(24 * time.Hour),
 		},
 	}
 	mw.pruneRetention(ctx)
@@ -65,4 +65,48 @@ func TestPruneRetention(t *testing.T) {
 
 	_, err = store.GetAdminSessionByTokenHash(ctx, "h")
 	require.Error(t, err, "expired sessions are pruned")
+}
+
+func TestPruneRetentionZeroKeepsEverything(t *testing.T) {
+	store, err := sqlite.InitDB("file:" + filepath.Join(t.TempDir(), "control.db") + "?_pragma=busy_timeout(5000)")
+	require.NoError(t, err)
+	defer store.Close()
+
+	ctx := context.Background()
+	now := time.Now().UTC()
+	for i := 0; i < 3; i++ {
+		_, err := store.CreateSnapshot(ctx, control.ConfigSnapshotRecord{
+			SnapshotData: `{"version":1}`, Author: "test", CreatedAt: now,
+		})
+		require.NoError(t, err)
+	}
+	require.NoError(t, store.CreateAuditEvent(ctx, control.AuditEvent{
+		ID: "ancient", OccurredAt: now.Add(-10 * 365 * 24 * time.Hour), Action: "update",
+	}))
+
+	mw := &Middleware{
+		controlStore: store,
+		ControlConfig: &ControlSettings{
+			SnapshotRetention: intPtrSetting(0),
+			AuditRetention:    durationPtrSetting(0),
+		},
+	}
+	mw.pruneRetention(ctx)
+
+	snapshots, err := store.ListSnapshots(ctx)
+	require.NoError(t, err)
+	require.Len(t, snapshots, 3, "an explicit 0 must disable snapshot pruning")
+
+	audit, err := store.ListAuditEvents(ctx, control.AuditFilter{})
+	require.NoError(t, err)
+	require.Len(t, audit, 1, "an explicit 0 must keep audit rows forever")
+}
+
+func intPtrSetting(v int) *int {
+	return &v
+}
+
+func durationPtrSetting(d time.Duration) *caddy.Duration {
+	value := caddy.Duration(d)
+	return &value
 }

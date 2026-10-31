@@ -156,7 +156,7 @@ func handlerFromConfig(file *config.File) (*Middleware, error) {
 		SessionSecure:     file.Control.Session.Secure,
 		AllowBasicAuth:    file.Control.Session.AllowBasicAuth,
 		SnapshotRetention: file.Control.SnapshotRetention,
-		AuditRetention:    caddy.Duration(file.Control.AuditRetention),
+		AuditRetention:    auditRetentionSetting(file.Control.AuditRetention),
 		BootstrapAdmin: &BootstrapAdminSettings{
 			Username: file.Control.BootstrapAdmin.Username,
 			Password: file.Control.BootstrapAdmin.Password,
@@ -235,6 +235,16 @@ func storageSettings(storage config.Storage) *StorageSettings {
 		}
 	}
 	return settings
+}
+
+// auditRetentionSetting preserves an explicit zero (keep audit rows forever)
+// while the nil pointer means "use the process default".
+func auditRetentionSetting(d *config.Duration) *caddy.Duration {
+	if d == nil {
+		return nil
+	}
+	value := caddy.Duration(*d)
+	return &value
 }
 
 func boolValue(v *bool, fallback bool) bool {

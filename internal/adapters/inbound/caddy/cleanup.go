@@ -2,6 +2,8 @@ package caddy
 
 // Cleanup releases all background resources, closing rate limit storage, ban manager, waiting room loops, GeoIP reader, and telemetry stores.
 func (m *Middleware) Cleanup() error {
+	// Stop background workers before closing the stores they read.
+	m.stopRetention()
 	if m.ringBuffer != nil {
 		_ = m.ringBuffer.Close()
 	}
@@ -21,7 +23,6 @@ func (m *Middleware) Cleanup() error {
 	if m.waitingRoom != nil {
 		_ = m.waitingRoom.Close()
 	}
-	m.stopRetention()
 	if m.banManager != nil {
 		_ = m.banManager.Close()
 	}

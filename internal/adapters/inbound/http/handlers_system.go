@@ -105,6 +105,17 @@ func (s *Server) handleMCPMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Cookie and cached Basic credentials are attached by the browser, so a
+	// same-site form can reach this endpoint without the client's intent. The
+	// REST routes enforce this in AuthMiddleware; MCP is mounted outside that
+	// group and must check it here.
+	if authCtx, ok := AuthFromContext(r.Context()); ok &&
+		(authCtx.Method == "cookie" || authCtx.Method == "basic") &&
+		!s.authMgr.OriginAllowed(r) {
+		respondError(w, http.StatusForbidden, "Forbidden: cross-origin request rejected")
+		return
+	}
+
 	bodyBytes, err := io.ReadAll(r.Body)
 	if err != nil {
 		respondError(w, http.StatusBadRequest, "failed to read request body: "+err.Error())
@@ -131,6 +142,10 @@ func (s *Server) handleMCPMessage(w http.ResponseWriter, r *http.Request) {
 			_ = json.Unmarshal(req.Params, &callParams)
 			// Disallow mutating tools for viewer
 			if callParams.Name == "create_exception_rule" || callParams.Name == "apply_configuration" || callParams.Name == "rollback_configuration" {
+				// Keep the JSON-RPC error response (MCP clients read tool errors
+				// from the body) but also leave an audit trail: the middleware
+				// sees a 200 because the protocol response is 200.
+				s.recordDeniedAccess(r, authCtx, http.StatusForbidden, fmt.Sprintf("role viewer is not authorized to execute mutating tool %q", callParams.Name))
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusOK)
 				_ = json.NewEncoder(w).Encode(mcp.JSONRPCResponse{

@@ -26,6 +26,14 @@ if [[ "${DRY_RUN:-0}" == "1" ]]; then
     exit 0
 fi
 
+# Never leave a partial or empty archive behind after a failed dump.
+cleanup_partial() {
+    if [[ -f "$OUTPUT" && ! -s "$OUTPUT" ]]; then
+        rm -f "$OUTPUT"
+    fi
+}
+trap cleanup_partial EXIT
+
 if [[ -n "${DATABASE_URL:-}" ]]; then
     command -v pg_dump >/dev/null || { echo "pg_dump is required" >&2; exit 1; }
     pg_dump --format=custom --no-owner --file "$OUTPUT" "$DATABASE_URL"

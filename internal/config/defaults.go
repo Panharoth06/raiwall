@@ -102,11 +102,13 @@ func applyDefaults(f *File) {
 	if f.Control.Session.Secure == nil {
 		f.Control.Session.Secure = boolPtr(true)
 	}
-	if f.Control.SnapshotRetention == 0 {
-		f.Control.SnapshotRetention = defaultSnapshotRetention
+	if f.Control.SnapshotRetention == nil {
+		value := defaultSnapshotRetention
+		f.Control.SnapshotRetention = &value
 	}
-	if f.Control.AuditRetention == 0 {
-		f.Control.AuditRetention = Duration(defaultAuditRetention)
+	if f.Control.AuditRetention == nil {
+		value := Duration(defaultAuditRetention)
+		f.Control.AuditRetention = &value
 	}
 
 	if f.WAF.Mode == "" {

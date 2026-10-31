@@ -69,6 +69,34 @@ func (s *Server) AuditMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// recordDeniedAccess writes an audit row when an authenticated principal is
+// refused by CSRF or RBAC. It is wired into AuthManager so denials that occur
+// before the audit middleware still leave a trace.
+func (s *Server) recordDeniedAccess(r *http.Request, authCtx *AuthContext, status int, reason string) {
+	if s == nil || s.store == nil || r == nil {
+		return
+	}
+	_, targetType, targetID := classifyAuditRequest(r)
+	event := control.AuditEvent{
+		Action:     "access_denied",
+		TargetType: targetType,
+		TargetID:   targetID,
+		StatusCode: status,
+		Detail:     reason,
+	}
+	if authCtx != nil {
+		event.ActorType = "user"
+		event.ActorID = authCtx.UserID
+		event.ActorName = authCtx.Username
+		event.Role = authCtx.Role
+		if authCtx.IsAPIKey {
+			event.ActorType = "api_key"
+			event.ActorID = authCtx.KeyID
+		}
+	}
+	s.writeAudit(r, event)
+}
+
 // writeAudit fills request metadata and persists the event. Failures are logged
 // but never break the request path; security-critical callers may check the
 // store directly when fail-closed behavior is required.

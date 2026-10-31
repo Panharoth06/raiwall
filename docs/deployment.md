@@ -75,10 +75,12 @@ control:
   allowed_networks: ["203.0.113.0/24", "10.0.0.0/8"]
 ```
 
-`allowed_networks` is enforced on the socket peer for `/.raiwall/*`, metrics, and
-telemetry. An empty list allows every source (compatibility default). Health
-probes (`/.raiwall/healthz`, `/.raiwall/readyz`) always bypass the allowlist.
-Unknown hosts no longer redirect to the console.
+`allowed_networks` is enforced on the **socket peer** for `/.raiwall/*`, metrics,
+and telemetry. Behind a TLS-terminating proxy the allowlist therefore sees the
+proxy address; restrict the console at the proxy or use a VPN. An empty list
+allows every source (compatibility default). Health probes
+(`/.raiwall/healthz`, `/.raiwall/readyz`) always bypass the allowlist. Unknown
+hosts no longer redirect to the console.
 
 ---
 
@@ -112,7 +114,9 @@ Notes:
 - Persistence: `/var/lib/raiwall` holds certificates and, for SQLite, the
   database. With external PostgreSQL, only certificates live on the PVC.
 - Probes: `/.raiwall/healthz` (liveness/startup) and `/.raiwall/readyz`
-  (readiness; database, active snapshot, and cluster sync).
+  (aggregate readiness: database, active snapshot, and cluster sync). The
+  unauthenticated probe reports only the aggregate state; the per-component
+  checks are available on the authenticated `/status` endpoint.
 
 ---
 
@@ -140,9 +144,12 @@ next request (sessions are revalidated against the database).
   `control.session.secure: true`.
 - Logout, password reset, role change, and deactivation revoke sessions
   immediately.
-- Cookie-authenticated mutations require a same-origin `Origin`/`Referer`
-  (cross-site requests receive 403). API keys are exempt.
-- Login is throttled per IP and username (5 failures → 15 minute lockout).
+- Cookie- and Basic-authenticated mutations require a same-origin
+  `Origin`/`Referer` (cross-site requests receive 403). API keys are exempt.
+- Login failures are counted per source address and per source+username pair
+  (5 failures → 15 minute lockout). A failed login from one address cannot lock
+  an operator out for everyone; behind a shared proxy all clients share the
+  proxy address, so terminate TLS at Raiwall or preserve the client address.
 
 ---
 
@@ -151,13 +158,14 @@ next request (sessions are revalidated against the database).
 | Endpoint | Purpose |
 |---|---|
 | `/.raiwall/healthz` | Process liveness only |
-| `/.raiwall/readyz` | Database ping, active snapshot, cluster sync/Redis when configured |
-| `/.raiwall/api/v1/status` | Authenticated status with the same component checks |
+| `/.raiwall/readyz` | Aggregate readiness (database, snapshot, cluster sync); no component details |
+| `/.raiwall/api/v1/status` | Authenticated status with the per-component checks |
 | `/.raiwall/metrics` | Authenticated Prometheus metrics |
 
-The dashboard's **Settings → Audit Log** shows the append-only record of
-sign-ins and control-plane changes (actor, action, target, status, IP). Audit
-rows never contain request bodies or credentials.
+The dashboard's **Settings → Audit Log** (admin only) shows the append-only
+record of sign-ins, control-plane changes, MCP tool calls, and refused
+mutations (actor, action, target, status, IP). Audit rows never contain request
+bodies or credentials.
 
 Probes are wired in Compose and Helm. Alert channels are configured under
 `telemetry.alert_channels`; they require authentication only if the webhook does.
@@ -203,7 +211,8 @@ raiwall backup --config /etc/raiwall/raiwall.yaml --output /backups/raiwall.db
 DB_PATH=/var/lib/raiwall/raiwall.db ./scripts/backup-sqlite.sh /backups/raiwall.db
 ```
 
-Stop Raiwall, keep the current database, then restore:
+Stop Raiwall (and, in Compose, the `raiwall` container) before restoring; the
+script keeps the current database as a `.before-restore.*` copy:
 
 ```bash
 CONFIRM_RESTORE=yes DB_PATH=/var/lib/raiwall/raiwall.db \
@@ -218,7 +227,8 @@ database before relying on backups.
 Forensic events honor `telemetry.retention` (default 30 days). The cleanup
 worker enforces `control.snapshot_retention` (default 200, always keeping the
 active version), `control.audit_retention` (default 365 days), and expired
-operator sessions.
+operator sessions. An explicit `0` for either retention setting disables that
+pruning (snapshots and audit rows are kept indefinitely).
 
 Test a restore into a scratch database before relying on a backup.
 

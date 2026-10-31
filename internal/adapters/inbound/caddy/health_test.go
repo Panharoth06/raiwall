@@ -26,14 +26,15 @@ func TestHealthAndReadinessProbes(t *testing.T) {
 	ready := httptest.NewRecorder()
 	require.True(t, mw.serveHealth(ready, httptest.NewRequest(http.MethodGet, "/.raiwall/readyz", nil)))
 	require.Equal(t, http.StatusOK, ready.Code)
-	require.Contains(t, ready.Body.String(), `"database":true`)
-	require.Contains(t, ready.Body.String(), `"snapshot":true`)
+	require.Contains(t, ready.Body.String(), `"status":"ready"`)
+	require.NotContains(t, ready.Body.String(), "database", "readiness must not enumerate components")
 
 	require.NoError(t, store.Close())
 	broken := httptest.NewRecorder()
 	require.True(t, mw.serveHealth(broken, httptest.NewRequest(http.MethodGet, "/.raiwall/readyz", nil)))
 	require.Equal(t, http.StatusServiceUnavailable, broken.Code)
-	require.Contains(t, broken.Body.String(), `"database":false`)
+	require.Contains(t, broken.Body.String(), `"status":"not_ready"`)
+	require.NotContains(t, broken.Body.String(), "database")
 
 	other := httptest.NewRecorder()
 	require.False(t, mw.serveHealth(other, httptest.NewRequest(http.MethodGet, "/healthz", nil)))

@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -210,4 +211,39 @@ func TestDiscoverPathFailsWhenNothing(t *testing.T) {
 	_, err = DiscoverPath("")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no configuration file found")
+}
+
+func TestParseRetentionDefaults(t *testing.T) {
+	file, _, err := Parse([]byte("version: 1\n"), "test.yaml")
+	require.NoError(t, err)
+	require.NotNil(t, file.Control.SnapshotRetention)
+	require.NotNil(t, file.Control.AuditRetention)
+	assert.Equal(t, 200, *file.Control.SnapshotRetention)
+	assert.Equal(t, 365*24*time.Hour, time.Duration(*file.Control.AuditRetention))
+}
+
+func TestParseRetentionZeroDisablesPruning(t *testing.T) {
+	doc := `
+version: 1
+control:
+  snapshot_retention: 0
+  audit_retention: 0
+`
+	file, _, err := Parse([]byte(doc), "test.yaml")
+	require.NoError(t, err)
+	require.NotNil(t, file.Control.SnapshotRetention)
+	require.NotNil(t, file.Control.AuditRetention)
+	assert.Equal(t, 0, *file.Control.SnapshotRetention, "explicit 0 must survive defaults")
+	assert.Equal(t, time.Duration(0), time.Duration(*file.Control.AuditRetention))
+}
+
+func TestParseRejectsNegativeRetention(t *testing.T) {
+	doc := `
+version: 1
+control:
+  snapshot_retention: -1
+`
+	_, _, err := Parse([]byte(doc), "test.yaml")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "snapshot_retention")
 }

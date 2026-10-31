@@ -226,6 +226,11 @@ func (s *Server) handleUpdateAdminUser(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Serialize the last-admin check with the write it authorizes; otherwise two
+	// concurrent demotions can each observe the other admin and both proceed.
+	s.operatorMu.Lock()
+	defer s.operatorMu.Unlock()
+
 	target, err := s.store.GetUserByID(r.Context(), chi.URLParam(r, "id"))
 	if err != nil {
 		respondError(w, http.StatusNotFound, "operator not found")
@@ -339,6 +344,9 @@ func (s *Server) handleDeactivateAdminUser(w http.ResponseWriter, r *http.Reques
 	if !ok {
 		return
 	}
+	s.operatorMu.Lock()
+	defer s.operatorMu.Unlock()
+
 	target, err := s.store.GetUserByID(r.Context(), chi.URLParam(r, "id"))
 	if err != nil {
 		respondError(w, http.StatusNotFound, "operator not found")

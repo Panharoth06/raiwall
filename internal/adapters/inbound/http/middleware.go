@@ -104,14 +104,19 @@ func (am *AuthManager) AuthMiddleware(next http.Handler) http.Handler {
 		if strings.HasSuffix(path, "/test") || strings.HasSuffix(path, "/dry-run") {
 			isMutating = false
 		}
-		// Allow MCP message JSON-RPC handler (tool-level RBAC is checked inside executor)
+		// MCP multiplexes read and mutating tools over one endpoint. The handler
+		// enforces same-origin for cookie/Basic principals and refuses mutating
+		// tools for viewers; treating the whole endpoint as a write would lock
+		// viewers out of the read-only tools.
 		if strings.HasSuffix(path, "/mcp/message") {
 			isMutating = false
 		}
 
-		// Cookie-authenticated mutations must come from this origin. API-key and
-		// Basic clients are exempt because they carry explicit credentials.
-		if isMutating && authCtx.Method == "cookie" && !am.OriginAllowed(r) {
+		// Browser-capable credentials (cookie and cached Basic auth) must come
+		// from this origin. API keys are exempt because they are sent explicitly
+		// in a header and cannot be replayed by a cross-site form.
+		if isMutating && (authCtx.Method == "cookie" || authCtx.Method == "basic") && !am.OriginAllowed(r) {
+			am.notifyDenied(r, authCtx, http.StatusForbidden, "cross-origin request rejected")
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusForbidden)
 			_ = json.NewEncoder(w).Encode(map[string]string{
@@ -121,6 +126,7 @@ func (am *AuthManager) AuthMiddleware(next http.Handler) http.Handler {
 		}
 
 		if isMutating && authCtx.Role != RoleAdmin {
+			am.notifyDenied(r, authCtx, http.StatusForbidden, "write operations require admin role")
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusForbidden)
 			_ = json.NewEncoder(w).Encode(map[string]string{

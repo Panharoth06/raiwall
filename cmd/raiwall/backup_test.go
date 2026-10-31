@@ -8,9 +8,52 @@ import (
 	"time"
 
 	"github.com/Panharoth06/raiwall/internal/adapters/outbound/storage/sqlite"
+	"github.com/Panharoth06/raiwall/internal/config"
 	"github.com/Panharoth06/raiwall/internal/core/control"
 	"github.com/stretchr/testify/require"
 )
+
+func TestControlStoreDSNResolvesNamedStore(t *testing.T) {
+	tests := []struct {
+		name string
+		cfg  config.Storage
+		want string
+	}{
+		{
+			name: "database_url shortcut",
+			cfg:  config.Storage{DatabaseURL: "file:/data/raiwall.db"},
+			want: "file:/data/raiwall.db",
+		},
+		{
+			name: "named control store",
+			cfg: config.Storage{
+				Stores: map[string]config.Store{
+					"control": {Driver: "sqlite", DSN: "file:/data/control.db"},
+					"events":  {Driver: "postgres", DSN: "postgres://events"},
+				},
+				Control: "control",
+			},
+			want: "file:/data/control.db",
+		},
+		{
+			name: "default store fallback",
+			cfg: config.Storage{
+				Stores: map[string]config.Store{"default": {Driver: "sqlite", DSN: "file:/data/default.db"}},
+			},
+			want: "file:/data/default.db",
+		},
+		{
+			name: "nothing configured",
+			cfg:  config.Storage{},
+			want: "",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.want, controlStoreDSN(&config.File{Storage: tc.cfg}))
+		})
+	}
+}
 
 func TestBackupSQLiteRoundTrip(t *testing.T) {
 	dir := t.TempDir()

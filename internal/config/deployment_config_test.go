@@ -133,3 +133,13 @@ control:
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "public_url")
 }
+
+func TestProductionModeRejectsShortBootstrapPassword(t *testing.T) {
+	doc := strings.Replace(validProductionDoc(), "security:", `  bootstrap_admin:
+    username: admin
+    password: short-pass1
+security:`, 1)
+	_, _, err := Parse([]byte(doc), "test.yaml")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "at least 12 characters")
+}

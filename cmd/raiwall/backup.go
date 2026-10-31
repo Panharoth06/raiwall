@@ -53,11 +53,33 @@ func cmdBackup(flags caddycmd.Flags) (int, error) {
 		fmt.Fprintf(os.Stderr, "warning: %s\n", warning)
 	}
 
-	if err := backupSQLite(file.Storage.DatabaseURL, output); err != nil {
+	dsn := controlStoreDSN(file)
+	if dsn == "" {
+		return 1, fmt.Errorf("no control database is configured; set storage.database_url or storage.stores[control].dsn")
+	}
+	if err := backupSQLite(dsn, output); err != nil {
 		return 1, err
 	}
 	fmt.Printf("backup written to %s\n", output)
 	return 0, nil
+}
+
+// controlStoreDSN resolves the database bound to the control role. A single
+// storage.database_url wins; otherwise the named store is read from
+// storage.stores so multi-store configurations are backed up from the right
+// database.
+func controlStoreDSN(file *config.File) string {
+	if dsn := strings.TrimSpace(file.Storage.DatabaseURL); dsn != "" {
+		return dsn
+	}
+	name := strings.TrimSpace(file.Storage.Control)
+	if name == "" {
+		name = "default"
+	}
+	if store, ok := file.Storage.Stores[name]; ok {
+		return strings.TrimSpace(store.DSN)
+	}
+	return ""
 }
 
 // backupSQLite writes a consistent snapshot with VACUUM INTO and verifies its

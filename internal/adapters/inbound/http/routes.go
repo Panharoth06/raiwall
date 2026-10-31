@@ -20,6 +20,9 @@ func (s *Server) routes() {
 	// MCP Server Protocol Endpoints (Protected by API Key / Session)
 	registerMCPRoutes := func(mcpRouter chi.Router) {
 		mcpRouter.Use(s.authMgr.AuthMiddleware)
+		// MCP tool calls mutate control-plane state; audit them like the REST
+		// routes. Tool-level RBAC runs inside the executor.
+		mcpRouter.Use(s.AuditMiddleware)
 		mcpRouter.Get("/", s.mcpServer.ServeSSE)
 		mcpRouter.Post("/message", s.handleMCPMessage)
 	}

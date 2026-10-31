@@ -10,6 +10,7 @@ import (
 var secretFieldNames = map[string]struct{}{
 	"hmac_secret":    {},
 	"password":       {},
+	"password_hash":  {},
 	"pow_secret":     {},
 	"client_secret":  {},
 	"session_secret": {},

@@ -79,6 +79,23 @@ type AuthManager struct {
 
 	mu      sync.RWMutex
 	session SessionConfig
+
+	// denied is invoked when an authenticated principal is refused (CSRF or
+	// RBAC). The audit middleware sits inside authentication, so denials need
+	// their own path to the audit log.
+	denied func(*http.Request, *AuthContext, int, string)
+}
+
+// SetDeniedHandler installs the audit sink for authorization denials. It must
+// be called before routes start serving.
+func (am *AuthManager) SetDeniedHandler(fn func(*http.Request, *AuthContext, int, string)) {
+	am.denied = fn
+}
+
+func (am *AuthManager) notifyDenied(r *http.Request, authCtx *AuthContext, status int, reason string) {
+	if am.denied != nil {
+		am.denied(r, authCtx, status, reason)
+	}
 }
 
 // NewAuthManager creates an AuthManager. The HMAC secret keys session token
@@ -359,13 +376,20 @@ func (am *AuthManager) authenticateBasic(r *http.Request, username, clientIP str
 	}, nil
 }
 
+// throttlingKeys scopes failure counters to the source address and to the
+// source+username pair. A username-only key would let any anonymous client lock
+// an operator out by sending failures from an address they do not control.
 func throttlingKeys(username, clientIP string) []string {
 	keys := make([]string, 0, 2)
 	if clientIP != "" {
 		keys = append(keys, "ip:"+clientIP)
 	}
 	if normalized := strings.ToLower(strings.TrimSpace(username)); normalized != "" {
-		keys = append(keys, "user:"+normalized)
+		if clientIP != "" {
+			keys = append(keys, "ip:"+clientIP+"|user:"+normalized)
+		} else {
+			keys = append(keys, "user:"+normalized)
+		}
 	}
 	return keys
 }

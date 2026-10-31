@@ -83,6 +83,11 @@ control:
   # Commit and hot-swap a new snapshot after every successful configuration
   # change. Set false to stage changes and deploy them from the Deployments page.
   auto_apply: true
+  session:
+    # This stack serves plain HTTP on :8080 for local use. Browsers will not
+    # send a Secure cookie over HTTP, so the dev profile disables it. The
+    # production profile (config/raiwall.production.yaml) sets secure: true.
+    secure: false
   # Keep the newest N configuration snapshots plus the active version.
   snapshot_retention: 200
   # Prune control-plane audit rows older than this (0 = keep forever).

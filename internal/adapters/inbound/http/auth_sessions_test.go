@@ -232,3 +232,124 @@ func TestSessionIdleExpiry(t *testing.T) {
 	me := authedRequest(server, http.MethodGet, "/api/v1/auth/me", cookie, "")
 	require.Equal(t, http.StatusUnauthorized, me.Code, "an idle-expired session must not authenticate")
 }
+
+func TestLoginLockoutIsScopedToSource(t *testing.T) {
+	server, store := setupTestServer(t)
+	defer store.Close()
+	createOperator(t, store, "erin", "correct-horse-battery", RoleAdmin)
+
+	for i := 0; i < loginMaxFailures; i++ {
+		body, _ := json.Marshal(map[string]string{"username": "erin", "password": "wrong"})
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewReader(body))
+		req.RemoteAddr = "198.51.100.10:1234"
+		rec := httptest.NewRecorder()
+		server.ServeHTTP(rec, req)
+		require.Equal(t, http.StatusUnauthorized, rec.Code, "attempt %d", i+1)
+	}
+
+	// A different client must not inherit a lockout from the attacker's address.
+	body, _ := json.Marshal(map[string]string{"username": "erin", "password": "correct-horse-battery"})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewReader(body))
+	req.RemoteAddr = "203.0.113.20:1234"
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code, "username-wide lockout would deny every source: %s", rec.Body.String())
+
+	// The offending address remains locked.
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewReader(body))
+	req.RemoteAddr = "198.51.100.10:1234"
+	rec = httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusTooManyRequests, rec.Code)
+}
+
+func TestCSRFRejectsCrossOriginBasicMutation(t *testing.T) {
+	server, store := setupTestServer(t)
+	defer store.Close()
+	createOperator(t, store, "heidi", "correct-horse-battery", RoleAdmin)
+	server.SetSessionConfig(SessionConfig{
+		IdleTimeout: time.Hour, AbsoluteTimeout: time.Hour, Secure: true,
+		AllowBasicAuth: true, PublicURL: "https://raiwall.example.com",
+	})
+
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/system/auto-apply", bytes.NewReader([]byte(`{"auto_apply":true}`)))
+	req.SetBasicAuth("heidi", "correct-horse-battery")
+	req.Header.Set("Origin", "https://evil.example")
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusForbidden, rec.Code)
+	require.Contains(t, rec.Body.String(), "cross-origin")
+}
+
+func TestDeniedMutationIsAudited(t *testing.T) {
+	server, store := setupTestServer(t)
+	defer store.Close()
+	createOperator(t, store, "ivy", "correct-horse-battery", RoleViewer)
+	cookie := login(t, server, "ivy", "correct-horse-battery")
+
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/system/auto-apply", bytes.NewReader([]byte(`{"auto_apply":true}`)))
+	req.AddCookie(cookie)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusForbidden, rec.Code)
+
+	events, err := store.ListAuditEvents(context.Background(), control.AuditFilter{Action: "access_denied"})
+	require.NoError(t, err)
+	require.Len(t, events, 1)
+	require.Equal(t, "ivy", events[0].ActorName)
+	require.Equal(t, RoleViewer, events[0].Role)
+	require.Equal(t, http.StatusForbidden, events[0].StatusCode)
+	require.Contains(t, events[0].Detail, "admin role")
+}
+
+func TestMCPRejectsCrossOriginCookieAndAuditsCalls(t *testing.T) {
+	server, store := setupTestServer(t)
+	defer store.Close()
+	secureSessionServer(t, server)
+	createOperator(t, store, "judy", "correct-horse-battery", RoleAdmin)
+	cookie := login(t, server, "judy", "correct-horse-battery")
+
+	payload := []byte(`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}`)
+	cross := httptest.NewRequest(http.MethodPost, "/.raiwall/api/v1/mcp/message", bytes.NewReader(payload))
+	cross.AddCookie(cookie)
+	cross.Header.Set("Origin", "https://evil.example")
+	crossRec := httptest.NewRecorder()
+	server.ServeHTTP(crossRec, cross)
+	require.Equal(t, http.StatusForbidden, crossRec.Code)
+	require.Contains(t, crossRec.Body.String(), "cross-origin")
+
+	same := httptest.NewRequest(http.MethodPost, "/.raiwall/api/v1/mcp/message", bytes.NewReader(payload))
+	same.AddCookie(cookie)
+	same.Header.Set("Origin", "https://raiwall.example.com")
+	sameRec := httptest.NewRecorder()
+	server.ServeHTTP(sameRec, same)
+	require.Equal(t, http.StatusOK, sameRec.Code, sameRec.Body.String())
+
+	events, err := store.ListAuditEvents(context.Background(), control.AuditFilter{Action: "create"})
+	require.NoError(t, err)
+	found := false
+	for _, event := range events {
+		if event.TargetType == "mcp" && event.TargetID == "message" {
+			found = true
+			require.Equal(t, "judy", event.ActorName)
+		}
+	}
+	require.True(t, found, "MCP calls must appear in the audit log")
+
+	createOperator(t, store, "ken", "correct-horse-battery", RoleViewer)
+	viewerCookie := login(t, server, "ken", "correct-horse-battery")
+	toolCall := []byte(`{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"apply_configuration","arguments":{}}}`)
+	req := httptest.NewRequest(http.MethodPost, "/.raiwall/api/v1/mcp/message", bytes.NewReader(toolCall))
+	req.AddCookie(viewerCookie)
+	req.Header.Set("Origin", "https://raiwall.example.com")
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code, "JSON-RPC clients read tool refusals from the body")
+	require.Contains(t, rec.Body.String(), "not authorized")
+
+	denied, err := store.ListAuditEvents(context.Background(), control.AuditFilter{Action: "access_denied"})
+	require.NoError(t, err)
+	require.Len(t, denied, 1)
+	require.Equal(t, "ken", denied[0].ActorName)
+	require.Contains(t, denied[0].Detail, "apply_configuration")
+}

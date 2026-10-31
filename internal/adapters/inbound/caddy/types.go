@@ -140,8 +140,8 @@ type ControlSettings struct {
 	SessionAbsolute   caddy.Duration          `json:"session_absolute_timeout,omitempty"`
 	SessionSecure     *bool                   `json:"session_secure,omitempty"`
 	AllowBasicAuth    bool                    `json:"allow_basic_auth,omitempty"`
-	SnapshotRetention int                     `json:"snapshot_retention,omitempty"`
-	AuditRetention    caddy.Duration          `json:"audit_retention,omitempty"`
+	SnapshotRetention *int                    `json:"snapshot_retention,omitempty"`
+	AuditRetention    *caddy.Duration         `json:"audit_retention,omitempty"`
 }
 
 // BootstrapAdminSettings provisions the first operator account when the store

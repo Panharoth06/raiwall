@@ -28,6 +28,9 @@ func (m *Middleware) serveHealth(w http.ResponseWriter, r *http.Request) bool {
 		return true
 	}
 
+	// Readiness is unauthenticated and bypasses the console allowlist, so it
+	// reports only the aggregate state. Authenticated /status exposes the
+	// per-component checks needed to diagnose a failure.
 	checks := m.Readiness(r.Context())
 	ready := true
 	for _, ok := range checks {
@@ -36,10 +39,10 @@ func (m *Middleware) serveHealth(w http.ResponseWriter, r *http.Request) bool {
 		}
 	}
 	if !ready {
-		writeHealthJSON(w, http.StatusServiceUnavailable, map[string]any{"status": "not_ready", "checks": checks})
+		writeHealthJSON(w, http.StatusServiceUnavailable, map[string]any{"status": "not_ready"})
 		return true
 	}
-	writeHealthJSON(w, http.StatusOK, map[string]any{"status": "ready", "checks": checks})
+	writeHealthJSON(w, http.StatusOK, map[string]any{"status": "ready"})
 	return true
 }
 

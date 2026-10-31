@@ -21,6 +21,8 @@ func (e *ValidationError) Error() string {
 	return fmt.Sprintf("%d configuration problems:\n  - %s", len(e.Problems), strings.Join(e.Problems, "\n  - "))
 }
 
+const minProductionPasswordLength = 12
+
 type validator struct {
 	problems []string
 }
@@ -151,10 +153,10 @@ func (f *File) validateControl(v *validator) {
 			v.add("control.allowed_networks entry %q is not a valid CIDR", network)
 		}
 	}
-	if f.Control.SnapshotRetention < 0 {
+	if f.Control.SnapshotRetention != nil && *f.Control.SnapshotRetention < 0 {
 		v.add("control.snapshot_retention must be zero or positive")
 	}
-	if f.Control.AuditRetention < 0 {
+	if f.Control.AuditRetention != nil && *f.Control.AuditRetention < 0 {
 		v.add("control.audit_retention must be zero or positive")
 	}
 }
@@ -173,6 +175,9 @@ func (f *File) validateSecurity(v *validator) {
 		_, known := weak[password]
 		if known || password == strings.ToLower(strings.TrimSpace(admin.Username)) {
 			v.add("control.bootstrap_admin.password is a weak default; set a strong password or leave it empty to generate one")
+		}
+		if len(admin.Password) < minProductionPasswordLength {
+			v.add("control.bootstrap_admin.password must be at least %d characters in production mode", minProductionPasswordLength)
 		}
 	}
 	if len(f.Control.HMACSecret) < 32 {

@@ -142,11 +142,13 @@ type Control struct {
 	// Session controls dashboard operator sessions.
 	Session Session `yaml:"session" json:"session"`
 	// SnapshotRetention keeps at most this many configuration snapshots
-	// (newest first plus the active version). 0 disables pruning.
-	SnapshotRetention int `yaml:"snapshot_retention" json:"snapshot_retention"`
+	// (newest first plus the active version). 0 disables pruning. A pointer
+	// distinguishes "unset" (apply the default) from an explicit 0.
+	SnapshotRetention *int `yaml:"snapshot_retention" json:"snapshot_retention"`
 	// AuditRetention prunes control-plane audit rows older than this. 0 keeps
-	// them forever.
-	AuditRetention Duration `yaml:"audit_retention" json:"audit_retention"`
+	// them forever. A pointer distinguishes "unset" (apply the default) from an
+	// explicit 0.
+	AuditRetention *Duration `yaml:"audit_retention" json:"audit_retention"`
 }
 
 // Session configures opaque dashboard operator sessions.

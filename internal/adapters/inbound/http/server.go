@@ -65,6 +65,10 @@ type Server struct {
 	ruleTester       func(*waf.RequestContext) (*waf.Verdict, error)
 	autoApply        bool
 	applyMu          sync.Mutex
+	// operatorMu serializes last-active-admin checks with the write that acts
+	// on them. This is per-process; multi-replica control planes still rely on
+	// the database serializing writes.
+	operatorMu sync.Mutex
 
 	// Coraza process defaults, injected by the Caddy data plane. The detection
 	// status/policy endpoints use these when no explicit policy row exists.
@@ -89,6 +93,7 @@ func NewServer(store control.ControlStore, hmacSecret []byte) *Server {
 		mcpServer:   mcp.NewServer(store),
 		templateMgr: tmplMgr,
 	}
+	authMgr.SetDeniedHandler(s.recordDeniedAccess)
 
 	s.routes()
 	return s

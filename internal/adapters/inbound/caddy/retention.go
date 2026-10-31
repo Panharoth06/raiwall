@@ -49,11 +49,11 @@ func (m *Middleware) pruneRetention(ctx context.Context) {
 	keep := defaultSnapshots
 	auditAge := defaultAuditAge
 	if m.ControlConfig != nil {
-		if m.ControlConfig.SnapshotRetention > 0 {
-			keep = m.ControlConfig.SnapshotRetention
+		if m.ControlConfig.SnapshotRetention != nil {
+			keep = *m.ControlConfig.SnapshotRetention
 		}
-		if m.ControlConfig.AuditRetention > 0 {
-			auditAge = time.Duration(m.ControlConfig.AuditRetention)
+		if m.ControlConfig.AuditRetention != nil {
+			auditAge = time.Duration(*m.ControlConfig.AuditRetention)
 		}
 	}
 
@@ -61,8 +61,12 @@ func (m *Middleware) pruneRetention(ctx context.Context) {
 	if snapshot := control.GetActiveSnapshot(); snapshot != nil {
 		active = snapshot.Version
 	}
-	if _, err := m.controlStore.PruneSnapshots(ctx, keep, active); err != nil && m.logger != nil {
-		m.logger.Warn("failed to prune configuration snapshots", zap.Error(err))
+	// An explicit zero (or a negative value from a hand-written Caddy JSON)
+	// disables snapshot pruning.
+	if keep > 0 {
+		if _, err := m.controlStore.PruneSnapshots(ctx, keep, active); err != nil && m.logger != nil {
+			m.logger.Warn("failed to prune configuration snapshots", zap.Error(err))
+		}
 	}
 
 	now := time.Now().UTC()
