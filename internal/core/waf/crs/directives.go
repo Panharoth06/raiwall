@@ -20,6 +20,10 @@ SecAction "id:990110,phase:1,pass,nolog,t:none,setvar:tx.inbound_anomaly_score_t
 SecAction "id:990120,phase:1,pass,nolog,t:none,setvar:tx.outbound_anomaly_score_threshold=%d"
 `, conf.ParanoiaLevel, conf.ParanoiaLevel, conf.InboundThreshold, conf.OutboundThreshold)
 
+	// Exception ctl rules run before the CRS includes so rule removal is in
+	// force when the detection rules execute in phase 1.
+	b.WriteString(exceptionDirectives(conf.Exceptions))
+
 	replaceBuiltin := false
 	for _, pack := range conf.Packs {
 		if pack.ReplaceBuiltin {

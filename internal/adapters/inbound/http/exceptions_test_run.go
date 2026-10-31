@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/Panharoth06/raiwall/internal/core/acl"
+	"github.com/Panharoth06/raiwall/internal/core/waf/crs"
 )
 
 // ExceptionTestRequest encapsulates a dry-run test request for exception evaluation.
@@ -32,10 +33,19 @@ type ExceptionSampleRequest struct {
 	RuleID    string `json:"rule_id"`
 }
 
+// ExceptionEffect describes how a matching exception affects one detection
+// engine. Directive is set when the effect is a concrete Coraza ctl action.
+type ExceptionEffect struct {
+	Engine    string `json:"engine"`
+	Directive string `json:"directive,omitempty"`
+	Detail    string `json:"detail"`
+}
+
 // ExceptionTestResponse represents the outcome of the simulation.
 type ExceptionTestResponse struct {
-	Matched bool   `json:"matched"`
-	Reason  string `json:"reason"`
+	Matched bool              `json:"matched"`
+	Reason  string            `json:"reason"`
+	Effects []ExceptionEffect `json:"effects,omitempty"`
 }
 
 func (s *Server) handleTestException(w http.ResponseWriter, r *http.Request) {
@@ -124,8 +134,40 @@ func (s *Server) handleTestException(w http.ResponseWriter, r *http.Request) {
 		reason = "request criteria did not match rule parameters"
 	}
 
+	var effects []ExceptionEffect
+	if matched {
+		effects = append(effects, ExceptionEffect{
+			Engine: "semantic",
+			Detail: "suppresses matching semantic detections for the scoped request",
+		})
+		effects = append(effects, crsEffect(rule))
+	}
+
 	respondJSON(w, http.StatusOK, ExceptionTestResponse{
 		Matched: matched,
 		Reason:  reason,
+		Effects: effects,
 	})
+}
+
+// crsEffect reports whether the exception translates into a Coraza ctl action.
+func crsEffect(rule acl.ExceptionRule) ExceptionEffect {
+	if rule.ParamRegex != "" {
+		return ExceptionEffect{
+			Engine: "crs",
+			Detail: "parameter-regex targets are semantic-only; CRS rules are not removed",
+		}
+	}
+	suppression, ok := crs.SuppressionFor(rule.RuleID, rule.Location, rule.ParamName)
+	if !ok {
+		return ExceptionEffect{
+			Engine: "crs",
+			Detail: "no CRS rule matches this rule_id (semantic-only)",
+		}
+	}
+	return ExceptionEffect{
+		Engine:    "crs",
+		Directive: suppression.Directive(),
+		Detail:    "removes the CRS rule for matching requests",
+	}
 }

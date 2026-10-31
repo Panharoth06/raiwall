@@ -164,27 +164,34 @@ columns (`aaa12f3`, `34ea459`, `5d14d49`).
 - [ ] Add engine/score filters to the events API and UI.
 - [ ] Gate: CRS events are distinguishable and queryable.
 
-### 1A.3 Per-site detection policy `[ ]`
+### 1A.3 Per-site detection policy `[x]`
+**Done:** API/UI and snapshot storage in `8557bf7`; runtime per-app CRS
+selection and the policy cache in the current change.
 **Targets:** `core/control/models.go`, `compiler.go`, `http/detector.go`,
 `web/`.
-- [ ] Add per-app `DetectionPolicy`: CRS enabled, mode, PL, thresholds.
-- [ ] Compile per-app CRS engines with a bounded policy cache keyed by hash.
-- [ ] Select policy by `ctx.AppID` at request time; default global policy.
-- [ ] API: GET/PUT per-app policy.
-- [ ] UI: per-site CRS controls in site detail.
-- [ ] Tests: app A block, app B audit, disabled app, hot reload.
-- [ ] Gate: per-app policy survives apply/rollback and replica propagation.
+- [x] Add per-app `DetectionPolicy`: CRS enabled, mode, PL, thresholds.
+- [x] Compile per-app CRS engines with a bounded policy cache keyed by hash
+      (`crs.Config.Fingerprint`; identical apps share one engine).
+- [x] Select policy by `ctx.AppID` at request time; default global policy.
+- [x] API: GET/PUT per-app policy.
+- [x] UI: per-site CRS controls in site detail.
+- [x] Tests: app A block, app B audit, disabled app, hot reload.
+- [x] Gate: per-app policy survives apply/rollback and replica propagation
+      (snapshot-derived; rollbacks recompile the same way).
 
-### 1A.4 Exceptions → CRS exclusions `[ ]`
+### 1A.4 Exceptions → CRS exclusions `[x]`
 **Targets:** `core/acl/exception.go`, `core/waf/crs/exceptions.go`,
 `http/exceptions.go`.
-- [ ] Translate host/path/method/location/param/rule exceptions into
-      `ctl:ruleRemoveById` / `ruleRemoveTargetById`.
-- [ ] Include exclusion set in the policy cache key.
-- [ ] Rule catalog with IDs, tags, severity, and descriptions.
-- [ ] Dry-run shows semantic and CRS effects.
-- [ ] Tests: exception suppresses CRS rule; other rules still fire.
-- [ ] Gate: one DB exception row drives both engines.
+- [x] Translate host/path/method/location/param/rule exceptions into
+      `ctl:ruleRemoveById` / `ctl:ruleRemoveTargetById`. `param_regex` targets
+      stay semantic-only because Coraza v3.3 ctl matches exact keys.
+- [x] Include exclusion set in the policy cache key.
+- [x] Rule catalog with IDs, tags, severity, and descriptions (`8557bf7`).
+- [x] Dry-run shows semantic and CRS effects (`effects` in the response, with
+      the exact ctl directive).
+- [x] Tests: exception suppresses CRS rule; other hosts, paths, and parameters
+      still fire.
+- [x] Gate: one DB exception row drives both engines.
 
 ### 1A.5 Rule test playground + go-ftw `[~]`
 **Done:** `/rules/test` API (`34ea459`) and UI (`5d14d49`).

@@ -392,7 +392,11 @@ export const api = {
       method: 'DELETE',
     }),
   dryRunException: (payload: { rule: Partial<ExceptionRule>; request: { host: string; path: string; method: string; params: Record<string, string> } }) =>
-    request<{ matched: boolean; reason: string }>('/exceptions/dry-run', {
+    request<{
+      matched: boolean;
+      reason: string;
+      effects?: { engine: string; directive?: string; detail: string }[];
+    }>('/exceptions/dry-run', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),

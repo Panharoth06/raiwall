@@ -35,7 +35,11 @@ const testParamName = ref('query');
 const testParamVal = ref("' OR 1=1 --");
 
 const testing = ref(false);
-const result = ref<{ matched: boolean; reason: string } | null>(null);
+const result = ref<{
+  matched: boolean;
+  reason: string;
+  effects?: { engine: string; directive?: string; detail: string }[];
+} | null>(null);
 
 watch(
   () => props.rule,
@@ -165,6 +169,16 @@ const handleOpenChange = (openState: boolean) => {
             <span>{{ result.matched ? 'Suppression Matched (Traffic Allowed)' : 'No Match (Threat Blocked)' }}</span>
           </div>
           <p class="mt-1 text-foreground text-xs font-mono">{{ result.reason }}</p>
+          <ul v-if="result.effects && result.effects.length" class="mt-2 space-y-1">
+            <li
+              v-for="effect in result.effects"
+              :key="effect.engine + (effect.directive || effect.detail)"
+              class="flex gap-2 font-mono text-xs"
+            >
+              <span class="uppercase text-muted-foreground w-16 shrink-0">{{ effect.engine }}</span>
+              <span class="text-foreground">{{ effect.directive || effect.detail }}</span>
+            </li>
+          </ul>
         </div>
       </div>
 

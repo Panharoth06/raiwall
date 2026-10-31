@@ -227,9 +227,12 @@ type Middleware struct {
 	declarativeDeployed bool
 
 	exceptionEngine atomic.Pointer[acl.ExceptionEngine]
-	// crsEngine is the reloadable Coraza ruleset engine (embedded CRS plus
-	// imported ModSecurity packs). Nil when CRS is disabled at provision time.
-	crsEngine   *crs.Engine
+	// crsEngine is the reloadable global Coraza ruleset engine (embedded CRS
+	// plus imported ModSecurity packs). Nil when CRS is disabled at provision
+	// time.
+	crsEngine *crs.Engine
+	// crsPolicies selects the compiled policy for each app at request time.
+	crsPolicies *crsPolicyEngine
 	bartTable   *acl.BARTTable
 	ipGroupMgr  *acl.IPGroupManager
 	geoIPReader acl.GeoIPReader

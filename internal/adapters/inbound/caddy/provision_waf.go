@@ -66,7 +66,11 @@ func (m *Middleware) provisionWAF(_ caddy.Context) error {
 				return fmt.Errorf("provision OWASP CRS engine: %w", err)
 			}
 			m.crsEngine = crsEngine
-			m.engine = waf.NewCompositeEngine(semantic, crsEngine)
+			if m.crsPolicies == nil {
+				m.crsPolicies = newCRSPolicyEngine()
+			}
+			m.crsPolicies.store(&crsPolicySet{global: crsEngine})
+			m.engine = waf.NewCompositeEngine(semantic, m.crsPolicies)
 			if m.logger != nil {
 				m.logger.Info("OWASP CRS enabled",
 					zap.String("mode", m.CRSMode),

@@ -59,6 +59,9 @@ type Config struct {
 	Disabled  bool
 	Packs     []Pack
 	Overrides []Override
+	// Exceptions are translated into phase-1 ctl actions that remove scoped
+	// CRS rules before they run.
+	Exceptions []Exception
 }
 
 // compiledSet is one immutable Coraza instance and its associated policy.
@@ -96,6 +99,9 @@ func (e *Engine) Reload(conf Config) error {
 }
 
 func compile(conf Config) (*compiledSet, error) {
+	if err := validateExceptions(conf.Exceptions); err != nil {
+		return nil, fmt.Errorf("compile Coraza exceptions: %w", err)
+	}
 	cfg := coraza.NewWAFConfig().
 		WithRootFS(buildOverlayFS(conf)).
 		WithRequestBodyAccess().
