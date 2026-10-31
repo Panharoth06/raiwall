@@ -1,6 +1,6 @@
 # Raiwall Enterprise Roadmap
 
-Living document. Last updated: **2026-10-31** (commit `62de007`).
+Living document. Last updated: **2026-10-31** (commit `bbf86bb`).
 
 This is the authoritative roadmap for turning Raiwall into an enterprise-grade,
 self-hosted WAF. It records the current capability matrix, the gap-closure
@@ -41,7 +41,7 @@ Priority: **P0** blocks enterprise use, **P1** major capability, **P2** maturity
 
 ---
 
-## 2. Current State (commit `62de007`)
+## 2. Current State (commit `bbf86bb`)
 
 ### Implemented
 
