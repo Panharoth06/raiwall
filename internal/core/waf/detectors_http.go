@@ -3,7 +3,9 @@ package waf
 import (
 	"fmt"
 	"net/http"
+	"net/netip"
 	"net/url"
+	"strconv"
 	"strings"
 )
 
@@ -16,20 +18,10 @@ var ssrfStrongMarkers = [...]string{
 	"fd00:ec2::254",            // IPv6 EC2 metadata
 }
 
-// Private and loopback networks indicative of internal service pivoting.
-var ssrfWeakPrefixes = [...]string{
-	"127.", "10.", "192.168.", "169.254.", "0.0.0.0",
-	"172.16.", "172.17.", "172.18.", "172.19.",
-	"172.20.", "172.21.", "172.22.", "172.23.",
-	"172.24.", "172.25.", "172.26.", "172.27.",
-	"172.28.", "172.29.", "172.30.", "172.31.",
-	"[::1]", "fd00:",
-}
-
 // scanSSRF detects attempts to coerce the application into fetching internal or
 // cloud-metadata resources through URL-shaped parameter values.
 func scanSSRF(v string) (Detection, bool) {
-	if !strings.ContainsAny(v, ".:@") {
+	if !strings.ContainsAny(v, ".:@") && !strings.Contains(v, "//") {
 		return Detection{}, false
 	}
 
@@ -46,29 +38,178 @@ func scanSSRF(v string) (Detection, bool) {
 		}
 	}
 
-	// URL-shaped values pointing at private or loopback infrastructure.
-	// Dev OAuth callbacks also target loopback, so private hosts stay weak.
-	if idx := strings.Index(v, "://"); idx > 0 {
-		authority := lower[idx+3:]
-		if end := strings.IndexAny(authority, "/?#"); end != -1 {
-			authority = authority[:end]
-		}
-		if at := strings.LastIndexByte(authority, '@'); at != -1 {
-			authority = authority[at+1:]
-		}
-		for _, prefix := range ssrfWeakPrefixes {
-			if strings.HasPrefix(authority, prefix) {
-				return Detection{
-					Module:  ModuleSSRF,
-					Level:   LevelWeak,
-					Reason:  "Internal network endpoint fetch attempt",
-					Matched: authority,
-				}, true
-			}
-		}
+	authority := ssrfAuthority(lower)
+	if authority == "" {
+		return Detection{}, false
+	}
+
+	strong, weak := classifySSRFHost(authority)
+	switch {
+	case strong:
+		return Detection{
+			Module:  ModuleSSRF,
+			Level:   LevelStrong,
+			Reason:  "Loopback, unspecified or link-local endpoint fetch attempt",
+			Matched: authority,
+		}, true
+	case weak:
+		return Detection{
+			Module:  ModuleSSRF,
+			Level:   LevelWeak,
+			Reason:  "Internal network endpoint fetch attempt",
+			Matched: authority,
+		}, true
 	}
 
 	return Detection{}, false
+}
+
+// ssrfAuthority extracts the authority component of a URL embedded in a
+// parameter value. It accepts absolute (scheme://) and scheme-relative (//)
+// forms and strips userinfo, path, query and fragment.
+func ssrfAuthority(v string) string {
+	var rest string
+	if idx := strings.Index(v, "://"); idx > 0 {
+		rest = v[idx+3:]
+	} else if idx := strings.Index(v, "//"); idx >= 0 && (idx == 0 || isAuthorityBoundary(v[idx-1])) {
+		rest = v[idx+2:]
+	} else {
+		return ""
+	}
+	if end := strings.IndexAny(rest, "/?#"); end != -1 {
+		rest = rest[:end]
+	}
+	if at := strings.LastIndexByte(rest, '@'); at != -1 {
+		rest = rest[at+1:]
+	}
+	return rest
+}
+
+// isAuthorityBoundary reports whether a byte may precede an embedded
+// scheme-relative URL (u=//host, redirect: //host).
+func isAuthorityBoundary(b byte) bool {
+	switch b {
+	case '=', ':', ',', '(', ' ', '\t', '\'', '"':
+		return true
+	default:
+		return false
+	}
+}
+
+// classifySSRFHost classifies a URL authority by its target address.
+//
+// Loopback, unspecified and link-local targets are strong signals: fetching
+// them is never legitimate from an application. RFC1918/ULA ranges and the
+// localhost hostname stay weak because development OAuth callbacks and
+// staging integrations legitimately point there; operators can raise the SSRF
+// module to strict or add a parameter exception when needed.
+func classifySSRFHost(authority string) (strong, weak bool) {
+	host := authority
+	if strings.HasPrefix(host, "[") {
+		if end := strings.IndexByte(host, ']'); end != -1 {
+			host = host[1:end]
+		}
+	} else if colon := strings.LastIndexByte(host, ':'); colon != -1 {
+		host = host[:colon]
+	}
+	host = strings.TrimSuffix(host, ".")
+	if host == "" {
+		return false, false
+	}
+	if host == "localhost" || strings.HasSuffix(host, ".localhost") {
+		return false, true
+	}
+	if zone := strings.IndexByte(host, '%'); zone != -1 {
+		host = host[:zone]
+	}
+
+	addr, err := netip.ParseAddr(host)
+	if err != nil {
+		// Legacy inet_aton forms: 2130706433, 0x7f000001, 0177.0.0.1.
+		var ok bool
+		addr, ok = parseObfuscatedIPv4(host)
+		if !ok {
+			return false, false
+		}
+	}
+
+	addr = addr.Unmap()
+	switch {
+	case addr.IsLoopback(), addr.IsUnspecified(), addr.IsLinkLocalUnicast():
+		return true, false
+	case addr.IsPrivate():
+		return false, true
+	}
+	return false, false
+}
+
+// parseObfuscatedIPv4 decodes the address forms accepted by inet_aton and
+// browsers: single 32-bit integers, hex/octal parts, and 2-4 component
+// addresses. Attackers use these to bypass string-prefix SSRF filters.
+func parseObfuscatedIPv4(host string) (netip.Addr, bool) {
+	parts := strings.Split(host, ".")
+	if len(parts) > 4 {
+		return netip.Addr{}, false
+	}
+
+	vals := make([]uint64, len(parts))
+	for i, part := range parts {
+		if part == "" {
+			return netip.Addr{}, false
+		}
+		base := 10
+		switch {
+		case strings.HasPrefix(part, "0x") || strings.HasPrefix(part, "0X"):
+			base = 16
+			part = part[2:]
+			if part == "" {
+				return netip.Addr{}, false
+			}
+		case len(part) > 1 && part[0] == '0':
+			base = 8
+			part = part[1:]
+		}
+		val, err := strconv.ParseUint(part, base, 32)
+		if err != nil {
+			return netip.Addr{}, false
+		}
+		vals[i] = val
+	}
+
+	var addr uint64
+	switch len(vals) {
+	case 1:
+		if vals[0] > 0xFFFFFFFF {
+			return netip.Addr{}, false
+		}
+		addr = vals[0]
+	case 2:
+		if vals[0] > 0xFF || vals[1] > 0xFFFFFF {
+			return netip.Addr{}, false
+		}
+		addr = vals[0]<<24 | vals[1]
+	case 3:
+		if vals[0] > 0xFF || vals[1] > 0xFF || vals[2] > 0xFFFF {
+			return netip.Addr{}, false
+		}
+		addr = vals[0]<<24 | vals[1]<<16 | vals[2]
+	case 4:
+		for _, val := range vals {
+			if val > 0xFF {
+				return netip.Addr{}, false
+			}
+		}
+		addr = vals[0]<<24 | vals[1]<<16 | vals[2]<<8 | vals[3]
+	default:
+		return netip.Addr{}, false
+	}
+
+	var b [4]byte
+	b[0] = byte(addr >> 24)
+	b[1] = byte(addr >> 16)
+	b[2] = byte(addr >> 8)
+	b[3] = byte(addr)
+	return netip.AddrFrom4(b), true
 }
 
 // Dangerous upload extensions blocked confidently in Balance mode.

@@ -107,7 +107,18 @@ func (x *XSSChop) probe(input string) (*Verdict, error) {
 		}, nil
 	}
 
-	// 2. Context 2: Quoted attribute context probe (<div data-val="<INPUT>"></div>)
+	// 2. Raw-text elements (xmp, noscript, textarea, ...) treat inner markup as
+	// text, but sanitizers that re-serialize can turn it into live markup
+	// (mutation XSS). Inspect the smuggled content as HTML.
+	if breakout, reason := analyzeRawTextSmuggling(input); breakout {
+		return &Verdict{
+			Action: ActionBlock,
+			RuleID: "SEMANTIC_XSS",
+			Reason: fmt.Sprintf("Cross-site scripting detected via raw-text smuggling: %s", reason),
+		}, nil
+	}
+
+	// 3. Context 2: Quoted attribute context probe (<div data-val="<INPUT>"></div>)
 	attrProbe := "<div data-val=\"" + input + "\"></div>"
 	if breakout, reason := analyzeAttributeBreakout(attrProbe); breakout {
 		return &Verdict{
@@ -128,6 +139,53 @@ func (x *XSSChop) probe(input string) (*Verdict, error) {
 	}
 
 	return VerdictAllow, nil
+}
+
+// rawTextElements parse their content as text. Sanitizers that serialize and
+// re-parse the DOM can reshape that text into executable markup, so content
+// containing dangerous tags or event handlers is treated as mutation XSS.
+var rawTextElements = [...]string{
+	"xmp", "noscript", "noembed", "noframes", "textarea", "title", "plaintext",
+}
+
+// analyzeRawTextSmuggling inspects the content of raw-text elements as if it
+// were markup. <xmp><img src=x onerror=alert(1)></xmp> is inert in a browser's
+// first parse but becomes live after a sanitizer round-trip.
+func analyzeRawTextSmuggling(input string) (bool, string) {
+	lower := strings.ToLower(input)
+
+	for _, tag := range rawTextElements {
+		open := "<" + tag
+		idx := strings.Index(lower, open)
+		if idx == -1 {
+			continue
+		}
+		after := idx + len(open)
+		if after < len(lower) && isHTMLNameByte(lower[after]) {
+			continue
+		}
+
+		gt := strings.IndexByte(lower[after:], '>')
+		if gt == -1 {
+			continue
+		}
+		start := after + gt + 1
+
+		end := strings.Index(lower[start:], "</"+tag)
+		inner := lower[start:]
+		if end != -1 {
+			inner = lower[start : start+end]
+		}
+		if breakout, reason := analyzeBodyBreakout("<div>" + inner + "</div>"); breakout {
+			return true, "markup inside <" + tag + ">: " + reason
+		}
+	}
+
+	return false, ""
+}
+
+func isHTMLNameByte(b byte) bool {
+	return (b >= 'a' && b <= 'z') || (b >= '0' && b <= '9') || b == '-' || b == ':'
 }
 
 // analyzeAttributeBreakout checks if input in <div data-val="<INPUT>"></div> breaks out of the attribute

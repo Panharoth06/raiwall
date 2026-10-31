@@ -258,10 +258,69 @@ var sstiStrong = [...]string{
 	"request.application.__globals__",
 }
 
+// sstiSensitiveTokens are identifiers that template injection payloads use to
+// reach configuration, the runtime, or the object graph. Matching requires
+// token boundaries so ordinary variables such as `request_id` stay weak.
+var sstiSensitiveTokens = [...]string{
+	"__class__", "__mro__", "__subclasses__", "__globals__", "__builtins__",
+	"__init__", "__dict__", "__import__", "__getattribute__", "__reduce__",
+	"config", "self", "request", "application", "settings", "environ",
+	"lipsum", "cycler", "joiner", "namespace", "get_flashed_messages",
+	"os.", "sys.", "subprocess", "popen", "system(", "eval(", "exec(",
+	"open(", "read(", "import ", "include ",
+}
+
+// containsSSTIToken reports whether the template expression references a
+// sensitive object or call, using token boundaries to avoid matching ordinary
+// identifiers such as request_id or configuration.
+func containsSSTIToken(interior string) bool {
+	lower := strings.ToLower(interior)
+	for _, token := range sstiSensitiveTokens {
+		idx := 0
+		for {
+			pos := strings.Index(lower[idx:], token)
+			if pos == -1 {
+				break
+			}
+			pos += idx
+			idx = pos + len(token)
+
+			beforeOK := pos == 0 || !isTokenByte(lower[pos-1])
+			after := pos + len(token)
+			afterOK := after >= len(lower) || !isTokenByte(lower[after]) ||
+				strings.HasSuffix(token, ".") || strings.HasSuffix(token, "(") ||
+				strings.HasSuffix(token, " ")
+			if beforeOK && afterOK {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func isTokenByte(b byte) bool {
+	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') ||
+		(b >= '0' && b <= '9') || b == '_'
+}
+
+// templateInterior returns the text between open and close, starting at from.
+func templateInterior(v, open, close string) (interior, matched string, ok bool) {
+	start := strings.Index(v, open)
+	if start == -1 {
+		return "", "", false
+	}
+	end := strings.Index(v[start+len(open):], close)
+	if end == -1 {
+		return "", "", false
+	}
+	end += start + len(open)
+	return v[start+len(open) : end], v[start : end+len(close)], true
+}
+
 // scanSSTI detects server-side template injection syntax across Jinja2, Twig,
-// and Freemarker.
+// Freemarker, and Ruby/Slim interpolation.
 func scanSSTI(v string) (Detection, bool) {
-	if !strings.ContainsAny(v, "{<") {
+	if !strings.ContainsAny(v, "{<#") {
 		return Detection{}, false
 	}
 
@@ -279,34 +338,50 @@ func scanSSTI(v string) (Detection, bool) {
 		}
 	}
 
-	// Mathematical expression probes: {{7*7}}, {{10*10}} — canonical SSTI canary
-	if start := strings.Index(v, "{{"); start != -1 {
-		if end := strings.Index(v[start:], "}}"); end != -1 {
-			interior := v[start+2 : start+end]
-			if containsArithmetic(interior) {
-				return Detection{
-					Module:  ModuleSSTI,
-					Level:   LevelStrong,
-					Reason:  "Template engine mathematical canary ({{…*…}})",
-					Matched: snippet(v, start, end+2),
-				}, true
-			}
+	// Expression probes: {{7*7}}, {{config}}, {{ self.__class__ }}
+	if interior, matched, ok := templateInterior(v, "{{", "}}"); ok {
+		if containsArithmetic(interior) || containsSSTIToken(interior) {
 			return Detection{
 				Module:  ModuleSSTI,
-				Level:   LevelWeak,
-				Reason:  "Template syntax in parameter",
-				Matched: "{{",
+				Level:   LevelStrong,
+				Reason:  "Template expression with sensitive object or arithmetic",
+				Matched: snippet(matched, 0, len(matched)),
 			}, true
 		}
-	}
-
-	// Twig block syntax {% raw %} / {% set %}
-	if strings.Contains(lower, "{%") && strings.Contains(lower, "%}") {
 		return Detection{
 			Module:  ModuleSSTI,
 			Level:   LevelWeak,
-			Reason:  "Twig/Jinja block syntax in parameter",
-			Matched: "{%",
+			Reason:  "Template syntax in parameter",
+			Matched: "{{",
+		}, true
+	}
+
+	// Statement blocks {% set %}, {% include %}, {% import %} carry executable
+	// template logic, unlike a bare variable interpolation.
+	if _, matched, ok := templateInterior(v, "{%", "%}"); ok {
+		return Detection{
+			Module:  ModuleSSTI,
+			Level:   LevelStrong,
+			Reason:  "Template block statement in parameter",
+			Matched: snippet(matched, 0, len(matched)),
+		}, true
+	}
+
+	// Ruby / Slim interpolation: #{7*7}, #{system('id')}
+	if interior, matched, ok := templateInterior(v, "#{", "}"); ok {
+		if containsArithmetic(interior) || containsSSTIToken(interior) {
+			return Detection{
+				Module:  ModuleSSTI,
+				Level:   LevelStrong,
+				Reason:  "Ruby/Slim interpolation with sensitive object or arithmetic",
+				Matched: snippet(matched, 0, len(matched)),
+			}, true
+		}
+		return Detection{
+			Module:  ModuleSSTI,
+			Level:   LevelWeak,
+			Reason:  "Ruby/Slim interpolation syntax in parameter",
+			Matched: "#{",
 		}, true
 	}
 
@@ -342,12 +417,13 @@ func scanPHPDeser(v string) (Detection, bool) {
 		}
 	}
 
-	// Weak signal: array-styled serialized payloads (a:1:{s:...})
+	// Serialized array payloads (a:1:{s:...}). The header shape is specific
+	// enough to block in Balance mode; plain "a:" text does not match.
 	if idx := strings.Index(lower, "a:"); idx != -1 {
 		if matchPHPArrayHeader(lower[idx+2:]) {
 			return Detection{
 				Module:  ModulePHPDeser,
-				Level:   LevelWeak,
+				Level:   LevelStrong,
 				Reason:  "PHP serialized array payload",
 				Matched: snippet(v, idx, 12),
 			}, true

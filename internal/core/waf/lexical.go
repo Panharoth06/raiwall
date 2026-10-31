@@ -271,6 +271,72 @@ func canPrecedeSQLBreakout(b byte) bool {
 	return isWordByte(b) || b == ')' || b == ']'
 }
 
+// hasSQLBooleanTautology reports whether the value starts with an
+// expression-like token and contains a boolean operator followed by a boolean
+// literal (1 or true, 'x' and false). libinjection does not fingerprint this
+// shape; bounded AST verification confirms it in the unquoted context.
+func hasSQLBooleanTautology(v string) bool {
+	lower := strings.ToLower(v)
+
+	for _, op := range [...]string{"or", "and", "xor"} {
+		idx := 0
+		for {
+			pos := strings.Index(lower[idx:], op)
+			if pos == -1 {
+				break
+			}
+			pos += idx
+			idx = pos + len(op)
+
+			if pos > 0 && isWordByte(lower[pos-1]) {
+				continue
+			}
+			after := pos + len(op)
+			if after < len(lower) && isWordByte(lower[after]) {
+				continue
+			}
+			if !startsExpressionLike(lower[:pos]) {
+				continue
+			}
+			if hasBooleanLiteral(strings.TrimLeft(lower[after:], " \t\r\n")) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// startsExpressionLike reports whether the prefix before a boolean operator is
+// an operand (number, quoted literal, or grouped expression) rather than prose.
+func startsExpressionLike(prefix string) bool {
+	trimmed := strings.TrimLeft(prefix, " \t\r\n")
+	if trimmed == "" {
+		return false
+	}
+	switch b := trimmed[0]; {
+	case b >= '0' && b <= '9':
+		return true
+	case b == '\'' || b == '"' || b == '(' || b == ')' || b == '-' || b == '+':
+		return true
+	default:
+		return false
+	}
+}
+
+func hasBooleanLiteral(s string) bool {
+	if strings.HasPrefix(s, "true") {
+		return literalBoundary(s[4:])
+	}
+	if strings.HasPrefix(s, "false") {
+		return literalBoundary(s[5:])
+	}
+	return false
+}
+
+func literalBoundary(s string) bool {
+	return s == "" || !isWordByte(s[0])
+}
+
 // xssGateTags lists element names that can execute script or load attacker
 // content. The gate only routes values to AST verification; XSSChop decides.
 var xssGateTags = [...]string{
@@ -374,11 +440,15 @@ func TriageWithDetails(value string) (TriageResult, string) {
 		return TriageSuspectSQLi, fingerprint
 	}
 
-	// 2b. Structural comment breakout that libinjection does not fingerprint
-	// (admin'#, admin'-- with trailing whitespace). Redirect to bounded AST
-	// verification instead of letting the value pass as benign.
+	// 2b. Structural breakouts that libinjection does not fingerprint:
+	// comment closure (admin'#, admin'--) and expression-shaped boolean
+	// tautologies (1 or true). Redirect to bounded AST verification instead
+	// of letting the value pass as benign.
 	if hasSQLCommentBreakout(value) {
 		return TriageSuspectSQLi, "quote_comment_breakout"
+	}
+	if hasSQLBooleanTautology(value) {
+		return TriageSuspectSQLi, "boolean_tautology"
 	}
 
 	// 3. Fast Cross-Site Scripting Lexical Scan (<2 µs via pure-Go libinjection and script pseudo-protocols)

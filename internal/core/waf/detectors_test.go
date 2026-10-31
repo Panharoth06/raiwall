@@ -145,7 +145,11 @@ func TestScanSSTI(t *testing.T) {
 		{"freemarker assign", "<#assign ex=\"freemarker.template.utility.Execute\"", true, LevelStrong},
 		{"globals gadget", "{{ request.application.__globals__ }}", true, LevelStrong},
 		{"weak template var", "hello={{ username }}", true, LevelWeak},
-		{"weak twig block", "payload={% set x = 1 %}", true, LevelWeak},
+		{"sensitive config object", "pref={{ config }}", true, LevelStrong},
+		{"sensitive request object", "x={{ request.application }}", true, LevelStrong},
+		{"request_id stays weak", "x={{ request_id }}", true, LevelWeak},
+		{"ruby arithmetic canary", "#{7*7}", true, LevelStrong},
+		{"twig block statement", "payload={% set x = 1 %}", true, LevelStrong},
 		{"benign json", `{ "user": "john" }`, false, 0},
 	}
 	for _, tc := range cases {
@@ -171,7 +175,7 @@ func TestScanPHPDeser(t *testing.T) {
 	}{
 		{"serialized object", `O:8:"Exploit":1:{s:4:"cmd";s:3:"id";}`, true, LevelStrong},
 		{"set_type gadget", `a:1:{s:3:"obj";O:7:"FooBar":0:{}}`, true, LevelStrong},
-		{"weak serialized array", `a:2:{s:4:"name";s:3:"jon";}`, true, LevelWeak},
+		{"serialized array", `a:2:{s:4:"name";s:3:"jon";}`, true, LevelStrong},
 		{"benign word", "status=online", false, 0},
 		{"benign value", "goto next page", false, 0},
 	}

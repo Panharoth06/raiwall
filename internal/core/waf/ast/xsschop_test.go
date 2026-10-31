@@ -20,6 +20,8 @@ func TestXSSChop_BenignInputs(t *testing.T) {
 		"100% cotton - blue",
 		"2026-10-18T12:00:00Z",
 		"simple text with no tags",
+		"<xmp>plain text</xmp>",
+		"<textarea>plain text</textarea>",
 	}
 
 	for _, input := range benignInputs {
@@ -70,6 +72,18 @@ func TestXSSChop_XSSVectors(t *testing.T) {
 		{
 			name:    "data:text/html pseudo-protocol",
 			payload: "data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==",
+		},
+		{
+			name:    "xmp raw-text smuggling",
+			payload: "<xmp><img src=x onerror=alert(1)></xmp>",
+		},
+		{
+			name:    "textarea raw-text smuggling",
+			payload: "<textarea><img src=x onerror=alert(1)></textarea>",
+		},
+		{
+			name:    "title raw-text smuggling",
+			payload: "<title><svg onload=alert(1)></title>",
 		},
 	}
 
