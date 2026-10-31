@@ -1,5 +1,10 @@
 # Implementation Plan: Raiwall Major Update (SafeLine v9.4.2 Parity & Enterprise Architecture)
 
+> **Historical document.** This SafeLine-parity plan predates the current
+> architecture and is not maintained. The authoritative plan is
+> [`ROADMAP.md`](../ROADMAP.md); the working checklist is
+> [`TASKS.md`](../TASKS.md).
+
 ## Executive Summary
 
 This plan outlines the architecture, component relationships, and delivery strategy for the **Raiwall Major Update**. The primary objective is establishing **100% functional, operational, and UX parity with Chaitin SafeLine WAF v9.4.2 Pro** (as documented in [`docs/`](file:///Users/macbook/Code/raiwall/docs/README.md) and [`docs/comparative-analysis-raiwall.md`](file:///Users/macbook/Code/raiwall/docs/comparative-analysis-raiwall.md)) while preserving Raiwall's core architectural advantages:

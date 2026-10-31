@@ -1,5 +1,10 @@
 # Tasks: Raiwall Domain 7 (Control Plane, Customization & Ecosystem Integration)
 
+> **Historical document.** These task lists reference the retired `pkg/` layout
+> and the SafeLine-parity scope. They are not maintained. See
+> [`ROADMAP.md`](../ROADMAP.md) and [`TASKS.md`](../TASKS.md) for the
+> authoritative plan and checklist.
+
 ## Completed Milestones
 - [x] **Milestone 1: Domain 1 (Reverse Proxy & Gateway)** — Tasks 1 through 8 completed and verified.
 - [x] **Milestone 2: Domain 2 (Semantic Threat Detection Engine)** — Tasks 9 through 17 completed and verified.

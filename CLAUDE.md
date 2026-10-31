@@ -40,6 +40,12 @@ There is no `lint` script and no ESLint/Prettier config in `web/`. The `npm run 
   - Route pages live in `web/src/views/` (not `pages/`). Other dirs: `api/`, `layouts/`, `lib/`, `composables/`, `stores/`, `types/`.
 - **Dockerfile** builds with `golang:alpine` + `CGO_ENABLED=0` and runs on `alpine:3.21`. `Dockerfile.all-in-one` is an alternative image.
 
+## Planning documents
+
+`ROADMAP.md` (capability matrix + phases 0–5) and `TASKS.md` (working checklist
+with acceptance criteria and commit references) are authoritative. The files
+under `tasks/` are historical SafeLine-parity notes; do not follow them.
+
 ## Gotchas
 
 - `web/embed.go` uses `//go:embed all:dist`, so the Go build fails if `web/dist` is missing. Run `pnpm build` first on a clean checkout.

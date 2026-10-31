@@ -201,9 +201,11 @@ raiwall/
 │   └── raiwall.yaml          # Annotated reference covering every schema section
 ├── deploy/
 │   └── helm/raiwall/         # Helm chart (ConfigMap from values, external PostgreSQL)
+├── ROADMAP.md                # ← Authoritative enterprise capability matrix & phased plan
+├── TASKS.md                  # ← Working checklist (status, acceptance criteria, commits)
 ├── tasks/
-│   ├── plan.md               # Implementation plan & architecture decisions
-│   └── todo.md               # Task breakdown with acceptance criteria
+│   ├── plan.md               # Historical SafeLine-parity notes (not authoritative)
+│   └── todo.md               # Historical task lists (not authoritative)
 ├── Dockerfile                # Multi-stage: golang:1.27-alpine → alpine:latest (lightweight, ~50MB)
 ├── Makefile                  # build, test, test-integration, lint, run targets
 ├── go.mod

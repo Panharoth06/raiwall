@@ -596,10 +596,22 @@ cd web && pnpm test
 
 ## Roadmap
 
-- [x] **Milestone 1 (Data Plane Core):** Caddy v2 reverse proxy middleware, `atomic.Pointer[ConfigSnapshot]` hot swaps, priority client IP extraction, two-phase request/response interception, decoupled `WAFEngine` interface, Smooth Weighted Round-Robin load balancing, and active health checks.
-- [x] **Milestone 2 (Stateful Defense & Semantic WAF):** Recursive normalization (Coraza), pure-Go `libinjection-go` lexical triage ($<2\text{ µs}$), bounded AST context evaluation (SQL, Shell, XSS), 3-Tier composite rate limiting, BART CIDR threat feeds, and SQLite/ClickHouse logging.
-- [x] **Milestone 3 (Active Defense & Control Plane):** JA4/JA4H TLS fingerprinting, HTTP 468 stateless PoW challenges, Vue 3 + TypeScript dashboard embedding, 3D attack globe, Envoy `ext_proc/v3` sidecar mode, Huma OpenAPI 3.1 REST API, and Model Context Protocol (MCP) server.
-- [x] **Milestone 4 (Application Routing & Managed Certificates):** Hostname-resolved application registry with reverse proxy, static file, and redirect routing, four load-balancing policies, managed certificate store (upload, self-signed, ACME) with AES-256-GCM key encryption and per-SNI resolution, per-site TLS modes, and draft-first apply with a pending-change banner.
+The authoritative capability matrix, architecture decisions, and phased plan
+live in **[ROADMAP.md](ROADMAP.md)**. The working checklist with acceptance
+criteria and commit references lives in **[TASKS.md](TASKS.md)**.
+
+- **Phase 0** — security and correctness blockers (in progress: telemetry auth,
+  body trust, Envoy wire format, app-auth bypass, client-IP trust are done; HA
+  state, ClickHouse, health checks, JA4/PROXY remain).
+- **Phase 1** — detection and rule engine. OWASP CRS 4.30 runs through Coraza
+  in audit mode with per-request anomaly scoring and forensic metadata; per-site
+  policy, CRS exclusions, go-ftw parity, and response inspection remain.
+- **Phase 2** — observability and compliance (OTel, SIEM, audit chain, reports).
+- **Phase 3** — enterprise control plane (sessions, SSO/MFA, RBAC, tenancy).
+- **Phase 4** — HA and Kubernetes.
+- **Phase 5** — ecosystem, supply chain, air-gap, and docs truth.
+
+> Historical SafeLine-parity notes under `tasks/` are no longer authoritative.
 
 ---
 
