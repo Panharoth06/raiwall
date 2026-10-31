@@ -106,4 +106,29 @@ describe('ForensicDrawer.vue', () => {
     expect(wrapper.find('[data-testid="modal-create-exception-btn"]').exists()).toBe(false);
     expect(wrapper.text()).toContain('Traffic Telemetry Context');
   });
+
+  it('renders CRS engine, anomaly score, paranoia level and matched rules', () => {
+    const wrapper = mount(ForensicDrawer, {
+      props: {
+        event: {
+          ...event,
+          action: 'audit',
+          rule_id: 'CRS_949110',
+          engine: 'crs',
+          anomaly_score: 8,
+          paranoia_level: 1,
+          matched_rules: [
+            '920340: Content-Type header missing from request with non-zero Content-Length [critical]',
+            '949110: Inbound Anomaly Score Exceeded [unknown]',
+          ],
+        },
+      },
+    });
+
+    expect(wrapper.find('[data-testid="detection-engine-metadata"]').exists()).toBe(true);
+    expect(wrapper.text()).toContain('crs');
+    expect(wrapper.text()).toContain('Anomaly 8');
+    expect(wrapper.text()).toContain('PL1');
+    expect(wrapper.text()).toContain('920340');
+  });
 });

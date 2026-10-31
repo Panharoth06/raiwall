@@ -13,7 +13,6 @@ import {
   Braces,
   Lock,
   Settings,
-  Gauge,
   LogOut,
   AlertTriangle,
   Sun,
@@ -150,8 +149,6 @@ const isItemActive = (path: string): boolean => {
   return currentPath.value.startsWith(path);
 };
 
-const isTopologyActive = computed(() => currentPath.value.startsWith('/topology') || currentPath.value.startsWith('/command-center'));
-
 const navigateTo = (path: string) => {
   mobileNavOpen.value = false;
   router.push(path);
@@ -202,24 +199,7 @@ const handleLogout = async () => {
         </button>
       </div>
 
-      <!-- Operations / Command Center Quick Access -->
-      <div class="p-3 pb-1 border-b border-border/50 flex-shrink-0">
-        <button
-          data-testid="nav-topology"
-          @click="navigateTo('/topology')"
-          :class="[
-            'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-[15px] font-medium transition-colors text-left cursor-pointer',
-            isTopologyActive
-              ? 'bg-primary/10 text-primary font-semibold'
-              : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-          ]"
-        >
-          <Gauge class="w-[18px] h-[18px] flex-shrink-0" :class="isTopologyActive ? 'text-primary' : 'text-muted-foreground'" />
-          <span class="truncate" :class="isTopologyActive ? 'text-foreground font-semibold' : 'text-muted-foreground'">Command Center</span>
-        </button>
-      </div>
-
-      <!-- SafeLine 8-Domain Navigation Links with Vertical Auto-Scroll -->
+      <!-- Navigation Links with Vertical Auto-Scroll -->
       <nav class="flex-1 min-h-0 px-3 py-2 space-y-1 overflow-y-auto">
         <div v-for="item in navItems" :key="item.path" class="space-y-0.5">
           <!-- Standard Nav Item (without children) -->
@@ -390,6 +370,14 @@ const handleLogout = async () => {
 
       <!-- View Slot Content -->
       <main class="flex-1 min-h-0 overflow-y-auto p-4 bg-background flex flex-col">
+        <div
+          v-if="!authStore.isAdmin"
+          data-testid="viewer-banner"
+          class="mb-3 flex items-center gap-2 rounded-md border border-info/30 bg-info/10 px-3 py-2 text-sm text-info shrink-0"
+        >
+          <ShieldCheck class="w-4 h-4 shrink-0" />
+          <span>Viewer mode — configuration changes require an administrator.</span>
+        </div>
         <slot />
       </main>
     </div>

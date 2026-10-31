@@ -171,10 +171,19 @@ func (r *Registry) TelemetryStore(ctx context.Context) (telemetry.ForensicStore,
 	}
 
 	if driver == "clickhouse" {
-		ch, err := clickhouse.NewClickHouseStore(clickhouse.ClickHouseConfig{URL: sc.DSN})
+		ch, err := clickhouse.NewClickHouseStore(clickhouse.ClickHouseConfig{
+			URL:           sc.DSN,
+			Retention:     sc.Retention,
+			PruneInterval: sc.PruneInterval,
+		})
 		if err != nil {
 			return nil, fmt.Errorf("open clickhouse telemetry store: %w", err)
 		}
+		if err := ch.InitSchema(ctx); err != nil {
+			_ = ch.Close()
+			return nil, fmt.Errorf("initialize clickhouse telemetry schema: %w", err)
+		}
+		ch.StartRetention()
 		r.mu.Lock()
 		r.telemetry = ch
 		r.mu.Unlock()

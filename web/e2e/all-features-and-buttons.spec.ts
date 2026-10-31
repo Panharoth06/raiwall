@@ -23,7 +23,6 @@ test.describe('Comprehensive End-to-End Feature & Interactive Button Audit', () 
   // 1. Navigation across all views
   test('1. Sidebar Navigation: Visits all primary navigation sections cleanly', async ({ page }) => {
     const navItems = [
-      { id: 'nav-topology', target: '#/topology' },
       { id: 'nav-statistics', target: '#/statistics' },
       { id: 'nav-applications', target: '#/sites' },
       { id: 'nav-attacks', target: '#/attacks' },
@@ -44,34 +43,21 @@ test.describe('Comprehensive End-to-End Feature & Interactive Button Audit', () 
     }
   });
 
-  // 2. Topology Command Center Controls
-  test('2. Topology Controls: Toggles Threats/Traffic, OWASP filters, and expands nodes', async ({ page }) => {
-    await page.goto('#/topology');
-    await page.waitForSelector('[data-testid="waf-dashboard-root"]');
+  // 2. Rule Tester: evaluates a CRS-only probe against the live engine
+  test('2. Rule Tester: evaluates a CRS-only protocol violation', async ({ page }) => {
+    await page.goto('#/rules?tab=tester');
+    await page.waitForSelector('text=Request Probe');
 
-    // Toggle Threats mode
-    const threatsBtn = page.locator('[data-testid="mode-btn-threats"]');
-    await threatsBtn.click();
-    await page.waitForTimeout(300);
+    // A POST body without Content-Type triggers CRS rule 920640 at PL1.
+    await page.fill('textarea[aria-label="Headers"]', '');
+    await page.locator('[aria-label="HTTP method"]').click();
+    await page.getByRole('option', { name: 'POST' }).click();
+    await page.fill('textarea[aria-label="Body"]', 'hello');
+    await page.getByRole('button', { name: 'Evaluate Request' }).click();
 
-    // Toggle Traffic mode
-    const trafficBtn = page.locator('[data-testid="mode-btn-traffic"]');
-    await trafficBtn.click();
-    await page.waitForTimeout(300);
-
-    // Filter popover and switch
-    const filterBtn = page.locator('[data-testid="filter-trigger-btn"]');
-    await filterBtn.click();
-    await page.waitForSelector('[data-testid="owasp-filter-switch"]');
-    await page.locator('[data-testid="owasp-filter-switch"]').click();
-    await page.waitForTimeout(200);
-    await page.keyboard.press('Escape');
-
-    // Expand human nodes
-    const humanNodes = page.locator('[data-testid="source-node-humans"]');
-    await humanNodes.click();
-    await page.waitForSelector('[data-testid="subnode-verified"]');
-    expect(await page.locator('[data-testid="subnode-verified"]').isVisible()).toBe(true);
+    await expect(page.getByText('CRS_949110')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('920640')).toBeVisible();
+    await expect(page.getByText('audit', { exact: true })).toBeVisible();
   });
 
   // 3. Protected Sites Lifecycle

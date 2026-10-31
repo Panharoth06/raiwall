@@ -1,4 +1,5 @@
 import type { ForensicEvent, AggregateStats } from '@/types/telemetry';
+import type { RuleTestRequest, RuleTestResult } from '@/types/rules';
 
 export interface Site {
   id: string;
@@ -455,6 +456,13 @@ export const api = {
       method: 'POST',
     }),
   getConfigHistory: () => request<ConfigHistoryItem[]>('/config/history'),
+
+  // Rule testing
+  testRule: (payload: RuleTestRequest) =>
+    request<RuleTestResult>('/rules/test', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
   getClusterStatus: () =>
     request<{ mode: string; redis_connected: boolean; active_version: number; channel: string }>('/cluster/status'),
 

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -17,25 +18,32 @@ const (
 
 // ClickHouseConfig specifies connection and behavior settings for ClickHouseStore.
 type ClickHouseConfig struct {
-	URL        string
-	Database   string
-	Table      string
-	Username   string
-	Password   string
-	Timeout    time.Duration
-	MaxRetries int
-	HTTPClient *http.Client
+	URL           string
+	Database      string
+	Table         string
+	Username      string
+	Password      string
+	Timeout       time.Duration
+	MaxRetries    int
+	Retention     time.Duration
+	PruneInterval time.Duration
+	HTTPClient    *http.Client
 }
 
 // ClickHouseStore implements telemetry.ForensicStore for columnar analytics.
 type ClickHouseStore struct {
-	url        string
-	database   string
-	table      string
-	username   string
-	password   string
-	maxRetries int
-	client     *http.Client
+	url           string
+	database      string
+	table         string
+	username      string
+	password      string
+	maxRetries    int
+	retention     time.Duration
+	pruneInterval time.Duration
+	client        *http.Client
+	stopCh        chan struct{}
+	closeOnce     sync.Once
+	wg            sync.WaitGroup
 }
 
 // NewClickHouseStore constructs a ClickHouseStore.
@@ -75,14 +83,22 @@ func NewClickHouseStore(cfg ClickHouseConfig) (*ClickHouseStore, error) {
 		}
 	}
 
+	pruneInterval := cfg.PruneInterval
+	if pruneInterval <= 0 {
+		pruneInterval = time.Hour
+	}
+
 	return &ClickHouseStore{
-		url:        baseURL,
-		database:   db,
-		table:      table,
-		username:   cfg.Username,
-		password:   cfg.Password,
-		maxRetries: retries,
-		client:     httpClient,
+		url:           baseURL,
+		database:      db,
+		table:         table,
+		username:      cfg.Username,
+		password:      cfg.Password,
+		maxRetries:    retries,
+		retention:     cfg.Retention,
+		pruneInterval: pruneInterval,
+		client:        httpClient,
+		stopCh:        make(chan struct{}),
 	}, nil
 }
 
@@ -110,7 +126,16 @@ func (s *ClickHouseStore) TableSchemaDDL() string {
 		headers String,
 		payload String CODEC(ZSTD(1)),
 		latency_us UInt64,
-		status_code UInt16
+		status_code UInt16,
+		payload_location LowCardinality(String),
+		matched_token String,
+		attack_category LowCardinality(String),
+		response_headers String,
+		response_body String,
+		engine LowCardinality(String),
+		anomaly_score Float64,
+		paranoia_level UInt8,
+		matched_rules String
 	) ENGINE = MergeTree()
 	PARTITION BY toYYYYMMDD(timestamp)
 	ORDER BY (timestamp, action, rule_id, client_ip)
@@ -118,10 +143,62 @@ func (s *ClickHouseStore) TableSchemaDDL() string {
 	`, s.database, s.table)
 }
 
-// InitSchema automatically runs schema creation on ClickHouse.
+// schemaAlterDDL upgrades tables created before the response/CRS columns
+// existed. ADD COLUMN IF NOT EXISTS makes repeated boots safe.
+func (s *ClickHouseStore) schemaAlterDDL() []string {
+	columns := []string{
+		"payload_location LowCardinality(String)",
+		"matched_token String",
+		"attack_category LowCardinality(String)",
+		"response_headers String",
+		"response_body String",
+		"engine LowCardinality(String)",
+		"anomaly_score Float64",
+		"paranoia_level UInt8",
+		"matched_rules String",
+	}
+	stmt := make([]string, 0, len(columns))
+	for _, col := range columns {
+		stmt = append(stmt, fmt.Sprintf("ALTER TABLE %s.%s ADD COLUMN IF NOT EXISTS %s", s.database, s.table, col))
+	}
+	return stmt
+}
+
+// InitSchema creates the table and upgrades older schemas.
 func (s *ClickHouseStore) InitSchema(ctx context.Context) error {
-	_, err := s.execWithRetry(ctx, s.TableSchemaDDL(), nil)
-	return err
+	if _, err := s.execWithRetry(ctx, s.TableSchemaDDL(), nil); err != nil {
+		return fmt.Errorf("create clickhouse schema: %w", err)
+	}
+	for _, stmt := range s.schemaAlterDDL() {
+		if _, err := s.execWithRetry(ctx, stmt, nil); err != nil {
+			return fmt.Errorf("upgrade clickhouse schema: %w", err)
+		}
+	}
+	return nil
+}
+
+// StartRetention prunes events older than the configured retention in the
+// background. It is a no-op when retention is unset.
+func (s *ClickHouseStore) StartRetention() {
+	if s.retention <= 0 {
+		return
+	}
+	s.wg.Add(1)
+	go func() {
+		defer s.wg.Done()
+		ticker := time.NewTicker(s.pruneInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				_, _ = s.Prune(ctx, s.retention)
+				cancel()
+			case <-s.stopCh:
+				return
+			}
+		}
+	}()
 }
 
 // Prune issues a lightweight ALTER TABLE DELETE command.
@@ -132,9 +209,13 @@ func (s *ClickHouseStore) Prune(ctx context.Context, maxAge time.Duration) (int6
 	return 0, err
 }
 
-// Close closes any persistent connections.
+// Close stops the retention worker and closes idle connections.
 func (s *ClickHouseStore) Close() error {
-	s.client.CloseIdleConnections()
+	s.closeOnce.Do(func() {
+		close(s.stopCh)
+		s.wg.Wait()
+		s.client.CloseIdleConnections()
+	})
 	return nil
 }
 

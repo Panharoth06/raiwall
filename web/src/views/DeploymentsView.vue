@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/auth'
 import ConfigDiffViewer from '@/components/ConfigDiffViewer.vue'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/empty-state'
+import AdminOnly from '@/components/auth/AdminOnly.vue'
 import {
   Table,
   TableHeader,
@@ -117,15 +118,17 @@ const handleRollback = async () => {
         >
           {{ loading ? 'Refreshing...' : 'Refresh' }}
         </Button>
-        <Button
-          v-if="configStore.hasDraftChanges"
-          size="sm"
-          @click="openDeployModal"
-          class="gap-1.5"
-        >
-          <Rocket class="w-4 h-4" />
-          <span>Deploy {{ configStore.diffs.length }} Changes</span>
-        </Button>
+        <AdminOnly>
+          <Button
+            v-if="configStore.hasDraftChanges"
+            size="sm"
+            @click="openDeployModal"
+            class="gap-1.5"
+          >
+            <Rocket class="w-4 h-4" />
+            <span>Deploy {{ configStore.diffs.length }} Changes</span>
+          </Button>
+        </AdminOnly>
       </div>
     </div>
 
@@ -231,17 +234,19 @@ const handleRollback = async () => {
                   {{ new Date(snap.applied_at).toLocaleString() }}
                 </TableCell>
                 <TableCell class="text-right">
-                  <Button
-                    v-if="snap.version !== configStore.activeVersion"
-                    variant="outline"
-                    size="sm"
-                    @click="confirmRollback(snap.version)"
-                    class="h-7 text-xs font-mono text-warning border-warning/30 hover:bg-warning/10 gap-1"
-                  >
-                    <RotateCcw class="w-3.5 h-3.5 text-warning" />
-                    <span>1-Click Rollback</span>
-                  </Button>
-                  <span v-else class="text-xs font-mono uppercase text-primary font-semibold">
+                  <AdminOnly>
+                    <Button
+                      v-if="snap.version !== configStore.activeVersion"
+                      variant="outline"
+                      size="sm"
+                      @click="confirmRollback(snap.version)"
+                      class="h-7 text-xs font-mono text-warning border-warning/30 hover:bg-warning/10 gap-1"
+                    >
+                      <RotateCcw class="w-3.5 h-3.5 text-warning" />
+                      <span>1-Click Rollback</span>
+                    </Button>
+                  </AdminOnly>
+                  <span v-if="snap.version === configStore.activeVersion" class="text-xs font-mono uppercase text-primary font-semibold">
                     Active
                   </span>
                 </TableCell>

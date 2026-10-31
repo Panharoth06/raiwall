@@ -37,6 +37,14 @@ export interface ForensicEvent {
   response_headers?: Record<string, string[]>;
   /** Base64-encoded raw upstream response body. */
   response_body?: string;
+  /** Engine that produced the verdict: semantic, crs, or cve. */
+  engine?: string;
+  /** OWASP CRS inbound anomaly score. */
+  anomaly_score?: number;
+  /** CRS paranoia level the request was evaluated at. */
+  paranoia_level?: number;
+  /** Contributing CRS rule IDs and messages. */
+  matched_rules?: string[];
 }
 
 /** Aggregated incident cluster: events sharing client_ip + host within a 5-minute window. */

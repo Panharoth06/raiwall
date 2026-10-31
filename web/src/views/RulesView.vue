@@ -4,17 +4,18 @@ import { useRoute, useRouter } from '@/router';
 import ExceptionsView from './ExceptionsView.vue';
 import ACLsView from './ACLsView.vue';
 import RateLimitingSettings from '@/components/http-flood/RateLimitingSettings.vue';
-import { Shield, FileCode, Sliders } from 'lucide-vue-next';
+import RuleTesterPanel from '@/components/rules/RuleTesterPanel.vue';
+import { Shield, FileCode, Sliders, FlaskConical } from 'lucide-vue-next';
 import { Tabs, type Tab } from '@/components/ui/tabs';
 
-type RuleSubTab = 'exceptions' | 'acls' | 'policies';
+type RuleSubTab = 'exceptions' | 'acls' | 'policies' | 'tester';
 
 const route = useRoute();
 const router = useRouter();
 
 const getInitialTab = (): RuleSubTab => {
   const tab = route.value?.query?.tab;
-  if (tab === 'acls' || tab === 'policies' || tab === 'exceptions') {
+  if (tab === 'acls' || tab === 'policies' || tab === 'exceptions' || tab === 'tester') {
     return tab;
   }
   const path = route.value?.path || '';
@@ -28,7 +29,7 @@ const activeTab = ref<RuleSubTab>(getInitialTab());
 watch(
   () => [route.value?.path, route.value?.query?.tab],
   ([newPath, newTab]) => {
-    if (newTab === 'acls' || newTab === 'policies' || newTab === 'exceptions') {
+    if (newTab === 'acls' || newTab === 'policies' || newTab === 'exceptions' || newTab === 'tester') {
       activeTab.value = newTab as RuleSubTab;
       return;
     }
@@ -47,6 +48,7 @@ const tabs: (Tab & { id: RuleSubTab })[] = [
   { id: 'exceptions', label: 'Exceptions Gate', icon: Shield, description: 'Parameter-level false-positive bypasses' },
   { id: 'acls', label: 'ACL Bytecode Rules', icon: FileCode, description: 'Sub-15ns expr-lang boolean ACLs' },
   { id: 'policies', label: 'Rate Limits', icon: Sliders, description: 'Three-tier velocity, attack, and scanner limits' },
+  { id: 'tester', label: 'Rule Tester', icon: FlaskConical, description: 'Evaluate a synthetic request against the live policy' },
 ];
 
 const handleTabChange = (tabId: string) => {
@@ -71,6 +73,7 @@ const handleTabChange = (tabId: string) => {
       <ExceptionsView v-if="activeTab === 'exceptions'" />
       <ACLsView v-else-if="activeTab === 'acls'" />
       <RateLimitingSettings v-else-if="activeTab === 'policies'" />
+      <RuleTesterPanel v-else-if="activeTab === 'tester'" />
     </div>
   </div>
 </template>

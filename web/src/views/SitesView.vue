@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/auth'
 import type { Site } from '@/api/client'
 import SiteDialog from '@/components/SiteDialog.vue'
 import SitesTable from '@/components/sites/SitesTable.vue'
+import AdminOnly from '@/components/auth/AdminOnly.vue'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/dialog'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -107,10 +108,12 @@ const pendingCount = computed(() => configStore.diffs.length)
         </p>
       </div>
 
-      <Button class="gap-1.5" @click="openAddDialog">
-        <Plus class="w-4 h-4" />
-        <span>Add Protected Site</span>
-      </Button>
+      <AdminOnly>
+        <Button class="gap-1.5" @click="openAddDialog">
+          <Plus class="w-4 h-4" />
+          <span>Add Protected Site</span>
+        </Button>
+      </AdminOnly>
     </div>
 
     <!-- Pending changes -->
@@ -132,15 +135,17 @@ const pendingCount = computed(() => configStore.diffs.length)
         >
           Review diff
         </Button>
-        <Button
-          class="h-7 px-3 text-xs gap-1.5"
-          :disabled="applying"
-          data-testid="sites-apply-now"
-          @click="applyNow"
-        >
-          <Loader2 v-if="applying" class="w-3.5 h-3.5 animate-spin" />
-          <span>{{ applying ? 'Applying…' : 'Apply now' }}</span>
-        </Button>
+        <AdminOnly>
+          <Button
+            class="h-7 px-3 text-xs gap-1.5"
+            :disabled="applying"
+            data-testid="sites-apply-now"
+            @click="applyNow"
+          >
+            <Loader2 v-if="applying" class="w-3.5 h-3.5 animate-spin" />
+            <span>{{ applying ? 'Applying…' : 'Apply now' }}</span>
+          </Button>
+        </AdminOnly>
       </div>
     </div>
 
@@ -153,10 +158,12 @@ const pendingCount = computed(() => configStore.diffs.length)
         description="Add your first application site to start proxying and inspecting inbound traffic."
         class="py-12"
       >
-        <Button class="gap-1.5" @click="openAddDialog">
-          <Plus class="w-4 h-4" />
-          <span>Add Protected Site</span>
-        </Button>
+        <AdminOnly>
+          <Button class="gap-1.5" @click="openAddDialog">
+            <Plus class="w-4 h-4" />
+            <span>Add Protected Site</span>
+          </Button>
+        </AdminOnly>
       </EmptyState>
 
       <SitesTable

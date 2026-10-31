@@ -21,7 +21,7 @@ describe('DashboardLayout.vue (Task 74)', () => {
     mockPush.mockClear();
   });
 
-  it('renders all 8 SafeLine core domains plus 3D Topology navigation links', () => {
+  it('renders all 8 core domains without the retired mock topology link', () => {
     const wrapper = mount(DashboardLayout, {
       slots: {
         default: '<div data-testid="test-content">Main View Content</div>',
@@ -38,7 +38,7 @@ describe('DashboardLayout.vue (Task 74)', () => {
     expect(wrapper.find('[data-testid="nav-auth-gateway-chevron"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="nav-deployments"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="nav-settings"]').exists()).toBe(true);
-    expect(wrapper.find('[data-testid="nav-topology"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="nav-topology"]').exists()).toBe(false);
 
     expect(wrapper.find('[data-testid="test-content"]').exists()).toBe(true);
   });

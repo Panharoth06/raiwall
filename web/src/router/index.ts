@@ -223,7 +223,6 @@ export function createSimpleRouter(routes: RouteRecord[]): SimpleRouter & Plugin
 }
 
 // Router instance with all routes for Raiwall Control Plane
-import CommandCenterView from '@/views/CommandCenterView.vue';
 import StatisticsView from '@/views/StatisticsView.vue';
 import AttacksView from '@/views/AttacksView.vue';
 import LoginView from '@/views/LoginView.vue';
@@ -244,8 +243,9 @@ import AuthGatewayView from '@/views/AuthGatewayView.vue';
 export const router = createSimpleRouter([
   { path: '/', name: 'statistics', component: StatisticsView },
   { path: '/statistics', name: 'statistics-alias', component: StatisticsView },
-  { path: '/topology', name: 'topology', component: CommandCenterView },
-  { path: '/command-center', name: 'command-center', component: CommandCenterView },
+  // Legacy mock-dashboard routes now land on the real statistics view.
+  { path: '/topology', name: 'topology', component: StatisticsView },
+  { path: '/command-center', name: 'command-center', component: StatisticsView },
   { path: '/sites', name: 'sites', component: SitesView },
   { path: '/sites/:id', name: 'site-detail', component: SiteDetailView },
   { path: '/sites/:id/rules', name: 'site-detail-rules', component: SiteDetailView },

@@ -73,7 +73,7 @@ func TestClickHouseStore_SaveBatchAndQuery(t *testing.T) {
 				respBody = `{"data":[{"count()":"42"}]}`
 			} else if strings.Contains(q, "SELECT event_id") || strings.Contains(bodyStr, "SELECT event_id") {
 				queryReceived.Add(1)
-				respBody = `{"data":[{"event_id":"evt-100","timestamp":"2026-10-19 10:00:00.000","host":"example.com","action":"block","rule_id":"SEMANTIC_SQLI","country":"US"}]}`
+				respBody = `{"data":[{"event_id":"evt-100","timestamp":"2026-10-19 10:00:00.000","host":"example.com","action":"block","rule_id":"CRS_949110","country":"US","payload_location":"Query","matched_token":"1 OR 1=1","attack_category":"crs","response_headers":"{\"Set-Cookie\":[\"session=abc\"]}","response_body":"aGVsbG8=","engine":"crs","anomaly_score":7,"paranoia_level":1,"matched_rules":"[\"942100: SQL Injection [critical]\"]"}]}`
 			} else if strings.Contains(q, "GROUP BY country") || strings.Contains(bodyStr, "GROUP BY country") {
 				respBody = `{"data":[{"country":"US","cnt":"10"},{"country":"CN","cnt":"5"}]}`
 			} else if strings.Contains(q, "GROUP BY rule_id") || strings.Contains(bodyStr, "GROUP BY rule_id") {
@@ -137,6 +137,24 @@ func TestClickHouseStore_SaveBatchAndQuery(t *testing.T) {
 	if len(res.Events) != 1 || res.Events[0].EventID != "evt-100" {
 		t.Errorf("unexpected event result: %+v", res.Events)
 	}
+	got := res.Events[0]
+	if got.Engine != "crs" || got.AnomalyScore != 7 || got.ParanoiaLevel != 1 {
+		t.Errorf("CRS metadata not decoded: %+v", got)
+	}
+	if got.PayloadLocation != "Query" || got.AttackCategory != "crs" || got.MatchedToken != "1 OR 1=1" {
+		t.Errorf("detection fields not decoded: %+v", got)
+	}
+	if string(got.ResponseBody) != "hello" {
+		t.Errorf("response body not decoded: %q", got.ResponseBody)
+	}
+	if len(got.ResponseHeaders["Set-Cookie"]) != 1 || len(got.MatchedRules) != 1 {
+		t.Errorf("response/matched metadata not decoded: %+v", got)
+	}
+
+	byID, err := store.GetEventByID(ctx, "evt-100")
+	if err != nil || byID == nil || byID.Engine != "crs" {
+		t.Fatalf("get by id failed: %+v (%v)", byID, err)
+	}
 
 	stats, err := store.QueryAggregates(ctx, time.Now().Add(-time.Hour), time.Now())
 	if err != nil {
@@ -170,6 +188,49 @@ func TestClickHouseStore_SaveBatchAndQuery(t *testing.T) {
 	_, err = store.Prune(ctx, 30*24*time.Hour)
 	if err != nil {
 		t.Fatalf("prune failed: %v", err)
+	}
+}
+
+func TestClickHouseStore_InitSchemaCreatesAndUpgrades(t *testing.T) {
+	var creates, alters atomic.Int32
+
+	mockClient := &http.Client{
+		Transport: mockRoundTripper(func(r *http.Request) (*http.Response, error) {
+			body, _ := io.ReadAll(r.Body)
+			stmt := string(body) + r.URL.Query().Get("query")
+			switch {
+			case strings.Contains(stmt, "CREATE TABLE IF NOT EXISTS"):
+				creates.Add(1)
+			case strings.Contains(stmt, "ADD COLUMN IF NOT EXISTS"):
+				alters.Add(1)
+			}
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     make(http.Header),
+				Body:       io.NopCloser(bytes.NewBufferString("OK")),
+			}, nil
+		}),
+	}
+
+	store, err := NewClickHouseStore(ClickHouseConfig{
+		URL:        "http://clickhouse.internal:8123",
+		Database:   "analytics",
+		Table:      "events",
+		HTTPClient: mockClient,
+	})
+	if err != nil {
+		t.Fatalf("create store: %v", err)
+	}
+	defer store.Close()
+
+	if err := store.InitSchema(context.Background()); err != nil {
+		t.Fatalf("init schema: %v", err)
+	}
+	if creates.Load() != 1 {
+		t.Errorf("expected 1 CREATE, got %d", creates.Load())
+	}
+	if alters.Load() != 9 {
+		t.Errorf("expected 9 column upgrades, got %d", alters.Load())
 	}
 }
 

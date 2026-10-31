@@ -4,6 +4,7 @@ import { X, FileCode, ExternalLink, ClipboardCopy, ShieldAlert, CheckCircle2 } f
 import type { ForensicEvent, IPGroupOption, CurlState } from '@/types/telemetry';
 import HighlightedCode from './HighlightedCode.vue';
 import IpGroupPicker from './IpGroupPicker.vue';
+import { Badge } from '@/components/ui/badge';
 import {
   Select,
   SelectTrigger,
@@ -202,6 +203,48 @@ function convertCharset(text: string, charset: 'utf-8' | 'gbk'): string {
             JA4 {{ event.ja4 }}
             <ExternalLink class="w-3 h-3" />
           </a>
+        </div>
+
+        <!-- Engine decision metadata (CRS anomaly scoring) -->
+        <div
+          v-if="event.engine || event.anomaly_score || (event.matched_rules && event.matched_rules.length)"
+          data-testid="detection-engine-metadata"
+          class="rounded-lg border border-border bg-muted/30 p-3 space-y-2"
+        >
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Detection Engine
+            </span>
+            <Badge variant="outline" class="uppercase font-mono">
+              {{ event.engine || 'semantic' }}
+            </Badge>
+            <span
+              v-if="event.anomaly_score"
+              class="text-xs font-mono tabular-nums text-foreground"
+            >
+              Anomaly {{ event.anomaly_score }}
+            </span>
+            <span
+              v-if="event.paranoia_level"
+              class="text-xs font-mono tabular-nums text-foreground"
+            >
+              PL{{ event.paranoia_level }}
+            </span>
+          </div>
+          <div v-if="event.matched_rules && event.matched_rules.length" class="space-y-1">
+            <span class="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Matched Rules
+            </span>
+            <ul class="space-y-1">
+              <li
+                v-for="(rule, index) in event.matched_rules"
+                :key="index"
+                class="text-xs font-mono text-muted-foreground break-all"
+              >
+                {{ rule }}
+              </li>
+            </ul>
+          </div>
         </div>
 
         <div v-if="event.matched_token">

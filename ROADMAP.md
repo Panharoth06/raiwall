@@ -154,7 +154,7 @@ Priority: **P0** blocks enterprise use, **P1** major capability, **P2** maturity
 | OpenTelemetry tracing | Absent | P1 | — |
 | Syslog RFC5424 / CEF / LEEF | Absent | P1 | — |
 | SIEM connectors (Splunk/Sentinel/Elastic) | Absent | P1 | — |
-| ClickHouse analytics / retention | Stub | P0 | Schema init, pruning, columns, lookup all pending |
+| ClickHouse analytics / retention | Partial | P0 | Schema init, retention worker, full columns and direct lookup repaired; live cluster integration pending |
 | SQLite/PG retention | Full | — | — |
 | Dashboards / attack map | Full | — | — |
 | Per-site/rule/upstream metrics | Absent | P1 | — |
@@ -232,7 +232,7 @@ Priority: **P0** blocks enterprise use, **P1** major capability, **P2** maturity
 | 0.1 | Authenticate telemetry/metrics/SSE/incidents/cURL; remove wildcard CORS and query-string credentials | `caddy/stage_routes.go`, `http/telemetry_api.go`, `http/streamer.go`, `http/middleware.go` | M | **Done** `13e8678` |
 | 0.2 | Bounded-prefix body inspection, gzip/deflate/brotli decode with bomb cap, pooled-buffer race fix, sidecar parity | `caddy/body_inspector.go`, `caddy/stage_waf.go`, `grpc/processor.go`, `core/waf/bodyinspect` | L | **Done** `13e8678` |
 | 0.3 | HA state: ban hydration, OnBan publish, snapshot propagation + poll, real cluster status, Redis AUTH/TLS | `core/rate/ban*.go`, `storage/redis/*`, `http/snapshots_apply.go`, `http/handlers_system.go` | L | **Pending** |
-| 0.4 | ClickHouse: InitSchema, pruning, full columns (incl. CRS metadata), indexed event lookup | `storage/clickhouse/*`, `storage/registry.go` | M | **Pending** |
+| 0.4 | ClickHouse: InitSchema, pruning, full columns (incl. CRS metadata), indexed event lookup | `storage/clickhouse/*`, `storage/registry.go` | M | **Done** (unit-tested; add live cluster integration in Phase 4) |
 | 0.5 | Envoy ext_proc field numbers + wire-format regression test | `grpc/proto_types.go` | M | **Done** `13e8678` |
 | 0.6 | Close per-site auth bypass; validate bearer/API-key claims | `core/auth/appgate.go`, `caddy/stage_auth_gate.go` | M | **Done** `13e8678` |
 | 0.7 | Client IP trust, trusted proxies, handshake JA4, PROXY protocol | `caddy/client_ip.go`, `core/bot/ja4.go`, new listener | M/L | **Partial** (`13e8678`: client IP; JA4/PROXY pending) |
@@ -477,6 +477,7 @@ single-node; multi-replica requires PostgreSQL + Redis + shared cert storage.
 | `13e8678` | Phase 0 security: telemetry auth, body prefix/decompression, Envoy wire format, app-auth bypass, client IP/trusted proxies, audit telemetry, response sanitization |
 | `aaa12f3` | Phase 1A.1: Coraza + OWASP CRS 4.30, composite engine, CRS config |
 | `34ea459` | Phase 1A.2/1A.5: CRS event metadata (SQLite/PG), rule-test playground, matched-rule filtering |
+| _unreleased_ | ClickHouse repair (schema/retention/columns/lookup), Rule Tester UI, CRS metadata in the forensic drawer, viewer write-action guard, mock Command Center removed |
 
 ## 9. Change Control
 

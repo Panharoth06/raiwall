@@ -48,16 +48,17 @@ Status legend: `[x]` done · `[~]` partial · `[ ]` pending.
 - [ ] Tests: two-replica ban convergence, restart hydration, config convergence.
 - [ ] Gate: two replicas agree on bans and config without restarts.
 
-### 0.4 Repair ClickHouse telemetry `[ ]`
+### 0.4 Repair ClickHouse telemetry `[x]`
 **Targets:** `storage/clickhouse/*`, `storage/registry.go`,
 `caddy/provision_telemetry.go`.
-- [ ] Call `InitSchema` when constructing the store.
-- [ ] Add CRS metadata columns (`engine`, `anomaly_score`, `paranoia_level`,
+- [x] Call `InitSchema` when constructing the store.
+- [x] Add CRS metadata columns (`engine`, `anomaly_score`, `paranoia_level`,
       `matched_rules`) plus existing response/attack fields.
-- [ ] Implement retention/prune loop and `Prune`.
-- [ ] Indexed `GetEventByID`; remove the 50-event scan.
-- [ ] Surface insert failures to the ring buffer/operator (metric/log).
-- [ ] Tests: schema bootstrap, batch round-trip, lookup, prune.
+- [x] Implement retention worker and `Prune`.
+- [x] Direct `GetEventByID`; remove the 50-event scan.
+- [ ] Surface insert failures to the ring buffer/operator (metric/log) — follow-up.
+- [x] Tests: schema bootstrap + upgrades, batch round-trip, lookup.
+- [ ] Live ClickHouse cluster integration (Phase 4).
 - [ ] Gate: ClickHouse serves forensic queries and prunes correctly.
 
 ### 0.5 Fix Envoy `ext_proc` wire format `[x]`
@@ -169,7 +170,7 @@ Status legend: `[x]` done · `[~]` partial · `[ ]` pending.
 - [ ] `tests/crs/` go-ftw fixture with Raiwall in block mode.
 - [ ] Nightly + on-change CI job; committed baseline/skip list.
 - [ ] Thresholds: 100% applicable PL1 critical, ≥95% overall, documented skips.
-- [ ] UI panel for the rule tester.
+- [x] UI panel for the rule tester (`Rules → Rule Tester`).
 - [ ] Fix the `/api/v1` alias in production (or make it the canonical base) and
       align the OpenAPI `servers` entry; live endpoint is
       `/.raiwall/api/v1/rules/test` today.
@@ -281,7 +282,10 @@ Status legend: `[x]` done · `[~]` partial · `[ ]` pending.
 - [ ] TOTP with hashed recovery codes; enforce for admin.
 - [ ] Tests: mock IdP, wrong state/nonce, recovery code.
 
-### 3.3 RBAC and scoped API keys `[ ]`
+### 3.3 RBAC and scoped API keys `[~]`
+- [~] Primary write actions (sites, exceptions, ACLs, deployments) are hidden
+      for viewers via `AdminOnly`; viewer banner added. Row-level actions,
+      settings, identity and policy screens still need the same pass.
 - [ ] Roles admin/operator/analyst/viewer/auditor with `resource:verb`.
 - [ ] Per-route permission middleware; remove method-only checks.
 - [ ] API keys: scopes, expiry, tenant, validated role, prefix+hash.
@@ -370,7 +374,9 @@ Status legend: `[x]` done · `[~]` partial · `[ ]` pending.
 - [ ] Signed CRS/GeoIP bundles.
 - [ ] Egress-blocked install test.
 
-### 5.4 Docs and API truth `[ ]`
+### 5.4 Docs and API truth `[~]`
+- [x] Retire the mock Command Center (hardcoded topology/tenant demo); legacy
+      routes now render the real statistics view.
 - [ ] `STATUS.md` feature matrix matching code.
 - [ ] Architecture/operations/security/upgrade docs.
 - [ ] OpenAPI 84/84 coverage (fix the `/api/v1` alias in production).

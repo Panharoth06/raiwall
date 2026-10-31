@@ -18,7 +18,7 @@ beforeEach(() => {
 });
 
 describe('RulesView.vue', () => {
-  it('renders Tabs with all three rule sub-tabs and defaults to exceptions', () => {
+  it('renders Tabs with all four rule sub-tabs and defaults to exceptions', () => {
     const store = useConfigStore();
     store.exceptions = [];
     store.acls = [];
@@ -29,15 +29,17 @@ describe('RulesView.vue', () => {
           ExceptionsView: { template: '<div data-testid="exceptions-subview">Exceptions SubView</div>' },
           ACLsView: { template: '<div data-testid="acls-subview">ACLs SubView</div>' },
           RateLimitingSettings: { template: '<div data-testid="policies-subview">Policies SubView</div>' },
+          RuleTesterPanel: { template: '<div data-testid="tester-subview">Tester SubView</div>' },
         },
       },
     });
 
     const tabItems = wrapper.findAll('[data-testid="tab-item"]');
-    expect(tabItems.length).toBe(3);
+    expect(tabItems.length).toBe(4);
     expect(tabItems[0].text()).toContain('Exceptions Gate');
     expect(tabItems[1].text()).toContain('ACL Bytecode Rules');
     expect(tabItems[2].text()).toContain('Rate Limits');
+    expect(tabItems[3].text()).toContain('Rule Tester');
 
     expect(wrapper.find('[data-testid="exceptions-subview"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="acls-subview"]').exists()).toBe(false);

@@ -5,6 +5,7 @@ import { useConfigStore } from '@/stores/config'
 import type { ExceptionRule } from '@/api/client'
 import ExceptionTestModal from '@/components/ExceptionTestModal.vue'
 import { Button } from '@/components/ui/button'
+import AdminOnly from '@/components/auth/AdminOnly.vue'
 import { Input } from '@/components/ui/input'
 import { ConfirmDialog } from '@/components/ui/dialog'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -144,13 +145,15 @@ const executeDelete = async () => {
         </p>
       </div>
 
-      <Button
-        @click="openAddModal"
-        class="gap-1.5"
-      >
-        <Plus class="w-4 h-4" />
-        <span>Add Exception Rule</span>
-      </Button>
+      <AdminOnly>
+        <Button
+          @click="openAddModal"
+          class="gap-1.5"
+        >
+          <Plus class="w-4 h-4" />
+          <span>Add Exception Rule</span>
+        </Button>
+      </AdminOnly>
     </div>
 
     <!-- Exceptions Table Container -->
@@ -162,13 +165,15 @@ const executeDelete = async () => {
         description="Suppress false-positives without disabling the WAF globally."
         class="py-12"
       >
-        <Button
-          @click="openAddModal"
-          class="gap-1.5"
-        >
-          <Plus class="w-4 h-4" />
-          <span>Add First Exception</span>
-        </Button>
+        <AdminOnly>
+          <Button
+            @click="openAddModal"
+            class="gap-1.5"
+          >
+            <Plus class="w-4 h-4" />
+            <span>Add First Exception</span>
+          </Button>
+        </AdminOnly>
       </EmptyState>
 
       <Table v-else container-class="overflow-visible">

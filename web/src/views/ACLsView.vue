@@ -5,6 +5,7 @@ import type { ACLRule } from '@/api/client'
 import AllowDenyTable from '@/components/acl/AllowDenyTable.vue'
 import AllowDenyModal from '@/components/acl/AllowDenyModal.vue'
 import { Button } from '@/components/ui/button'
+import AdminOnly from '@/components/auth/AdminOnly.vue'
 import { Badge } from '@/components/ui/badge'
 import { ConfirmDialog } from '@/components/ui/dialog'
 import { Plus, ShieldCheck } from 'lucide-vue-next'
@@ -118,13 +119,15 @@ const handleMoveDown = async (rule: ACLRule, index: number) => {
         <Badge variant="outline" class="font-mono text-xs uppercase">
           Bytecode Engine · expr-lang · CIDR
         </Badge>
-        <Button
-          @click="openAddRule"
-          class="gap-1.5"
-        >
-          <Plus class="w-4 h-4" />
-          <span>ADD RULES</span>
-        </Button>
+        <AdminOnly>
+          <Button
+            @click="openAddRule"
+            class="gap-1.5"
+          >
+            <Plus class="w-4 h-4" />
+            <span>ADD RULES</span>
+          </Button>
+        </AdminOnly>
       </div>
     </div>
 
