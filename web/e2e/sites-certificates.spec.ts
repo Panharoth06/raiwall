@@ -22,6 +22,13 @@ async function login(page: Page) {
 const unique = (prefix: string) => `${prefix}-${Date.now().toString(36)}`;
 const host = (label: string) => `${label}.e2e.local`;
 
+async function autoApplyEnabled(page: Page): Promise<boolean> {
+  const auth = { Authorization: `Basic ${Buffer.from('admin:admin').toString('base64')}` };
+  const res = await page.request.get('/.raiwall/api/v1/status', { headers: auth });
+  if (!res.ok()) return false;
+  return ((await res.json()) as { auto_apply?: boolean }).auto_apply === true;
+}
+
 for (const vp of viewports) {
   test.describe(`sites + certificates ${vp.name} ${vp.width}x${vp.height}`, () => {
     test.use({ viewport: { width: vp.width, height: vp.height } });
@@ -32,6 +39,7 @@ for (const vp of viewports) {
       const domain = host(label);
 
       await login(page);
+      const autoApply = await autoApplyEnabled(page);
       await page.goto('#/sites');
       await page.getByRole('button', { name: 'Add Protected Site' }).first().click();
 
@@ -54,11 +62,15 @@ for (const vp of viewports) {
       await expect(page.getByText(domain)).toBeVisible();
 
       const banner = page.locator('[data-testid="sites-pending-banner"]');
-      await expect(banner).toBeVisible();
-      await expect(banner).toContainText('staged change');
-
-      await page.locator('[data-testid="sites-apply-now"]').click();
-      await expect(banner).toBeHidden({ timeout: 15_000 });
+      if (autoApply) {
+        // The save itself commits the snapshot; no pending draft remains.
+        await expect(banner).toHaveCount(0);
+      } else {
+        await expect(banner).toBeVisible();
+        await expect(banner).toContainText('staged change');
+        await page.locator('[data-testid="sites-apply-now"]').click();
+        await expect(banner).toBeHidden({ timeout: 15_000 });
+      }
 
       // Cleanup through the API so the stack stays usable across runs.
       const api = await page.request;
@@ -70,10 +82,12 @@ for (const vp of viewports) {
       await api.delete(`/.raiwall/api/v1/sites/${created!.id}`, {
         headers: { Accept: 'application/json' },
       });
-      await api.post('/.raiwall/api/v1/config/apply', {
-        headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-        data: { author: 'admin', description: 'e2e cleanup' },
-      });
+      if (!autoApply) {
+        await api.post('/.raiwall/api/v1/config/apply', {
+          headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+          data: { author: 'admin', description: 'e2e cleanup' },
+        });
+      }
     });
 
     test(`creates and deletes a managed certificate (${vp.name})`, async ({ page }) => {

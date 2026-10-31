@@ -33,6 +33,7 @@ func (s *Server) routes() {
 		sub.Group(func(api chi.Router) {
 			api.Use(s.authMgr.AuthMiddleware)
 			api.Use(s.DeclarativeGuardMiddleware)
+			api.Use(s.AutoApplyMiddleware)
 
 			// Auth
 			api.Post("/auth/logout", s.handleLogout)

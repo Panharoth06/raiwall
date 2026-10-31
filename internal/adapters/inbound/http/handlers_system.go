@@ -24,6 +24,7 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		"status":         "healthy",
 		"active_version": ver,
 		"mode":           mode,
+		"auto_apply":     s.autoApply,
 		"timestamp":      time.Now().UTC(),
 	})
 }

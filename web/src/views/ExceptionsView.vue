@@ -218,6 +218,7 @@ const executeDelete = async () => {
                     <Button
                       variant="ghost"
                       size="icon"
+                      data-testid="exception-test"
                       class="h-7 w-7 text-muted-foreground hover:text-foreground"
                       @click="openTestSimulator(rule)"
                     >
@@ -234,6 +235,7 @@ const executeDelete = async () => {
                     <Button
                       variant="ghost"
                       size="icon"
+                      data-testid="exception-delete"
                       class="h-7 w-7 text-muted-foreground hover:text-threat"
                       @click="confirmDelete(rule.id)"
                     >

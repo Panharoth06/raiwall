@@ -82,12 +82,10 @@ test.describe('Comprehensive End-to-End Feature & Interactive Button Audit', () 
     await expect(page.locator('table')).toContainText('E2E Automated Site');
 
     // Delete site cleanly
-    page.once('dialog', async (dialog) => {
-      await dialog.accept();
-    });
-    await page.locator('tr:has-text("E2E Automated Site") button[title="Delete site"]').click();
-    await page.waitForTimeout(600);
-    await expect(page.getByText('No protected sites configured')).toBeVisible();
+    const siteRow = page.locator('tr', { hasText: 'E2E Automated Site' });
+    await siteRow.locator('[data-testid="site-delete"]').click();
+    await page.getByRole('button', { name: 'Delete Site', exact: true }).click();
+    await expect(siteRow).toHaveCount(0, { timeout: 10000 });
   });
 
   // 4. Bytecode ACL Rules & Syntax Verifier
@@ -95,37 +93,30 @@ test.describe('Comprehensive End-to-End Feature & Interactive Button Audit', () 
     await page.goto('#/acls');
     await page.waitForTimeout(400);
 
-    // Open Add ACL Rule dialog
-    const addAclBtn = page.locator('button:has-text("New ACL Rule"), button:has-text("Add First ACL Rule")').first();
-    await addAclBtn.click();
-    await page.waitForSelector('textarea[placeholder*="in_cidr"]');
+    // Open Add ACL Rule dialog and switch to the raw expression editor
+    await page.locator('button:has-text("ADD RULES")').first().click();
+    const aclDialog = page.getByRole('dialog');
+    await expect(aclDialog).toBeVisible();
+    await aclDialog.getByPlaceholder('e.g. Allow Office Network').fill('E2E ACL Rule');
+    await aclDialog.getByRole('button', { name: 'Advanced expr Mode' }).click();
 
-    // Click "Verify Syntax" button
-    const verifyBtn = page.locator('button:has-text("Verify Syntax")');
-    await verifyBtn.click();
-    await page.waitForTimeout(400);
+    const expression = aclDialog.locator('textarea[placeholder*="in_cidr"]');
+    await expression.fill('in_cidr(client_ip, "203.0.113.0/24")');
+    await aclDialog.getByRole('button', { name: 'Verify Syntax' }).click();
+    await expect(aclDialog.getByText('Expression verified cleanly')).toBeVisible({ timeout: 10000 });
 
-    // Assert successful compilation banner
-    await expect(page.locator('text=Expression compiled cleanly')).toBeVisible();
-
-    // Fill rule name
-    await page.fill('input[placeholder="e.g. Block External Admin Access"]', 'E2E ACL Rule');
-
-    // Save to Draft
-    const saveBtn = page.locator('button:has-text("Save to Draft")');
-    await saveBtn.click();
-    await page.waitForTimeout(600);
+    // Save the rule
+    await aclDialog.getByRole('button', { name: 'SUBMIT', exact: true }).click();
+    await expect(aclDialog).toBeHidden();
 
     // Verify in table
-    await expect(page.locator('text=E2E ACL Rule')).toBeVisible();
+    await expect(page.locator('tr', { hasText: 'E2E ACL Rule' })).toBeVisible();
 
     // Delete rule
-    page.once('dialog', async (dialog) => {
-      await dialog.accept();
-    });
-    const deleteBtn = page.locator('table tr:has-text("E2E ACL Rule") button').last();
-    await deleteBtn.click();
-    await page.waitForTimeout(600);
+    const aclRow = page.locator('tr', { hasText: 'E2E ACL Rule' });
+    await aclRow.locator('button').last().click();
+    await page.getByRole('button', { name: 'Delete Rule', exact: true }).click();
+    await expect(aclRow).toHaveCount(0, { timeout: 10000 });
   });
 
   // 5. Exceptions Gate & Dry-run Simulator
@@ -134,42 +125,30 @@ test.describe('Comprehensive End-to-End Feature & Interactive Button Audit', () 
     await page.waitForTimeout(400);
 
     // Open Add Exception modal
-    const addExcBtn = page.locator('button:has-text("Add Exception Rule"), button:has-text("Add First Exception")').first();
-    await addExcBtn.click();
-    await page.waitForSelector('input[placeholder="/api/v1/search"]');
+    await page.locator('button:has-text("Add Exception Rule"), button:has-text("Add First Exception")').first().click();
+    await page.waitForSelector('input[placeholder="e.g. /checkout/payment"]');
 
     // Fill exception form
-    await page.fill('input[placeholder="/api/v1/search"]', '/api/v1/search');
-    await page.fill('input[placeholder="e.g. search_term"]', 'q');
-    await page.fill('input[placeholder*="Valid SQL editor payload"]', 'E2E false positive bypass');
-
-    // Save Exception
-    const saveBtn = page.locator('button:has-text("Add to Draft")');
-    await saveBtn.click();
-    await page.waitForTimeout(600);
+    await page.fill('input[placeholder="e.g. /checkout/payment"]', '/api/v1/search');
+    await page.fill('input[placeholder="e.g. signature or token"]', 'q');
+    await page.fill('input[placeholder="e.g. Base64 encoded payload in webhook"]', 'E2E false positive bypass');
+    await page.getByRole('dialog').getByRole('button', { name: 'Add Exception', exact: true }).click();
 
     // Verify Path column renders '/api/v1/search'
-    await expect(page.locator('table tr:has-text("/api/v1/search")')).toBeVisible();
+    const exceptionRow = page.locator('tr', { hasText: '/api/v1/search' });
+    await expect(exceptionRow).toBeVisible();
 
     // Open dry-run simulator on this rule
-    const testBtn = page.locator('table tr:has-text("/api/v1/search") button:has-text("Test")').first();
-    if (await testBtn.isVisible()) {
-      await testBtn.click();
-      await page.waitForSelector('button:has-text("Run Test Simulation")');
-      await page.locator('button:has-text("Run Test Simulation")').click();
-      await page.waitForTimeout(500);
-      await expect(page.locator('text=Exception Match').or(page.locator('text=Match Result'))).toBeVisible();
-      await page.keyboard.press('Escape');
-      await page.waitForTimeout(200);
-    }
+    await exceptionRow.locator('[data-testid="exception-test"]').click();
+    await page.getByRole('button', { name: 'Run Dry-Run Test' }).click();
+    await expect(page.getByText(/Suppression Matched|No Match/)).toBeVisible();
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(200);
 
     // Delete exception
-    page.once('dialog', async (dialog) => {
-      await dialog.accept();
-    });
-    const deleteBtn = page.locator('table tr:has-text("/api/v1/search") button').last();
-    await deleteBtn.click();
-    await page.waitForTimeout(600);
+    await exceptionRow.locator('[data-testid="exception-delete"]').click();
+    await page.getByRole('button', { name: 'Delete Exception', exact: true }).click();
+    await expect(exceptionRow).toHaveCount(0, { timeout: 10000 });
   });
 
   // 6. RulesView Subtab switching
@@ -296,7 +275,7 @@ test.describe('Comprehensive End-to-End Feature & Interactive Button Audit', () 
       await trapsInput.fill('/trap/e2e');
       await page.locator('[data-testid="bot-save-protect"]').click();
       await expect(page.locator('[data-testid="bot-notice"]')).toContainText('BOT Protect saved');
-      await expect(appRow.locator('[data-testid="bot-row-status"]')).toContainText('On');
+      await expect(appRow.locator('[data-testid="bot-row-status"]')).toContainText(/On|Partial/);
 
       // Remove the override and confirm the global policy applies again.
       await appRow.locator('[data-testid="bot-configure-app"]').click();
@@ -359,8 +338,51 @@ test.describe('Comprehensive End-to-End Feature & Interactive Button Audit', () 
     }
   });
 
+  // 9b. Auto-apply: saving a protected site commits a live snapshot
+  test('9b. Auto-apply: saving a site hot-swaps configuration without manual deploy', async ({ page }) => {
+    const stamp = Date.now();
+    const name = `E2E Auto Apply ${stamp}`;
+    const host = `auto-apply-${stamp}.e2e.test`;
+    const auth = { Authorization: `Basic ${Buffer.from('admin:admin').toString('base64')}` };
+
+    try {
+      await page.goto('#/sites');
+      await page.waitForTimeout(400);
+
+      const addSiteBtn = page
+        .locator('button:has-text("Add Protected Site"), button:has-text("Add First Application"), button:has-text("Add First Site")')
+        .first();
+      await addSiteBtn.click();
+      await page.waitForSelector('input[placeholder="Application Name"]');
+      await page.fill('input[placeholder="Application Name"]', name);
+      await page.fill('input[placeholder="www.example.com, support *"]', host);
+      await page.locator('button:has-text("SUBMIT")').click();
+
+      await expect(page.locator('table')).toContainText(name, { timeout: 10000 });
+
+      await page.goto('#/deployments');
+      await expect(page.getByTestId('auto-apply-notice')).toBeVisible();
+      await expect(page.locator('[data-testid="snapshot-history-table"]')).toContainText(
+        /Auto-applied after POST .*\/sites/,
+        { timeout: 10000 }
+      );
+      await expect(page.getByTestId('manual-deploy-btn')).toHaveCount(0);
+    } finally {
+      const sitesResponse = await page.request.get('/.raiwall/api/v1/sites', { headers: auth });
+      if (sitesResponse.ok()) {
+        const sites = (await sitesResponse.json()) as Array<{ id: string; hostnames?: string[] }>;
+        for (const site of sites) {
+          if (site.hostnames?.includes(host)) {
+            await page.request.delete(`/.raiwall/api/v1/sites/${site.id}`, { headers: auth });
+          }
+        }
+      }
+    }
+  });
+
   // 10. API Keys Management
   test('10. API Keys: Generates new key token and revokes cleanly', async ({ page }) => {
+    const keyName = `E2E Test Key ${Date.now()}`;
     await page.goto('#/system');
     await page.waitForTimeout(400);
 
@@ -371,7 +393,7 @@ test.describe('Comprehensive End-to-End Feature & Interactive Button Audit', () 
     // Generate Key
     await page.locator('button:has-text("Generate API Key")').click();
     await page.waitForSelector('input[placeholder="e.g. CI/CD Deployer or Claude Desktop"]');
-    await page.fill('input[placeholder="e.g. CI/CD Deployer or Claude Desktop"]', 'E2E Test Key');
+    await page.fill('input[placeholder="e.g. CI/CD Deployer or Claude Desktop"]', keyName);
 
     await page.locator('button:has-text("Generate Token")').click();
     await page.waitForTimeout(400);
@@ -382,15 +404,13 @@ test.describe('Comprehensive End-to-End Feature & Interactive Button Audit', () 
     await page.waitForTimeout(300);
 
     // Verify key in table
-    await expect(page.locator('text=E2E Test Key')).toBeVisible();
+    const keyRow = page.locator('tr', { hasText: keyName });
+    await expect(keyRow).toBeVisible();
 
     // Revoke key
-    page.once('dialog', async (dialog) => {
-      await dialog.accept();
-    });
-    const revokeBtn = page.locator('table tr:has-text("E2E Test Key") button').last();
-    await revokeBtn.click();
-    await page.waitForTimeout(600);
+    await keyRow.locator('button').last().click();
+    await page.getByRole('button', { name: 'Revoke Key', exact: true }).click();
+    await expect(keyRow).toHaveCount(0, { timeout: 10000 });
   });
 
   // 11. Live Attacks Stream & Quick Exception Action

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"sync"
 
 	"github.com/Panharoth06/raiwall/internal/adapters/inbound/mcp"
 	"github.com/Panharoth06/raiwall/internal/core/acl"
@@ -37,6 +38,8 @@ type Server struct {
 	certReloader     func(context.Context) error
 	certReconciler   func(context.Context)
 	ruleTester       func(*waf.RequestContext) (*waf.Verdict, error)
+	autoApply        bool
+	applyMu          sync.Mutex
 }
 
 // NewServer initializes a new Control Plane API server with Chi routing.
@@ -60,6 +63,27 @@ func NewServer(store control.ControlStore, hmacSecret []byte) *Server {
 // SetClusterPublisher sets the distributed cluster event publisher.
 func (s *Server) SetClusterPublisher(pub ClusterPublisher) {
 	s.clusterPublisher = pub
+}
+
+// SetAutoApply enables committing a snapshot after every successful
+// configuration mutation. It must be called before routes start serving.
+func (s *Server) SetAutoApply(enabled bool) {
+	s.autoApply = enabled
+}
+
+// AutoApplyEnabled reports whether mutations are committed automatically.
+func (s *Server) AutoApplyEnabled() bool {
+	return s.autoApply
+}
+
+// publishVersion notifies cluster peers about a newly active snapshot.
+func (s *Server) publishVersion(version uint64) {
+	if s.clusterPublisher == nil {
+		return
+	}
+	go func() {
+		_ = s.clusterPublisher.PublishVersion(context.Background(), version)
+	}()
 }
 
 // SetCertificateReloader installs the TLS provider refresh callback invoked

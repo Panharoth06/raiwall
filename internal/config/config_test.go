@@ -46,6 +46,17 @@ control:
 	assert.Equal(t, "s3cret", file.Control.HMACSecret)
 }
 
+func TestParseControlAutoApply(t *testing.T) {
+	doc := `
+version: 1
+control:
+  auto_apply: true
+`
+	file, _, err := Parse([]byte(doc), "test.yaml")
+	require.NoError(t, err)
+	assert.True(t, file.Control.AutoApply)
+}
+
 func TestParseMissingRequiredEnv(t *testing.T) {
 	doc := `
 version: 1

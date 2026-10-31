@@ -47,6 +47,9 @@ storage:
 
 control:
   hmac_secret: "${RAIWALL_HMAC_SECRET:-}"
+  # true = every saved change is compiled and hot-swapped immediately.
+  # false = changes stay staged until committed from the Deployments page.
+  auto_apply: true
   bootstrap_admin:
     username: admin
     password: "${RAIWALL_ADMIN_PASSWORD:-}"

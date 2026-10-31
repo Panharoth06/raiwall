@@ -197,6 +197,14 @@ export interface ConfigHistoryItem {
   hash: string;
 }
 
+export interface SystemStatus {
+  status: string;
+  active_version: number;
+  mode: string;
+  auto_apply: boolean;
+  timestamp: string;
+}
+
 export interface UserSession {
   username: string;
   role: 'admin' | 'viewer';
@@ -465,6 +473,7 @@ export const api = {
     }),
   getClusterStatus: () =>
     request<{ mode: string; redis_connected: boolean; active_version: number; channel: string }>('/cluster/status'),
+  getStatus: () => request<SystemStatus>('/status'),
 
   // Telemetry
   listEvents: (params?: EventQueryParams) => {

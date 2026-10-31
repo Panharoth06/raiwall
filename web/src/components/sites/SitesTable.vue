@@ -195,6 +195,7 @@ const certificateName = (id?: string) => {
                 <Button
                   variant="ghost"
                   size="icon"
+                  data-testid="site-delete"
                   class="h-7 w-7 text-muted-foreground hover:text-threat"
                   @click="emit('delete', site.id)"
                 >

@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -59,11 +58,7 @@ func (s *Server) handleApplyConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if s.clusterPublisher != nil {
-		go func(v uint64) {
-			_ = s.clusterPublisher.PublishVersion(context.Background(), v)
-		}(deployed.Version)
-	}
+	s.publishVersion(deployed.Version)
 
 	respondJSON(w, http.StatusOK, ApplyResponse{
 		Success:     true,
@@ -88,11 +83,7 @@ func (s *Server) handleRollbackConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if s.clusterPublisher != nil {
-		go func(v uint64) {
-			_ = s.clusterPublisher.PublishVersion(context.Background(), v)
-		}(restored.Version)
-	}
+	s.publishVersion(restored.Version)
 
 	respondJSON(w, http.StatusOK, map[string]any{
 		"success":        true,

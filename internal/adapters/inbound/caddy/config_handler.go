@@ -140,6 +140,7 @@ func handlerFromConfig(file *config.File) (*Middleware, error) {
 	m.StorageConfig = storageSettings(file.Storage)
 	m.ControlConfig = &ControlSettings{
 		HMACSecret: file.Control.HMACSecret,
+		AutoApply:  file.Control.AutoApply,
 		BootstrapAdmin: &BootstrapAdminSettings{
 			Username: file.Control.BootstrapAdmin.Username,
 			Password: file.Control.BootstrapAdmin.Password,

@@ -120,6 +120,7 @@ type StorageSettings struct {
 type ControlSettings struct {
 	DBPath         string                  `json:"db_path,omitempty"`
 	HMACSecret     string                  `json:"hmac_secret,omitempty"`
+	AutoApply      bool                    `json:"auto_apply,omitempty"`
 	BootstrapAdmin *BootstrapAdminSettings `json:"bootstrap_admin,omitempty"`
 }
 

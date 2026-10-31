@@ -188,6 +188,7 @@ config:
 
   control:
     hmac_secret: "${RAIWALL_HMAC_SECRET}"
+    auto_apply: true
     bootstrap_admin:
       username: admin
       password: "${RAIWALL_ADMIN_PASSWORD}"

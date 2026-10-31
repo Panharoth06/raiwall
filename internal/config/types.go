@@ -127,7 +127,11 @@ type Control struct {
 	HMACSecret string `yaml:"hmac_secret" json:"hmac_secret"`
 	// DBPath is a legacy single-store override retained for migration. Prefer
 	// Storage.DatabaseURL or Storage.Stores.
-	DBPath         string         `yaml:"db_path,omitempty" json:"db_path,omitempty"`
+	DBPath string `yaml:"db_path,omitempty" json:"db_path,omitempty"`
+	// AutoApply commits and hot-swaps a new configuration snapshot after every
+	// successful control-plane mutation. When disabled, operators stage changes
+	// and commit them from the Deployments page.
+	AutoApply      bool           `yaml:"auto_apply,omitempty" json:"auto_apply,omitempty"`
 	BootstrapAdmin BootstrapAdmin `yaml:"bootstrap_admin" json:"bootstrap_admin"`
 }
 

@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useConfigStore } from '@/stores/config'
 import { useAuthStore } from '@/stores/auth'
+import { api } from '@/api/client'
 import ConfigDiffViewer from '@/components/ConfigDiffViewer.vue'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -21,13 +22,14 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { Rocket, RotateCcw, History } from 'lucide-vue-next'
+import { Rocket, RotateCcw, History, Zap } from 'lucide-vue-next'
 
 const configStore = useConfigStore()
 const authStore = useAuthStore()
 
 const loading = ref(true)
 const loadError = ref<string | null>(null)
+const autoApply = ref(false)
 const deployModalOpen = ref(false)
 const commitDescription = ref('')
 const deploying = ref(false)
@@ -41,8 +43,20 @@ const rollbackError = ref<string | null>(null)
 const refresh = async () => {
   loading.value = true
   loadError.value = null
+  const statusPromise = api
+    .getStatus()
+    .then((status) => {
+      autoApply.value = status.auto_apply
+    })
+    .catch(() => {
+      // Manual deployment stays available when the status probe is unreachable.
+    })
   try {
-    await Promise.all([configStore.refreshHistory(), configStore.refreshDiff()])
+    await Promise.all([
+      configStore.refreshHistory(),
+      configStore.refreshDiff(),
+      statusPromise,
+    ])
   } catch (err: unknown) {
     loadError.value = err instanceof Error ? err.message : 'Failed to load snapshot history'
   } finally {
@@ -105,7 +119,9 @@ const handleRollback = async () => {
           <span>Deployments & Rollback History</span>
         </h1>
         <p class="text-sm text-muted-foreground mt-1 leading-relaxed">
-          Atomic configuration promotion, pre-flight compiler validation, and 1-click snapshot rollback.
+          {{ autoApply
+            ? 'Every saved change is compiled and hot-swapped immediately. Snapshot history supports 1-click rollback.'
+            : 'Atomic configuration promotion, pre-flight compiler validation, and 1-click snapshot rollback.' }}
         </p>
       </div>
 
@@ -121,12 +137,13 @@ const handleRollback = async () => {
         <AdminOnly>
           <Button
             v-if="configStore.hasDraftChanges"
+            data-testid="manual-deploy-btn"
             size="sm"
             @click="openDeployModal"
             class="gap-1.5"
           >
             <Rocket class="w-4 h-4" />
-            <span>Deploy {{ configStore.diffs.length }} Changes</span>
+            <span>{{ autoApply ? 'Retry Apply' : `Deploy ${configStore.diffs.length} Changes` }}</span>
           </Button>
         </AdminOnly>
       </div>
@@ -134,6 +151,19 @@ const handleRollback = async () => {
 
     <!-- Scrollable content area -->
     <div class="flex-1 min-h-0 overflow-y-auto space-y-6 pr-1">
+      <!-- Auto-apply status -->
+      <div
+        v-if="autoApply"
+        data-testid="auto-apply-notice"
+        class="flex items-start gap-2 rounded-md border border-border bg-muted/40 px-3 py-2"
+      >
+        <Zap class="w-4 h-4 text-primary mt-0.5 shrink-0" />
+        <p class="text-xs text-muted-foreground leading-relaxed">
+          Auto-apply is on. Saves are committed without a manual deploy step; staged changes below
+          only appear when an apply needs operator attention.
+        </p>
+      </div>
+
       <!-- Staged Changes Section -->
       <div class="space-y-3">
         <div class="flex items-center justify-between">

@@ -80,6 +80,9 @@ control:
   # Signs admin session cookies. Empty = generated per boot (sessions do not
   # survive a restart). Set a stable 32+ byte value in production.
   hmac_secret: "${RAIWALL_HMAC_SECRET:-}"
+  # Commit and hot-swap a new snapshot after every successful configuration
+  # change. Set false to stage changes and deploy them from the Deployments page.
+  auto_apply: true
   bootstrap_admin:
     username: "${RAIWALL_ADMIN_USERNAME:-admin}"
     # Empty = a random password is generated and logged once at WARN level.

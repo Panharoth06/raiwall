@@ -53,6 +53,9 @@ func (m *Middleware) provisionControl(ctx caddy.Context) error {
 			secret = []byte(m.ControlConfig.HMACSecret)
 		}
 		m.controlAPI = api.NewServer(m.controlStore, secret)
+		if m.ControlConfig != nil {
+			m.controlAPI.SetAutoApply(m.ControlConfig.AutoApply)
+		}
 		m.ensureInitialAdminUser(m.controlStore)
 	}
 

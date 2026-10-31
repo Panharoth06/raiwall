@@ -68,6 +68,72 @@ describe('DeploymentsView.vue', () => {
     expect(wrapper.text()).toContain('1-Click Rollback');
   });
 
+  it('shows auto-apply status and offers retry only for staged changes', async () => {
+    vi.spyOn(api, 'getStatus').mockResolvedValue({
+      status: 'healthy',
+      active_version: 4,
+      mode: 'defense',
+      auto_apply: true,
+      timestamp: new Date().toISOString(),
+    });
+    vi.spyOn(api, 'getConfigHistory').mockResolvedValue([
+      {
+        version: 4,
+        author: 'admin',
+        description: 'Auto-applied after POST /api/v1/sites',
+        applied_at: new Date().toISOString(),
+        hash: 'hash4',
+      },
+    ]);
+    vi.spyOn(api, 'getClusterStatus').mockResolvedValue({
+      mode: 'standalone',
+      redis_connected: false,
+      active_version: 4,
+      channel: '',
+    });
+    vi.spyOn(api, 'getDraftDiff').mockResolvedValue({
+      has_changes: true,
+      diffs: [
+        {
+          type: 'site',
+          action: 'added',
+          name: 'Staged after failed apply',
+          details: 'auto.example.com',
+        },
+      ],
+    });
+
+    const wrapper = mount(DeploymentsView);
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="auto-apply-notice"]').exists()).toBe(true);
+    expect(wrapper.text()).toContain('hot-swapped immediately');
+    expect(wrapper.find('[data-testid="manual-deploy-btn"]').text()).toContain('Retry Apply');
+  });
+
+  it('does not offer a manual deploy when auto-apply has no staged changes', async () => {
+    vi.spyOn(api, 'getStatus').mockResolvedValue({
+      status: 'healthy',
+      active_version: 4,
+      mode: 'defense',
+      auto_apply: true,
+      timestamp: new Date().toISOString(),
+    });
+    vi.spyOn(api, 'getConfigHistory').mockResolvedValue([]);
+    vi.spyOn(api, 'getClusterStatus').mockResolvedValue({
+      mode: 'standalone',
+      redis_connected: false,
+      active_version: 4,
+      channel: '',
+    });
+    vi.spyOn(api, 'getDraftDiff').mockResolvedValue({ has_changes: false, diffs: [] });
+
+    const wrapper = mount(DeploymentsView);
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="manual-deploy-btn"]').exists()).toBe(false);
+  });
+
   it('loads snapshot history from the control-plane API on mount', async () => {
     vi.spyOn(api, 'getConfigHistory').mockResolvedValue([
       {
