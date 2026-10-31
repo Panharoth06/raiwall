@@ -236,7 +236,7 @@ Priority: **P0** blocks enterprise use, **P1** major capability, **P2** maturity
 | 0.5 | Envoy ext_proc field numbers + wire-format regression test | `grpc/proto_types.go` | M | **Done** `13e8678` |
 | 0.6 | Close per-site auth bypass; validate bearer/API-key claims | `core/auth/appgate.go`, `caddy/stage_auth_gate.go` | M | **Done** `13e8678` |
 | 0.7 | Client IP trust, trusted proxies, handshake JA4, PROXY protocol | `caddy/client_ip.go`, `core/bot/ja4.go`, new listener | M/L | **Partial** (`13e8678`: client IP; JA4/PROXY pending) |
-| 0.8 | Start health checks, retries/timeouts/failover, WebSocket-capable proxy | `caddy/upstream.go`, `caddy/forwarding.go` | M | **Pending** |
+| 0.8 | Start health checks, retries/timeouts/failover, WebSocket-capable proxy | `caddy/upstream.go`, `caddy/forwarding.go`, `caddy/proxy.go` | M | **Partial** (gRPC trailers deferred to 1B.5) |
 | 0.9 | Audit verdicts reach telemetry; response data sanitization | `caddy/stage_waf.go`, `caddy/stage_response.go`, `core/telemetry/sanitizer.go` | S/M | **Done** `13e8678` |
 | 0.10 | Secure/revocable sessions, login lockout, default-credential refusal, docs de-claim, LICENSE/SECURITY/CI | `http/auth.go`, `README.md`, `.github/` | M | **Partial** (`13e8678`: API-key roles; rest pending) |
 

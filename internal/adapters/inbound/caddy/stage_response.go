@@ -84,36 +84,42 @@ func (m *Middleware) forwardAndInspectResponse(
 			if clientIP != nil {
 				clientIPStr = clientIP.String()
 			}
-			backend, release, err := targetPool.SelectBackend(appCfg.LoadBalancing, clientIPStr)
-			if err != nil {
-				http.Error(interceptor, "Bad Gateway: "+err.Error(), http.StatusBadGateway)
-				nextErr = err
+			forwardReq = r.Clone(r.Context())
+			if matchedRule != nil {
+				if matchedRule.StripPrefix && matchedRule.Prefix != "" && matchedRule.Prefix != "/" {
+					cleanPrefix := strings.TrimSuffix(matchedRule.Prefix, "/")
+					forwardReq.URL.Path = strings.TrimPrefix(forwardReq.URL.Path, cleanPrefix)
+					if !strings.HasPrefix(forwardReq.URL.Path, "/") {
+						forwardReq.URL.Path = "/" + forwardReq.URL.Path
+					}
+					if forwardReq.URL.RawPath != "" {
+						forwardReq.URL.RawPath = strings.TrimPrefix(forwardReq.URL.RawPath, cleanPrefix)
+						if !strings.HasPrefix(forwardReq.URL.RawPath, "/") {
+							forwardReq.URL.RawPath = "/" + forwardReq.URL.RawPath
+						}
+					}
+				}
+				if matchedRule.HostHeaderOverride != "" {
+					forwardReq.Host = matchedRule.HostHeaderOverride
+				}
+			}
+			var transport http.RoundTripper = http.DefaultTransport
+			if m.upstreamRegistry != nil && m.upstreamRegistry.SharedTransport() != nil {
+				transport = m.upstreamRegistry.SharedTransport()
+			}
+			if IsWebSocketUpgrade(forwardReq) {
+				// Upgrades cannot be buffered through RoundTrip, so splice the
+				// hijacked connection to a single selected backend.
+				backend, release, err := targetPool.SelectBackend(appCfg.LoadBalancing, clientIPStr)
+				if err != nil {
+					http.Error(interceptor, "Bad Gateway: "+err.Error(), http.StatusBadGateway)
+					nextErr = err
+				} else {
+					defer release()
+					nextErr = ProxyWebSocket(interceptor, forwardReq, backend.Dial, 0)
+				}
 			} else {
-				defer release()
-				forwardReq = r.Clone(r.Context())
-				if matchedRule != nil {
-					if matchedRule.StripPrefix && matchedRule.Prefix != "" && matchedRule.Prefix != "/" {
-						cleanPrefix := strings.TrimSuffix(matchedRule.Prefix, "/")
-						forwardReq.URL.Path = strings.TrimPrefix(forwardReq.URL.Path, cleanPrefix)
-						if !strings.HasPrefix(forwardReq.URL.Path, "/") {
-							forwardReq.URL.Path = "/" + forwardReq.URL.Path
-						}
-						if forwardReq.URL.RawPath != "" {
-							forwardReq.URL.RawPath = strings.TrimPrefix(forwardReq.URL.RawPath, cleanPrefix)
-							if !strings.HasPrefix(forwardReq.URL.RawPath, "/") {
-								forwardReq.URL.RawPath = "/" + forwardReq.URL.RawPath
-							}
-						}
-					}
-					if matchedRule.HostHeaderOverride != "" {
-						forwardReq.Host = matchedRule.HostHeaderOverride
-					}
-				}
-				var transport http.RoundTripper = http.DefaultTransport
-				if m.upstreamRegistry != nil && m.upstreamRegistry.SharedTransport() != nil {
-					transport = m.upstreamRegistry.SharedTransport()
-				}
-				nextErr = ProxyToBackend(interceptor, forwardReq, backend.Dial, transport)
+				nextErr = ProxyWithFailover(interceptor, forwardReq, targetPool, appCfg.LoadBalancing, clientIPStr, transport, defaultProxyAttempts)
 			}
 		} else if next != nil {
 			nextErr = next.ServeHTTP(interceptor, forwardReq)

@@ -24,16 +24,40 @@ type UpstreamBackend struct {
 
 	healthy       atomic.Bool
 	fails         atomic.Int32
+	downAt        atomic.Int64
 	inflight      atomic.Int64
 	client        *http.Client
 	stopChan      chan struct{}
 	closeOnce     sync.Once
+	startOnce     sync.Once
 	currentWeight int
 }
 
-// IsHealthy returns whether this backend is currently considered healthy.
+// IsHealthy reports whether this backend may receive traffic. A backend marked
+// down becomes eligible again once FailTimeout has elapsed, so a recovered
+// backend rejoins on the next request instead of waiting for the active probe.
 func (ub *UpstreamBackend) IsHealthy() bool {
-	return ub.healthy.Load()
+	if ub.healthy.Load() {
+		return true
+	}
+	if ub.FailTimeout <= 0 {
+		return false
+	}
+	down := ub.downAt.Load()
+	if down == 0 {
+		return false
+	}
+	return time.Since(time.Unix(0, down)) >= ub.FailTimeout
+}
+
+// MarkFailure records a request-path (passive) failure against the backend.
+func (ub *UpstreamBackend) MarkFailure() {
+	ub.recordFailure()
+}
+
+// MarkSuccess clears the failure count after a successful request.
+func (ub *UpstreamBackend) MarkSuccess() {
+	ub.recordSuccess()
 }
 
 // UpstreamPool manages load balancing and health checks for a set of backends.
@@ -97,16 +121,21 @@ func (p *UpstreamPool) Backends() []*UpstreamBackend {
 	return res
 }
 
-// StartHealthChecks begins background health check probes for all backends in the pool.
+// StartHealthChecks begins background health check probes for all backends in
+// the pool. It is safe to call repeatedly: each backend starts at most one
+// probe loop, so pools shared across requests never accumulate goroutines.
 func (p *UpstreamPool) StartHealthChecks(ctx context.Context) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
 	for _, b := range p.backends {
-		if b.Transport != nil {
-			b.client.Transport = b.Transport
-		}
-		go b.runHealthChecks(ctx)
+		backend := b
+		backend.startOnce.Do(func() {
+			if backend.Transport != nil {
+				backend.client.Transport = backend.Transport
+			}
+			go backend.runHealthChecks(ctx)
+		})
 	}
 }
 
@@ -165,12 +194,16 @@ func (ub *UpstreamBackend) probe(ctx context.Context) {
 
 func (ub *UpstreamBackend) recordSuccess() {
 	ub.fails.Store(0)
+	ub.downAt.Store(0)
 	ub.healthy.Store(true)
 }
 
 func (ub *UpstreamBackend) recordFailure() {
 	fails := ub.fails.Add(1)
 	if int(fails) >= ub.MaxFails {
+		// Record the transition instant so IsHealthy can re-admit traffic once
+		// FailTimeout expires.
+		ub.downAt.CompareAndSwap(0, time.Now().UnixNano())
 		ub.healthy.Store(false)
 	}
 }

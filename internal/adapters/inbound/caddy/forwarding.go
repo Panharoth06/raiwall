@@ -1,10 +1,11 @@
 package caddy
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"io"
+	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -56,22 +57,47 @@ func MatchForwardingRule(rules []control.ForwardingRule, path string) *control.F
 	return bestMatch
 }
 
+// Upstream transport timeouts. Without these a stalled backend can pin a
+// worker goroutine for the lifetime of the connection (TASKS.md 0.8).
+const (
+	upstreamDialTimeout           = 10 * time.Second
+	upstreamResponseHeaderTimeout = 30 * time.Second
+	upstreamIdleConnTimeout       = 90 * time.Second
+	upstreamTLSHandshakeTimeout   = 10 * time.Second
+)
+
 // UpstreamRegistry manages cached UpstreamPool instances to avoid memory leaks.
 type UpstreamRegistry struct {
 	mu        sync.RWMutex
 	pools     map[string]*UpstreamPool
 	transport http.RoundTripper
+
+	// ctx bounds the lifetime of every health-check goroutine the registry
+	// starts, so Close tears them all down.
+	ctx    context.Context
+	cancel context.CancelFunc
 }
 
 // NewUpstreamRegistry initializes a new UpstreamRegistry.
 func NewUpstreamRegistry() *UpstreamRegistry {
+	ctx, cancel := context.WithCancel(context.Background())
 	return &UpstreamRegistry{
 		pools: make(map[string]*UpstreamPool),
 		transport: &http.Transport{
-			MaxIdleConns:        1000,
-			MaxIdleConnsPerHost: 100,
-			IdleConnTimeout:     90 * time.Second,
+			DialContext: (&net.Dialer{
+				Timeout:   upstreamDialTimeout,
+				KeepAlive: 30 * time.Second,
+			}).DialContext,
+			MaxIdleConns:          1000,
+			MaxIdleConnsPerHost:   100,
+			IdleConnTimeout:       upstreamIdleConnTimeout,
+			ResponseHeaderTimeout: upstreamResponseHeaderTimeout,
+			TLSHandshakeTimeout:   upstreamTLSHandshakeTimeout,
+			ExpectContinueTimeout: 1 * time.Second,
+			ForceAttemptHTTP2:     true,
 		},
+		ctx:    ctx,
+		cancel: cancel,
 	}
 }
 
@@ -106,7 +132,20 @@ func (r *UpstreamRegistry) GetOrCreatePool(targets []control.UpstreamTarget) *Up
 	}
 
 	pool := NewUpstreamPool(targets)
+	for _, b := range pool.backends {
+		if b.Transport == nil {
+			b.Transport = r.transport
+		}
+	}
 	r.pools[key] = pool
+	// Active health checks previously had no production caller, so unhealthy
+	// backends were never detected (TASKS.md 0.8). StartHealthChecks is
+	// idempotent per backend, so a cached pool never accumulates goroutines.
+	ctx := r.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	pool.StartHealthChecks(ctx)
 	return pool
 }
 
@@ -121,6 +160,9 @@ func (r *UpstreamRegistry) SharedTransport() http.RoundTripper {
 func (r *UpstreamRegistry) Close() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if r.cancel != nil {
+		r.cancel()
+	}
 	for _, p := range r.pools {
 		p.Stop()
 	}
@@ -128,51 +170,4 @@ func (r *UpstreamRegistry) Close() {
 	if tr, ok := r.transport.(*http.Transport); ok && tr != nil {
 		tr.CloseIdleConnections()
 	}
-}
-
-// ProxyToBackend forwards an HTTP request to an upstream dial address using the given transport.
-func ProxyToBackend(w http.ResponseWriter, r *http.Request, dial string, transport http.RoundTripper) error {
-	scheme := "http"
-	dialHost := dial
-	if strings.HasPrefix(dialHost, "https://") {
-		scheme = "https"
-		dialHost = strings.TrimPrefix(dialHost, "https://")
-	} else if strings.HasPrefix(dialHost, "http://") {
-		dialHost = strings.TrimPrefix(dialHost, "http://")
-	}
-
-	outURL := *r.URL
-	outURL.Scheme = scheme
-	outURL.Host = dialHost
-
-	outReq, err := http.NewRequestWithContext(r.Context(), r.Method, outURL.String(), r.Body)
-	if err != nil {
-		http.Error(w, "Failed to create upstream request: "+err.Error(), http.StatusBadGateway)
-		return err
-	}
-
-	outReq.Header = r.Header.Clone()
-	if r.Host != "" {
-		outReq.Host = r.Host
-	}
-
-	if transport == nil {
-		transport = http.DefaultTransport
-	}
-
-	resp, err := transport.RoundTrip(outReq)
-	if err != nil {
-		http.Error(w, "Upstream connection failed: "+err.Error(), http.StatusBadGateway)
-		return err
-	}
-	defer resp.Body.Close()
-
-	for k, vv := range resp.Header {
-		for _, v := range vv {
-			w.Header().Add(k, v)
-		}
-	}
-	w.WriteHeader(resp.StatusCode)
-	_, err = io.Copy(w, resp.Body)
-	return err
 }

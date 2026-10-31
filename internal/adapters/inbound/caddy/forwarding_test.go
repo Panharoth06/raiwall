@@ -3,6 +3,7 @@ package caddy
 import (
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 
 	"github.com/Panharoth06/raiwall/internal/core/control"
@@ -121,8 +122,17 @@ func TestDynamicForwarding_ServeHTTP(t *testing.T) {
 	b2Dial := "backend2.internal:8002"
 
 	registry := NewUpstreamRegistry()
+	// Active health probes share this transport and run concurrently, so the
+	// handler ignores them and guards the captured request state.
+	var mu sync.Mutex
 	registry.SetTransport(testRoundTripper(func(req *http.Request) (*http.Response, error) {
 		rec := httptest.NewRecorder()
+		if req.URL.Path == "/healthz" {
+			rec.WriteHeader(http.StatusOK)
+			return rec.Result(), nil
+		}
+		mu.Lock()
+		defer mu.Unlock()
 		if req.URL.Host == b1Dial {
 			backend1ReceivedPath = req.URL.Path
 			backend1ReceivedHost = req.Host

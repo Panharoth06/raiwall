@@ -86,16 +86,22 @@ Status legend: `[x]` done · `[~]` partial · `[ ]` pending.
 - [ ] PROXY protocol v1/v2 listener with trusted-peer enforcement.
 - [ ] Gate: spoofed IP/JA4/h2 tests pass.
 
-### 0.8 Upstream reliability `[ ]`
-**Targets:** `caddy/upstream.go`, `caddy/forwarding.go`, `caddy/interceptor.go`.
-- [ ] Start active health checks for every pool; honor `fail_timeout` and
-      expected status.
-- [ ] Passive failure marking + retry another backend.
-- [ ] Upstream connect/response-header/idle timeouts.
-- [ ] WebSocket/101 hijack path for configured upstreams.
-- [ ] gRPC h2c/trailers support (can defer to 1B.5 but document).
-- [ ] Tests: backend down, failover, timeout, WebSocket echo.
-- [ ] Gate: no request can occupy a worker on a stalled upstream indefinitely.
+### 0.8 Upstream reliability `[~]`
+**Targets:** `caddy/upstream.go`, `caddy/forwarding.go`, `caddy/proxy.go`,
+`caddy/stage_response.go`.
+- [x] Start active health checks for every pool (once per backend, torn down by
+      `UpstreamRegistry.Close`); backends re-admitted after `fail_timeout`.
+- [x] Passive failure marking + retry another backend (`ProxyWithFailover`,
+      bodies up to 1 MiB replayable; larger bodies get one attempt).
+- [x] Upstream dial/TLS/response-header/idle timeouts on the shared transport.
+- [x] WebSocket/101 hijack path (`ProxyWebSocket`) for configured upstreams.
+- [ ] gRPC h2c/trailers support: deferred to 1B.5. `ProxyWithFailover` does not
+      forward trailers yet.
+- [ ] Honor a per-target expected health-check status (probe still expects 200).
+- [x] Tests: backend down, failover, body replay, timeout, WebSocket echo,
+      fail-timeout re-admission, registry starts probes; `-race` clean.
+- [x] Gate: no request can occupy a worker on a stalled upstream indefinitely
+      (response-header timeout; covered by the stalled-upstream test).
 
 ### 0.9 Audit telemetry and response sanitization `[x]`
 **Done in `13e8678`.**
