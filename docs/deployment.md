@@ -166,14 +166,54 @@ Probes are wired in Compose and Helm. Alert channels are configured under
 
 ## 7. Backups and retention
 
-Use `pg_dump -Fc` against the control database and restore with `pg_restore
---clean --if-exists` while Raiwall is stopped. Backup scripts and a Helm
-CronJob are part of the operations milestone; until then:
+### PostgreSQL (Compose and Helm)
 
 ```bash
-docker compose -f docker-compose.prod.yml exec -T postgres \
-  pg_dump -U raiwall -Fc raiwall > raiwall-$(date +%F).dump
+# Compose: dump through the postgres container (verifies with pg_restore --list)
+COMPOSE_FILE=docker-compose.prod.yml ./scripts/backup-postgres.sh
+
+# External PostgreSQL with client tools installed
+DATABASE_URL=postgres://... ./scripts/backup-postgres.sh /backups/raiwall.dump
 ```
+
+Restore is stop-the-world and requires explicit confirmation:
+
+```bash
+CONFIRM_RESTORE=yes COMPOSE_FILE=docker-compose.prod.yml \
+  ./scripts/restore-postgres.sh /backups/raiwall.dump
+```
+
+In Helm, enable the scheduled backup CronJob (writes to a PVC and prunes after
+`retentionDays`):
+
+```bash
+helm upgrade --install raiwall deploy/helm/raiwall ... \
+  --set backup.enabled=true \
+  --set backup.schedule="0 2 * * *" \
+  --set backup.retentionDays=14
+```
+
+### SQLite
+
+```bash
+# Preferred: consistent online backup with an integrity check
+raiwall backup --config /etc/raiwall/raiwall.yaml --output /backups/raiwall.db
+
+# Or with the sqlite3 CLI
+DB_PATH=/var/lib/raiwall/raiwall.db ./scripts/backup-sqlite.sh /backups/raiwall.db
+```
+
+Stop Raiwall, keep the current database, then restore:
+
+```bash
+CONFIRM_RESTORE=yes DB_PATH=/var/lib/raiwall/raiwall.db \
+  ./scripts/restore-sqlite.sh /backups/raiwall.db
+```
+
+**RPO** equals the backup interval (nightly by default; run more often for
+tighter recovery). **RTO** is the time to stop Raiwall, restore, restart, and
+verify `/readyz` plus a dashboard login. Rehearse a restore into a scratch
+database before relying on backups.
 
 Forensic events honor `telemetry.retention` (default 30 days). The cleanup
 worker enforces `control.snapshot_retention` (default 200, always keeping the

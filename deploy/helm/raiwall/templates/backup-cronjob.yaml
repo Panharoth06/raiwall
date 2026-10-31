@@ -1,0 +1,82 @@
+{{- if .Values.backup.enabled }}
+{{- if not .Values.backup.existingClaim }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "raiwall.fullname" . }}-backups
+  labels:
+    {{- include "raiwall.labels" . | nindent 4 }}
+  {{- with .Values.backup.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  {{- with .Values.backup.storageClass }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.backup.size }}
+---
+{{- end }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "raiwall.fullname" . }}-backup
+  labels:
+    {{- include "raiwall.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.backup.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            {{- include "raiwall.selectorLabels" . | nindent 12 }}
+        spec:
+          restartPolicy: OnFailure
+          # The backup volume is written by the postgres image user; this job
+          # runs as root only inside its own pod and only mounts the backup PVC.
+          securityContext:
+            runAsUser: 0
+            runAsGroup: 0
+            fsGroup: 0
+          containers:
+            - name: pg-dump
+              image: "postgres:18-alpine"
+              imagePullPolicy: IfNotPresent
+              command: ["/bin/sh", "-ec"]
+              args:
+                - |
+                  ts=$(date -u +%Y%m%d-%H%M%S)
+                  pg_dump --format=custom --no-owner --file "/backups/raiwall-$ts.dump" "$RAIWALL_DATABASE_URL"
+                  pg_restore --list "/backups/raiwall-$ts.dump" >/dev/null
+                  find /backups -name 'raiwall-*.dump' -mtime +"$RETENTION_DAYS" -delete
+              env:
+                - name: RETENTION_DAYS
+                  value: {{ .Values.backup.retentionDays | quote }}
+                - name: RAIWALL_DATABASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      {{- if .Values.database.existingSecret }}
+                      name: {{ .Values.database.existingSecret }}
+                      key: {{ .Values.database.urlKey }}
+                      {{- else }}
+                      name: {{ include "raiwall.secretName" . }}
+                      key: RAIWALL_DATABASE_URL
+                      {{- end }}
+              volumeMounts:
+                - name: backups
+                  mountPath: /backups
+              resources:
+                {{- toYaml .Values.backup.resources | nindent 16 }}
+          volumes:
+            - name: backups
+              persistentVolumeClaim:
+                claimName: {{ default (printf "%s-backups" (include "raiwall.fullname" .)) .Values.backup.existingClaim }}
+{{- end }}

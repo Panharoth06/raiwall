@@ -427,10 +427,16 @@ CI gate, and OpenAPI base in the current change.
 - [ ] Authenticated ServiceMonitor.
 - [ ] Tests: `helm lint`/template, kind deploy.
 
-### 4.6 Backup and restore `[ ]`
-- [ ] CLI export/import; CronJob; documented RTO/RPO.
-- [ ] Restore drill.
-- [ ] Tests: backup→restore round-trip.
+### 4.6 Backup and restore `[~]`
+- [x] SQLite online backup (`raiwall backup`, VACUUM INTO + integrity check) and
+      `scripts/backup-sqlite.sh`; restore script with a pre-restore copy.
+- [x] PostgreSQL `pg_dump -Fc` backup / `pg_restore --clean --if-exists`
+      restore scripts (Compose and external DSN), plus a Helm CronJob with PVC
+      and retention.
+- [x] Documented RTO/RPO and restore steps in `docs/deployment.md`.
+- [ ] Restore drill executed against a live Compose/Helm stack.
+- [~] Tests: SQLite backup→restore round-trip and script dry-runs pass; the
+      live PostgreSQL restore drill remains.
 
 ### 4.7 Version and upgrades `[ ]`
 - [ ] `/system/version` with build info and schema version.

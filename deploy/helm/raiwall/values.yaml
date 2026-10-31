@@ -70,6 +70,24 @@ persistence:
   size: 1Gi
   annotations: {}
 
+# Scheduled pg_dump backups into a PVC (retention in days). Requires the
+# PostgreSQL client tools image pinned to the server major version.
+backup:
+  enabled: false
+  schedule: "0 2 * * *"
+  retentionDays: 14
+  # Use an existing PVC instead of provisioning one.
+  existingClaim: ""
+  storageClass: ""
+  size: 10Gi
+  annotations: {}
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 256Mi
+
 # External PostgreSQL is the only supported database in this chart. There is no
 # bundled PostgreSQL subchart.
 database:
