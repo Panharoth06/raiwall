@@ -156,6 +156,16 @@ type WAF struct {
 	StripHeaders        []string `yaml:"strip_headers" json:"strip_headers"`
 	ASTTimeout          Duration `yaml:"ast_timeout" json:"ast_timeout"`
 	MaxParamSize        int      `yaml:"max_param_size" json:"max_param_size"`
+	CRS                 CRS      `yaml:"crs" json:"crs"`
+}
+
+// CRS configures the optional OWASP Core Rule Set engine (Coraza).
+type CRS struct {
+	Enabled           bool   `yaml:"enabled" json:"enabled"`
+	Mode              string `yaml:"mode" json:"mode"`
+	ParanoiaLevel     int    `yaml:"paranoia_level" json:"paranoia_level"`
+	InboundThreshold  int    `yaml:"inbound_threshold" json:"inbound_threshold"`
+	OutboundThreshold int    `yaml:"outbound_threshold" json:"outbound_threshold"`
 }
 
 // Bot configures bot mitigation and stateless proof-of-work.

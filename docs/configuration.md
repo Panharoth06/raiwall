@@ -172,6 +172,21 @@ databases: `raiwall_control.db` and `raiwall_telemetry.db`, both under
 | `ast_timeout` | `5ms` | **Hard ceiling 5ms** |
 | `max_param_size` | `32768` | **Hard ceiling 32 KiB** |
 
+#### `waf.crs`
+
+The vendored OWASP Core Rule Set (4.30.0) runs through Coraza after the
+semantic engine. CRS performs its own normalization and anomaly scoring.
+
+| Key | Default | Constraints |
+| :--- | :--- | :--- |
+| `enabled` | `false` | Enable the CRS engine |
+| `mode` | `audit` | `audit` or `block` |
+| `paranoia_level` | `1` | 1–4 |
+| `inbound_threshold` | `5` | Anomaly score needed to interrupt |
+| `outbound_threshold` | `4` | Reserved for response inspection |
+
+Start in `audit`, review `CRS_*` events, add exceptions, then switch to `block`.
+
 ### `bot`
 
 | Key | Default | Constraints |

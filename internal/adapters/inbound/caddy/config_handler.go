@@ -16,14 +16,19 @@ import (
 // only place it is translated into runtime configuration.
 func handlerFromConfig(file *config.File) (*Middleware, error) {
 	m := &Middleware{
-		Mode:                file.WAF.Mode,
-		BlockStatusCode:     file.WAF.BlockStatusCode,
-		BlockResponseBody:   file.WAF.BlockResponseBody,
-		OfflineStatusCode:   file.WAF.OfflineStatusCode,
-		OfflineResponseBody: file.WAF.OfflineResponseBody,
-		StripHeaders:        file.WAF.StripHeaders,
-		ASTTimeout:          caddy.Duration(file.WAF.ASTTimeout),
-		MaxParamSize:        file.WAF.MaxParamSize,
+		Mode:                 file.WAF.Mode,
+		BlockStatusCode:      file.WAF.BlockStatusCode,
+		BlockResponseBody:    file.WAF.BlockResponseBody,
+		OfflineStatusCode:    file.WAF.OfflineStatusCode,
+		OfflineResponseBody:  file.WAF.OfflineResponseBody,
+		StripHeaders:         file.WAF.StripHeaders,
+		ASTTimeout:           caddy.Duration(file.WAF.ASTTimeout),
+		MaxParamSize:         file.WAF.MaxParamSize,
+		CRSEnabled:           file.WAF.CRS.Enabled,
+		CRSMode:              file.WAF.CRS.Mode,
+		CRSParanoiaLevel:     file.WAF.CRS.ParanoiaLevel,
+		CRSInboundThreshold:  file.WAF.CRS.InboundThreshold,
+		CRSOutboundThreshold: file.WAF.CRS.OutboundThreshold,
 
 		BotDefense:    file.Bot.Defense,
 		PoWDifficulty: file.Bot.PoWDifficulty,

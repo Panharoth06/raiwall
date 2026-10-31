@@ -142,14 +142,19 @@ type DeclarativeSettings = config.DeclarativeResources
 
 // Middleware is the Caddy HTTP handler implementing Raiwall WAF and Gateway interception.
 type Middleware struct {
-	Mode                string         `json:"mode,omitempty"`
-	BlockStatusCode     int            `json:"block_status_code,omitempty"`
-	BlockResponseBody   string         `json:"block_response_body,omitempty"`
-	OfflineStatusCode   int            `json:"offline_status_code,omitempty"`
-	OfflineResponseBody string         `json:"offline_response_body,omitempty"`
-	StripHeaders        []string       `json:"strip_headers,omitempty"`
-	ASTTimeout          caddy.Duration `json:"ast_timeout,omitempty"`
-	MaxParamSize        int            `json:"max_param_size,omitempty"`
+	Mode                 string         `json:"mode,omitempty"`
+	BlockStatusCode      int            `json:"block_status_code,omitempty"`
+	BlockResponseBody    string         `json:"block_response_body,omitempty"`
+	OfflineStatusCode    int            `json:"offline_status_code,omitempty"`
+	OfflineResponseBody  string         `json:"offline_response_body,omitempty"`
+	StripHeaders         []string       `json:"strip_headers,omitempty"`
+	ASTTimeout           caddy.Duration `json:"ast_timeout,omitempty"`
+	MaxParamSize         int            `json:"max_param_size,omitempty"`
+	CRSEnabled           bool           `json:"crs_enabled,omitempty"`
+	CRSMode              string         `json:"crs_mode,omitempty"`
+	CRSParanoiaLevel     int            `json:"crs_paranoia_level,omitempty"`
+	CRSInboundThreshold  int            `json:"crs_inbound_threshold,omitempty"`
+	CRSOutboundThreshold int            `json:"crs_outbound_threshold,omitempty"`
 
 	// Domain 3: Bot Mitigation & Chaos Engine configuration
 	BotDefense    string         `json:"bot_defense,omitempty"`

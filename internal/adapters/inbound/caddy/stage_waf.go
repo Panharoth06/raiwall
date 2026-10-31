@@ -3,6 +3,7 @@ package caddy
 import (
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/Panharoth06/raiwall/internal/core/control"
@@ -32,14 +33,23 @@ func (m *Middleware) inspectWAFRequest(
 	if readErr != nil && m.logger != nil {
 		m.logger.Warn("Failed to buffer request body for inspection", zap.Error(readErr))
 	}
+	inspectionHeaders := r.Header
 	if len(bodyBytes) > 0 {
-		decoded, decodeErr := bodyinspect.Decode(bodyBytes, r.Header.Get("Content-Encoding"), bodyinspect.MaxDecodedSize)
+		contentEncoding := r.Header.Get("Content-Encoding")
+		decoded, decodeErr := bodyinspect.Decode(bodyBytes, contentEncoding, bodyinspect.MaxDecodedSize)
 		if decodeErr != nil {
 			if m.logger != nil {
 				m.logger.Warn("Failed to decompress request body for inspection", zap.Error(decodeErr))
 			}
 		} else {
 			bodyBytes = decoded
+			if strings.TrimSpace(contentEncoding) != "" && !strings.EqualFold(contentEncoding, "identity") {
+				// The inspection copy is decoded, so present matching headers to
+				// the engines; the upstream still receives the original body.
+				inspectionHeaders = r.Header.Clone()
+				inspectionHeaders.Del("Content-Encoding")
+				inspectionHeaders.Del("Content-Length")
+			}
 		}
 	}
 
@@ -49,7 +59,7 @@ func (m *Middleware) inspectWAFRequest(
 		Host:      r.Host,
 		Path:      r.URL.Path,
 		Query:     r.URL.RawQuery,
-		Headers:   r.Header,
+		Headers:   inspectionHeaders,
 		Body:      bodyBytes,
 		UserAgent: r.UserAgent(),
 		JA4:       ja4,

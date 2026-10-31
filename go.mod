@@ -7,6 +7,7 @@ require (
 	github.com/andybalholm/brotli v1.1.0
 	github.com/caddyserver/caddy/v2 v2.8.4
 	github.com/caddyserver/certmagic v0.21.3
+	github.com/corazawaf/coraza/v3 v3.8.1
 	github.com/corazawaf/libinjection-go v0.3.5
 	github.com/coreos/go-oidc/v3 v3.21.0
 	github.com/exaring/ja4plus v0.0.3
@@ -22,13 +23,13 @@ require (
 	github.com/pquerna/otp v1.5.0
 	github.com/prometheus/client_golang v1.19.1
 	github.com/spf13/pflag v1.0.5
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.1
 	go.uber.org/zap v1.27.0
-	golang.org/x/crypto v0.48.0
+	golang.org/x/crypto v0.58.0
 	golang.org/x/net v0.61.0
 	golang.org/x/oauth2 v0.36.0
 	google.golang.org/grpc v1.63.2
-	google.golang.org/protobuf v1.34.1
+	google.golang.org/protobuf v1.36.11
 	gopkg.in/yaml.v3 v3.0.1
 	modernc.org/sqlite v1.61.0
 )
@@ -36,14 +37,6 @@ require (
 replace github.com/go-jose/go-jose/v4 => github.com/go-jose/go-jose/v4 v4.1.1
 
 replace golang.org/x/term => golang.org/x/term v0.20.0
-
-replace golang.org/x/crypto => golang.org/x/crypto v0.23.0
-
-replace golang.org/x/net => golang.org/x/net v0.25.0
-
-replace golang.org/x/sync => golang.org/x/sync v0.7.0
-
-replace golang.org/x/text => golang.org/x/text v0.15.0
 
 require (
 	filippo.io/edwards25519 v1.1.0 // indirect
@@ -65,7 +58,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/chzyer/readline v1.5.1 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.3 // indirect
-	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dgraph-io/badger v1.6.2 // indirect
 	github.com/dgraph-io/badger/v2 v2.2007.4 // indirect
 	github.com/dgraph-io/ristretto v0.1.0 // indirect
@@ -84,6 +77,8 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-sql-driver/mysql v1.7.1 // indirect
 	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
+	github.com/goccy/go-json v0.10.5 // indirect
+	github.com/goccy/go-yaml v1.19.2 // indirect
 	github.com/golang/glog v1.2.0 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/cel-go v0.20.1 // indirect
@@ -91,6 +86,8 @@ require (
 	github.com/google/go-tpm v0.9.0 // indirect
 	github.com/google/go-tspi v0.3.0 // indirect
 	github.com/google/pprof v0.0.0-20261016150608-1facf8f91b50 // indirect
+	github.com/gotnospirit/makeplural v0.0.0-20180622080156-a5f48d94d976 // indirect
+	github.com/gotnospirit/messageformat v0.0.0-20221001023931-dfe49f1eb092 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.18.0 // indirect
 	github.com/huandu/xstrings v1.3.3 // indirect
 	github.com/imdario/mergo v0.3.12 // indirect
@@ -104,9 +101,12 @@ require (
 	github.com/jackc/pgtype v1.14.0 // indirect
 	github.com/jackc/pgx/v4 v4.18.3 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
+	github.com/kaptinlin/go-i18n v0.1.4 // indirect
+	github.com/kaptinlin/jsonschema v0.4.6 // indirect
 	github.com/klauspost/compress v1.17.8 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.7 // indirect
 	github.com/libdns/libdns v0.2.2 // indirect
+	github.com/magefile/mage v1.17.0 // indirect
 	github.com/manifoldco/promptui v0.9.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
@@ -118,9 +118,10 @@ require (
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
 	github.com/ncruces/go-strftime v1.1.0 // indirect
 	github.com/onsi/ginkgo/v2 v2.13.2 // indirect
+	github.com/petar-dambovaliev/aho-corasick v0.0.0-20250424160509-463d218d4745 // indirect
 	github.com/pires/go-proxyproto v0.7.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/pmezard/go-difflib v1.0.0 // indirect
+	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_model v0.5.0 // indirect
 	github.com/prometheus/common v0.48.0 // indirect
 	github.com/prometheus/procfs v0.12.0 // indirect
@@ -143,7 +144,11 @@ require (
 	github.com/spf13/cobra v1.8.0 // indirect
 	github.com/stoewer/go-strcase v1.2.0 // indirect
 	github.com/tailscale/tscert v0.0.0-20240517230440-bbccfbf48933 // indirect
+	github.com/tidwall/gjson v1.18.0 // indirect
+	github.com/tidwall/match v1.1.1 // indirect
+	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/urfave/cli v1.22.14 // indirect
+	github.com/valllabh/ocsf-schema-golang v1.0.3 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/yuin/goldmark v1.7.1 // indirect
 	github.com/yuin/goldmark-highlighting/v2 v2.0.0-20230729083705-37449abec8cc // indirect
@@ -174,8 +179,8 @@ require (
 	golang.org/x/mod v0.42.0 // indirect
 	golang.org/x/sync v0.24.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
-	golang.org/x/term v0.20.0 // indirect
-	golang.org/x/text v0.24.0 // indirect
+	golang.org/x/term v0.47.0 // indirect
+	golang.org/x/text v0.43.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 	golang.org/x/tools v0.52.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240506185236-b8a5c65736ae // indirect
@@ -185,4 +190,5 @@ require (
 	modernc.org/libc v1.79.0 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.12.1 // indirect
+	rsc.io/binaryregexp v0.2.0 // indirect
 )

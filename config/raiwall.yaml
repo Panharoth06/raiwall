@@ -96,6 +96,12 @@ waf:
   strip_headers: [Server, X-Powered-By, X-AspNet-Version]
   ast_timeout: 5ms              # hard ceiling: 5ms per parameter
   max_param_size: 32768         # hard ceiling: 32 KiB per parameter
+  crs:
+    enabled: true               # OWASP CRS 4.30 via Coraza
+    mode: audit                 # audit | block (start in audit, then enforce)
+    paranoia_level: 1           # 1-4
+    inbound_threshold: 5        # anomaly score needed to interrupt
+    outbound_threshold: 4
 
 bot:
   defense: defense              # defense | challenge | strict | audit | off

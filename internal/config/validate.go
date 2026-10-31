@@ -152,6 +152,19 @@ func (f *File) validateWAF(v *validator) {
 	if f.WAF.MaxParamSize <= 0 || f.WAF.MaxParamSize > MaxInspectionParamSize {
 		v.add("waf.max_param_size must be between 1 and %d bytes", MaxInspectionParamSize)
 	}
+	if f.WAF.CRS.Enabled {
+		switch strings.ToLower(f.WAF.CRS.Mode) {
+		case "", "audit", "block":
+		default:
+			v.add("waf.crs.mode %q must be audit or block", f.WAF.CRS.Mode)
+		}
+		if f.WAF.CRS.ParanoiaLevel != 0 && (f.WAF.CRS.ParanoiaLevel < 1 || f.WAF.CRS.ParanoiaLevel > 4) {
+			v.add("waf.crs.paranoia_level must be between 1 and 4")
+		}
+		if f.WAF.CRS.InboundThreshold < 0 || f.WAF.CRS.OutboundThreshold < 0 {
+			v.add("waf.crs anomaly thresholds must be zero (default) or positive")
+		}
+	}
 }
 
 func (f *File) validateBot(v *validator) {

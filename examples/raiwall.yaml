@@ -62,6 +62,14 @@ waf:
   strip_headers: [Server, X-Powered-By, X-AspNet-Version]
   ast_timeout: 5ms
   max_param_size: 32768
+  # OWASP Core Rule Set (vendored 4.30.0, executed by Coraza) runs after the
+  # semantic engine. Keep mode: audit while tuning, then switch to block.
+  crs:
+    enabled: true
+    mode: audit
+    paranoia_level: 1
+    inbound_threshold: 5
+    outbound_threshold: 4
 
 bot:
   defense: defense

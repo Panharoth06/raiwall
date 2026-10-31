@@ -21,16 +21,29 @@ const (
 	ActionAudit Action = "audit"
 )
 
+// RuleMatch records one rule that contributed to a verdict. CRS verdicts can
+// aggregate several matches behind a single anomaly threshold.
+type RuleMatch struct {
+	RuleID   string `json:"rule_id"`
+	Message  string `json:"message,omitempty"`
+	Severity string `json:"severity,omitempty"`
+	Engine   string `json:"engine,omitempty"`
+}
+
 // Verdict contains the inspection decision and metadata.
 type Verdict struct {
-	Action          Action  `json:"action"`
-	RuleID          string  `json:"rule_id,omitempty"`
-	Reason          string  `json:"reason,omitempty"`
-	StatusCode      int     `json:"status_code,omitempty"`
-	Confidence      float64 `json:"confidence,omitempty"`
-	PayloadLocation string  `json:"payload_location,omitempty"`
-	MatchedToken    string  `json:"matched_token,omitempty"`
-	AttackCategory  string  `json:"attack_category,omitempty"`
+	Action          Action      `json:"action"`
+	RuleID          string      `json:"rule_id,omitempty"`
+	Reason          string      `json:"reason,omitempty"`
+	StatusCode      int         `json:"status_code,omitempty"`
+	Confidence      float64     `json:"confidence,omitempty"`
+	PayloadLocation string      `json:"payload_location,omitempty"`
+	MatchedToken    string      `json:"matched_token,omitempty"`
+	AttackCategory  string      `json:"attack_category,omitempty"`
+	Engine          string      `json:"engine,omitempty"`
+	AnomalyScore    float64     `json:"anomaly_score,omitempty"`
+	ParanoiaLevel   int         `json:"paranoia_level,omitempty"`
+	MatchedRules    []RuleMatch `json:"matched_rules,omitempty"`
 }
 
 // VerdictAllow is a pre-allocated singleton for clean zero-allocation passthrough.

@@ -7,6 +7,7 @@ import (
 	"github.com/Panharoth06/raiwall/internal/core/acl"
 	"github.com/Panharoth06/raiwall/internal/core/control"
 	"github.com/Panharoth06/raiwall/internal/core/waf"
+	"github.com/Panharoth06/raiwall/internal/core/waf/crs"
 	"github.com/Panharoth06/raiwall/internal/core/waf/cve"
 	"github.com/caddyserver/caddy/v2"
 	"go.uber.org/zap"
@@ -46,7 +47,31 @@ func (m *Middleware) provisionWAF(_ caddy.Context) error {
 		} else if m.logger != nil {
 			m.logger.Error("cve virtual-patch library failed to load; inner rules disabled", zap.Error(err))
 		}
-		m.engine = waf.NewSemanticEngine(opts...)
+		semantic := waf.NewSemanticEngine(opts...)
+		m.engine = semantic
+
+		// OWASP CRS runs as a second engine after the semantic funnel. It has
+		// its own normalization and anomaly scoring, so it receives the raw
+		// request unchanged. CRS mode is audit by default to allow tuning.
+		if m.CRSEnabled {
+			crsEngine, err := crs.New(crs.Config{
+				Mode:              crs.Mode(m.CRSMode),
+				ParanoiaLevel:     m.CRSParanoiaLevel,
+				InboundThreshold:  m.CRSInboundThreshold,
+				OutboundThreshold: m.CRSOutboundThreshold,
+				MaxBodySize:       MaxInspectionBodySize,
+			})
+			if err != nil {
+				return fmt.Errorf("provision OWASP CRS engine: %w", err)
+			}
+			m.engine = waf.NewCompositeEngine(semantic, crsEngine)
+			if m.logger != nil {
+				m.logger.Info("OWASP CRS enabled",
+					zap.String("mode", m.CRSMode),
+					zap.Int("paranoia_level", m.CRSParanoiaLevel),
+				)
+			}
+		}
 	} else if sem, ok := m.engine.(*waf.SemanticEngine); ok {
 		sem.SetExceptionEngine(m.exceptionEngine)
 	}
