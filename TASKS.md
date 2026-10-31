@@ -1,7 +1,7 @@
 # Raiwall Enterprise Tasks
 
 Actionable breakdown for [`ROADMAP.md`](ROADMAP.md). Last updated: **2026-10-31**
-(commit `5d14d49`).
+(commit `e671812`).
 
 Use this file as the working checklist. Each task is self-contained: implement,
 test, update `ROADMAP.md` status, run `graphify update .`, and commit with a
@@ -309,6 +309,24 @@ columns (`aaa12f3`, `34ea459`, `5d14d49`).
 - [ ] Public listener serves sites and app auth only.
 - [ ] Dev escape hatch with startup warning.
 - [ ] Helm values and tests.
+
+### 3.7 Instant configuration apply `[x]`
+**Done in `e671812`.**
+- [x] `control.auto_apply` (YAML + Helm) commits a snapshot after every
+      successful mutation; enabled in the shipped Docker, Helm, and example
+      configs.
+- [x] Covers sites, forwarding rules, exceptions, ACLs, rate/bot policies, the
+      detector matrix, and inner rules.
+- [x] Mutation responses are buffered; an apply failure returns 500 and leaves
+      the change staged for repair instead of silently serving stale config.
+- [x] Snapshot author comes from the authenticated principal; cluster peers are
+      notified; `X-Raiwall-Config-Version` returns the new version.
+- [x] Simulation endpoints and runtime-managed resources (bans, certificates,
+      templates, IP groups, identity, API keys, manual apply/rollback) excluded.
+- [x] `GET /status` exposes `auto_apply`; Deployments hides manual deploy and
+      keeps Retry Apply only when staged changes remain.
+- [x] Tests: Go middleware apply/disabled/simulation/failure, frontend
+      notice/retry, Playwright UI save → snapshot history, full E2E suite.
 
 ---
 

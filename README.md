@@ -89,7 +89,7 @@ Built natively as a **Caddy v2** module, Raiwall combines extreme proxy throughp
 
 ### 🎛️ 8. Control Plane & Single-Binary Packaging
 - **Unified Binary:** REST API (`huma` OpenAPI 3.1), Embedded Vue 3 Dashboard, and Caddy Data Plane ship in a single compact binary (~50 MB, not strictly bounded under 50 MB).
-- **Draft-First Administration:** Applications, certificates, exceptions, ACLs, and policies are staged as a draft with a pending-change banner, applied atomically to a new config version, and rollback-able by version.
+- **Instant, Versioned Configuration:** Applications, exceptions, ACLs, detector policy, and rate/bot policies are compiled and hot-swapped immediately after each successful save (`control.auto_apply`, enabled in the shipped configuration). Every revision remains rollback-able by version; disable auto-apply to stage changes for a manual deploy.
 - **Portable Control Store:** Embedded SQLite in WAL mode by default, or PostgreSQL via `storage.database_url` / `RAIWALL_DATABASE_URL` for multi-instance deployments.
 - **Sidecar Mode:** Envoy External Processor (`ext_proc/v3`) gRPC interface for Kubernetes ingress sidecar deployment.
 
@@ -516,6 +516,9 @@ hostname.
 
 - **Docker Compose:** `config/raiwall.yaml` is mounted read-only at
   `/etc/raiwall/raiwall.yaml`; secrets come from `.env` (see `.env.example`).
+- **Applying changes:** `control.auto_apply: true` commits every successful
+  control-plane mutation to a new snapshot immediately. Set it to `false` to
+  stage changes and deploy them from **Deployments & Rollback History**.
 - **Helm:** `deploy/helm/raiwall/values.yaml#config` mirrors the schema 1:1 and
   renders a ConfigMap. Secrets are injected from a chart-managed Secret or an
   existing Secret. See [`deploy/helm/raiwall/README.md`](deploy/helm/raiwall/README.md).

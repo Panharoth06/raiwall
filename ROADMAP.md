@@ -194,7 +194,7 @@ Priority: **P0** blocks enterprise use, **P1** major capability, **P2** maturity
 
 | Feature | Status | Priority | Gap |
 |---|---|---|---|
-| Config snapshots/apply/rollback | Full | — | Shallow diff; rollback not audited |
+| Config snapshots/apply/rollback | Full | — | Auto-apply on save (opt-out); shallow diff; rollback not audited |
 | Multi-replica config propagation | Absent | P0 | Publisher only in tests |
 | Cluster status/health | Stub | P0 | Hardcoded standalone |
 | Redis client AUTH/TLS/Sentinel/Cluster | Absent | P1 | Hand-rolled RESP |
@@ -478,6 +478,7 @@ single-node; multi-replica requires PostgreSQL + Redis + shared cert storage.
 | `aaa12f3` | Phase 1A.1: Coraza + OWASP CRS 4.30, composite engine, CRS config |
 | `34ea459` | Phase 1A.2/1A.5: CRS event metadata (SQLite/PG), rule-test playground, matched-rule filtering |
 | `5d14d49` | ClickHouse repair (schema/retention/columns/lookup), Rule Tester UI, CRS metadata in the forensic drawer, viewer write-action guard, mock Command Center removed |
+| `e671812` | Instant configuration apply: `control.auto_apply`, server-side snapshot commit after mutations with buffered failure responses, cluster version publish, `GET /status` flag, Deployments UI notice/retry, full E2E suite re-aligned |
 
 ## 9. Change Control
 
