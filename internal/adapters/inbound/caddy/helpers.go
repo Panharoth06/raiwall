@@ -12,6 +12,7 @@ import (
 	"github.com/Panharoth06/raiwall/internal/core/bot"
 	"github.com/Panharoth06/raiwall/internal/core/rate"
 	"github.com/Panharoth06/raiwall/internal/core/telemetry"
+	"github.com/Panharoth06/raiwall/internal/core/waf"
 	"go.uber.org/zap"
 )
 
@@ -72,6 +73,33 @@ func (a *banStoreAdapter) Clear() {
 func (a *banStoreAdapter) Close() {
 	if a.bm != nil {
 		_ = a.bm.Close()
+	}
+}
+
+// applyVerdictMetadata copies engine, anomaly score, paranoia level, and
+// contributing rule matches from a WAF verdict onto a forensic event.
+func applyVerdictMetadata(event *telemetry.ForensicEvent, verdict *waf.Verdict) {
+	if event == nil || verdict == nil {
+		return
+	}
+	if event.Engine == "" {
+		event.Engine = verdict.Engine
+	}
+	if verdict.AnomalyScore > 0 {
+		event.AnomalyScore = verdict.AnomalyScore
+	}
+	if verdict.ParanoiaLevel > 0 {
+		event.ParanoiaLevel = verdict.ParanoiaLevel
+	}
+	for _, match := range verdict.MatchedRules {
+		label := match.RuleID
+		if match.Message != "" {
+			label += ": " + match.Message
+		}
+		if match.Severity != "" {
+			label += " [" + match.Severity + "]"
+		}
+		event.MatchedRules = append(event.MatchedRules, label)
 	}
 }
 

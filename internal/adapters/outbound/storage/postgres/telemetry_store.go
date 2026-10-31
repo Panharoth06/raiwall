@@ -87,10 +87,12 @@ func (s *TelemetryStore) SaveBatch(ctx context.Context, events []*telemetry.Fore
 		event_id, timestamp, host, path, method, client_ip, ja4,
 		country, continent, city, asn, as_org, latitude, longitude,
 		rule_id, action, severity, headers, payload, latency_us, status_code,
-		payload_location, matched_token, attack_category, response_headers, response_body
+		payload_location, matched_token, attack_category, response_headers, response_body,
+		engine, anomaly_score, paranoia_level, matched_rules
 	) VALUES (
 		$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
-		$15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26
+		$15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26,
+		$27, $28, $29, $30
 	) ON CONFLICT (event_id) DO UPDATE SET
 		timestamp = EXCLUDED.timestamp,
 		host = EXCLUDED.host,
@@ -116,7 +118,11 @@ func (s *TelemetryStore) SaveBatch(ctx context.Context, events []*telemetry.Fore
 		matched_token = EXCLUDED.matched_token,
 		attack_category = EXCLUDED.attack_category,
 		response_headers = EXCLUDED.response_headers,
-		response_body = EXCLUDED.response_body
+		response_body = EXCLUDED.response_body,
+		engine = EXCLUDED.engine,
+		anomaly_score = EXCLUDED.anomaly_score,
+		paranoia_level = EXCLUDED.paranoia_level,
+		matched_rules = EXCLUDED.matched_rules
 	`
 
 	stmt, err := tx.PrepareContext(ctx, query)
@@ -135,6 +141,12 @@ func (s *TelemetryStore) SaveBatch(ctx context.Context, events []*telemetry.Fore
 		if len(e.ResponseHeaders) > 0 {
 			if b, err := json.Marshal(e.ResponseHeaders); err == nil {
 				respHeadersJSON = string(b)
+			}
+		}
+		var matchedRulesJSON string
+		if len(e.MatchedRules) > 0 {
+			if b, err := json.Marshal(e.MatchedRules); err == nil {
+				matchedRulesJSON = string(b)
 			}
 		}
 
@@ -165,6 +177,10 @@ func (s *TelemetryStore) SaveBatch(ctx context.Context, events []*telemetry.Fore
 			e.AttackCategory,
 			respHeadersJSON,
 			e.ResponseBody,
+			e.Engine,
+			e.AnomalyScore,
+			e.ParanoiaLevel,
+			matchedRulesJSON,
 		)
 		if err != nil {
 			return fmt.Errorf("insert postgres event %s: %w", e.EventID, err)

@@ -55,6 +55,11 @@ func TestEngine_CompilesAndDetects(t *testing.T) {
 				if len(verdict.MatchedRules) == 0 {
 					t.Fatal("expected matched rules")
 				}
+				for _, match := range verdict.MatchedRules {
+					if match.RuleID == "900000" || match.RuleID == "900001" {
+						t.Fatalf("setup rule %s leaked into matched rules", match.RuleID)
+					}
+				}
 			} else if verdict.Action != waf.ActionAllow {
 				t.Fatalf("expected allow, got %s (%s)", verdict.Action, verdict.Reason)
 			}

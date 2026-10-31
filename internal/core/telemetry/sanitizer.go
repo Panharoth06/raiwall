@@ -130,6 +130,11 @@ func (s *Sanitizer) Sanitize(event *ForensicEvent) {
 		}
 		event.ResponseBody = []byte(body)
 	}
+
+	// 6. Rule messages can echo matched data; scrub them like payloads.
+	for i, rule := range event.MatchedRules {
+		event.MatchedRules[i] = s.SanitizePayload(rule)
+	}
 }
 
 // Sanitize calls DefaultSanitizer.Sanitize.

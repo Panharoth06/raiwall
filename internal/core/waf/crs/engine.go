@@ -213,10 +213,17 @@ func (e *Engine) verdict(tx ctypes.Transaction, it *ctypes.Interruption) *waf.Ve
 
 	for _, match := range tx.MatchedRules() {
 		meta := match.Rule()
+		severity := meta.Severity().String()
+		// Setup and initialization rules have no severity and match on every
+		// transaction; keep only detection rules and the interrupting rule so
+		// the matched-rule list is actionable.
+		if severity == "unknown" && meta.ID() != it.RuleID {
+			continue
+		}
 		v.MatchedRules = append(v.MatchedRules, waf.RuleMatch{
 			RuleID:   strconv.Itoa(meta.ID()),
 			Message:  match.Message(),
-			Severity: meta.Severity().String(),
+			Severity: severity,
 			Engine:   "crs",
 		})
 		if len(v.MatchedRules) >= MaxMatchedRules {

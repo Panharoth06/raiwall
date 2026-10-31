@@ -38,6 +38,10 @@ type ForensicEvent struct {
 	AttackCategory   string              `json:"attack_category,omitempty"`
 	ResponseHeaders  map[string][]string `json:"response_headers,omitempty"`
 	ResponseBody     []byte              `json:"response_body,omitempty"`
+	Engine           string              `json:"engine,omitempty"`         // semantic, crs, cve
+	AnomalyScore     float64             `json:"anomaly_score,omitempty"`  // CRS anomaly score
+	ParanoiaLevel    int                 `json:"paranoia_level,omitempty"` // CRS paranoia level
+	MatchedRules     []string            `json:"matched_rules,omitempty"`  // contributing rule IDs/messages
 }
 
 // ToJSON serializes the ForensicEvent to JSON bytes.

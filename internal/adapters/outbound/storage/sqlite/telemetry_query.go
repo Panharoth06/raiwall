@@ -70,7 +70,11 @@ func (s *TelemetryStore) Query(ctx context.Context, params telemetry.QueryParams
 		       COALESCE(matched_token, '') AS matched_token,
 		       COALESCE(attack_category, '') AS attack_category,
 		       COALESCE(response_headers, '') AS response_headers,
-		       COALESCE(response_body, '') AS response_body
+		       COALESCE(response_body, '') AS response_body,
+		       COALESCE(engine, '') AS engine,
+		       COALESCE(anomaly_score, 0) AS anomaly_score,
+		       COALESCE(paranoia_level, 0) AS paranoia_level,
+		       COALESCE(matched_rules, '') AS matched_rules
 		FROM forensic_events
 		WHERE %s
 		ORDER BY timestamp DESC
@@ -87,11 +91,12 @@ func (s *TelemetryStore) Query(ctx context.Context, params telemetry.QueryParams
 	var events []*telemetry.ForensicEvent
 	for rows.Next() {
 		var (
-			e               telemetry.ForensicEvent
-			tsStr           string
-			headersJSON     string
-			respHeadersJSON string
-			latencyUs       int64
+			e                telemetry.ForensicEvent
+			tsStr            string
+			headersJSON      string
+			respHeadersJSON  string
+			matchedRulesJSON string
+			latencyUs        int64
 		)
 		err := rows.Scan(
 			&e.EventID,
@@ -120,9 +125,16 @@ func (s *TelemetryStore) Query(ctx context.Context, params telemetry.QueryParams
 			&e.AttackCategory,
 			&respHeadersJSON,
 			&e.ResponseBody,
+			&e.Engine,
+			&e.AnomalyScore,
+			&e.ParanoiaLevel,
+			&matchedRulesJSON,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("scan event: %w", err)
+		}
+		if matchedRulesJSON != "" {
+			_ = json.Unmarshal([]byte(matchedRulesJSON), &e.MatchedRules)
 		}
 
 		if t, err := time.Parse(time.RFC3339Nano, tsStr); err == nil {
@@ -154,18 +166,21 @@ func (s *TelemetryStore) GetEventByID(ctx context.Context, eventID string) (*tel
 		       rule_id, action, severity, headers, payload, latency_us, status_code,
 		       COALESCE(payload_location, ''), COALESCE(matched_token, ''),
 		       COALESCE(attack_category, ''), COALESCE(response_headers, ''),
-		       COALESCE(response_body, X'')
+		       COALESCE(response_body, X''),
+		       COALESCE(engine, ''), COALESCE(anomaly_score, 0),
+		       COALESCE(paranoia_level, 0), COALESCE(matched_rules, '')
 		FROM forensic_events
 		WHERE event_id = ?
 		LIMIT 1
 	`
 	row := s.db.QueryRowContext(ctx, query, eventID)
 	var (
-		e               telemetry.ForensicEvent
-		tsStr           string
-		headersJSON     string
-		respHeadersJSON string
-		latencyUs       int64
+		e                telemetry.ForensicEvent
+		tsStr            string
+		headersJSON      string
+		respHeadersJSON  string
+		matchedRulesJSON string
+		latencyUs        int64
 	)
 	err := row.Scan(
 		&e.EventID, &tsStr, &e.Host, &e.Path, &e.Method, &e.ClientIP, &e.JA4,
@@ -175,6 +190,7 @@ func (s *TelemetryStore) GetEventByID(ctx context.Context, eventID string) (*tel
 		&latencyUs, &e.StatusCode,
 		&e.PayloadLocation, &e.MatchedToken, &e.AttackCategory,
 		&respHeadersJSON, &e.ResponseBody,
+		&e.Engine, &e.AnomalyScore, &e.ParanoiaLevel, &matchedRulesJSON,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -191,6 +207,9 @@ func (s *TelemetryStore) GetEventByID(ctx context.Context, eventID string) (*tel
 	}
 	if respHeadersJSON != "" {
 		_ = json.Unmarshal([]byte(respHeadersJSON), &e.ResponseHeaders)
+	}
+	if matchedRulesJSON != "" {
+		_ = json.Unmarshal([]byte(matchedRulesJSON), &e.MatchedRules)
 	}
 	e.Latency = time.Duration(latencyUs) * time.Microsecond
 	return &e, nil

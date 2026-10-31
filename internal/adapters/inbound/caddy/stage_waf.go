@@ -94,7 +94,7 @@ func (m *Middleware) inspectWAFRequest(
 					zap.String("reason", verdict.Reason),
 				)
 			}
-			m.recordTelemetry(&telemetry.ForensicEvent{
+			event := &telemetry.ForensicEvent{
 				EventID:          eventID,
 				Timestamp:        startTime,
 				Host:             r.Host,
@@ -113,7 +113,9 @@ func (m *Middleware) inspectWAFRequest(
 				PayloadLocation:  normalizePayloadLocation(verdict.PayloadLocation),
 				MatchedToken:     verdict.MatchedToken,
 				AttackCategory:   verdict.AttackCategory,
-			})
+			}
+			applyVerdictMetadata(event, verdict)
+			m.recordTelemetry(event)
 			return verdict, bodyBytes, false, nil
 		}
 
@@ -147,7 +149,7 @@ func (m *Middleware) inspectWAFRequest(
 			}
 
 			rendered := m.renderBlockResponse(statusCode, eventID, clientIP.String(), r.Host, r.URL.Path, body)
-			m.recordTelemetry(&telemetry.ForensicEvent{
+			event := &telemetry.ForensicEvent{
 				EventID:          eventID,
 				Timestamp:        startTime,
 				Host:             r.Host,
@@ -168,7 +170,9 @@ func (m *Middleware) inspectWAFRequest(
 				AttackCategory:   verdict.AttackCategory,
 				ResponseHeaders:  map[string][]string{"Content-Type": {"text/html; charset=utf-8"}},
 				ResponseBody:     []byte(rendered),
-			})
+			}
+			applyVerdictMetadata(event, verdict)
+			m.recordTelemetry(event)
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 			w.Header().Set("X-Raiwall-Event-ID", eventID)
 			w.WriteHeader(statusCode)

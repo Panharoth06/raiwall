@@ -141,7 +141,11 @@ func (s *TelemetryStore) initSchema() error {
 		matched_token TEXT,
 		attack_category TEXT,
 		response_headers TEXT,
-		response_body BLOB
+		response_body BLOB,
+		engine TEXT,
+		anomaly_score REAL,
+		paranoia_level INTEGER,
+		matched_rules TEXT
 	);
 
 	CREATE INDEX IF NOT EXISTS idx_events_ts ON forensic_events(timestamp);
@@ -162,6 +166,10 @@ func (s *TelemetryStore) initSchema() error {
 		"ALTER TABLE forensic_events ADD COLUMN attack_category TEXT;",
 		"ALTER TABLE forensic_events ADD COLUMN response_headers TEXT;",
 		"ALTER TABLE forensic_events ADD COLUMN response_body BLOB;",
+		"ALTER TABLE forensic_events ADD COLUMN engine TEXT;",
+		"ALTER TABLE forensic_events ADD COLUMN anomaly_score REAL;",
+		"ALTER TABLE forensic_events ADD COLUMN paranoia_level INTEGER;",
+		"ALTER TABLE forensic_events ADD COLUMN matched_rules TEXT;",
 	}
 	for _, m := range migrations {
 		_, _ = s.db.Exec(m)
@@ -206,8 +214,9 @@ func (s *TelemetryStore) SaveBatch(ctx context.Context, events []*telemetry.Fore
 		event_id, timestamp, host, path, method, client_ip, ja4,
 		country, continent, city, asn, as_org, latitude, longitude,
 		rule_id, action, severity, headers, payload, latency_us, status_code,
-		payload_location, matched_token, attack_category, response_headers, response_body
-	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+		payload_location, matched_token, attack_category, response_headers, response_body,
+		engine, anomaly_score, paranoia_level, matched_rules
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 	`
 	stmt, err := tx.PrepareContext(ctx, query)
 	if err != nil {
@@ -225,6 +234,12 @@ func (s *TelemetryStore) SaveBatch(ctx context.Context, events []*telemetry.Fore
 		if len(e.ResponseHeaders) > 0 {
 			if b, err := json.Marshal(e.ResponseHeaders); err == nil {
 				respHeadersJSON = string(b)
+			}
+		}
+		var matchedRulesJSON string
+		if len(e.MatchedRules) > 0 {
+			if b, err := json.Marshal(e.MatchedRules); err == nil {
+				matchedRulesJSON = string(b)
 			}
 		}
 
@@ -255,6 +270,10 @@ func (s *TelemetryStore) SaveBatch(ctx context.Context, events []*telemetry.Fore
 			e.AttackCategory,
 			respHeadersJSON,
 			e.ResponseBody,
+			e.Engine,
+			e.AnomalyScore,
+			e.ParanoiaLevel,
+			matchedRulesJSON,
 		)
 		if err != nil {
 			return fmt.Errorf("exec insert event %s: %w", e.EventID, err)

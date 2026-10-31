@@ -42,6 +42,9 @@ func (s *Server) routes() {
 			api.Get("/status", s.handleStatus)
 			api.Get("/cluster/status", s.handleClusterStatus)
 
+			// Synthetic request evaluation against the live WAF engine.
+			api.Post("/rules/test", s.handleRuleTest)
+
 			// Semantic Detection Matrix (SafeLine parity: 14 modules, 4 modes)
 			api.Get("/detector", s.handleGetDetector)
 			api.Put("/detector/modules/{module}", s.handleUpdateDetectorModule)

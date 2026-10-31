@@ -14,6 +14,7 @@ import (
 	"github.com/Panharoth06/raiwall/internal/core/acl"
 	"github.com/Panharoth06/raiwall/internal/core/control"
 	"github.com/Panharoth06/raiwall/internal/core/control/templates"
+	"github.com/Panharoth06/raiwall/internal/core/waf"
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/modules/caddytls"
 	"github.com/google/uuid"
@@ -53,6 +54,18 @@ func (m *Middleware) provisionControl(ctx caddy.Context) error {
 		}
 		m.controlAPI = api.NewServer(m.controlStore, secret)
 		m.ensureInitialAdminUser(m.controlStore)
+	}
+
+	if m.controlAPI != nil {
+		// The rule playground evaluates against the same engine that serves
+		// traffic so operators can validate exceptions and CRS tuning.
+		m.controlAPI.SetRuleTester(func(req *waf.RequestContext) (*waf.Verdict, error) {
+			engine := m.engine
+			if engine == nil {
+				engine = waf.NewPassthroughEngine()
+			}
+			return engine.InspectRequest(req)
+		})
 	}
 
 	if m.templateManager == nil {

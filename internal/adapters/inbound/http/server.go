@@ -11,6 +11,7 @@ import (
 	"github.com/Panharoth06/raiwall/internal/core/control"
 	"github.com/Panharoth06/raiwall/internal/core/control/templates"
 	"github.com/Panharoth06/raiwall/internal/core/rate"
+	"github.com/Panharoth06/raiwall/internal/core/waf"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -35,6 +36,7 @@ type Server struct {
 	templateMgr      *templates.TemplateManager
 	certReloader     func(context.Context) error
 	certReconciler   func(context.Context)
+	ruleTester       func(*waf.RequestContext) (*waf.Verdict, error)
 }
 
 // NewServer initializes a new Control Plane API server with Chi routing.

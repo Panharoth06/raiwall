@@ -69,6 +69,17 @@ func OpenAPISpec() map[string]any {
 					},
 				},
 			},
+			"/rules/test": map[string]any{
+				"post": map[string]any{
+					"summary":     "Evaluate a synthetic request against the live WAF engine",
+					"description": "Runs the semantic funnel and OWASP CRS, returning the verdict, anomaly score, paranoia level and matched rules.",
+					"responses": map[string]any{
+						"200": map[string]any{"description": "Inspection verdict"},
+						"400": map[string]any{"description": "Invalid probe"},
+						"503": map[string]any{"description": "Rule tester unavailable"},
+					},
+				},
+			},
 			"/sites": map[string]any{
 				"get": map[string]any{
 					"summary": "List all configured sites and upstreams",

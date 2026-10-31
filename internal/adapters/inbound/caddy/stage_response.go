@@ -188,7 +188,7 @@ func (m *Middleware) forwardAndInspectResponse(
 		severity = "low"
 		ruleID = respVerdict.RuleID
 	}
-	m.recordTelemetry(&telemetry.ForensicEvent{
+	event := &telemetry.ForensicEvent{
 		EventID:          uuid.New().String(),
 		Timestamp:        startTime,
 		Host:             r.Host,
@@ -208,7 +208,13 @@ func (m *Middleware) forwardAndInspectResponse(
 		MatchedToken:     token,
 		AttackCategory:   category,
 		ResponseHeaders:  cloneHeaderMap(interceptor.Header()),
-	})
+	}
+	metadataVerdict := verdict
+	if metadataVerdict == nil {
+		metadataVerdict = respVerdict
+	}
+	applyVerdictMetadata(event, metadataVerdict)
+	m.recordTelemetry(event)
 
 	return nextErr
 }
