@@ -125,6 +125,18 @@ rate_limit:
   tier3_ban_duration: 24h
   storage: memory               # memory | redis
   storage_addr: "${RAIWALL_RATE_REDIS_ADDR:-}"
+  # Cluster mode: redis carries rate limits, bans, and config events across
+  # replicas. Redis is inside the trust boundary: anyone who can SET or
+  # PUBLISH on it can inject bans and config snapshots into every replica, so
+  # enable AUTH/TLS and reach it only from cluster nodes. Secrets belong in
+  # the environment, not this file.
+  redis_username: "${RAIWALL_RATE_REDIS_USERNAME:-}"
+  redis_password: "${RAIWALL_RATE_REDIS_PASSWORD:-}"
+  redis_tls: false
+  redis_tls_server_name: ""
+  redis_tls_ca_file: ""
+  redis_tls_insecure_skip_verify: false
+  cluster_channel: "raiwall:cluster:events"
 
 waiting_room:
   enabled: true

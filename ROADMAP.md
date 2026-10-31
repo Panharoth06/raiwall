@@ -231,7 +231,7 @@ Priority: **P0** blocks enterprise use, **P1** major capability, **P2** maturity
 |---|---|---|---|---|
 | 0.1 | Authenticate telemetry/metrics/SSE/incidents/cURL; remove wildcard CORS and query-string credentials | `caddy/stage_routes.go`, `http/telemetry_api.go`, `http/streamer.go`, `http/middleware.go` | M | **Done** `13e8678` |
 | 0.2 | Bounded-prefix body inspection, gzip/deflate/brotli decode with bomb cap, pooled-buffer race fix, sidecar parity | `caddy/body_inspector.go`, `caddy/stage_waf.go`, `grpc/processor.go`, `core/waf/bodyinspect` | L | **Done** `13e8678` |
-| 0.3 | HA state: ban hydration, OnBan publish, snapshot propagation + poll, real cluster status, Redis AUTH/TLS | `core/rate/ban*.go`, `storage/redis/*`, `http/snapshots_apply.go`, `http/handlers_system.go` | L | **Pending** |
+| 0.3 | HA state: ban hydration, OnBan publish, snapshot propagation + poll, real cluster status, Redis AUTH/TLS | `core/rate/ban*.go`, `storage/redis/*`, `http/snapshots_apply.go`, `http/handlers_system.go` | L | **Done** (in-process two-replica convergence; live Sentinel/Cluster in 4.1) |
 | 0.4 | ClickHouse: InitSchema, pruning, full columns (incl. CRS metadata), indexed event lookup | `storage/clickhouse/*`, `storage/registry.go` | M | **Done** (unit-tested; add live cluster integration in Phase 4) |
 | 0.5 | Envoy ext_proc field numbers + wire-format regression test | `grpc/proto_types.go` | M | **Done** `13e8678` |
 | 0.6 | Close per-site auth bypass; validate bearer/API-key claims | `core/auth/appgate.go`, `caddy/stage_auth_gate.go` | M | **Done** `13e8678` |
@@ -451,7 +451,7 @@ containers; raw HTTP/2 frame smuggling beyond the front proxy.
 | Huma OpenAPI 3.1 | chi + hand-written partial spec | Say “OpenAPI 3.1 (partial)” |
 | Shoutrrr alerts | Native Slack/Discord/Telegram/webhook sender | Describe native sender |
 | Ristretto rate limiter | Not used | Remove |
-| Redis cluster sync | Unwired | Mark planned until 0.3 |
+| Redis cluster sync | Wired (0.3) | Live Sentinel/Cluster in 4.1 |
 | Globe.gl / shadcn-vue | Custom router / radix-vue | Correct |
 | JA4 TLS fingerprinting | Header-derived | Mark planned until 0.7 |
 | Enterprise-grade / HA | Replica 1, PDB off, RWO | Publish `STATUS.md`; pre-GA language |

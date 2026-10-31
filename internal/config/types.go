@@ -194,6 +194,16 @@ type RateLimit struct {
 	Tier3BanDuration Duration `yaml:"tier3_ban_duration" json:"tier3_ban_duration"`
 	Storage          string   `yaml:"storage" json:"storage"`
 	StorageAddr      string   `yaml:"storage_addr" json:"storage_addr"`
+
+	// Redis cluster options. They apply when Storage is "redis": the same
+	// connection carries rate limits, bans, and the HA event channel.
+	RedisUsername              string `yaml:"redis_username" json:"redis_username"`
+	RedisPassword              string `yaml:"redis_password" json:"redis_password"`
+	RedisTLS                   bool   `yaml:"redis_tls" json:"redis_tls"`
+	RedisTLSServerName         string `yaml:"redis_tls_server_name" json:"redis_tls_server_name"`
+	RedisTLSCAFile             string `yaml:"redis_tls_ca_file" json:"redis_tls_ca_file"`
+	RedisTLSInsecureSkipVerify bool   `yaml:"redis_tls_insecure_skip_verify" json:"redis_tls_insecure_skip_verify"`
+	ClusterChannel             string `yaml:"cluster_channel" json:"cluster_channel"`
 }
 
 // WaitingRoom configures the bounded admission queue.

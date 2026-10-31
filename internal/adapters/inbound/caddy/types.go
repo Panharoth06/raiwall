@@ -8,6 +8,7 @@ import (
 	"github.com/Panharoth06/raiwall/internal/adapters/inbound/http"
 	"github.com/Panharoth06/raiwall/internal/adapters/outbound/alerts"
 	"github.com/Panharoth06/raiwall/internal/adapters/outbound/storage"
+	"github.com/Panharoth06/raiwall/internal/adapters/outbound/storage/redis"
 	"github.com/Panharoth06/raiwall/internal/config"
 	"github.com/Panharoth06/raiwall/internal/core/acl"
 	"github.com/Panharoth06/raiwall/internal/core/auth"
@@ -39,6 +40,15 @@ type RateLimitSettings struct {
 	Tier3BanDuration caddy.Duration `json:"tier3_ban_duration,omitempty"`
 	StorageType      string         `json:"storage_type,omitempty"`
 	StorageAddr      string         `json:"storage_addr,omitempty"`
+
+	// Redis cluster options, shared by rate limiting, bans, and HA events.
+	RedisUsername              string `json:"redis_username,omitempty"`
+	RedisPassword              string `json:"redis_password,omitempty"`
+	RedisTLS                   bool   `json:"redis_tls,omitempty"`
+	RedisTLSServerName         string `json:"redis_tls_server_name,omitempty"`
+	RedisTLSCAFile             string `json:"redis_tls_ca_file,omitempty"`
+	RedisTLSInsecureSkipVerify bool   `json:"redis_tls_insecure_skip_verify,omitempty"`
+	ClusterChannel             string `json:"cluster_channel,omitempty"`
 }
 
 // WaitingRoomSettings configures the bounded virtual waiting room.
@@ -203,6 +213,18 @@ type Middleware struct {
 	tier3Trap    *rate.Tier3ScannerTrap
 	waitingRoom  *rate.WaitingRoomManager
 	rateStorage  rate.RateStorage
+
+	// redisClient is the shared cluster connection built from rate_limit's
+	// redis settings; clusterPub/clusterSub are its HA wiring.
+	redisClient     *redis.SimpleRESPClient
+	clusterPub      *redis.Publisher
+	clusterSub      *redis.Subscriber
+	clusterStop     chan struct{}
+	clusterWG       sync.WaitGroup
+	clusterBanQueue chan *rate.BanEntry
+	// declarativeDeployed records that startup declarative sync deployed a
+	// snapshot before the cluster publisher existed.
+	declarativeDeployed bool
 
 	exceptionEngine atomic.Pointer[acl.ExceptionEngine]
 	// crsEngine is the reloadable Coraza ruleset engine (embedded CRS plus

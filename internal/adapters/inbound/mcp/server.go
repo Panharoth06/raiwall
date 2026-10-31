@@ -49,6 +49,11 @@ func NewServer(store control.ControlStore) *Server {
 	}
 }
 
+// SetApplyNotifier installs the post-apply notification hook used by cluster sync.
+func (s *Server) SetApplyNotifier(fn func(ctx context.Context, snap *control.ConfigSnapshot)) {
+	s.registry.SetApplyNotifier(fn)
+}
+
 // Registry returns the underlying tool registry.
 func (s *Server) Registry() *Registry {
 	return s.registry

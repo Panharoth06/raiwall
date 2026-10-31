@@ -472,7 +472,16 @@ export const api = {
       body: JSON.stringify(payload),
     }),
   getClusterStatus: () =>
-    request<{ mode: string; redis_connected: boolean; active_version: number; channel: string }>('/cluster/status'),
+    request<{
+      mode: string;
+      redis_connected: boolean;
+      active_version: number;
+      channel: string;
+      applied_version?: number;
+      applied_hash?: string;
+      last_apply_error?: string;
+      ban_count?: number;
+    }>('/cluster/status'),
   getStatus: () => request<SystemStatus>('/status'),
   setAutoApply: (enabled: boolean) =>
     request<{ success: boolean; auto_apply: boolean }>('/system/auto-apply', {

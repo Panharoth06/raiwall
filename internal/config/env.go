@@ -177,6 +177,7 @@ var secretKeys = map[string]struct{}{
 	"hmac_secret":    {},
 	"password":       {},
 	"password_hash":  {},
+	"redis_password": {},
 	"pow_secret":     {},
 	"session_secret": {},
 	"client_secret":  {},

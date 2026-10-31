@@ -224,6 +224,17 @@ config:
     tier3_ban_duration: 24h
     storage: memory
     storage_addr: ""
+    # Cluster mode: set storage to redis and fill storage_addr. Redis is inside
+    # the trust boundary -- any writer can inject bans and config snapshots --
+    # so require AUTH/TLS and a cluster-only network. Credentials belong in a
+    # Secret, referenced through environment interpolation.
+    redis_username: ""
+    redis_password: ""
+    redis_tls: false
+    redis_tls_server_name: ""
+    redis_tls_ca_file: ""
+    redis_tls_insecure_skip_verify: false
+    cluster_channel: "raiwall:cluster:events"
 
   waiting_room:
     enabled: true

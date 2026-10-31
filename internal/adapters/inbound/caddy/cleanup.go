@@ -24,8 +24,22 @@ func (m *Middleware) Cleanup() error {
 	if m.banManager != nil {
 		_ = m.banManager.Close()
 	}
+	// Stop the subscriber before the client it reads from is closed. The
+	// rate storage owns the shared client and closes it below.
+	if m.clusterSub != nil {
+		m.clusterSub.Stop()
+	}
+	if m.clusterStop != nil {
+		close(m.clusterStop)
+	}
+	m.clusterWG.Wait()
 	if m.rateStorage != nil {
 		_ = m.rateStorage.Close()
+	}
+	// RedisStorage already closes the shared client; this covers a client that
+	// was built for cluster sync while a different storage was injected.
+	if m.redisClient != nil {
+		_ = m.redisClient.Close()
 	}
 	if m.sidecarServer != nil {
 		m.sidecarServer.Stop()

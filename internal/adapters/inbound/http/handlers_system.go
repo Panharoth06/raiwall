@@ -11,6 +11,10 @@ import (
 	"github.com/Panharoth06/raiwall/internal/core/control"
 )
 
+// defaultClusterChannel matches the redis adapter's default; standalone mode
+// still reports the channel peers would use.
+const defaultClusterChannel = "raiwall:cluster:events"
+
 func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	snap := control.GetActiveSnapshot()
 	var ver uint64
@@ -48,17 +52,28 @@ func (s *Server) handleUpdateAutoApply(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleClusterStatus(w http.ResponseWriter, r *http.Request) {
+	if s.clusterStatus != nil {
+		respondJSON(w, http.StatusOK, s.clusterStatus.ClusterStatus(r.Context()))
+		return
+	}
+
 	snap := control.GetActiveSnapshot()
 	var ver uint64 = 1
 	if snap != nil {
 		ver = snap.Version
 	}
+	banCount := 0
+	if s.banManager != nil {
+		banCount = s.banManager.Count()
+	}
 
-	respondJSON(w, http.StatusOK, map[string]any{
-		"mode":            "standalone",
-		"redis_connected": false,
-		"active_version":  ver,
-		"channel":         "raiwall:cluster",
+	respondJSON(w, http.StatusOK, ClusterStatus{
+		Mode:           "standalone",
+		RedisConnected: false,
+		ActiveVersion:  ver,
+		AppliedVersion: ver,
+		Channel:        defaultClusterChannel,
+		BanCount:       banCount,
 	})
 }
 

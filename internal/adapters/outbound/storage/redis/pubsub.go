@@ -26,6 +26,9 @@ type VersionNotification struct {
 	Hash      string    `json:"hash"`
 	Author    string    `json:"author,omitempty"`
 	Timestamp time.Time `json:"timestamp"`
+	// Revision identifies this notification so a duplicate delivery is applied
+	// once. It is not the config version: rollbacks legitimately decrease that.
+	Revision int64 `json:"revision,omitempty"`
 }
 
 // ClusterRedisClient defines the Redis operations required by the cluster synchronizer.
@@ -79,6 +82,7 @@ func (p *Publisher) PublishSnapshot(ctx context.Context, snap *control.ConfigSna
 		Hash:      hashStr,
 		Author:    author,
 		Timestamp: time.Now().UTC(),
+		Revision:  time.Now().UnixNano(),
 	}
 	notifData, _ := json.Marshal(notif)
 
@@ -87,6 +91,13 @@ func (p *Publisher) PublishSnapshot(ctx context.Context, snap *control.ConfigSna
 	}
 
 	return nil
+}
+
+// SetChannel overrides the pub/sub channel. An empty value keeps the default.
+func (p *Publisher) SetChannel(channel string) {
+	if channel != "" {
+		p.channel = channel
+	}
 }
 
 // PublishVersion is a helper satisfying ClusterPublisher.
@@ -191,7 +202,7 @@ func (m *MockRedisClient) Get(ctx context.Context, key string) (string, error) {
 	defer m.mu.RUnlock()
 	val, ok := m.data[key]
 	if !ok {
-		return "", errors.New("redis: nil")
+		return "", ErrNil
 	}
 	return val, nil
 }

@@ -24,12 +24,31 @@ type ClusterPublisher interface {
 	PublishUnblockAll(ctx context.Context) error
 }
 
+// ClusterStatus is the live HA state reported by the cluster status endpoint.
+type ClusterStatus struct {
+	Mode           string `json:"mode"`
+	RedisConnected bool   `json:"redis_connected"`
+	Channel        string `json:"channel"`
+	ActiveVersion  uint64 `json:"active_version"`
+	AppliedVersion uint64 `json:"applied_version"`
+	AppliedHash    string `json:"applied_hash,omitempty"`
+	LastApplyError string `json:"last_apply_error,omitempty"`
+	BanCount       int    `json:"ban_count"`
+}
+
+// ClusterStatusProvider supplies live HA state from the data plane. A nil
+// provider means the process is running standalone.
+type ClusterStatusProvider interface {
+	ClusterStatus(ctx context.Context) ClusterStatus
+}
+
 // Server provides the HTTP handler for the Raiwall Control Plane REST API.
 type Server struct {
 	store            control.ControlStore
 	authMgr          *AuthManager
 	router           *chi.Mux
 	clusterPublisher ClusterPublisher
+	clusterStatus    ClusterStatusProvider
 	mcpServer        *mcp.Server
 	banManager       *rate.BanManager
 	waitingRoom      *rate.WaitingRoomManager
@@ -72,6 +91,20 @@ func NewServer(store control.ControlStore, hmacSecret []byte) *Server {
 // SetClusterPublisher sets the distributed cluster event publisher.
 func (s *Server) SetClusterPublisher(pub ClusterPublisher) {
 	s.clusterPublisher = pub
+	// MCP applies bypass the HTTP handlers, so they announce through the same
+	// publisher instead of silently leaving peers behind.
+	if pub != nil && s.mcpServer != nil {
+		s.mcpServer.SetApplyNotifier(func(_ context.Context, snap *control.ConfigSnapshot) {
+			go func() {
+				_ = pub.PublishVersion(context.Background(), snap.Version)
+			}()
+		})
+	}
+}
+
+// SetClusterStatusProvider installs the live HA status source.
+func (s *Server) SetClusterStatusProvider(provider ClusterStatusProvider) {
+	s.clusterStatus = provider
 }
 
 // SetAutoApply enables committing a snapshot after every successful

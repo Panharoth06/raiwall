@@ -33,6 +33,20 @@ type ToolContent struct {
 type Registry struct {
 	store control.ControlStore
 	tools map[string]ToolDefinition
+	// applyNotifier runs after a tool deploys or rolls back a snapshot so the
+	// cluster publisher can announce it like any other control-plane apply.
+	applyNotifier func(ctx context.Context, snap *control.ConfigSnapshot)
+}
+
+// SetApplyNotifier installs the post-apply notification hook.
+func (r *Registry) SetApplyNotifier(fn func(ctx context.Context, snap *control.ConfigSnapshot)) {
+	r.applyNotifier = fn
+}
+
+func (r *Registry) notifyApplied(ctx context.Context, snap *control.ConfigSnapshot) {
+	if r.applyNotifier != nil && snap != nil {
+		r.applyNotifier(ctx, snap)
+	}
 }
 
 // NewRegistry constructs a Registry initialized with Raiwall WAF operational tools.
@@ -254,6 +268,7 @@ func (r *Registry) Execute(ctx context.Context, name string, args map[string]any
 				Content: []ToolContent{{Type: "text", Text: fmt.Sprintf("Configuration apply failed: %v", err)}},
 			}, nil
 		}
+		r.notifyApplied(ctx, deployed)
 
 		return &ToolCallResult{
 			Content: []ToolContent{{Type: "text", Text: fmt.Sprintf("Configuration successfully applied and swapped to version %d (Author: %s)", deployed.Version, author)}},
@@ -276,6 +291,7 @@ func (r *Registry) Execute(ctx context.Context, name string, args map[string]any
 				Content: []ToolContent{{Type: "text", Text: fmt.Sprintf("Rollback failed: %v", err)}},
 			}, nil
 		}
+		r.notifyApplied(ctx, restored)
 
 		return &ToolCallResult{
 			Content: []ToolContent{{Type: "text", Text: fmt.Sprintf("Successfully rolled back to configuration version %d", restored.Version)}},

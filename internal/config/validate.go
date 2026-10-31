@@ -190,6 +190,13 @@ func (f *File) validateRateLimit(v *validator) {
 	if strings.EqualFold(f.RateLimit.Storage, "redis") && f.RateLimit.StorageAddr == "" {
 		v.add("rate_limit.storage_addr is required when rate_limit.storage is redis")
 	}
+	if f.RateLimit.RedisUsername != "" && f.RateLimit.RedisPassword == "" {
+		v.add("rate_limit.redis_username requires redis_password")
+	}
+	if !f.RateLimit.RedisTLS && (f.RateLimit.RedisTLSServerName != "" ||
+		f.RateLimit.RedisTLSCAFile != "" || f.RateLimit.RedisTLSInsecureSkipVerify) {
+		v.add("rate_limit.redis_tls must be enabled when any redis_tls_* option is set")
+	}
 }
 
 func (f *File) validateTelemetry(v *validator) {

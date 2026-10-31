@@ -20,7 +20,16 @@ export const useConfigStore = defineStore('config', () => {
   const policies = ref<PolicySettings | null>(null);
   const diffs = ref<ConfigDiffItem[]>([]);
   const history = ref<ConfigHistoryItem[]>([]);
-  const cluster = ref<{ mode: string; redis_connected: boolean; active_version: number; channel: string } | null>(null);
+  const cluster = ref<{
+    mode: string;
+    redis_connected: boolean;
+    active_version: number;
+    channel: string;
+    applied_version?: number;
+    applied_hash?: string;
+    last_apply_error?: string;
+    ban_count?: number;
+  } | null>(null);
 
   const loading = ref(false);
   const error = ref<string | null>(null);

@@ -32,21 +32,39 @@ Status legend: `[x]` done · `[~]` partial · `[ ]` pending.
 - [x] Apply prefix inspection and decompression to the Envoy sidecar path.
 - [x] Tests: small/oversize/chunked/empty, gzip/deflate/br, bomb cap, reconstruction.
 
-### 0.3 Wire HA state `[ ]`
+### 0.3 Wire HA state `[x]`
 **Targets:** `core/rate/ban.go`, `core/rate/ban_registry.go`,
 `storage/redis/*`, `http/snapshots_apply.go`, `http/handlers_system.go`,
 `caddy/provision_rate.go`.
-- [ ] Hydrate `BanManager` from Redis at startup.
-- [ ] Wire `OnBan`/`OnUnblock` callbacks to publish events.
-- [ ] Subscribe and apply remote ban/unban events; reconcile expiry.
-- [ ] Publish snapshot `{version, hash}` on apply and rollback.
-- [ ] Subscribers fetch, verify hash, and atomically swap; 10–15 s DB poll fallback.
-- [ ] Reject stale/mismatched versions; expose `applied_version`, `applied_hash`,
-      `last_apply_error`.
-- [ ] Replace hardcoded `/cluster/status` with real mode/redis state.
-- [ ] Redis client AUTH/TLS (full Sentinel/Cluster in 4.1).
-- [ ] Tests: two-replica ban convergence, restart hydration, config convergence.
-- [ ] Gate: two replicas agree on bans and config without restarts.
+- [x] Hydrate `BanManager` from Redis at startup (expired entries skipped,
+      no callbacks or write-back).
+- [x] Wire ban fan-out: `OnBan` publishes; remote applies never echo.
+      Unblock events are published by the control-plane handlers that own the
+      operator action (single owner, no double publish).
+- [x] Subscribe and apply remote ban/unban events; expired remote bans ignored;
+      every (re)connect re-reconciles bans from shared storage so events missed
+      during a Redis gap converge.
+- [x] Publish snapshot `{version, hash}` on apply and rollback (existing
+      publisher, now wired to the control-plane server and MCP tool path).
+- [x] Subscribers fetch, verify hash, and atomically swap through the same
+      deploy hooks as a local apply; 10 s DB poll fallback. Rollbacks apply by
+      content hash (config versions are not ordered); duplicate notifications
+      are suppressed by a revision marker.
+- [x] Reject duplicate/hash-mismatched notifications; `/cluster/status` exposes
+      `applied_version`, `applied_hash`, `last_apply_error`, and `ban_count`.
+- [x] Reconcile bans after reconnects (shared storage is authoritative) and
+      bound ban fan-out through a queue so a Redis outage cannot spawn a
+      goroutine per ban.
+- [x] Replace hardcoded `/cluster/status` with real mode/redis state.
+- [x] Redis client AUTH/TLS (username+password, CA file, server name,
+      explicit insecure-skip defaulting off). Full Sentinel/Cluster in 4.1.
+- [x] Tests: two-replica ban convergence (no echo), restart hydration,
+      config convergence with deploy hooks, stale/hash-mismatch rejection,
+      status endpoint in standalone and Redis modes.
+- [x] Gate: two replicas agree on bans and config without restarts.
+      No redis-server was available locally, so the gate is proven with an
+      in-process RESP server (including AUTH and TLS); live Sentinel/Cluster
+      validation stays in 4.1.
 
 ### 0.4 Repair ClickHouse telemetry `[x]`
 **Targets:** `storage/clickhouse/*`, `storage/registry.go`,

@@ -50,6 +50,14 @@ func handlerFromConfig(file *config.File) (*Middleware, error) {
 			Tier3BanDuration: caddy.Duration(file.RateLimit.Tier3BanDuration),
 			StorageType:      file.RateLimit.Storage,
 			StorageAddr:      file.RateLimit.StorageAddr,
+
+			RedisUsername:              file.RateLimit.RedisUsername,
+			RedisPassword:              file.RateLimit.RedisPassword,
+			RedisTLS:                   file.RateLimit.RedisTLS,
+			RedisTLSServerName:         file.RateLimit.RedisTLSServerName,
+			RedisTLSCAFile:             file.RateLimit.RedisTLSCAFile,
+			RedisTLSInsecureSkipVerify: file.RateLimit.RedisTLSInsecureSkipVerify,
+			ClusterChannel:             file.RateLimit.ClusterChannel,
 		}
 	}
 

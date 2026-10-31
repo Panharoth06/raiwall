@@ -1,6 +1,7 @@
 package caddy
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -9,6 +10,9 @@ import (
 	"github.com/Panharoth06/raiwall/internal/core/rate"
 	"github.com/caddyserver/caddy/v2"
 )
+
+// redisCommandTimeout bounds one Redis round trip, including dial and AUTH.
+const redisCommandTimeout = 2 * time.Second
 
 func (m *Middleware) provisionRate(_ caddy.Context) error {
 	if m.banManager == nil {
@@ -20,12 +24,26 @@ func (m *Middleware) provisionRate(_ caddy.Context) error {
 
 	if m.rateStorage == nil {
 		if m.RateLimitConfig != nil && strings.ToLower(m.RateLimitConfig.StorageType) == "redis" && m.RateLimitConfig.StorageAddr != "" {
-			redisClient := redis.NewSimpleRESPClient(m.RateLimitConfig.StorageAddr, 2*time.Second)
+			client, err := redis.NewRESPClient(redis.Options{
+				Addr:                  m.RateLimitConfig.StorageAddr,
+				Timeout:               redisCommandTimeout,
+				Username:              m.RateLimitConfig.RedisUsername,
+				Password:              m.RateLimitConfig.RedisPassword,
+				TLS:                   m.RateLimitConfig.RedisTLS,
+				TLSServerName:         m.RateLimitConfig.RedisTLSServerName,
+				TLSCAFile:             m.RateLimitConfig.RedisTLSCAFile,
+				TLSInsecureSkipVerify: m.RateLimitConfig.RedisTLSInsecureSkipVerify,
+				OnReconnect:           m.reconcileBans,
+			})
+			if err != nil {
+				return fmt.Errorf("configure redis rate storage: %w", err)
+			}
+			m.redisClient = client
 			m.rateStorage = redis.NewRedisStorage(redis.RedisStorageConfig{
-				Client:            redisClient,
+				Client:            client,
 				FallbackOnFailure: true,
 			})
-			m.banManager.SetBanStorage(redis.NewRedisBanStorage(redisClient, "rw:bans:"))
+			m.banManager.SetBanStorage(redis.NewRedisBanStorage(client, "rw:bans:"))
 		} else {
 			m.rateStorage = rate.NewMemoryStorage()
 		}

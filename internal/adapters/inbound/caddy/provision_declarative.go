@@ -40,6 +40,7 @@ func (m *Middleware) syncDeclarative() error {
 	if err != nil {
 		return err
 	}
+	m.declarativeDeployed = deployed
 
 	if m.logger != nil {
 		fields := []zap.Field{

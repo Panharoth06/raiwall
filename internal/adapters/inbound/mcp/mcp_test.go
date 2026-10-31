@@ -129,6 +129,42 @@ func TestMCP_ToolExecution(t *testing.T) {
 	require.Contains(t, callRes.Content[0].Text, "Successfully rolled back")
 }
 
+func TestMCP_ApplyNotifierRunsForApplyAndRollback(t *testing.T) {
+	server, store := setupTestMCP(t)
+	defer store.Close()
+
+	notified := make(chan uint64, 4)
+	server.SetApplyNotifier(func(_ context.Context, snap *control.ConfigSnapshot) {
+		notified <- snap.Version
+	})
+
+	call := func(id int, name string, args map[string]any) *ToolCallResult {
+		params, err := json.Marshal(map[string]any{"name": name, "arguments": args})
+		require.NoError(t, err)
+		resp := server.HandleRequest(context.Background(), &JSONRPCRequest{
+			JSONRPC: "2.0", ID: id, Method: "tools/call", Params: params,
+		})
+		require.Nil(t, resp.Error)
+		return resp.Result.(*ToolCallResult)
+	}
+
+	require.False(t, call(1, "apply_configuration", map[string]any{"author": "test"}).IsError)
+	select {
+	case version := <-notified:
+		require.Equal(t, uint64(1), version)
+	case <-time.After(time.Second):
+		t.Fatal("apply did not notify the cluster publisher")
+	}
+
+	require.False(t, call(2, "rollback_configuration", map[string]any{"version": 1}).IsError)
+	select {
+	case version := <-notified:
+		require.Equal(t, uint64(1), version)
+	case <-time.After(time.Second):
+		t.Fatal("rollback did not notify the cluster publisher")
+	}
+}
+
 func TestMCP_StdioLoop(t *testing.T) {
 	server, store := setupTestMCP(t)
 	defer store.Close()

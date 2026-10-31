@@ -60,6 +60,9 @@ func (m *Middleware) Provision(ctx caddy.Context) error {
 	if err := m.provisionControl(ctx); err != nil {
 		return err
 	}
+	if err := m.provisionCluster(ctx); err != nil {
+		return err
+	}
 	if err := m.provisionSidecar(ctx); err != nil {
 		return err
 	}

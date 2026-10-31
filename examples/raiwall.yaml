@@ -93,6 +93,24 @@ rate_limit:
   tier3_ban_duration: 24h
   storage: memory
   storage_addr: ""
+  # Cluster mode. Point storage at Redis to share rate limits, bans, and
+  # configuration events between replicas:
+  #   storage: redis
+  #   storage_addr: "redis:6379"
+  # Redis is inside the trust boundary: any principal that can SET or PUBLISH
+  # on it can inject bans and configuration snapshots into every replica.
+  # Require AUTH/TLS and keep it on a cluster-only network.
+  # Credentials should come from the environment:
+  #   redis_password: "${RAIWALL_RATE_REDIS_PASSWORD:?password required}"
+  redis_username: ""
+  redis_password: ""
+  # TLS to Redis. Prefer a CA file over skipping verification; skipping is for
+  # local testing only because it permits man-in-the-middle attacks.
+  redis_tls: false
+  redis_tls_server_name: ""
+  redis_tls_ca_file: ""
+  redis_tls_insecure_skip_verify: false
+  cluster_channel: "raiwall:cluster:events"
 
 waiting_room:
   enabled: true
