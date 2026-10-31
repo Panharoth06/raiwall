@@ -149,6 +149,7 @@ databases: `raiwall_control.db` and `raiwall_telemetry.db`, both under
 | :--- | :--- | :--- |
 | `hmac_secret` | generated per boot | Set a stable 32+ byte value in production |
 | `db_path` | unset | Legacy single-store override; prefer `storage` |
+| `auto_apply` | `false` (shipped configs: `true`) | Commit and hot-swap a snapshot after every successful configuration mutation. When `false`, changes stay staged until deployed from **Deployments & Rollback History**. |
 | `bootstrap_admin.username` | `admin` | Required |
 | `bootstrap_admin.password` | generated | Logged once at WARN level |
 | `bootstrap_admin.role` | `admin` | `admin` or `viewer` |
