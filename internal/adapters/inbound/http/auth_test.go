@@ -83,7 +83,7 @@ func TestAuth_LoginAndSessionCookie(t *testing.T) {
 	cookies := w.Result().Cookies()
 	var sessionCookie *http.Cookie
 	for _, c := range cookies {
-		if c.Name == SessionCookieName {
+		if c.Name == server.AuthManager().CookieName() {
 			sessionCookie = c
 			break
 		}

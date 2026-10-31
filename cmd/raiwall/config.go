@@ -13,6 +13,7 @@ import (
 func init() {
 	fs := flag.NewFlagSet("config", flag.ExitOnError)
 	fs.String("config", "", "Path to a raiwall.yaml document (defaults to discovery)")
+	fs.Bool("include-secrets", false, "print secrets in `config print` output (default redacts)")
 
 	caddycmd.RegisterCommand(caddycmd.Command{
 		Name:  "config",
@@ -25,6 +26,13 @@ func init() {
 		Flags: fs,
 		Func:  cmdConfig,
 	})
+}
+
+func getFlagBool(flags caddycmd.Flags, name string, def bool) bool {
+	if flags.FlagSet != nil && flags.FlagSet.Lookup(name) != nil {
+		return flags.Bool(name)
+	}
+	return def
 }
 
 func cmdConfig(flags caddycmd.Flags) (int, error) {
@@ -70,7 +78,16 @@ func cmdConfig(flags caddycmd.Flags) (int, error) {
 			resolved, len(file.Applications), len(file.ACLs), len(file.Exceptions))
 		return 0, nil
 	case "print":
-		fmt.Println(string(adapted))
+		if getFlagBool(flags, "include-secrets", false) {
+			fmt.Println(string(adapted))
+			return 0, nil
+		}
+		redacted, err := redactAdaptedConfig(adapted)
+		if err != nil {
+			return 1, fmt.Errorf("redact adapted config: %w", err)
+		}
+		fmt.Fprintln(os.Stderr, "secrets are redacted; pass --include-secrets to print them")
+		fmt.Println(string(redacted))
 		return 0, nil
 	default:
 		return 1, fmt.Errorf("unknown config subcommand %q: choose validate or print", args[0])

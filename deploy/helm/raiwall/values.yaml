@@ -40,6 +40,10 @@ securityContext:
 
 service:
   type: ClusterIP
+  # External ports. The container listens on 8080/8443 as a non-root user; the
+  # Service maps public 80/443 (and 443/UDP for HTTP/3) to those ports.
+  httpPort: 80
+  httpsPort: 443
   annotations: {}
 
 ingress:
@@ -96,21 +100,21 @@ secrets:
 probes:
   liveness:
     enabled: true
-    path: /.raiwall/api/openapi.json
+    path: /.raiwall/healthz
     initialDelaySeconds: 10
     periodSeconds: 20
     timeoutSeconds: 3
     failureThreshold: 3
   readiness:
     enabled: true
-    path: /.raiwall/api/openapi.json
+    path: /.raiwall/readyz
     initialDelaySeconds: 5
     periodSeconds: 10
     timeoutSeconds: 3
     failureThreshold: 3
   startup:
     enabled: true
-    path: /.raiwall/api/openapi.json
+    path: /.raiwall/healthz
     periodSeconds: 5
     failureThreshold: 30
 
@@ -161,8 +165,9 @@ config:
       listen: ":8443"
       http3: true
       tls_min_version: "1.2"
-    auto_https: false
+    auto_https: true
     acme:
+      # Required with production_mode; e.g. ops@example.com
       email: ""
       ca: ""
       staging: false
@@ -188,6 +193,15 @@ config:
 
   control:
     hmac_secret: "${RAIWALL_HMAC_SECRET}"
+    # Required with production_mode, e.g. https://raiwall.example.com
+    public_url: ""
+    # Optional console allowlist, e.g. ["10.0.0.0/8"].
+    allowed_networks: []
+    session:
+      idle_timeout: 8h
+      absolute_timeout: 24h
+      secure: true
+      allow_basic_auth: false
     auto_apply: true
     bootstrap_admin:
       username: admin
@@ -195,7 +209,8 @@ config:
       role: admin
 
   security:
-    strict_secrets: false
+    strict_secrets: true
+    production_mode: true
 
   waf:
     mode: defense
@@ -215,8 +230,8 @@ config:
   rate_limit:
     tier1_rate: 100
     tier1_period: 10s
-    tier1_burst: 20
-    tier2_threshold: 10
+    tier1_burst: 50
+    tier2_threshold: 20
     tier2_window: 60s
     tier2_ban_duration: 24h
     tier3_threshold: 20
@@ -237,7 +252,7 @@ config:
     cluster_channel: "raiwall:cluster:events"
 
   waiting_room:
-    enabled: true
+    enabled: false
     max_concurrent: 500
     max_queue_depth: 1000
     admission_rate: 50

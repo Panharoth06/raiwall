@@ -11,6 +11,14 @@ import (
 // serveInternalRoutes intercepts requests to Raiwall internal endpoints (telemetry, API, UI).
 // Returns true if the request was handled internally and requires no further processing.
 func (m *Middleware) serveInternalRoutes(w http.ResponseWriter, r *http.Request) bool {
+	if m.serveHealth(w, r) {
+		return true
+	}
+	if isInternalAdminPath(r.URL.Path) && !m.adminClientAllowed(r) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return true
+	}
+
 	// Internal WAF routes: GeoIP database status for the dashboard
 	if m.geoipAPI != nil && isGeoIPStatusPath(r.URL.Path) {
 		m.geoipAPI.ServeHTTP(w, r)

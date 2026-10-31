@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,6 +14,8 @@ import (
 
 // defaultClusterChannel matches the redis adapter's default; standalone mode
 // still reports the channel peers would use.
+const statusProbeTimeout = 2 * time.Second
+
 const defaultClusterChannel = "raiwall:cluster:events"
 
 func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
@@ -24,8 +27,27 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		mode = snap.DefaultMode
 	}
 
+	checks := map[string]bool{"snapshot": snap != nil && snap.Version >= 1}
+	if s.store != nil {
+		ctx, cancel := context.WithTimeout(r.Context(), statusProbeTimeout)
+		checks["database"] = s.store.Ping(ctx) == nil
+		cancel()
+	}
+	if s.readiness != nil {
+		for name, ok := range s.readiness.Readiness(r.Context()) {
+			checks[name] = ok
+		}
+	}
+	status := "healthy"
+	for _, ok := range checks {
+		if !ok {
+			status = "degraded"
+		}
+	}
+
 	respondJSON(w, http.StatusOK, map[string]any{
-		"status":         "healthy",
+		"status":         status,
+		"checks":         checks,
 		"active_version": ver,
 		"mode":           mode,
 		"auto_apply":     s.autoApply,

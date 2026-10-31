@@ -1,3 +1,14 @@
+{{- if .Values.config.security.production_mode }}
+{{- if not .Values.config.control.public_url }}
+{{- fail "config.control.public_url is required (e.g. https://raiwall.example.com)" }}
+{{- end }}
+{{- if not .Values.config.server.acme.email }}
+{{- fail "config.server.acme.email is required when auto_https is enabled" }}
+{{- end }}
+{{- end }}
+{{- if and (not .Values.database.existingSecret) (or (eq .Values.database.password "change-me") (not .Values.database.password)) }}
+{{- fail "set database.password to a strong value or use database.existingSecret" }}
+{{- end }}
 apiVersion: v1
 kind: ConfigMap
 metadata:

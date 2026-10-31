@@ -89,6 +89,11 @@ func TestControlPlane_E2E_FullLifecycle(t *testing.T) {
 
 	// 2. Initialize API Server
 	apiServer := api.NewServer(store, []byte("e2e_test_secret_32_bytes_long_ok"))
+	// This suite exercises the opt-in HTTP Basic path; production defaults to
+	// session cookies with Basic disabled.
+	apiServer.SetSessionConfig(api.SessionConfig{
+		IdleTimeout: time.Hour, AbsoluteTimeout: time.Hour, Secure: false, AllowBasicAuth: true,
+	})
 	pub := &mockPublisher{}
 	apiServer.SetClusterPublisher(pub)
 	router := apiServer.Router()

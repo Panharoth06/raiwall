@@ -55,7 +55,24 @@ func (m *Middleware) provisionControl(ctx caddy.Context) error {
 		m.controlAPI = api.NewServer(m.controlStore, secret)
 		if m.ControlConfig != nil {
 			m.controlAPI.SetAutoApply(m.ControlConfig.AutoApply)
+			secure := true
+			if m.ControlConfig.SessionSecure != nil {
+				secure = *m.ControlConfig.SessionSecure
+			}
+			m.controlAPI.SetSessionConfig(api.SessionConfig{
+				IdleTimeout:     time.Duration(m.ControlConfig.SessionIdle),
+				AbsoluteTimeout: time.Duration(m.ControlConfig.SessionAbsolute),
+				Secure:          secure,
+				AllowBasicAuth:  m.ControlConfig.AllowBasicAuth,
+				PublicURL:       m.ControlConfig.PublicURL,
+			})
+			networks, err := parseAdminNetworks(m.ControlConfig.AllowedNetworks)
+			if err != nil {
+				return err
+			}
+			m.adminNetworks = networks
 		}
+		m.controlAPI.SetReadinessProvider(m)
 		m.controlAPI.SetCRSDefaults(
 			m.CRSEnabled, m.CRSMode,
 			m.CRSParanoiaLevel, m.CRSInboundThreshold, m.CRSOutboundThreshold,

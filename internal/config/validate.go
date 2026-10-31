@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"net"
+	"net/url"
 	"sort"
 	"strings"
 )
@@ -39,6 +40,7 @@ func (f *File) Validate() error {
 	f.validateLogging(v)
 	f.validateStorage(v)
 	f.validateControl(v)
+	f.validateSecurity(v)
 	f.validateWAF(v)
 	f.validateBot(v)
 	f.validateRateLimit(v)
@@ -130,6 +132,68 @@ func (f *File) validateControl(v *validator) {
 	}
 	if admin.Role != "admin" && admin.Role != "viewer" {
 		v.add("control.bootstrap_admin.role must be admin or viewer")
+	}
+
+	session := f.Control.Session
+	if session.IdleTimeout > 0 && session.AbsoluteTimeout > 0 && session.IdleTimeout > session.AbsoluteTimeout {
+		v.add("control.session.idle_timeout must not exceed control.session.absolute_timeout")
+	}
+	if f.Control.PublicURL != "" {
+		parsed, err := url.Parse(f.Control.PublicURL)
+		if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+			v.add("control.public_url %q must be an absolute URL", f.Control.PublicURL)
+		} else if parsed.Scheme != "http" && parsed.Scheme != "https" {
+			v.add("control.public_url %q must use http or https", f.Control.PublicURL)
+		}
+	}
+	for _, network := range f.Control.AllowedNetworks {
+		if _, _, err := net.ParseCIDR(strings.TrimSpace(network)); err != nil {
+			v.add("control.allowed_networks entry %q is not a valid CIDR", network)
+		}
+	}
+}
+
+// validateSecurity enforces the public-exposure gate. It runs only when
+// security.production_mode is enabled so local development stays frictionless.
+func (f *File) validateSecurity(v *validator) {
+	if !f.Security.ProductionMode {
+		return
+	}
+
+	admin := f.Control.BootstrapAdmin
+	password := strings.ToLower(strings.TrimSpace(admin.Password))
+	if password != "" {
+		weak := map[string]struct{}{"admin": {}, "password": {}, "changeme": {}, "letmein": {}}
+		_, known := weak[password]
+		if known || password == strings.ToLower(strings.TrimSpace(admin.Username)) {
+			v.add("control.bootstrap_admin.password is a weak default; set a strong password or leave it empty to generate one")
+		}
+	}
+	if len(f.Control.HMACSecret) < 32 {
+		v.add("control.hmac_secret must be at least 32 bytes in production mode")
+	}
+	if strings.ToLower(f.Bot.Defense) != "off" && len(f.Bot.PoWSecret) < 32 {
+		v.add("bot.pow_secret must be at least 32 bytes in production mode")
+	}
+	if f.Control.Session.Secure != nil && !*f.Control.Session.Secure {
+		v.add("control.session.secure must be true in production mode")
+	}
+
+	publicURL, err := url.Parse(f.Control.PublicURL)
+	if err != nil || publicURL.Scheme != "https" || publicURL.Host == "" {
+		v.add("control.public_url must be an https:// base URL in production mode")
+	}
+
+	httpsEnabled := enabled(f.Server.HTTPS.Enabled)
+	if !httpsEnabled {
+		v.add("server.https.enabled must be true in production mode")
+		return
+	}
+	if !f.Server.AutoHTTPS && len(f.Certificates) == 0 {
+		v.add("server.https is enabled with no certificate source; enable auto_https with an ACME email or declare certificates")
+	}
+	if f.Server.AutoHTTPS && strings.TrimSpace(f.Server.ACME.Email) == "" {
+		v.add("server.acme.email is required when auto_https is enabled in production mode")
 	}
 }
 

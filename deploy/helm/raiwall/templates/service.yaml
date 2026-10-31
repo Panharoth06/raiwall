@@ -15,15 +15,21 @@ spec:
   ports:
     {{- if .Values.config.server.http.enabled }}
     - name: http
-      port: {{ include "raiwall.containerPort" .Values.config.server.http.listen }}
+      port: {{ .Values.service.httpPort }}
       targetPort: http
       protocol: TCP
     {{- end }}
     {{- if .Values.config.server.https.enabled }}
     - name: https
-      port: {{ include "raiwall.containerPort" .Values.config.server.https.listen }}
+      port: {{ .Values.service.httpsPort }}
       targetPort: https
       protocol: TCP
+    {{- if .Values.config.server.https.http3 }}
+    - name: https-udp
+      port: {{ .Values.service.httpsPort }}
+      targetPort: https
+      protocol: UDP
+    {{- end }}
     {{- end }}
     {{- if and .Values.config.sidecar .Values.config.sidecar.enabled }}
     - name: grpc

@@ -34,6 +34,9 @@ const (
 	defaultSessionCookie   = "rw_session"
 	defaultACLBlockStatus  = 403
 	defaultACLRedirectCode = 302
+
+	defaultSessionIdleTimeout     = 8 * time.Hour
+	defaultSessionAbsoluteTimeout = 24 * time.Hour
 )
 
 // applyDefaults fills unset fields so a minimal document is deployable. All
@@ -87,6 +90,15 @@ func applyDefaults(f *File) {
 	}
 	if f.Control.BootstrapAdmin.Role == "" {
 		f.Control.BootstrapAdmin.Role = defaultAdminRole
+	}
+	if f.Control.Session.IdleTimeout <= 0 {
+		f.Control.Session.IdleTimeout = Duration(defaultSessionIdleTimeout)
+	}
+	if f.Control.Session.AbsoluteTimeout <= 0 {
+		f.Control.Session.AbsoluteTimeout = Duration(defaultSessionAbsoluteTimeout)
+	}
+	if f.Control.Session.Secure == nil {
+		f.Control.Session.Secure = boolPtr(true)
 	}
 
 	if f.WAF.Mode == "" {

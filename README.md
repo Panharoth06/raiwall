@@ -32,7 +32,7 @@
 
 ## Overview
 
-**Raiwall** is an open-source, enterprise-grade Web Application Firewall and reverse proxy gateway designed for modern web applications, APIs, and microservices. 
+**Raiwall** is a self-hosted Web Application Firewall and reverse proxy gateway designed for modern web applications, APIs, and microservices. 
 
 Built natively as a **Caddy v2** module, Raiwall combines extreme proxy throughput with multi-stage semantic threat inspection, stateless bot challenges, anti-CGNAT rate limiting, pluggable storage backends (SQLite, PostgreSQL, ClickHouse, Redis), and real-time forensic visualization — all delivered in a **single, dependency-free binary** embedding a Vue 3 + TypeScript admin dashboard via `go:embed`.
 
@@ -52,7 +52,7 @@ Built natively as a **Caddy v2** module, Raiwall combines extreme proxy throughp
 - **Three-Stage Funnel:**
   1. *Recursive Normalization:* Multi-pass decoding of URL, HTML entities, Base64, and Unicode escapes with SQL/script comment stripping.
   2. *Pure-Go Lexical Triage:* Ultra-fast token analysis using pure-Go `libinjection-go` ($<2\text{ µs}$) for immediate SQLi/XSS triage with zero CGO overhead.
-  3. *Bounded AST Context Verification:* Synthesizes grammar trees to detect execution breakouts (SQL via TiDB parser, Bash via `mvdan/sh`, DOM/JS via `tdewolff/parse`).
+  3. *Bounded AST Context Verification:* Runs bounded, in-tree context checks to detect execution breakouts (SQL, shell, DOM/JS) without external parser dependencies.
 - **CPU Starvation Defenses:** Hard 32 KB per-parameter caps and strict 5 ms parser timeouts maintain $p99 < 15\text{ ms}$ under heavy load.
 
 ### 🤖 3. Bot Mitigation & Dynamic Active Defense
@@ -78,17 +78,17 @@ Built natively as a **Caddy v2** module, Raiwall combines extreme proxy throughp
 - **Dual-Tier Storage:** Embedded SQLite WAL mode by default; batch-ingested ClickHouse for enterprise scale.
 - **Privacy Compliance:** In-stream automated scrubbing of PII & PCI-DSS 4.0 data (`passwords`, `tokens`, `cvv`).
 - **Visual Attack Map:** 3D threat origin arcs powered by Three.js / `globe.gl` and Apache ECharts.
-- **Multi-Channel ChatOps:** Instant push alerts to Telegram, Discord, Slack, and generic webhooks via Shoutrrr.
+- **Multi-Channel ChatOps:** Instant push alerts to Telegram, Discord, Slack, and generic webhooks through the built-in HTTP sender.
 
 ### 💾 7. Pluggable Storage & Multi-Tier Persistence
 - **Decoupled Hexagonal Storage:** Clean separation of data concerns across independent domain ports (`ControlStorePort`, `ForensicStorePort`, `RateStoragePort`) and pluggable outbound adapters.
 - **Control Plane Store:** Zero-config embedded **SQLite** (pure Go with WAL mode) for lightweight, single-binary edge deployments, or **PostgreSQL** (`pgx`) for multi-instance HA clusters and shared configuration.
 - **Telemetry & Forensics Store:** Embedded **SQLite** for standalone setups or **ClickHouse** for high-ingestion columnar forensic events, automated retention pruning, and historical analytics.
-- **Rate Limiting & Ban Store:** In-memory **Ristretto** for microsecond-latency local GCRA token buckets or **Redis** for distributed multi-gateway cluster synchronization.
+- **Rate Limiting & Ban Store:** In-memory local GCRA token buckets, or **Redis** for distributed multi-gateway cluster synchronization.
 - **Automated Schema Migrations:** Built-in schema migrator handles PostgreSQL and SQLite table upgrades transparently at startup.
 
 ### 🎛️ 8. Control Plane & Single-Binary Packaging
-- **Unified Binary:** REST API (`huma` OpenAPI 3.1), Embedded Vue 3 Dashboard, and Caddy Data Plane ship in a single compact binary (~50 MB, not strictly bounded under 50 MB).
+- **Unified Binary:** REST API (chi router, hand-written OpenAPI 3.1), Embedded Vue 3 Dashboard, and Caddy Data Plane ship in a single compact binary (~50 MB, not strictly bounded under 50 MB).
 - **Instant, Versioned Configuration:** Applications, exceptions, ACLs, detector policy, and rate/bot policies are compiled and hot-swapped immediately after each successful save (`control.auto_apply`, enabled in the shipped configuration). Every revision remains rollback-able by version; disable auto-apply to stage changes for a manual deploy.
 - **Portable Control Store:** Embedded SQLite in WAL mode by default, or PostgreSQL via `storage.database_url` / `RAIWALL_DATABASE_URL` for multi-instance deployments.
 - **Sidecar Mode:** Envoy External Processor (`ext_proc/v3`) gRPC interface for Kubernetes ingress sidecar deployment.
@@ -105,7 +105,7 @@ Raiwall is architected using **Strict Hexagonal Architecture (Ports and Adapters
 flowchart TD
     subgraph DrivingAdapters["DRIVING / INBOUND ADAPTERS (internal/adapters/inbound)"]
         CaddyAdapter["caddy/<br/>Caddy v2 HTTP Middleware<br/>Pipeline Orchestrator"]
-        HttpAPIAdapter["http/<br/>Huma v2 REST API<br/>Telemetry & Auth Handlers"]
+        HttpAPIAdapter["http/<br/>chi REST API<br/>OpenAPI 3.1 + Auth Handlers"]
         GrpcSidecarAdapter["grpc/<br/>Envoy ext_proc v3<br/>Sidecar Server"]
         McpAdapter["mcp/<br/>Model Context Protocol<br/>Tool Server"]
     end
@@ -134,7 +134,7 @@ flowchart TD
         StorageRedis["storage/redis/<br/>Redis Rate Limit Store"]
         StorageMemory["storage/memory/<br/>In-Memory Rate & Ban Store"]
         GeoIPMaxMind["geoip/maxmind/<br/>MaxMind GeoIP Reader"]
-        AlertsShoutrrr["alerts/shoutrrr/<br/>Shoutrrr Notification Client"]
+        AlertsWebhook["alerts/<br/>Webhook Notification Sender"]
         FeedsDownloader["feeds/<br/>Threat Feed File Loader"]
     end
 
@@ -149,7 +149,7 @@ flowchart TD
 ```mermaid
 flowchart TD
     subgraph ControlPlane["CONTROL PLANE (Admin & API)"]
-        UI["Vue 3 + shadcn-vue<br/>(ECharts + Globe.gl)"] <--> API["Huma OpenAPI 3.1 REST API"]
+        UI["Vue 3 + radix-vue<br/>(d3)"] <--> API["REST API + OpenAPI 3.1"]
         API <--> DB[("SQLite / PostgreSQL<br/>(sqlc)")]
         API --> EngineConfig["Config Validation & Rollback"]
     end
@@ -171,7 +171,7 @@ flowchart TD
         
         Step8 --> Step9{"9. Semantic WAF"}
         Step9 -->|"Lexical Triage (<2µs)"| LibInj["libinjection-go (Pure Go)"]
-        Step9 -->|"Suspicious Tokens"| AST["AST Context Verifier<br/>(TiDB SQL / mvdan Shell / tdewolff XSS)"]
+        Step9 -->|"Suspicious Tokens"| AST["Bounded Context Verifier<br/>(SQL / shell / DOM-JS checks)"]
         
         LibInj -->|"Verdict: Allow"| Proxy["10. Router<br/>(Proxy / Static / Redirect<br/>+ 4 LB Policies + Scanner Trap)"]
         AST -->|"Verdict: Allow"| Proxy
@@ -184,7 +184,7 @@ flowchart TD
         RingBuffer["Async Ring Buffer<br/>(500ms Batch Flush)"]
         PII["PII / PCI-DSS Sanitizer<br/>(Auto-mask Tokens & Secrets)"]
         Logs[("SQLite WAL / ClickHouse")]
-        Alerts["Shoutrrr Push Alerts<br/>(Slack, Discord, Telegram)"]
+        Alerts["Webhook Push Alerts<br/>(Slack, Discord, Telegram)"]
         
         RingBuffer --> PII
         PII --> Logs
@@ -222,13 +222,13 @@ raiwall/
 │   └── adapters/                         # Concrete Technology Adapters
 │       ├── inbound/                      # Driving Adapters
 │       │   ├── caddy/                    # Caddy v2 HTTP middleware & stage pipeline orchestrator
-│       │   ├── http/                     # Huma v2 OpenAPI 3.1 REST API & UI static handler
+│       │   ├── http/                     # chi REST API, OpenAPI 3.1 & UI static handler
 │       │   ├── grpc/                     # Envoy ext_proc v3 sidecar server
 │       │   └── mcp/                      # Model Context Protocol security operations server
 │       └── outbound/                     # Driven Adapters
 │           ├── storage/                  # SQLite WAL, ClickHouse, Redis, Memory drivers
 │           ├── geoip/                    # MaxMind GeoLite2 reader
-│           ├── alerts/                   # Shoutrrr multi-channel push notification dispatcher
+│           ├── alerts/                   # Multi-channel webhook notification dispatcher
 │           └── feeds/                    # Threat intelligence feed loader
 ├── web/                                  # Vue 3 + TypeScript admin dashboard (embedded via go:embed)
 ├── tests/
@@ -407,7 +407,7 @@ every key, default, and constraint is documented in
 | `rate_limit` | Three tiers (velocity, attack frequency, scanner trap) and memory/Redis storage |
 | `waiting_room` | Bounded admission queue and target paths |
 | `auth` | Portal-wide zero-trust gate (simple users or OIDC) |
-| `telemetry` | Flush interval, buffer, retention, Shoutrrr alert channels |
+| `telemetry` | Flush interval, buffer, retention, alert channels (Slack/Discord/Telegram/webhook) |
 | `sidecar` | Envoy `ext_proc` gRPC listener |
 | `geoip` / `threat_feeds` | MaxMind databases and local CIDR feeds |
 | `declarative` | `off` / `seed` / `sync`, `prune`, `strict` |
@@ -450,7 +450,7 @@ Raiwall features a pluggable, multi-tier storage architecture that decouples con
 | :--- | :--- | :--- | :--- |
 | **Control Plane** (`control`) | `sqlite`, `postgres` | Applications, certificates, ACLs, exception rules, IP groups, policies, and users | Embedded SQLite for single-binary / edge; PostgreSQL for multi-gateway HA clusters |
 | **Telemetry & Forensics** (`telemetry`) | `sqlite`, `clickhouse` | High-frequency security event logs, audit records, and incident rollups | Embedded SQLite for standard traffic; ClickHouse for large-scale analytics & long retention |
-| **Rate Limiter & Bans** (`rate_limit`) | `memory`, `redis` | GCRA token buckets, sliding windows, and active IP bans | In-memory Ristretto for zero-latency local caching; Redis for cluster-wide synchronized bans |
+| **Rate Limiter & Bans** (`rate_limit`) | `memory`, `redis` | GCRA token buckets, sliding windows, and active IP bans | In-memory local storage for zero-latency caching; Redis for cluster-wide synchronized bans |
 
 #### 1. Single Database Shortcut (`storage.database_url`)
 
@@ -482,7 +482,7 @@ storage:
   telemetry: telemetry
 
 rate_limit:
-  storage: redis           # memory (Ristretto) or redis (cluster-wide sync)
+  storage: redis           # memory (local) or redis (cluster-wide sync)
   storage_addr: "redis:6379"
   storage_password: "${REDIS_PASSWORD:-}"
 ```
@@ -591,9 +591,9 @@ cd web && pnpm test
 
 ## Tech Stack
 
-- **Data Plane:** Go 1.27+, Caddy v2 (`caddyhttp`), CertMagic, `libinjection-go` (Pure Go), Coraza, TiDB Parser, `mvdan/sh`, `tdewolff/parse`, `exaring/ja4plus`, `gaissmai/bart`, `ristretto`.
-- **Control Plane:** Huma v2 (OpenAPI 3.1 REST API), `sqlc`, SQLite (`modernc.org/sqlite`), PostgreSQL (`pgx`), Zap logging, Prometheus metrics, Shoutrrr alerting, Model Context Protocol (MCP).
-- **Dashboard UI:** Vue 3 (latest), TypeScript, Vite, `shadcn-vue` (Radix primitives + Tailwind CSS), Pinia, Vue Router 4, Apache ECharts, `globe.gl`.
+- **Data Plane:** Go 1.27+, Caddy v2 (`caddyhttp`), CertMagic, `libinjection-go`, Coraza (OWASP CRS), `exaring/ja4plus`, `gaissmai/bart`, in-tree bounded context checks.
+- **Control Plane:** chi router + hand-written OpenAPI 3.1, `sqlc`, SQLite (`modernc.org/sqlite`), PostgreSQL (`pgx`), Zap logging, Prometheus metrics, built-in webhook alerting (Slack/Discord/Telegram), Model Context Protocol (MCP).
+- **Dashboard UI:** Vue 3, TypeScript, Vite, `radix-vue` primitives in a shadcn-style component library, Tailwind CSS, Pinia, custom router, d3 visualizations.
 
 ---
 
@@ -603,12 +603,13 @@ The authoritative capability matrix, architecture decisions, and phased plan
 live in **[ROADMAP.md](ROADMAP.md)**. The working checklist with acceptance
 criteria and commit references lives in **[TASKS.md](TASKS.md)**.
 
-- **Phase 0** — security and correctness blockers (in progress: telemetry auth,
-  body trust, Envoy wire format, app-auth bypass, client-IP trust are done; HA
-  state, ClickHouse, health checks, JA4/PROXY remain).
+- **Phase 0** — security and correctness blockers. Telemetry auth, body trust,
+  Envoy wire format, app-auth bypass, client-IP trust, ClickHouse telemetry, HA
+  state, and upstream failover are done; JA4/PROXY and the remaining safety-net
+  items are tracked in TASKS.md.
 - **Phase 1** — detection and rule engine. OWASP CRS 4.30 runs through Coraza
-  in audit mode with per-request anomaly scoring and forensic metadata; per-site
-  policy, CRS exclusions, go-ftw parity, and response inspection remain.
+  with per-request anomaly scoring, per-site policy, CRS exclusions, and a
+  go-ftw parity gate; response inspection and DLP remain.
 - **Phase 2** — observability and compliance (OTel, SIEM, audit chain, reports).
 - **Phase 3** — enterprise control plane (sessions, SSO/MFA, RBAC, tenancy).
 - **Phase 4** — HA and Kubernetes.
@@ -620,4 +621,4 @@ criteria and commit references lives in **[TASKS.md](TASKS.md)**.
 
 ## License
 
-All rights reserved. License details to be announced.
+License terms are not finalized. No license is granted for redistribution until a LICENSE file is added; contact the maintainers first.

@@ -151,6 +151,21 @@ type ApiKeyRecord struct {
 	LastUsedAt sql.NullTime `json:"last_used_at"`
 }
 
+// AdminSession is an opaque dashboard operator session. Only the HMAC of the
+// bearer token is stored, so a database leak cannot replay a cookie.
+type AdminSession struct {
+	ID                string       `json:"id"`
+	UserID            string       `json:"user_id"`
+	TokenHash         string       `json:"-"`
+	CreatedAt         time.Time    `json:"created_at"`
+	LastSeenAt        time.Time    `json:"last_seen_at"`
+	IdleExpiresAt     time.Time    `json:"idle_expires_at"`
+	AbsoluteExpiresAt time.Time    `json:"absolute_expires_at"`
+	RevokedAt         sql.NullTime `json:"revoked_at"`
+	ClientIP          string       `json:"client_ip"`
+	UserAgent         string       `json:"user_agent"`
+}
+
 // ForwardingRuleRecord represents a path-prefix routing rule to custom backends.
 type ForwardingRuleRecord struct {
 	ID                 string    `json:"id"`

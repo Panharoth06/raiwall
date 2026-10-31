@@ -1,6 +1,6 @@
 # AGENTS.md — Raiwall
 
-> **Raiwall** is an open-source, enterprise-grade Web Application Firewall (WAF) and reverse proxy gateway. The data plane is built as a native Caddy v2 module in Go; the control plane ships a Vue 3 + TypeScript admin dashboard embedded in the same single binary via `go:embed`.
+> **Raiwall** is a self-hosted Web Application Firewall (WAF) and reverse proxy gateway. The data plane is built as a native Caddy v2 module in Go; the control plane ships a Vue 3 + TypeScript admin dashboard embedded in the same single binary via `go:embed`.
 
 ---
 
@@ -23,7 +23,7 @@
 
 ## Project Overview
 
-Raiwall is a self-hosted, enterprise-grade WAF that combines:
+Raiwall is a self-hosted WAF that combines:
 
 - **High-throughput reverse proxying** (HTTP/1.1, HTTP/2, HTTP/3/QUIC, WebSockets, gRPC) via Caddy v2.
 - **Semantic threat detection** using a three-stage funnel: recursive normalization → pure-Go `libinjection-go` lexical triage (< 2 µs) → bounded AST context verification (SQL, Shell, XSS).
@@ -41,7 +41,7 @@ The entire stack ships as a **single Go binary** with the Vue admin UI embedded 
 ```mermaid
 flowchart TD
     subgraph ControlPlane["CONTROL PLANE (Admin & API)"]
-        UI["Vue 3 + shadcn-vue<br/>(ECharts + Globe.gl)"] <--> API["Huma OpenAPI 3.1 REST API"]
+        UI["Vue 3 + radix-vue<br/>(d3)"] <--> API["REST API + OpenAPI 3.1"]
         API <--> DB[("SQLite WAL (sqlc)")]
         API --> EngineConfig["Config Validation & Rollback"]
     end
@@ -63,7 +63,7 @@ flowchart TD
         
         Step8 --> Step9{"9. Semantic WAF"}
         Step9 -->|"Lexical Triage (<2µs)"| LibInj["libinjection-go (Pure Go)"]
-        Step9 -->|"Suspicious Tokens"| AST["AST Context Verifier<br/>(TiDB SQL / mvdan Shell / tdewolff XSS)"]
+        Step9 -->|"Suspicious Tokens"| AST["Bounded Context Verifier<br/>(SQL / shell / DOM-JS checks)"]
         
         LibInj -->|"Verdict: Allow"| Proxy["10. Reverse Proxy<br/>(Upstream SWRR + 403/404 Scanner Trap)"]
         AST -->|"Verdict: Allow"| Proxy
@@ -76,7 +76,7 @@ flowchart TD
         RingBuffer["Async Ring Buffer<br/>(500ms Batch Flush)"]
         PII["PII / PCI-DSS Sanitizer<br/>(Auto-mask Tokens & Secrets)"]
         Logs[("SQLite WAL / ClickHouse")]
-        Alerts["Shoutrrr Push Alerts<br/>(Slack, Discord, Telegram)"]
+        Alerts["Webhook Push Alerts<br/>(Slack, Discord, Telegram)"]
         
         RingBuffer --> PII
         PII --> Logs
@@ -94,12 +94,12 @@ flowchart TD
 | # | Domain | Summary |
 |---|--------|---------|
 | 1 | **Reverse Proxy & Gateway** | Caddy v2 data plane: multi-protocol proxying, automated SSL/ACME, `atomic.Pointer[ConfigSnapshot]` hot-reload, `sync.Pool` buffer pooling, weighted round-robin load balancing, active health checks. |
-| 2 | **Semantic Threat Detection** | Three-stage funnel: recursive normalization (Coraza) → pure-Go `libinjection-go` lexical triage (< 2 µs) → bounded AST verification (SQL via TiDB parser, Shell via `mvdan/sh`, XSS via `tdewolff/parse`). Hard 32 KB cap and 5 ms timeout per parameter. |
+| 2 | **Semantic Threat Detection** | Three-stage funnel: recursive normalization (Coraza) → pure-Go `libinjection-go` lexical triage (< 2 µs) → bounded in-tree context verification (SQL, shell, DOM/JS) with no external parser dependency. Hard 32 KB cap and 5 ms timeout per parameter. |
 | 3 | **Bot Mitigation & Active Defense** | JA4/JA4H TLS fingerprinting, HTTP/2 frame fingerprinting, intelligent API vs. browser route classification, stateless SHA-256 Proof-of-Work (HTTP 468), HMAC clearance cookies, SPA hydration protection. |
-| 4 | **DDoS & Rate Limiting** | Three-tiered rate limiting: Tier 1 (access velocity → PoW), Tier 2 (attack frequency → auto-ban), Tier 3 (scanner trap on upstream 403/404 → ban). Composite keys (IP + JA4 + Cookie) for CGNAT safety. Ristretto (single-node) / Redis (cluster). |
+| 4 | **DDoS & Rate Limiting** | Three-tiered rate limiting: Tier 1 (access velocity → PoW), Tier 2 (attack frequency → auto-ban), Tier 3 (scanner trap on upstream 403/404 → ban). Composite keys (IP + JA4 + Cookie) for CGNAT safety. In-memory local storage (single node) / Redis (cluster). |
 | 5 | **Access Control & Identity** | Parameter-level false-positive exception engine, compiled bytecode ACLs (`expr-lang/expr`, < 15 ns), balanced routing table CIDR matching (`gaissmai/bart`, ~15 ns for 500K+ IPs), MaxMind GeoIP, OIDC/SSO zero-code pre-auth. |
-| 6 | **Observability & Forensics** | Async ring buffer (500 ms flush), dual storage (SQLite WAL default / ClickHouse enterprise), automated PII/PCI-DSS sanitization, live SSE/WebSocket inspector, 3D attack globe (Globe.gl), ECharts dashboards, multi-channel alerts (Shoutrrr). |
-| 7 | **Control Plane & Ecosystem** | Unified single-binary execution, atomic config rollback, Huma OpenAPI 3.1 REST API, Envoy `ext_proc/v3` gRPC sidecar mode, Redis Pub/Sub cluster sync. |
+| 6 | **Observability & Forensics** | Async ring buffer (500 ms flush), dual storage (SQLite WAL default / ClickHouse enterprise), automated PII/PCI-DSS sanitization, live SSE/WebSocket inspector, 3D attack globe (Globe.gl), ECharts dashboards, multi-channel webhook alerts (Slack/Discord/Telegram). |
+| 7 | **Control Plane & Ecosystem** | Unified single-binary execution, atomic config rollback, chi REST API with hand-written OpenAPI 3.1, Envoy `ext_proc/v3` gRPC sidecar mode, Redis Pub/Sub cluster sync. |
 
 ---
 
@@ -112,19 +112,17 @@ flowchart TD
 | Language | **Go 1.27+** |
 | Reverse Proxy Core | **Caddy v2** (`caddyserver/caddy/v2` v2.8.4) |
 | SSL/TLS | **CertMagic** (`caddyserver/certmagic`) |
-| REST API | **Huma v2** (`danielgtaylor/huma/v2`) — auto-generates OpenAPI 3.1 |
+| REST API | **chi** (`go-chi/chi`) with a hand-written OpenAPI 3.1 document |
 | Database | **SQLite** via `modernc.org/sqlite` (pure Go, WAL mode) |
 | SQL Layer | **sqlc** — compiles SQL queries to type-safe Go code |
 | Structured Logging | **Zap** (`go.uber.org/zap`) — consistent with Caddy internals |
 | Metrics | **Prometheus** (`prometheus/client_golang`) |
-| Alerting | **Shoutrrr** (`containrrr/shoutrrr`) |
+| Alerting | Built-in HTTP sender (Slack/Discord/Telegram/webhook) |
 | WAF Lexer | **libinjection-go** (`corazawaf/libinjection-go`, Pure Go / CGO-free) |
 | WAF Normalization | **Coraza** (`corazawaf/coraza`) |
-| WAF AST (SQL) | **TiDB Parser** (`pingcap/tidb/pkg/parser`) or `xwb1989/sqlparser` |
-| WAF AST (Shell) | **mvdan/sh** (`mvdan/sh/v3/syntax`) |
-| WAF AST (HTML/JS) | **tdewolff/parse** (`tdewolff/parse/v2`) |
+| WAF context checks | In-tree bounded SQL/shell/DOM-JS analysis |
 | TLS Fingerprinting | **JA4+** (`exaring/ja4plus`) |
-| Rate Limiting (local) | **Ristretto** (`dgraph-io/ristretto`) |
+| Rate Limiting (local) | In-memory GCRA storage (`core/rate`) |
 | Rate Limiting (distributed) | **ulule/limiter** over Redis/Dragonfly |
 | ACL Engine | **expr** (`expr-lang/expr`) |
 | CIDR Matching | **BART** (`gaissmai/bart`) |
@@ -280,7 +278,7 @@ raiwall/
     - **Strict Typography Floor (text-xs / 12px)**: Never use sub-12px micro-text (`text-[10px]`, `text-[11px]`, etc.) for any badge, label, timestamp, or table cell. Default body and controls to `text-sm` (14px).
     - **Global App Consistency**: Follow standardized blueprints for page headers, table filter bars, modals, and unified semantic status badge tokens (`threat`, `success`, `warning`, `info`, `muted`).
     - **Zero Mock Data & Zero Dead Buttons**: Zero tolerance for hardcoded dummy data arrays in production code (`web/src/{views,components,stores}`). Every button must perform a real action; no dead buttons (`@click=""`, `@click="() => {}"`, or `console.log`).
-    - **Strict Backend API Parity (Zero Red Flags)**: Never display frontend controls, cards, or metrics without an active, verified Go backend Huma OpenAPI endpoint. Refer to [`.agents/rules/frontend-discipline.md`](.agents/rules/frontend-discipline.md) for full specification and audit gates.
+    - **Strict Backend API Parity (Zero Red Flags)**: Never display frontend controls, cards, or metrics without an active, verified Go backend OpenAPI endpoint. Refer to [`.agents/rules/frontend-discipline.md`](.agents/rules/frontend-discipline.md) for full specification and audit gates.
 
 ### General
 

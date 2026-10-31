@@ -133,6 +133,28 @@ type Control struct {
 	// and commit them from the Deployments page.
 	AutoApply      bool           `yaml:"auto_apply,omitempty" json:"auto_apply,omitempty"`
 	BootstrapAdmin BootstrapAdmin `yaml:"bootstrap_admin" json:"bootstrap_admin"`
+	// PublicURL is the canonical external base (scheme://host[:port]). It is
+	// used for CSRF origin checks and console redirects.
+	PublicURL string `yaml:"public_url" json:"public_url"`
+	// AllowedNetworks restricts /.raiwall admin traffic to these CIDRs. An
+	// empty list allows every source; the runbook recommends a VPN/IP allowlist.
+	AllowedNetworks []string `yaml:"allowed_networks" json:"allowed_networks"`
+	// Session controls dashboard operator sessions.
+	Session Session `yaml:"session" json:"session"`
+}
+
+// Session configures opaque dashboard operator sessions.
+type Session struct {
+	// IdleTimeout ends a session after this much inactivity.
+	IdleTimeout Duration `yaml:"idle_timeout" json:"idle_timeout"`
+	// AbsoluteTimeout is a hard limit regardless of activity.
+	AbsoluteTimeout Duration `yaml:"absolute_timeout" json:"absolute_timeout"`
+	// Secure marks the cookie Secure and uses the __Host- prefix. Default true;
+	// set false only for local plaintext development.
+	Secure *bool `yaml:"secure,omitempty" json:"secure,omitempty"`
+	// AllowBasicAuth keeps HTTP Basic authentication on API routes for tooling.
+	// Disabled by default; the dashboard uses the login flow.
+	AllowBasicAuth bool `yaml:"allow_basic_auth" json:"allow_basic_auth"`
 }
 
 // BootstrapAdmin creates the first operator account when the store is empty.
@@ -148,6 +170,10 @@ type BootstrapAdmin struct {
 type Security struct {
 	// StrictSecrets rejects inline plaintext secrets instead of warning.
 	StrictSecrets bool `yaml:"strict_secrets" json:"strict_secrets"`
+	// ProductionMode refuses unsafe deployment defaults (weak admin password,
+	// short or missing secrets, insecure cookies, non-TLS public URL, HTTPS
+	// without a certificate source). Enable it in Compose/Helm/production.
+	ProductionMode bool `yaml:"production_mode" json:"production_mode"`
 }
 
 // WAF configures the semantic inspection pipeline.

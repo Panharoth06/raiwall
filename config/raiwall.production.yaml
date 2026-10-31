@@ -1,0 +1,139 @@
+# ==============================================================================
+# Raiwall production profile: public HTTPS terminated by Raiwall.
+# ==============================================================================
+# Used by docker-compose.prod.yml. Secrets come from the environment; startup
+# fails closed when a required value is missing (security.production_mode).
+#
+# Host port 80 -> container 8080 (ACME HTTP-01, redirect to HTTPS)
+# Host port 443 -> container 8443 (TLS, HTTP/3 over UDP)
+# The container runs as uid 1000 and cannot bind 80/443 directly.
+#
+# Required environment:
+#   RAIWALL_DATABASE_URL   postgres://...
+#   RAIWALL_HMAC_SECRET    openssl rand -hex 32
+#   RAIWALL_POW_SECRET     openssl rand -hex 32
+#   RAIWALL_PUBLIC_URL     https://raiwall.example.com
+#   RAIWALL_ACME_EMAIL     ops@example.com
+# ==============================================================================
+
+version: 1
+
+server:
+  http:
+    enabled: true
+    listen: ":8080"
+  https:
+    enabled: true
+    listen: ":8443"
+    http3: true
+    tls_min_version: "1.2"
+  # Obtain certificates for every configured site hostname.
+  auto_https: true
+  acme:
+    email: "${RAIWALL_ACME_EMAIL:?set RAIWALL_ACME_EMAIL}"
+    staging: false
+
+caddy:
+  admin:
+    listen: "off"
+  storage:
+    module: file_system
+    root: /var/lib/raiwall/certmagic
+
+logging:
+  level: info
+  format: json
+  output: stderr
+
+storage:
+  database_url: "${RAIWALL_DATABASE_URL:?set RAIWALL_DATABASE_URL}"
+
+control:
+  hmac_secret: "${RAIWALL_HMAC_SECRET:?set RAIWALL_HMAC_SECRET}"
+  # The dashboard/API origin. Also used for CSRF origin checks.
+  public_url: "${RAIWALL_PUBLIC_URL:?set RAIWALL_PUBLIC_URL}"
+  # Optional: restrict the console to VPN/office ranges, e.g.
+  #   allowed_networks: ["10.0.0.0/8", "192.168.0.0/16"]
+  allowed_networks: []
+  session:
+    idle_timeout: 8h
+    absolute_timeout: 24h
+    secure: true
+    allow_basic_auth: false
+  auto_apply: true
+  bootstrap_admin:
+    username: "${RAIWALL_ADMIN_USERNAME:-admin}"
+    # Empty generates a one-time password logged at WARN.
+    password: "${RAIWALL_ADMIN_PASSWORD:-}"
+    role: admin
+
+security:
+  strict_secrets: true
+  production_mode: true
+
+waf:
+  mode: defense
+  block_status_code: 403
+  offline_status_code: 503
+  strip_headers: [Server, X-Powered-By, X-AspNet-Version]
+  ast_timeout: 5ms
+  max_param_size: 32768
+  crs:
+    enabled: true
+    mode: block
+    paranoia_level: 1
+    inbound_threshold: 5
+    outbound_threshold: 4
+
+bot:
+  defense: defense
+  pow_difficulty: 50000
+  pow_secret: "${RAIWALL_POW_SECRET:?set RAIWALL_POW_SECRET}"
+  clearance_ttl: 2h
+  honeypot_trap: true
+
+rate_limit:
+  tier1_rate: 100
+  tier1_period: 10s
+  tier1_burst: 50
+  tier2_threshold: 20
+  tier2_window: 60s
+  tier2_ban_duration: 24h
+  tier3_threshold: 20
+  tier3_window: 30s
+  tier3_ban_duration: 24h
+  storage: memory
+  storage_addr: ""
+  redis_username: ""
+  redis_password: ""
+  redis_tls: false
+  redis_tls_server_name: ""
+  redis_tls_ca_file: ""
+  redis_tls_insecure_skip_verify: false
+  cluster_channel: "raiwall:cluster:events"
+
+# Unlimited concurrency by default. Add target_paths (for example /checkout)
+# before enabling this for high-demand launches.
+waiting_room:
+  enabled: false
+  max_concurrent: 500
+  max_queue_depth: 1000
+  admission_rate: 50
+  token_ttl: 15m
+
+telemetry:
+  flush_interval: 500ms
+  buffer_size: 4096
+  retention: 720h
+
+geoip:
+  country: /usr/share/GeoIP/GeoLite2-Country.mmdb
+  city: /usr/share/GeoIP/GeoLite2-City.mmdb
+  asn: /usr/share/GeoIP/GeoLite2-ASN.mmdb
+  auto_update: true
+
+# Sites are managed in the dashboard/control store, not this file.
+declarative:
+  mode: off
+  prune: false
+  strict: false

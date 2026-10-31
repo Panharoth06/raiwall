@@ -12,9 +12,10 @@ import (
 
 func adminRedirectMiddleware() *Middleware {
 	return &Middleware{
-		Mode:      "defense",
-		engine:    waf.NewSemanticEngine(),
-		uiHandler: &UIHandler{},
+		Mode:          "defense",
+		engine:        waf.NewSemanticEngine(),
+		uiHandler:     &UIHandler{},
+		ControlConfig: &ControlSettings{PublicURL: "https://console.example.com"},
 	}
 }
 
@@ -36,7 +37,7 @@ func TestRedirectUnconfiguredHostSendsBrowsersToDashboard(t *testing.T) {
 	mw := adminRedirectMiddleware()
 
 	t.Run("unknown host redirects to dashboard", func(t *testing.T) {
-		req := browserRequest(http.MethodGet, "http://unconfigured.example.net/")
+		req := browserRequest(http.MethodGet, "http://console.example.com/")
 		rec := httptest.NewRecorder()
 
 		err := mw.ServeHTTP(rec, req, &mockNextHandler{})
@@ -49,7 +50,7 @@ func TestRedirectUnconfiguredHostSendsBrowsersToDashboard(t *testing.T) {
 	})
 
 	t.Run("deep link without file extension redirects", func(t *testing.T) {
-		req := browserRequest(http.MethodGet, "http://unconfigured.example.net/sites")
+		req := browserRequest(http.MethodGet, "http://console.example.com/sites")
 		rec := httptest.NewRecorder()
 
 		require.NoError(t, mw.ServeHTTP(rec, req, &mockNextHandler{}))
@@ -58,12 +59,21 @@ func TestRedirectUnconfiguredHostSendsBrowsersToDashboard(t *testing.T) {
 	})
 
 	t.Run("HEAD navigation redirects without a body", func(t *testing.T) {
-		req := browserRequest(http.MethodHead, "http://unconfigured.example.net/")
+		req := browserRequest(http.MethodHead, "http://console.example.com/")
 		rec := httptest.NewRecorder()
 
 		require.NoError(t, mw.ServeHTTP(rec, req, &mockNextHandler{}))
 		require.Equal(t, http.StatusFound, rec.Code)
 		require.Empty(t, rec.Body.String())
+	})
+
+	t.Run("other unknown hosts do not advertise the console", func(t *testing.T) {
+		req := browserRequest(http.MethodGet, "http://unconfigured.example.net/")
+		rec := httptest.NewRecorder()
+		next := &mockNextHandler{}
+
+		require.NoError(t, mw.ServeHTTP(rec, req, next))
+		require.NotEqual(t, adminDashboardPath, rec.Header().Get("Location"))
 	})
 
 	t.Run("configured host is never redirected", func(t *testing.T) {
@@ -91,12 +101,12 @@ func TestRedirectUnconfiguredHostIgnoresNonBrowserTraffic(t *testing.T) {
 		url    string
 		accept string
 	}{
-		{name: "curl wildcard accept", method: http.MethodGet, url: "http://unconfigured.example.net/", accept: "*/*"},
-		{name: "json api client", method: http.MethodGet, url: "http://unconfigured.example.net/api/v1/sites", accept: "application/json"},
-		{name: "no accept header", method: http.MethodGet, url: "http://unconfigured.example.net/"},
-		{name: "post form", method: http.MethodPost, url: "http://unconfigured.example.net/login", accept: "text/html"},
-		{name: "asset request", method: http.MethodGet, url: "http://unconfigured.example.net/favicon.ico", accept: "text/html"},
-		{name: "acme http-01 token", method: http.MethodGet, url: "http://unconfigured.example.net/.well-known/acme-challenge/token", accept: "*/*"},
+		{name: "curl wildcard accept", method: http.MethodGet, url: "http://console.example.com/", accept: "*/*"},
+		{name: "json api client", method: http.MethodGet, url: "http://console.example.com/api/v1/sites", accept: "application/json"},
+		{name: "no accept header", method: http.MethodGet, url: "http://console.example.com/"},
+		{name: "post form", method: http.MethodPost, url: "http://console.example.com/login", accept: "text/html"},
+		{name: "asset request", method: http.MethodGet, url: "http://console.example.com/favicon.ico", accept: "text/html"},
+		{name: "acme http-01 token", method: http.MethodGet, url: "http://console.example.com/.well-known/acme-challenge/token", accept: "*/*"},
 	}
 
 	for _, tc := range cases {
@@ -120,7 +130,7 @@ func TestRedirectUnconfiguredHostRequiresSnapshotAndUI(t *testing.T) {
 			control.StoreSnapshot(control.NewConfigSnapshot(0, control.ModeDefense, nil))
 		})
 
-		req := browserRequest(http.MethodGet, "http://unconfigured.example.net/")
+		req := browserRequest(http.MethodGet, "http://console.example.com/")
 		rec := httptest.NewRecorder()
 
 		require.NoError(t, adminRedirectMiddleware().ServeHTTP(rec, req, &mockNextHandler{}))
@@ -130,7 +140,7 @@ func TestRedirectUnconfiguredHostRequiresSnapshotAndUI(t *testing.T) {
 
 	t.Run("missing embedded UI disables redirect", func(t *testing.T) {
 		mw := &Middleware{Mode: "defense", engine: waf.NewSemanticEngine()}
-		req := browserRequest(http.MethodGet, "http://unconfigured.example.net/")
+		req := browserRequest(http.MethodGet, "http://console.example.com/")
 		rec := httptest.NewRecorder()
 
 		require.False(t, mw.redirectUnconfiguredHost(rec, req))

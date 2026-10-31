@@ -6,6 +6,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -66,6 +67,15 @@ func setupEnterpriseFixture(t *testing.T) *enterpriseTestFixture {
 	mw := &caddy.Middleware{
 		Mode:            "defense",
 		BlockStatusCode: http.StatusForbidden,
+		ControlConfig: &caddy.ControlSettings{
+			DBPath: "file:" + filepath.Join(t.TempDir(), "control-enterprise.db"),
+			// This suite exercises the opt-in Basic path with a fixed test admin.
+			AllowBasicAuth: true,
+			SessionSecure:  new(bool),
+			BootstrapAdmin: &caddy.BootstrapAdminSettings{
+				Username: "admin", Password: "admin", Role: "admin",
+			},
+		},
 		TelemetryConfig: &caddy.TelemetrySettings{
 			StorageType: "sqlite",
 			StoragePath: "file:test_telemetry?mode=memory&cache=shared",

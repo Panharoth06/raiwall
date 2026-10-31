@@ -77,7 +77,12 @@ func buildCaddyConfig(file *config.File) ([]byte, error) {
 
 func adminConfig(file *config.File) map[string]any {
 	if strings.EqualFold(strings.TrimSpace(file.Caddy.Admin.Listen), "off") {
-		return map[string]any{"disabled": true}
+		// Caddy autosaves the adapted config (including secrets) unless
+		// persistence is disabled. The admin API is off, so nothing needs it.
+		return map[string]any{
+			"disabled": true,
+			"config":   map[string]any{"persist": false},
+		}
 	}
 	return map[string]any{"listen": file.Caddy.Admin.Listen}
 }

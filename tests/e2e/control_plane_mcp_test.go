@@ -30,8 +30,9 @@ func TestControlPlane_E2E_ProxyMiddlewareAndMCP(t *testing.T) {
 	mw := &caddy.Middleware{
 		Mode: "defense",
 		ControlConfig: &caddy.ControlSettings{
-			DBPath:     dbDSN,
-			HMACSecret: "e2e_test_secret_32_bytes_long_ok",
+			DBPath:        dbDSN,
+			HMACSecret:    "e2e_test_secret_32_bytes_long_ok",
+			SessionSecure: new(bool),
 		},
 	}
 

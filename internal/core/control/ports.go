@@ -7,6 +7,8 @@ import (
 
 // ControlStore defines the driven port interface for vendor-agnostic Control Plane persistence.
 type ControlStore interface {
+	// Ping verifies the backing database is reachable for readiness probes.
+	Ping(ctx context.Context) error
 	// Apps
 	ListApps(ctx context.Context) ([]SiteApp, error)
 	GetApp(ctx context.Context, id string) (SiteApp, error)
@@ -66,6 +68,14 @@ type ControlStore interface {
 	CreateUser(ctx context.Context, user UserRecord) error
 	UpdateUser(ctx context.Context, user UserRecord) error
 	DeleteUser(ctx context.Context, id string) error
+
+	// Operator sessions
+	CreateAdminSession(ctx context.Context, session AdminSession) error
+	GetAdminSessionByTokenHash(ctx context.Context, tokenHash string) (AdminSession, error)
+	TouchAdminSession(ctx context.Context, id string, seenAt, idleExpiresAt time.Time) error
+	RevokeAdminSession(ctx context.Context, id string, revokedAt time.Time) error
+	RevokeAdminSessionsForUser(ctx context.Context, userID string, revokedAt time.Time) error
+	DeleteExpiredAdminSessions(ctx context.Context, now time.Time) (int64, error)
 
 	// API Keys
 	ListAPIKeys(ctx context.Context) ([]ApiKeyRecord, error)

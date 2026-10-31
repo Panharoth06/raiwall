@@ -57,6 +57,9 @@ func TestEndToEndTelemetry(t *testing.T) {
 		BlockStatusCode: http.StatusForbidden,
 		ControlConfig: &caddy.ControlSettings{
 			DBPath: "file:" + filepath.Join(t.TempDir(), "control-e2e.db"),
+			// Opt in to Basic auth and insecure cookies for the in-process test.
+			AllowBasicAuth: true,
+			SessionSecure:  new(bool),
 			BootstrapAdmin: &caddy.BootstrapAdminSettings{
 				Username: "admin",
 				Password: "e2e-admin-pass",

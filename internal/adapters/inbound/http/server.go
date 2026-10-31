@@ -36,6 +36,11 @@ type ClusterStatus struct {
 	BanCount       int    `json:"ban_count"`
 }
 
+// ReadinessProvider reports data-plane dependency health for /status.
+type ReadinessProvider interface {
+	Readiness(ctx context.Context) map[string]bool
+}
+
 // ClusterStatusProvider supplies live HA state from the data plane. A nil
 // provider means the process is running standalone.
 type ClusterStatusProvider interface {
@@ -49,6 +54,7 @@ type Server struct {
 	router           *chi.Mux
 	clusterPublisher ClusterPublisher
 	clusterStatus    ClusterStatusProvider
+	readiness        ReadinessProvider
 	mcpServer        *mcp.Server
 	banManager       *rate.BanManager
 	waitingRoom      *rate.WaitingRoomManager
@@ -102,10 +108,23 @@ func (s *Server) SetClusterPublisher(pub ClusterPublisher) {
 	}
 }
 
+// SetReadinessProvider installs the dependency health source.
+func (s *Server) SetReadinessProvider(provider ReadinessProvider) {
+	s.readiness = provider
+}
+
 // SetClusterStatusProvider installs the live HA status source.
 func (s *Server) SetClusterStatusProvider(provider ClusterStatusProvider) {
 	s.clusterStatus = provider
 }
+
+// SetSessionConfig applies operator session, cookie, and login settings.
+func (s *Server) SetSessionConfig(cfg SessionConfig) {
+	s.authMgr.SetSessionConfig(cfg)
+}
+
+// AuthManager returns the authentication manager (used by tests).
+func (s *Server) AuthManager() *AuthManager { return s.authMgr }
 
 // SetAutoApply enables committing a snapshot after every successful
 // configuration mutation. It must be called before routes start serving.

@@ -3,11 +3,9 @@ package api
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/Panharoth06/raiwall/internal/core/control/declarative"
 	"github.com/go-chi/chi/v5"
@@ -111,6 +109,17 @@ func (am *AuthManager) AuthMiddleware(next http.Handler) http.Handler {
 			isMutating = false
 		}
 
+		// Cookie-authenticated mutations must come from this origin. API-key and
+		// Basic clients are exempt because they carry explicit credentials.
+		if isMutating && authCtx.Method == "cookie" && !am.OriginAllowed(r) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusForbidden)
+			_ = json.NewEncoder(w).Encode(map[string]string{
+				"error": "Forbidden: cross-origin request rejected",
+			})
+			return
+		}
+
 		if isMutating && authCtx.Role != RoleAdmin {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusForbidden)
@@ -124,64 +133,4 @@ func (am *AuthManager) AuthMiddleware(next http.Handler) http.Handler {
 		ctx := ContextWithAuth(r.Context(), authCtx)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
-}
-
-// Authenticate resolves the request principal from an API key, session cookie,
-// or HTTP Basic credentials. Query-string credentials are deliberately not
-// accepted: they leak into access logs, proxies, and browser referrers.
-func (am *AuthManager) Authenticate(r *http.Request) (*AuthContext, error) {
-	var authCtx *AuthContext
-	var authErr error
-
-	// 1. Try Bearer Token or X-Raiwall-Key.
-	token := r.Header.Get("X-Raiwall-Key")
-	if token == "" {
-		if h := r.Header.Get("Authorization"); strings.HasPrefix(h, "Bearer ") {
-			token = strings.TrimPrefix(h, "Bearer ")
-		}
-	}
-
-	if token != "" {
-		keyHash := HashAPIKey(token)
-		keyRecord, err := am.store.GetAPIKeyByHash(r.Context(), keyHash)
-		if err == nil && keyRecord.IsActive == 1 {
-			if !keyRecord.ExpiresAt.Valid || keyRecord.ExpiresAt.Time.After(time.Now().UTC()) {
-				authCtx = &AuthContext{
-					Role:     keyRecord.Role,
-					IsAPIKey: true,
-					KeyID:    keyRecord.ID,
-					Username: keyRecord.Name,
-				}
-				go func(kID string) {
-					_ = am.store.UpdateAPIKeyLastUsed(context.Background(), kID, time.Now().UTC())
-				}(keyRecord.ID)
-			}
-		}
-	}
-
-	// 2. Try Session Cookie if no API key.
-	if authCtx == nil {
-		if cookie, err := r.Cookie(SessionCookieName); err == nil {
-			authCtx, authErr = am.VerifySessionCookie(cookie)
-		}
-	}
-
-	// 3. Try HTTP Basic Auth.
-	if authCtx == nil {
-		if user, pass, ok := r.BasicAuth(); ok {
-			u, err := am.store.GetUserByUsername(r.Context(), user)
-			if err == nil && u.IsActive == 1 && CheckPassword(pass, u.PasswordHash) {
-				authCtx = &AuthContext{
-					UserID:   u.ID,
-					Username: u.Username,
-					Role:     u.Role,
-				}
-			}
-		}
-	}
-
-	if authCtx == nil && authErr == nil {
-		authErr = errors.New("unauthorized: valid API key or session cookie required")
-	}
-	return authCtx, authErr
 }

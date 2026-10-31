@@ -1,6 +1,7 @@
 package caddy
 
 import (
+	"net/netip"
 	"sync"
 	"sync/atomic"
 
@@ -129,10 +130,16 @@ type StorageSettings struct {
 
 // ControlSettings configures the Control Plane database and management API.
 type ControlSettings struct {
-	DBPath         string                  `json:"db_path,omitempty"`
-	HMACSecret     string                  `json:"hmac_secret,omitempty"`
-	AutoApply      bool                    `json:"auto_apply,omitempty"`
-	BootstrapAdmin *BootstrapAdminSettings `json:"bootstrap_admin,omitempty"`
+	DBPath          string                  `json:"db_path,omitempty"`
+	HMACSecret      string                  `json:"hmac_secret,omitempty"`
+	AutoApply       bool                    `json:"auto_apply,omitempty"`
+	BootstrapAdmin  *BootstrapAdminSettings `json:"bootstrap_admin,omitempty"`
+	PublicURL       string                  `json:"public_url,omitempty"`
+	AllowedNetworks []string                `json:"allowed_networks,omitempty"`
+	SessionIdle     caddy.Duration          `json:"session_idle_timeout,omitempty"`
+	SessionAbsolute caddy.Duration          `json:"session_absolute_timeout,omitempty"`
+	SessionSecure   *bool                   `json:"session_secure,omitempty"`
+	AllowBasicAuth  bool                    `json:"allow_basic_auth,omitempty"`
 }
 
 // BootstrapAdminSettings provisions the first operator account when the store
@@ -252,17 +259,20 @@ type Middleware struct {
 	appAuthGateSecret string
 	appAuthSecretOnce sync.Once
 
-	storageRegistry    *storage.Registry
-	telemetryStore     telemetry.ForensicStore
-	ringBuffer         *telemetry.RingBuffer
-	streamer           *api.EventStreamer
-	alertEngine        *alerts.AlertEngine
-	metrics            *telemetry.Metrics
-	telemetryAPI       *api.TelemetryAPI
-	geoipAPI           *api.GeoIPStatusAPI
-	uiHandler          *UIHandler
-	controlStore       control.ControlStore
-	controlAPI         *api.Server
+	storageRegistry *storage.Registry
+	telemetryStore  telemetry.ForensicStore
+	ringBuffer      *telemetry.RingBuffer
+	streamer        *api.EventStreamer
+	alertEngine     *alerts.AlertEngine
+	metrics         *telemetry.Metrics
+	telemetryAPI    *api.TelemetryAPI
+	geoipAPI        *api.GeoIPStatusAPI
+	uiHandler       *UIHandler
+	controlStore    control.ControlStore
+	controlAPI      *api.Server
+	// adminNetworks restricts /.raiwall and telemetry to these CIDRs. Empty
+	// means unrestricted.
+	adminNetworks      []netip.Prefix
 	templateManager    *templates.TemplateManager
 	sidecarServer      *grpc.ExtProcServer
 	upstreamRegistry   *UpstreamRegistry

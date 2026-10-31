@@ -4,9 +4,12 @@ package e2e
 
 import (
 	"encoding/base64"
+	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -14,6 +17,19 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func loginLive(t *testing.T, client *http.Client, baseURL, username, password string) *http.Cookie {
+	t.Helper()
+	payload, err := json.Marshal(map[string]string{"username": username, "password": password})
+	require.NoError(t, err)
+	resp, err := client.Post(baseURL+"/.raiwall/api/v1/auth/login", "application/json", strings.NewReader(string(payload)))
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode, "login should succeed")
+	cookies := resp.Cookies()
+	require.NotEmpty(t, cookies)
+	return cookies[0]
+}
 
 func TestLiveContainer_EndToEndVerification(t *testing.T) {
 	client := &http.Client{
@@ -41,8 +57,14 @@ func TestLiveContainer_EndToEndVerification(t *testing.T) {
 	uiBody, _ := io.ReadAll(uiResp.Body)
 	assert.Contains(t, strings.ToLower(string(uiBody)), "<!doctype html>", "Should serve HTML document")
 
-	// 3. Basic Auth verification on Control Plane API
-	basicAuthHeader := "Basic " + base64.StdEncoding.EncodeToString([]byte("admin:admin"))
+	// 3. Session login on the Control Plane API. Credentials come from the
+	// environment because shipped configs no longer default to admin/admin.
+	adminUser := os.Getenv("RAIWALL_E2E_ADMIN_USER")
+	adminPassword := os.Getenv("RAIWALL_E2E_ADMIN_PASSWORD")
+	if adminUser == "" || adminPassword == "" {
+		t.Skip("set RAIWALL_E2E_ADMIN_USER and RAIWALL_E2E_ADMIN_PASSWORD to run authenticated live checks")
+	}
+	authCookie := loginLive(t, client, baseURL, adminUser, adminPassword)
 
 	// 3a. Unauthorized without credentials
 	unauthReq, _ := http.NewRequest(http.MethodGet, baseURL+"/.raiwall/api/v1/sites", nil)
@@ -51,25 +73,24 @@ func TestLiveContainer_EndToEndVerification(t *testing.T) {
 	defer unauthResp.Body.Close()
 	assert.Equal(t, http.StatusUnauthorized, unauthResp.StatusCode, "Unauthenticated request should return 401")
 
-	// 3b. Unauthorized with bad credentials
-	badAuthReq, _ := http.NewRequest(http.MethodGet, baseURL+"/.raiwall/api/v1/sites", nil)
-	badAuthReq.Header.Set("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte("admin:wrongpass")))
-	badAuthResp, err := client.Do(badAuthReq)
+	// 3b. Wrong credentials are rejected
+	badBody := strings.NewReader(fmt.Sprintf(`{"username":%q,"password":"wrong"}`, adminUser))
+	badAuthResp, err := client.Post(baseURL+"/.raiwall/api/v1/auth/login", "application/json", badBody)
 	require.NoError(t, err)
 	defer badAuthResp.Body.Close()
 	assert.Equal(t, http.StatusUnauthorized, badAuthResp.StatusCode, "Bad credentials should return 401")
 
-	// 3c. Authorized with admin:admin
+	// 3c. Authorized with the session cookie
 	authReq, _ := http.NewRequest(http.MethodGet, baseURL+"/.raiwall/api/v1/sites", nil)
-	authReq.Header.Set("Authorization", basicAuthHeader)
+	authReq.AddCookie(authCookie)
 	authResp, err := client.Do(authReq)
 	require.NoError(t, err)
 	defer authResp.Body.Close()
-	assert.Equal(t, http.StatusOK, authResp.StatusCode, "Basic auth admin:admin should return 200")
+	assert.Equal(t, http.StatusOK, authResp.StatusCode, "Session login should authorize the API")
 
 	// 4. IP Groups API Endpoint (Task 94)
 	ipgReq, _ := http.NewRequest(http.MethodGet, baseURL+"/.raiwall/api/v1/ip-groups", nil)
-	ipgReq.Header.Set("Authorization", basicAuthHeader)
+	ipgReq.AddCookie(authCookie)
 	ipgResp, err := client.Do(ipgReq)
 	require.NoError(t, err)
 	defer ipgResp.Body.Close()
@@ -77,7 +98,7 @@ func TestLiveContainer_EndToEndVerification(t *testing.T) {
 
 	// 5. Response Templates API Endpoint (Task 95)
 	tmplReq, _ := http.NewRequest(http.MethodGet, baseURL+"/.raiwall/api/v1/templates", nil)
-	tmplReq.Header.Set("Authorization", basicAuthHeader)
+	tmplReq.AddCookie(authCookie)
 	tmplResp, err := client.Do(tmplReq)
 	require.NoError(t, err)
 	defer tmplResp.Body.Close()
@@ -119,7 +140,7 @@ func TestLiveContainer_EndToEndVerification(t *testing.T) {
 	// 10. Query Telemetry Events
 	time.Sleep(600 * time.Millisecond) // Wait for buffer flush
 	telemReq, _ := http.NewRequest(http.MethodGet, baseURL+"/.raiwall/api/v1/telemetry/events?limit=5", nil)
-	telemReq.Header.Set("Authorization", basicAuthHeader)
+	telemReq.AddCookie(authCookie)
 	telemResp, err := client.Do(telemReq)
 	require.NoError(t, err)
 	defer telemResp.Body.Close()

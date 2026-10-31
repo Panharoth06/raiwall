@@ -238,7 +238,7 @@ Priority: **P0** blocks enterprise use, **P1** major capability, **P2** maturity
 | 0.7 | Client IP trust, trusted proxies, handshake JA4, PROXY protocol | `caddy/client_ip.go`, `core/bot/ja4.go`, new listener | M/L | **Partial** (`13e8678`: client IP; JA4/PROXY pending) |
 | 0.8 | Start health checks, retries/timeouts/failover, WebSocket-capable proxy | `caddy/upstream.go`, `caddy/forwarding.go`, `caddy/proxy.go` | M | **Partial** (gRPC trailers deferred to 1B.5) |
 | 0.9 | Audit verdicts reach telemetry; response data sanitization | `caddy/stage_waf.go`, `caddy/stage_response.go`, `core/telemetry/sanitizer.go` | S/M | **Done** `13e8678` |
-| 0.10 | Secure/revocable sessions, login lockout, default-credential refusal, docs de-claim, LICENSE/SECURITY/CI | `http/auth.go`, `README.md`, `.github/` | M | **Partial** (`13e8678`: API-key roles; rest pending) |
+| 0.10 | Secure/revocable sessions, login lockout, default-credential refusal, docs de-claim, LICENSE/SECURITY/CI | `http/auth.go`, `README.md`, `.github/` | M | **Partial** (sessions/lockout/defaults/docs done; LICENSE/SECURITY/CI pending) |
 
 **Exit gate:** every P0 security test passes; no unauthenticated telemetry;
 oversize/gzip/chunked tests pass under `-race`; two replicas converge on bans
@@ -293,12 +293,12 @@ legal-hold/WORM/prune drill; report reconciliation; alert retry/history.
 
 | ID | Deliverable | Targets | Size |
 |---|---|---|---|
-| 3.1 | DB-backed sessions, idle/absolute expiry, revocation, CSRF, `__Host-` cookie, lockout | `core/control/sessions.go`, `http/auth.go` | M |
+| 3.1 | DB-backed sessions, idle/absolute expiry, revocation, CSRF, `__Host-` cookie, lockout | `core/control/sessions.go`, `http/auth.go` | M | **Done** |
 | 3.2 | Operator OIDC (state/nonce/PKCE, group→role) + TOTP/recovery codes | `http/auth_oidc.go`, `auth_totp.go` | M |
 | 3.3 | Permission-based RBAC (admin/operator/analyst/viewer/auditor), scoped API keys, user CRUD/UI | `http/rbac.go`, `web/` | L |
 | 3.4 | Secret keyring (AES-GCM key IDs, Vault Transit, cloud KMS), write-only fields | `core/crypto/keyring.go`, `adapters/outbound/secrets/*` | M |
 | 3.5 | Multi-tenancy: `tenant_id` row scoping, tenant stores, quotas, migrate to `default` | all stores, `http/tenants.go` | L |
-| 3.6 | Separate admin listener with mTLS/IP allowlist | `caddy/stage_routes.go`, Helm | S/M |
+| 3.6 | Separate admin listener with mTLS/IP allowlist | `caddy/stage_routes.go`, Helm | S/M | **Partial** (CIDR allowlist + public_url redirect gate; split listener pending) |
 
 **Exit gate:** five-role authz matrix; OIDC/TOTP e2e; session/CSRF/lockout;
 scoped keys; tenant isolation; no plaintext secrets; admin mTLS.

@@ -1,7 +1,9 @@
 package caddy
 
 import (
+	"net"
 	"net/http"
+	"net/url"
 	"path"
 	"strings"
 )
@@ -19,7 +21,7 @@ const adminDashboardPath = "/.raiwall/"
 // API clients, probes and non-GET methods keep the original gateway behaviour so
 // machine traffic never receives an HTML redirect.
 func (m *Middleware) redirectUnconfiguredHost(w http.ResponseWriter, r *http.Request) bool {
-	if m.uiHandler == nil {
+	if m.uiHandler == nil || !m.isConsoleHost(r.Host) {
 		return false
 	}
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
@@ -39,6 +41,26 @@ func (m *Middleware) redirectUnconfiguredHost(w http.ResponseWriter, r *http.Req
 	w.Header().Set("X-Raiwall-Route", "admin-redirect")
 	http.Redirect(w, r, adminDashboardPath, http.StatusFound)
 	return true
+}
+
+// isConsoleHost reports whether the request targets control.public_url. Unknown
+// hosts no longer reveal or redirect to the dashboard.
+func (m *Middleware) isConsoleHost(host string) bool {
+	if m.ControlConfig == nil || strings.TrimSpace(m.ControlConfig.PublicURL) == "" {
+		return false
+	}
+	parsed, err := url.Parse(m.ControlConfig.PublicURL)
+	if err != nil || parsed.Host == "" {
+		return false
+	}
+	return strings.EqualFold(hostOnly(host), hostOnly(parsed.Host))
+}
+
+func hostOnly(host string) string {
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		return h
+	}
+	return strings.Trim(host, "[]")
 }
 
 // requestAcceptsHTML reports whether the client is a browser navigation. An

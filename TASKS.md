@@ -129,16 +129,23 @@ Status legend: `[x]` done · `[~]` partial · `[ ]` pending.
 - [x] Tests for response header/body scrubbing.
 
 ### 0.10 Safety net `[~]`
-**Done:** API key role validation (`13e8678`).
+**Done:** API key role validation (`13e8678`); deployment hardening (current).
 - [x] Reject API-key roles other than `admin`/`viewer`.
-- [ ] DB-backed sessions with idle/absolute expiry and revocation (3.1).
-- [ ] Secure/`__Host-` cookie attributes and CSRF for cookie mutations (3.1).
-- [ ] Login rate limit and lockout.
-- [ ] Refuse default `admin/admin`; require explicit bootstrap password.
-- [ ] De-claim README/AGENTS (see ROADMAP §7).
+- [x] DB-backed sessions with idle/absolute expiry and revocation (3.1).
+- [x] Secure/`__Host-` cookie attributes and same-origin CSRF for cookie
+      mutations (3.1).
+- [x] Login rate limit and lockout.
+- [x] Refuse weak default admin credentials (`security.production_mode`);
+      Compose/Helm require stable HMAC/PoW secrets and no longer ship
+      `admin/admin` or a published Postgres port.
+- [x] De-claim README/AGENTS stack claims (parser libs, Huma, Shoutrrr,
+      Ristretto, HA wording) and route production deploys to
+      `docs/deployment.md`.
+- [x] Stop persisting secrets in Caddy's autosave file; `config print` redacts
+      secrets by default.
 - [ ] Add `LICENSE`, `NOTICE`, `SECURITY.md`, `STATUS.md`.
 - [ ] Minimal CI: build, `go test -race`, `govulncheck`.
-- [ ] Gate: no known insecure default remains in shipped configs.
+- [x] Gate: no known insecure default remains in shipped configs.
 
 ---
 
@@ -310,12 +317,15 @@ CI gate, and OpenAPI base in the current change.
 
 ## Phase 3 — Enterprise Control Plane
 
-### 3.1 Sessions and CSRF `[ ]`
-- [ ] Opaque hashed session tokens, idle/absolute expiry, revocation.
-- [ ] `__Host-` Secure HttpOnly cookie; rotate on login/privilege change.
-- [ ] Double-submit CSRF for cookie mutations; API keys exempt.
-- [ ] Login lockout/rate limit.
-- [ ] Tests: replay, revoke, expiry, CSRF missing/invalid.
+### 3.1 Sessions and CSRF `[x]`
+- [x] Opaque hashed session tokens, idle/absolute expiry, revocation.
+- [x] `__Host-` Secure HttpOnly cookie; a new session is minted on each login
+      and all sessions are revoked on password reset, role change, or
+      deactivation.
+- [x] Same-origin `Origin`/`Referer` enforcement for cookie mutations; requests
+      with neither header (CLI/CI) are allowed, API keys are exempt.
+- [x] Login lockout/rate limit (5 failures → 15m, per IP and username).
+- [x] Tests: revoke, idle expiry, CSRF cross-origin, lockout, Basic opt-in.
 
 ### 3.2 Operator SSO + MFA `[ ]`
 - [ ] OIDC with state/nonce/PKCE and group→role mapping.
@@ -344,11 +354,15 @@ CI gate, and OpenAPI base in the current change.
 - [ ] Tenant admin UI.
 - [ ] Tests: cross-tenant reads/writes denied.
 
-### 3.6 Admin listener isolation `[ ]`
+### 3.6 Admin listener isolation `[~]`
 - [ ] Separate admin listener; mTLS/IP allowlist.
+- [x] `control.allowed_networks` CIDR allowlist for `/.raiwall/*`, metrics, and
+      telemetry (health probes bypass it); enforced on the socket peer.
+- [x] `control.public_url` gates the unknown-host console redirect; other hosts
+      no longer advertise the dashboard.
 - [ ] Public listener serves sites and app auth only.
 - [ ] Dev escape hatch with startup warning.
-- [ ] Helm values and tests.
+- [ ] Helm values and tests for a split listener.
 
 ### 3.7 Instant configuration apply `[x]`
 **Done in `e671812`.**
