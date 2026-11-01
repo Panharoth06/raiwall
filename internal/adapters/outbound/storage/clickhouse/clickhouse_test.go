@@ -304,3 +304,45 @@ func TestParseClickHouseBucket(t *testing.T) {
 		}
 	}
 }
+
+func TestClickHouseQuery_FiltersAndEscaping(t *testing.T) {
+	var queries []string
+	client := &http.Client{Transport: mockRoundTripper(func(r *http.Request) (*http.Response, error) {
+		body, _ := io.ReadAll(r.Body)
+		queries = append(queries, r.URL.Query().Get("query")+string(body))
+		return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header),
+			Body: io.NopCloser(bytes.NewBufferString(`{"data":[]}`))}, nil
+	})}
+	store, err := NewClickHouseStore(ClickHouseConfig{URL: "http://ch:8123", HTTPClient: client})
+	if err != nil {
+		t.Fatalf("create store: %v", err)
+	}
+	defer store.Close()
+
+	score := 5.5
+	_, err = store.Query(context.Background(), telemetry.QueryParams{
+		ClientIP:        `x\' OR 1=1 --`,
+		MinSeverity:     "high",
+		Engine:          "crs",
+		MinAnomalyScore: &score,
+	})
+	if err != nil {
+		t.Fatalf("query: %v", err)
+	}
+	var count string
+	for _, q := range queries {
+		if strings.Contains(q, "SELECT count()") {
+			count = q
+		}
+	}
+	for _, want := range []string{
+		`client_ip = 'x\\\' OR 1=1 --'`,
+		"lower(severity) IN ('high', 'critical')",
+		"engine = 'crs'",
+		"anomaly_score >= 5.5",
+	} {
+		if !strings.Contains(count, want) {
+			t.Errorf("count query missing %q:\n%s", want, count)
+		}
+	}
+}

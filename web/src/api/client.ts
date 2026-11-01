@@ -261,6 +261,8 @@ export interface EventQueryParams {
   rule_id?: string;
   country?: string;
   min_severity?: string;
+  engine?: 'semantic' | 'crs';
+  min_score?: number;
   start_time?: string;
   end_time?: string;
 }
@@ -587,6 +589,8 @@ export const api = {
     if (params?.rule_id) q.set('rule_id', params.rule_id);
     if (params?.country) q.set('country', params.country);
     if (params?.min_severity) q.set('min_severity', params.min_severity);
+    if (params?.engine) q.set('engine', params.engine);
+    if (params?.min_score != null) q.set('min_score', params.min_score.toString());
     if (params?.start_time) q.set('start_time', params.start_time);
     if (params?.end_time) q.set('end_time', params.end_time);
     const qs = q.toString();

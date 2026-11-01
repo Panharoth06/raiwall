@@ -269,7 +269,3 @@ func (s *ClickHouseStore) execWithRetry(ctx context.Context, query string, body 
 
 	return nil, lastErr
 }
-
-func escapeCH(s string) string {
-	return strings.ReplaceAll(s, "'", "''")
-}

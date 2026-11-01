@@ -40,9 +40,19 @@ func (s *TelemetryStore) Query(ctx context.Context, params telemetry.QueryParams
 		whereClauses = append(whereClauses, "country = ?")
 		args = append(args, params.Country)
 	}
-	if params.MinSeverity != "" {
-		whereClauses = append(whereClauses, "severity = ?")
-		args = append(args, params.MinSeverity)
+	if sevs := telemetry.SeveritiesAtLeast(params.MinSeverity); len(sevs) > 0 {
+		whereClauses = append(whereClauses, "LOWER(severity) IN (?"+strings.Repeat(", ?", len(sevs)-1)+")")
+		for _, sev := range sevs {
+			args = append(args, sev)
+		}
+	}
+	if params.Engine != "" {
+		whereClauses = append(whereClauses, "engine = ?")
+		args = append(args, params.Engine)
+	}
+	if params.MinAnomalyScore != nil {
+		whereClauses = append(whereClauses, "COALESCE(anomaly_score, 0) >= ?")
+		args = append(args, *params.MinAnomalyScore)
 	}
 
 	whereSQL := strings.Join(whereClauses, " AND ")

@@ -10,22 +10,13 @@ import {
   Ban,
   Database,
   RotateCw,
-  ChevronLeft,
-  ChevronRight,
   AlertCircle,
 } from 'lucide-vue-next';
 import { api } from '@/api/client';
 import type { ForensicEvent, ExceptionDraft } from '@/types/telemetry';
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from '@/components/ui/select';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
-import { SearchInput } from '@/components/ui/search-input';
 import { TablePagination } from '@/components/ui/table-pagination';
+import LogsFilterBar from '@/components/LogsFilterBar.vue';
 
 const props = withDefaults(
   defineProps<{
@@ -49,6 +40,8 @@ const error = ref<string | null>(null);
 
 const searchQuery = ref<string>('');
 const selectedAction = ref<string>(props.initialAction);
+const selectedEngine = ref<'all' | 'semantic' | 'crs'>('all');
+const minScore = ref<number | null | undefined>(null);
 const currentPage = ref<number>(1);
 const pageSize = ref<number>(props.pageSize || 20);
 const activeEvent = ref<ForensicEvent | null>(null);
@@ -64,6 +57,8 @@ async function fetchLogs() {
       offset,
       action: selectedAction.value !== 'all' ? selectedAction.value : undefined,
       client_ip: searchQuery.value.trim() ? searchQuery.value.trim() : undefined,
+      engine: selectedEngine.value !== 'all' ? selectedEngine.value : undefined,
+      min_score: minScore.value != null && minScore.value >= 0 ? minScore.value : undefined,
     });
 
     if (res && Array.isArray(res.events)) {
@@ -85,9 +80,18 @@ onMounted(() => {
   fetchLogs();
 });
 
-watch(selectedAction, () => {
+watch([selectedAction, selectedEngine], () => {
   currentPage.value = 1;
   fetchLogs();
+});
+
+let scoreDebounceTimer: ReturnType<typeof setTimeout> | undefined;
+watch(minScore, () => {
+  clearTimeout(scoreDebounceTimer);
+  scoreDebounceTimer = setTimeout(() => {
+    currentPage.value = 1;
+    fetchLogs();
+  }, 300);
 });
 
 let searchDebounceTimer: any = null;
@@ -226,29 +230,12 @@ function getPayloadOrQuery(ev: ForensicEvent): string {
 
       <!-- Controls: Search, Action Filter, Refresh -->
       <div class="flex items-center gap-2.5">
-        <SearchInput
-          v-model="searchQuery"
-          clearable
-          placeholder="Filter IP, Rule, Method, Country…"
-          data-testid="logs-search-input"
-          class="w-48 sm:w-64"
+        <LogsFilterBar
+          v-model:search="searchQuery"
+          v-model:action="selectedAction"
+          v-model:engine="selectedEngine"
+          v-model:min-score="minScore"
         />
-
-        <!-- Action Filter Select -->
-        <div class="relative z-30">
-          <Select v-model="selectedAction">
-            <SelectTrigger data-testid="logs-action-filter-select" class="h-8 w-32 border-input bg-background text-foreground text-xs">
-              <SelectValue placeholder="All Actions" />
-            </SelectTrigger>
-            <SelectContent class="border-border bg-popover text-popover-foreground z-50">
-              <SelectItem value="all">All Actions</SelectItem>
-              <SelectItem value="allow">Allow</SelectItem>
-              <SelectItem value="block">Block</SelectItem>
-              <SelectItem value="challenge">Challenge</SelectItem>
-              <SelectItem value="ban">Ban</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
 
         <!-- Refresh Button -->
         <button

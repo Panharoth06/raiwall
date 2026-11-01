@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -61,19 +62,31 @@ func (s *ClickHouseStore) Query(ctx context.Context, params telemetry.QueryParam
 		whereClauses = append(whereClauses, fmt.Sprintf("timestamp <= '%s'", params.EndTime.UTC().Format("2006-01-02 15:04:05.000")))
 	}
 	if params.ClientIP != "" {
-		whereClauses = append(whereClauses, fmt.Sprintf("client_ip = '%s'", escapeCH(params.ClientIP)))
+		whereClauses = append(whereClauses, fmt.Sprintf("client_ip = '%s'", escapeClickHouseLiteral(params.ClientIP)))
 	}
 	if params.Action != "" {
-		whereClauses = append(whereClauses, fmt.Sprintf("action = '%s'", escapeCH(params.Action)))
+		whereClauses = append(whereClauses, fmt.Sprintf("action = '%s'", escapeClickHouseLiteral(params.Action)))
 	}
 	if params.RuleID != "" {
-		whereClauses = append(whereClauses, fmt.Sprintf("rule_id = '%s'", escapeCH(params.RuleID)))
+		whereClauses = append(whereClauses, fmt.Sprintf("rule_id = '%s'", escapeClickHouseLiteral(params.RuleID)))
 	}
 	if params.Country != "" {
-		whereClauses = append(whereClauses, fmt.Sprintf("country = '%s'", escapeCH(params.Country)))
+		whereClauses = append(whereClauses, fmt.Sprintf("country = '%s'", escapeClickHouseLiteral(params.Country)))
 	}
 	if params.MinSeverity != "" {
-		whereClauses = append(whereClauses, fmt.Sprintf("severity = '%s'", escapeCH(params.MinSeverity)))
+		if sevs := telemetry.SeveritiesAtLeast(params.MinSeverity); len(sevs) > 0 {
+			quoted := make([]string, len(sevs))
+			for i, sev := range sevs {
+				quoted[i] = "'" + escapeClickHouseLiteral(sev) + "'"
+			}
+			whereClauses = append(whereClauses, "lower(severity) IN ("+strings.Join(quoted, ", ")+")")
+		}
+	}
+	if params.Engine != "" {
+		whereClauses = append(whereClauses, fmt.Sprintf("engine = '%s'", escapeClickHouseLiteral(params.Engine)))
+	}
+	if params.MinAnomalyScore != nil {
+		whereClauses = append(whereClauses, "anomaly_score >= "+strconv.FormatFloat(*params.MinAnomalyScore, 'f', -1, 64))
 	}
 
 	whereSQL := strings.Join(whereClauses, " AND ")
@@ -145,7 +158,7 @@ func (s *ClickHouseStore) GetEventByID(ctx context.Context, eventID string) (*te
 		ORDER BY timestamp DESC
 		LIMIT 1
 		FORMAT JSON
-	`, chEventColumns, s.database, s.table, escapeCH(eventID))
+	`, chEventColumns, s.database, s.table, escapeClickHouseLiteral(eventID))
 
 	resp, err := s.execWithRetry(ctx, query, nil)
 	if err != nil {

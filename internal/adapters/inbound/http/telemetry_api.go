@@ -107,35 +107,10 @@ func (api *TelemetryAPI) handleEventsQuery(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	q := r.URL.Query()
-	params := telemetry.QueryParams{
-		ClientIP:    q.Get("client_ip"),
-		Action:      q.Get("action"),
-		RuleID:      q.Get("rule_id"),
-		Country:     q.Get("country"),
-		MinSeverity: q.Get("min_severity"),
-	}
-
-	if st := q.Get("start_time"); st != "" {
-		if t, err := time.Parse(time.RFC3339, st); err == nil {
-			params.StartTime = t
-		}
-	}
-	if et := q.Get("end_time"); et != "" {
-		if t, err := time.Parse(time.RFC3339, et); err == nil {
-			params.EndTime = t
-		}
-	}
-
-	if l := q.Get("limit"); l != "" {
-		if limitVal, err := strconv.Atoi(l); err == nil {
-			params.Limit = limitVal
-		}
-	}
-	if o := q.Get("offset"); o != "" {
-		if offsetVal, err := strconv.Atoi(o); err == nil {
-			params.Offset = offsetVal
-		}
+	params, err := parseEventQuery(r.URL.Query())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 
 	result, err := api.store.Query(r.Context(), params)

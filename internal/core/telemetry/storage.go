@@ -2,6 +2,7 @@ package telemetry
 
 import (
 	"context"
+	"strings"
 	"time"
 )
 
@@ -14,8 +15,29 @@ type QueryParams struct {
 	RuleID      string    `json:"rule_id,omitempty"`
 	Country     string    `json:"country,omitempty"`
 	MinSeverity string    `json:"min_severity,omitempty"`
-	Limit       int       `json:"limit,omitempty"`
-	Offset      int       `json:"offset,omitempty"`
+	// Engine restricts results to one detection engine ("semantic", "crs").
+	Engine string `json:"engine,omitempty"`
+	// MinAnomalyScore keeps events whose CRS anomaly score is at least this value.
+	MinAnomalyScore *float64 `json:"min_score,omitempty"`
+	Limit           int      `json:"limit,omitempty"`
+	Offset          int      `json:"offset,omitempty"`
+}
+
+// severityOrder lists severities from lowest to highest rank.
+var severityOrder = []string{"info", "low", "medium", "high", "critical"}
+
+// SeveritiesAtLeast returns every severity ranked at or above min, so stores
+// can filter with an IN list instead of an exact match. It returns nil for an
+// unknown severity.
+func SeveritiesAtLeast(min string) []string {
+	for i, s := range severityOrder {
+		if strings.EqualFold(s, min) {
+			out := make([]string, len(severityOrder)-i)
+			copy(out, severityOrder[i:])
+			return out
+		}
+	}
+	return nil
 }
 
 // QueryResult encapsulates a page of forensic events with total match count.

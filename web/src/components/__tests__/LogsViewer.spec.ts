@@ -3,7 +3,8 @@ import { mount } from '@vue/test-utils';
 import LogsViewer from '@/components/LogsViewer.vue';
 import { Select } from '@/components/ui/select';
 import { api } from '@/api/client';
-import type { ForensicEvent, EventsQueryResult } from '@/api/client';
+import type { EventsQueryResult } from '@/api/client';
+import type { ForensicEvent } from '@/types/telemetry';
 
 vi.mock('@/api/client', () => ({
   api: {
@@ -93,6 +94,32 @@ describe('LogsViewer.vue', () => {
         })
       );
     });
+  });
+
+  it('filters logs by detection engine', async () => {
+    const wrapper = mount(LogsViewer);
+    await vi.waitFor(() => {
+      expect(api.listEvents).toHaveBeenCalled();
+    });
+
+    const engineSelect = wrapper.findAllComponents(Select)[1];
+    engineSelect.vm.$emit('update:modelValue', 'crs');
+    await vi.waitFor(() => {
+      expect(api.listEvents).toHaveBeenCalledWith(expect.objectContaining({ engine: 'crs' }));
+    });
+  });
+
+  it('filters logs by minimum anomaly score', async () => {
+    vi.useFakeTimers();
+    const wrapper = mount(LogsViewer);
+
+    const scoreInput = wrapper.find('[data-testid="logs-min-score-input"] input');
+    await scoreInput.setValue('5');
+    await scoreInput.trigger('blur');
+    vi.advanceTimersByTime(350);
+
+    expect(api.listEvents).toHaveBeenCalledWith(expect.objectContaining({ min_score: 5 }));
+    vi.useRealTimers();
   });
 
   it('filters logs by search query', async () => {
