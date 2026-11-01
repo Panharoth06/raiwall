@@ -358,13 +358,9 @@ func (f *File) validateResources(v *validator) {
 		if app.SSLMode == "manual" && app.Certificate == "" {
 			v.add("%s.certificate is required when ssl_mode is manual", prefix)
 		}
-		for j, up := range app.Upstreams {
-			if !validDial(up.Dial) {
-				v.add("%s.upstreams[%d].dial %q is not a valid host:port", prefix, j, up.Dial)
-			}
-			if up.Weight < 0 || up.MaxFails < 0 {
-				v.add("%s.upstreams[%d] weights and max_fails must be non-negative", prefix, j)
-			}
+		v.validateUpstreams(prefix, app.Upstreams)
+		for k, rule := range app.Forwarding {
+			v.validateUpstreams(fmt.Sprintf("%s.forwarding[%d]", prefix, k), rule.Upstreams)
 		}
 	}
 

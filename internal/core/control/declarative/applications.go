@@ -155,6 +155,7 @@ func buildApplication(app config.Application, id string, prev control.SiteApp, c
 			FailTimeout:         up.FailTimeout.Std(),
 			HealthCheckPath:     up.HealthCheckPath,
 			HealthCheckInterval: up.HealthCheckInterval.Std(),
+			HealthCheckStatus:   up.HealthCheckStatus,
 		})
 	}
 
@@ -251,6 +252,7 @@ func (s *syncer) syncForwarding(appID string, rules []config.ForwardingRule) err
 				FailTimeout:         up.FailTimeout.Std(),
 				HealthCheckPath:     up.HealthCheckPath,
 				HealthCheckInterval: up.HealthCheckInterval.Std(),
+				HealthCheckStatus:   up.HealthCheckStatus,
 			})
 		}
 		upstreamJSON, _ := json.Marshal(upstreams)

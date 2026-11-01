@@ -41,6 +41,8 @@ type Upstream struct {
 	FailTimeout         Duration `yaml:"fail_timeout" json:"fail_timeout"`
 	HealthCheckPath     string   `yaml:"health_check_path" json:"health_check_path"`
 	HealthCheckInterval Duration `yaml:"health_check_interval" json:"health_check_interval"`
+	// HealthCheckStatus is the HTTP status a healthy probe must return (default 200).
+	HealthCheckStatus int `yaml:"health_check_status" json:"health_check_status"`
 }
 
 // Port is declarative listener metadata for an application.

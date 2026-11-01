@@ -53,6 +53,7 @@ type UpstreamTarget struct {
 	FailTimeout         time.Duration `json:"fail_timeout,omitempty"`
 	HealthCheckPath     string        `json:"health_check_path,omitempty"`
 	HealthCheckInterval time.Duration `json:"health_check_interval,omitempty"`
+	HealthCheckStatus   int           `json:"health_check_status,omitempty"`
 }
 
 // UnmarshalJSON custom unmarshaler for UpstreamTarget supporting string durations and numeric nanoseconds.
@@ -64,6 +65,7 @@ func (u *UpstreamTarget) UnmarshalJSON(data []byte) error {
 		FailTimeout         any    `json:"fail_timeout,omitempty"`
 		HealthCheckPath     string `json:"health_check_path,omitempty"`
 		HealthCheckInterval any    `json:"health_check_interval,omitempty"`
+		HealthCheckStatus   int    `json:"health_check_status,omitempty"`
 		Interval            any    `json:"interval,omitempty"`
 	}
 
@@ -76,6 +78,7 @@ func (u *UpstreamTarget) UnmarshalJSON(data []byte) error {
 	u.Weight = raw.Weight
 	u.MaxFails = raw.MaxFails
 	u.HealthCheckPath = raw.HealthCheckPath
+	u.HealthCheckStatus = raw.HealthCheckStatus
 
 	parseDur := func(v any) (time.Duration, error) {
 		if v == nil {
@@ -130,14 +133,16 @@ func (u UpstreamTarget) MarshalJSON() ([]byte, error) {
 		FailTimeout         string `json:"fail_timeout,omitempty"`
 		HealthCheckPath     string `json:"health_check_path,omitempty"`
 		HealthCheckInterval string `json:"health_check_interval,omitempty"`
+		HealthCheckStatus   int    `json:"health_check_status,omitempty"`
 		Interval            string `json:"interval,omitempty"`
 	}
 
 	t := targetAlias{
-		Dial:            u.Dial,
-		Weight:          u.Weight,
-		MaxFails:        u.MaxFails,
-		HealthCheckPath: u.HealthCheckPath,
+		Dial:              u.Dial,
+		Weight:            u.Weight,
+		MaxFails:          u.MaxFails,
+		HealthCheckPath:   u.HealthCheckPath,
+		HealthCheckStatus: u.HealthCheckStatus,
 	}
 	if u.FailTimeout > 0 {
 		t.FailTimeout = u.FailTimeout.String()

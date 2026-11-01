@@ -90,6 +90,10 @@ func NewUpstreamPool(targets []control.UpstreamTarget) *UpstreamPool {
 		if hcPath == "" {
 			hcPath = "/healthz"
 		}
+		expected := t.HealthCheckStatus
+		if expected == 0 {
+			expected = http.StatusOK
+		}
 
 		backend := &UpstreamBackend{
 			Dial:                t.Dial,
@@ -98,7 +102,7 @@ func NewUpstreamPool(targets []control.UpstreamTarget) *UpstreamPool {
 			FailTimeout:         t.FailTimeout,
 			HealthCheckPath:     hcPath,
 			HealthCheckInterval: interval,
-			ExpectedStatus:      http.StatusOK,
+			ExpectedStatus:      expected,
 			stopChan:            make(chan struct{}),
 			client: &http.Client{
 				Timeout: 2 * time.Second,

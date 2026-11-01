@@ -216,6 +216,8 @@ applications:
         fail_timeout: 30s
         health_check_path: /healthz
         health_check_interval: 15s
+        # Status a healthy probe must return (default 200).
+        health_check_status: 200
       - dial: "10.0.0.11:8080"
         weight: 1
         max_fails: 3
