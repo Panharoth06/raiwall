@@ -1,6 +1,7 @@
 package telemetry
 
 import (
+	"errors"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -205,4 +206,36 @@ func BenchmarkRingBuffer_Push(b *testing.B) {
 			rb.Push(event)
 		}
 	})
+}
+
+func TestRingBuffer_FailedBatchNotCountedAsFlushed(t *testing.T) {
+	var reported atomic.Int64
+	done := make(chan struct{}, 1)
+	rb := NewRingBuffer(RingBufferConfig{
+		Capacity:      10,
+		BatchSize:     2,
+		FlushInterval: 10 * time.Second,
+		Handler:       func([]*ForensicEvent) error { return errors.New("store down") },
+		OnError: func(err error, events int) {
+			reported.Add(int64(events))
+			select {
+			case done <- struct{}{}:
+			default:
+			}
+		},
+	})
+	rb.Push(&ForensicEvent{EventID: "a"})
+	rb.Push(&ForensicEvent{EventID: "b"})
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("OnError not called")
+	}
+	_ = rb.Close()
+	if rb.Failed() != 2 || reported.Load() != 2 {
+		t.Fatalf("failed=%d reported=%d, want 2/2", rb.Failed(), reported.Load())
+	}
+	if rb.Flushed() != 0 {
+		t.Fatalf("flushed=%d, want 0 for a failed batch", rb.Flushed())
+	}
 }

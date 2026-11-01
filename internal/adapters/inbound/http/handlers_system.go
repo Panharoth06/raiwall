@@ -45,14 +45,20 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	respondJSON(w, http.StatusOK, map[string]any{
+	payload := map[string]any{
 		"status":         status,
 		"checks":         checks,
 		"active_version": ver,
 		"mode":           mode,
 		"auto_apply":     s.autoApply,
 		"timestamp":      time.Now().UTC(),
-	})
+	}
+	if tp, ok := s.readiness.(TelemetryStatsProvider); ok {
+		if stats := tp.TelemetryStats(); stats != nil {
+			payload["telemetry"] = stats
+		}
+	}
+	respondJSON(w, http.StatusOK, payload)
 }
 
 type updateAutoApplyRequest struct {

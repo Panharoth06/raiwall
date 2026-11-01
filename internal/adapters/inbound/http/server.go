@@ -41,6 +41,13 @@ type ReadinessProvider interface {
 	Readiness(ctx context.Context) map[string]bool
 }
 
+// TelemetryStatsProvider is an optional extension of ReadinessProvider that
+// reports forensic pipeline counters (enqueued, flushed, dropped,
+// write_failed) so operators can see lost telemetry from /status.
+type TelemetryStatsProvider interface {
+	TelemetryStats() map[string]uint64
+}
+
 // ClusterStatusProvider supplies live HA state from the data plane. A nil
 // provider means the process is running standalone.
 type ClusterStatusProvider interface {

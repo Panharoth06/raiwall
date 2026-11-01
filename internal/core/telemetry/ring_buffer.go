@@ -31,6 +31,9 @@ type RingBufferConfig struct {
 	BatchSize     int
 	FlushInterval time.Duration
 	Handler       BatchHandler
+	// OnError, when set, is called after a batch fails to persist with the
+	// handler's error and the number of events lost.
+	OnError func(err error, events int)
 }
 
 // RingBuffer is a high-throughput, non-blocking in-memory event buffer.
@@ -41,10 +44,12 @@ type RingBuffer struct {
 	batchSize     int
 	flushInterval time.Duration
 	handler       BatchHandler
+	onError       func(err error, events int)
 
 	dropped  atomic.Uint64
 	enqueued atomic.Uint64
 	flushed  atomic.Uint64
+	failed   atomic.Uint64
 
 	stopCh chan struct{}
 	doneCh chan struct{}
@@ -73,6 +78,7 @@ func NewRingBuffer(cfg RingBufferConfig) *RingBuffer {
 		batchSize:     batchVal,
 		flushInterval: intervalVal,
 		handler:       cfg.Handler,
+		onError:       cfg.OnError,
 		stopCh:        make(chan struct{}),
 		doneCh:        make(chan struct{}),
 	}
@@ -116,6 +122,12 @@ func (rb *RingBuffer) Flushed() uint64 {
 	return rb.flushed.Load()
 }
 
+// Failed returns the total number of events lost because their batch failed
+// to persist.
+func (rb *RingBuffer) Failed() uint64 {
+	return rb.failed.Load()
+}
+
 // Capacity returns the buffer's capacity.
 func (rb *RingBuffer) Capacity() int {
 	return rb.capacity
@@ -146,10 +158,18 @@ func (rb *RingBuffer) worker() {
 		if len(batch) == 0 {
 			return
 		}
+		var err error
 		if rb.handler != nil {
-			_ = rb.handler(batch)
+			err = rb.handler(batch)
 		}
-		rb.flushed.Add(uint64(len(batch)))
+		if err != nil {
+			rb.failed.Add(uint64(len(batch)))
+			if rb.onError != nil {
+				rb.onError(err, len(batch))
+			}
+		} else {
+			rb.flushed.Add(uint64(len(batch)))
+		}
 		batch = make([]*ForensicEvent, 0, rb.batchSize)
 	}
 

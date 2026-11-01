@@ -117,6 +117,7 @@ func (m *Middleware) provisionTelemetry(_ caddy.Context) error {
 				}
 				return nil
 			},
+			OnError: m.telemetryWriteFailureReporter(),
 		})
 	}
 

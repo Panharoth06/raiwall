@@ -15,6 +15,7 @@ type Metrics struct {
 	BlockedTotal          *prometheus.CounterVec
 	RequestDuration       *prometheus.HistogramVec
 	TelemetryDroppedTotal prometheus.Counter
+	TelemetryFailedTotal  prometheus.Counter
 	ActiveConnections     prometheus.Gauge
 	BannedIPsTotal        prometheus.Gauge
 }
@@ -64,6 +65,13 @@ func NewMetrics(reg prometheus.Registerer) *Metrics {
 		},
 	)
 
+	telemetryFailedTotal := prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "raiwall_telemetry_write_failed_total",
+			Help: "Total number of forensic events lost because the telemetry store rejected their batch.",
+		},
+	)
+
 	activeConnections := prometheus.NewGauge(
 		prometheus.GaugeOpts{
 			Name: "raiwall_active_connections",
@@ -82,6 +90,7 @@ func NewMetrics(reg prometheus.Registerer) *Metrics {
 	_ = reg.Register(blockedTotal)
 	_ = reg.Register(requestDuration)
 	_ = reg.Register(telemetryDroppedTotal)
+	_ = reg.Register(telemetryFailedTotal)
 	_ = reg.Register(activeConnections)
 	_ = reg.Register(bannedIPsTotal)
 
@@ -91,6 +100,7 @@ func NewMetrics(reg prometheus.Registerer) *Metrics {
 		BlockedTotal:          blockedTotal,
 		RequestDuration:       requestDuration,
 		TelemetryDroppedTotal: telemetryDroppedTotal,
+		TelemetryFailedTotal:  telemetryFailedTotal,
 		ActiveConnections:     activeConnections,
 		BannedIPsTotal:        bannedIPsTotal,
 	}
@@ -110,6 +120,11 @@ func (m *Metrics) RecordBlock(reason, ruleID string) {
 // RecordTelemetryDropped records dropped events from ring buffer saturation.
 func (m *Metrics) RecordTelemetryDropped(count float64) {
 	m.TelemetryDroppedTotal.Add(count)
+}
+
+// RecordTelemetryWriteFailed records events lost to a failed store write.
+func (m *Metrics) RecordTelemetryWriteFailed(count float64) {
+	m.TelemetryFailedTotal.Add(count)
 }
 
 // SetActiveConnections sets the gauge of current active proxy connections.
