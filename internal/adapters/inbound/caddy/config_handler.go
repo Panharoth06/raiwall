@@ -168,6 +168,8 @@ func handlerFromConfig(file *config.File) (*Middleware, error) {
 		m.SidecarConfig = &SidecarSettings{
 			Listen:      file.Sidecar.Listen,
 			MaxBodySize: file.Sidecar.MaxBodySize,
+
+			TrustedProxies: file.Sidecar.TrustedProxies,
 		}
 	}
 

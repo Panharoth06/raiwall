@@ -146,30 +146,32 @@ func ParseH2Fingerprint(raw string) (*HTTP2Fingerprint, error) {
 	return fp, nil
 }
 
-// ExtractHTTP2Fingerprint extracts HTTP/2 connection parameters from context or headers.
+// ExtractHTTP2Fingerprint returns the HTTP/2 fingerprint captured from this
+// connection's opening frames, as stored in the request context. Headers are
+// never consulted here; see HTTP2FingerprintFromHeaders.
 func ExtractHTTP2Fingerprint(r *http.Request) *HTTP2Fingerprint {
 	if r == nil {
 		return nil
 	}
+	return GetHTTP2Fingerprint(r.Context())
+}
 
-	// 1. Check request context
-	if fp := GetHTTP2Fingerprint(r.Context()); fp != nil {
-		return fp
+// HTTP2FingerprintFromHeaders parses a fingerprint forwarded by an edge proxy
+// (X-HTTP2-Fingerprint, then X-H2-Fingerprint). Callers must only use it when
+// the socket peer is a configured trusted proxy.
+func HTTP2FingerprintFromHeaders(h http.Header) *HTTP2Fingerprint {
+	raw := h.Get(HeaderXHTTP2Fingerprint)
+	if raw == "" {
+		raw = h.Get(HeaderXH2Fingerprint)
 	}
-
-	// 2. Check header fallbacks
-	headerVal := r.Header.Get(HeaderXHTTP2Fingerprint)
-	if headerVal == "" {
-		headerVal = r.Header.Get(HeaderXH2Fingerprint)
+	if raw == "" {
+		return nil
 	}
-
-	if headerVal != "" {
-		if fp, err := ParseH2Fingerprint(headerVal); err == nil {
-			return fp
-		}
+	fp, err := ParseH2Fingerprint(raw)
+	if err != nil {
+		return nil
 	}
-
-	return nil
+	return fp
 }
 
 // CorrelateH2WithUA checks for inconsistencies between the HTTP/2 fingerprint and User-Agent.

@@ -156,6 +156,8 @@ type BootstrapAdminSettings struct {
 type SidecarSettings struct {
 	Listen      string `json:"listen,omitempty"`
 	MaxBodySize int64  `json:"max_body_size,omitempty"`
+	// TrustedProxies are hops in front of Envoy skipped when walking XFF.
+	TrustedProxies []string `json:"trusted_proxies,omitempty"`
 }
 
 // DeclarativeSettings is the config package's declarative resource bundle.

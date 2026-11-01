@@ -107,7 +107,7 @@ func (s *ExtProcServer) Process(stream ExternalProcessor_ProcessServer) error {
 				}
 			}
 
-			clientIP = extractClientIP(headers)
+			clientIP = extractClientIP(headers, s.trusted)
 			if blocked, err := s.evalSnapshotACL(stream, host, path, method, clientIP, headers); blocked || err != nil {
 				return err
 			}

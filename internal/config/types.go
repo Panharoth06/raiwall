@@ -52,6 +52,8 @@ type Server struct {
 	// only when Caddy should also obtain certificates for unknown SNI.
 	AutoHTTPS bool `yaml:"auto_https" json:"auto_https"`
 	ACME      ACME `yaml:"acme" json:"acme"`
+	// ProxyProtocol accepts PROXY v1/v2 headers from trusted load balancers.
+	ProxyProtocol *ProxyProtocol `yaml:"proxy_protocol,omitempty" json:"proxy_protocol,omitempty"`
 }
 
 // HTTPListener configures the plaintext listener.
@@ -298,6 +300,9 @@ type Sidecar struct {
 	Enabled     *bool  `yaml:"enabled,omitempty" json:"enabled,omitempty"`
 	Listen      string `yaml:"listen" json:"listen"`
 	MaxBodySize int64  `yaml:"max_body_size" json:"max_body_size"`
+	// TrustedProxies lists hops in front of Envoy whose X-Forwarded-For
+	// entries are skipped when locating the client address.
+	TrustedProxies []string `yaml:"trusted_proxies,omitempty" json:"trusted_proxies,omitempty"`
 }
 
 // GeoIP points at MaxMind database files used by ACL expressions, telemetry

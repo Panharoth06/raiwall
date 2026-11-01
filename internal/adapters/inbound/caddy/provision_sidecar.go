@@ -24,6 +24,8 @@ func (m *Middleware) provisionSidecar(_ caddy.Context) error {
 			MaxBodySize: maxBodySize,
 			WAFEngine:   m.engine,
 			RingBuffer:  m.ringBuffer,
+
+			TrustedProxies: m.SidecarConfig.TrustedProxies,
 		})
 		if err := m.sidecarServer.Start(); err != nil {
 			return fmt.Errorf("failed to start Envoy ext_proc sidecar server on %s: %w", listenAddr, err)

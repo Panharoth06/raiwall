@@ -3,7 +3,6 @@ package bot
 import (
 	"context"
 	"crypto/tls"
-	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -53,122 +52,43 @@ func TestContextJA4(t *testing.T) {
 	}
 }
 
-func TestExtractJA4(t *testing.T) {
-	tests := []struct {
-		name     string
-		setupReq func() *http.Request
-		wantJA4  string
-	}{
-		{
-			name: "nil request",
-			setupReq: func() *http.Request {
-				return nil
-			},
-			wantJA4: "",
-		},
-		{
-			name: "context present",
-			setupReq: func() *http.Request {
-				req := httptest.NewRequest(http.MethodGet, "https://example.com/", nil)
-				ctx := WithJA4(req.Context(), "ja4-from-context")
-				req.Header.Set("X-JA4-Fingerprint", "ja4-from-header")
-				return req.WithContext(ctx)
-			},
-			wantJA4: "ja4-from-context",
-		},
-		{
-			name: "X-JA4-Fingerprint header fallback",
-			setupReq: func() *http.Request {
-				req := httptest.NewRequest(http.MethodGet, "https://example.com/", nil)
-				req.Header.Set("X-JA4-Fingerprint", "ja4-from-x-header")
-				req.Header.Set("JA4", "ja4-from-ja4-header")
-				return req
-			},
-			wantJA4: "ja4-from-x-header",
-		},
-		{
-			name: "JA4 header fallback",
-			setupReq: func() *http.Request {
-				req := httptest.NewRequest(http.MethodGet, "https://example.com/", nil)
-				req.Header.Set("JA4", "  ja4-from-plain-header  ")
-				return req
-			},
-			wantJA4: "ja4-from-plain-header",
-		},
-		{
-			name: "no ja4 source",
-			setupReq: func() *http.Request {
-				return httptest.NewRequest(http.MethodGet, "https://example.com/", nil)
-			},
-			wantJA4: "",
-		},
+func TestExtractJA4IgnoresHeaders(t *testing.T) {
+	if got := ExtractJA4(nil); got != "" {
+		t.Errorf("ExtractJA4(nil) = %q, want empty", got)
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			req := tt.setupReq()
-			got := ExtractJA4(req)
-			if got != tt.wantJA4 {
-				t.Errorf("ExtractJA4() = %q, want %q", got, tt.wantJA4)
-			}
-		})
+	spoofed := httptest.NewRequest(http.MethodGet, "https://example.com/", nil)
+	spoofed.Header.Set(HeaderXJA4Fingerprint, "ja4-from-header")
+	spoofed.Header.Set(HeaderJA4, "ja4-from-plain-header")
+	if got := ExtractJA4(spoofed); got != "" {
+		t.Errorf("ExtractJA4 must not read client headers, got %q", got)
+	}
+
+	captured := spoofed.WithContext(WithJA4(spoofed.Context(), "ja4-from-handshake"))
+	if got := ExtractJA4(captured); got != "ja4-from-handshake" {
+		t.Errorf("ExtractJA4 = %q, want the handshake value", got)
 	}
 }
 
-func TestDirectTLSCapturer(t *testing.T) {
-	capturer := NewDirectTLSCapturer()
-	if capturer == nil {
-		t.Fatal("NewDirectTLSCapturer returned nil")
+func TestJA4FromHeaders(t *testing.T) {
+	tests := []struct {
+		name    string
+		headers map[string]string
+		want    string
+	}{
+		{"none", nil, ""},
+		{"x-header wins", map[string]string{HeaderXJA4Fingerprint: "a", HeaderJA4: "b"}, "a"},
+		{"plain header trimmed", map[string]string{HeaderJA4: "  b  "}, "b"},
 	}
-
-	// Test nil hello
-	_, err := capturer.GetConfigForClient(nil)
-	if err != nil {
-		t.Errorf("GetConfigForClient(nil) returned error: %v", err)
-	}
-
-	// Test with nil Conn (must not panic)
-	helloNoConn := &tls.ClientHelloInfo{
-		CipherSuites:      []uint16{tls.TLS_AES_128_GCM_SHA256},
-		ServerName:        "example.com",
-		SupportedVersions: []uint16{tls.VersionTLS13},
-	}
-	_, err = capturer.GetConfigForClient(helloNoConn)
-	if err != nil {
-		t.Errorf("GetConfigForClient(helloNoConn) returned error: %v", err)
-	}
-
-	// Test with valid Conn
-	serverConn, clientConn := net.Pipe()
-	defer serverConn.Close()
-	defer clientConn.Close()
-
-	hello := &tls.ClientHelloInfo{
-		CipherSuites:      []uint16{tls.TLS_AES_128_GCM_SHA256, tls.TLS_AES_256_GCM_SHA384},
-		ServerName:        "example.com",
-		SupportedVersions: []uint16{tls.VersionTLS13},
-		SupportedProtos:   []string{"h2", "http/1.1"},
-		Conn:              serverConn,
-	}
-	_, err = capturer.GetConfigForClient(hello)
-	if err != nil {
-		t.Errorf("GetConfigForClient(hello) returned error: %v", err)
-	}
-
-	capturer.ConnStateCallback(serverConn, http.StateActive)
-	capturer.ConnStateCallback(serverConn, http.StateClosed)
-
-	// Test handler wrap
-	called := false
-	handler := capturer.Wrap(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		called = true
-		w.WriteHeader(http.StatusOK)
-	}))
-
-	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "https://example.com/", nil)
-	handler.ServeHTTP(rec, req)
-	if !called {
-		t.Error("wrapped handler was not called")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := http.Header{}
+			for k, v := range tt.headers {
+				h.Set(k, v)
+			}
+			if got := JA4FromHeaders(h); got != tt.want {
+				t.Errorf("JA4FromHeaders() = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }

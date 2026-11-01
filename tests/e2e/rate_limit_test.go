@@ -123,7 +123,7 @@ func TestEndToEndRateLimitAndDDoSDefense(t *testing.T) {
 			req.Header.Set("Accept", "text/html,application/xhtml+xml")
 			req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36")
 			req.Header.Set("X-Real-IP", browserIP)
-			req.Header.Set("X-JA4-Fingerprint", ja4)
+			req = req.WithContext(bot.WithJA4(req.Context(), ja4))
 			rec := httptest.NewRecorder()
 
 			if err := f.mw.ServeHTTP(rec, req, f.next); err != nil {
@@ -146,7 +146,7 @@ func TestEndToEndRateLimitAndDDoSDefense(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "https://example.com/api/data", nil)
 			req.Header.Set("Authorization", "Bearer sk_api_token_123")
 			req.Header.Set("X-Real-IP", apiIP)
-			req.Header.Set("X-JA4-Fingerprint", ja4)
+			req = req.WithContext(bot.WithJA4(req.Context(), ja4))
 			rec := httptest.NewRecorder()
 
 			if err := f.mw.ServeHTTP(rec, req, f.next); err != nil {
@@ -181,7 +181,7 @@ func TestEndToEndRateLimitAndDDoSDefense(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "https://example.com/api/data?q=1%27%20OR%20%271%27=%271", nil)
 			req.Header.Set("Authorization", "Bearer token-attacker")
 			req.Header.Set("X-Real-IP", attackerIP)
-			req.Header.Set("X-JA4-Fingerprint", attackerJA4)
+			req = req.WithContext(bot.WithJA4(req.Context(), attackerJA4))
 			rec := httptest.NewRecorder()
 
 			_ = f.mw.ServeHTTP(rec, req, f.next)
@@ -199,7 +199,7 @@ func TestEndToEndRateLimitAndDDoSDefense(t *testing.T) {
 		benignReq := httptest.NewRequest(http.MethodGet, "https://example.com/api/data", nil)
 		benignReq.Header.Set("Authorization", "Bearer token-attacker")
 		benignReq.Header.Set("X-Real-IP", attackerIP)
-		benignReq.Header.Set("X-JA4-Fingerprint", attackerJA4)
+		benignReq = benignReq.WithContext(bot.WithJA4(benignReq.Context(), attackerJA4))
 		recBenign := httptest.NewRecorder()
 
 		if err := f.mw.ServeHTTP(recBenign, benignReq, f.next); err != nil {
@@ -227,7 +227,7 @@ func TestEndToEndRateLimitAndDDoSDefense(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "https://example.com"+path, nil)
 			req.Header.Set("Authorization", "Bearer scanner-recon")
 			req.Header.Set("X-Real-IP", sharedIP)
-			req.Header.Set("X-JA4-Fingerprint", scannerJA4)
+			req = req.WithContext(bot.WithJA4(req.Context(), scannerJA4))
 			rec := httptest.NewRecorder()
 
 			_ = f.mw.ServeHTTP(rec, req, f.next)
@@ -247,7 +247,7 @@ func TestEndToEndRateLimitAndDDoSDefense(t *testing.T) {
 		innocentReq := httptest.NewRequest(http.MethodGet, "https://example.com/api/data", nil)
 		innocentReq.Header.Set("Authorization", "Bearer jwt-innocent")
 		innocentReq.Header.Set("X-Real-IP", sharedIP)
-		innocentReq.Header.Set("X-JA4-Fingerprint", innocentJA4)
+		innocentReq = innocentReq.WithContext(bot.WithJA4(innocentReq.Context(), innocentJA4))
 		recInnocent := httptest.NewRecorder()
 
 		if err := f.mw.ServeHTTP(recInnocent, innocentReq, f.next); err != nil {
@@ -270,7 +270,7 @@ func TestEndToEndRateLimitAndDDoSDefense(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "https://example.com/api/data?q=1%27%20OR%20%271%27=%271", nil)
 			req.Header.Set("Authorization", "Bearer token-audit")
 			req.Header.Set("X-Real-IP", auditIP)
-			req.Header.Set("X-JA4-Fingerprint", auditJA4)
+			req = req.WithContext(bot.WithJA4(req.Context(), auditJA4))
 			rec := httptest.NewRecorder()
 
 			_ = f.mw.ServeHTTP(rec, req, f.next)

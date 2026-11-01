@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Panharoth06/raiwall/internal/core/bot"
 	"github.com/Panharoth06/raiwall/internal/core/control"
 	"github.com/Panharoth06/raiwall/internal/core/waf"
 	"github.com/caddyserver/caddy/v2"
@@ -164,7 +165,7 @@ func TestBotDefense_AuditModeDoesNotBlock(t *testing.T) {
 	// Request with curl JA4 claiming to be Chrome UA (spoofed)
 	req := httptest.NewRequest("GET", "https://example.com/page", nil)
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
-	req.Header.Set("X-JA4-Fingerprint", "t13d1516h2_curl_default")
+	req = req.WithContext(bot.WithJA4(req.Context(), "t13d1516h2_curl_default"))
 	rec := httptest.NewRecorder()
 
 	nextHandler := caddyhttp.HandlerFunc(func(w http.ResponseWriter, r *http.Request) error {

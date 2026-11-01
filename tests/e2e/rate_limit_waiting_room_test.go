@@ -45,7 +45,7 @@ func TestEndToEndRateLimit_WaitingRoomAndConcurrency(t *testing.T) {
 		reqWait.Header.Set("Accept", "text/html,application/xhtml+xml")
 		reqWait.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh)")
 		reqWait.Header.Set("X-Real-IP", queueIP)
-		reqWait.Header.Set("X-JA4-Fingerprint", queueJA4)
+		reqWait = reqWait.WithContext(bot.WithJA4(reqWait.Context(), queueJA4))
 		recWait := httptest.NewRecorder()
 
 		_ = f.mw.ServeHTTP(recWait, reqWait, f.next)
@@ -60,7 +60,7 @@ func TestEndToEndRateLimit_WaitingRoomAndConcurrency(t *testing.T) {
 		reqAPI := httptest.NewRequest(http.MethodGet, "https://example.com/api/data", nil)
 		reqAPI.Header.Set("Authorization", "Bearer sk_token")
 		reqAPI.Header.Set("X-Real-IP", queueIP)
-		reqAPI.Header.Set("X-JA4-Fingerprint", queueJA4)
+		reqAPI = reqAPI.WithContext(bot.WithJA4(reqAPI.Context(), queueJA4))
 		recAPI := httptest.NewRecorder()
 
 		_ = f.mw.ServeHTTP(recAPI, reqAPI, f.next)
@@ -81,7 +81,7 @@ func TestEndToEndRateLimit_WaitingRoomAndConcurrency(t *testing.T) {
 		reqAdmitted.Header.Set("Accept", "text/html,application/xhtml+xml")
 		reqAdmitted.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh)")
 		reqAdmitted.Header.Set("X-Real-IP", queueIP)
-		reqAdmitted.Header.Set("X-JA4-Fingerprint", queueJA4)
+		reqAdmitted = reqAdmitted.WithContext(bot.WithJA4(reqAdmitted.Context(), queueJA4))
 		reqAdmitted.AddCookie(&http.Cookie{Name: rate.WaitingRoomClearanceCookie, Value: validToken})
 		recAdmitted := httptest.NewRecorder()
 
@@ -120,7 +120,7 @@ func TestEndToEndRateLimit_WaitingRoomAndConcurrency(t *testing.T) {
 					req := httptest.NewRequest(http.MethodGet, "https://example.com/api/data", nil)
 					req.Header.Set("Authorization", "Bearer jwt-concurrent")
 					req.Header.Set("X-Real-IP", clientIP)
-					req.Header.Set("X-JA4-Fingerprint", ja4)
+					req = req.WithContext(bot.WithJA4(req.Context(), ja4))
 					rec := httptest.NewRecorder()
 
 					_ = f.mw.ServeHTTP(rec, req, f.next)
@@ -153,7 +153,7 @@ func TestEndToEndRateLimit_WaitingRoomAndConcurrency(t *testing.T) {
 			req.Header.Set("Accept", "text/html,application/xhtml+xml")
 			req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36")
 			req.Header.Set("X-Real-IP", verifiedIP)
-			req.Header.Set("X-JA4-Fingerprint", verifiedJA4)
+			req = req.WithContext(bot.WithJA4(req.Context(), verifiedJA4))
 			req.AddCookie(clearanceCookie)
 			rec := httptest.NewRecorder()
 
@@ -212,7 +212,7 @@ func TestEndToEndRateLimit_WaitingRoomAndConcurrency(t *testing.T) {
 		req1.Header.Set("Accept", "text/html,application/xhtml+xml")
 		req1.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh)")
 		req1.Header.Set("X-Real-IP", cookieIP)
-		req1.Header.Set("X-JA4-Fingerprint", cookieJA4)
+		req1 = req1.WithContext(bot.WithJA4(req1.Context(), cookieJA4))
 		rec1 := httptest.NewRecorder()
 
 		_ = mwWait.ServeHTTP(rec1, req1, f.next)
@@ -235,7 +235,7 @@ func TestEndToEndRateLimit_WaitingRoomAndConcurrency(t *testing.T) {
 		req2.Header.Set("Accept", "text/html,application/xhtml+xml")
 		req2.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh)")
 		req2.Header.Set("X-Real-IP", cookieIP)
-		req2.Header.Set("X-JA4-Fingerprint", cookieJA4)
+		req2 = req2.WithContext(bot.WithJA4(req2.Context(), cookieJA4))
 		req2.AddCookie(queueCookie)
 		rec2 := httptest.NewRecorder()
 
@@ -276,7 +276,7 @@ func TestEndToEndRateLimit_WaitingRoomAndConcurrency(t *testing.T) {
 		reqNonTarget.Header.Set("Accept", "text/html,application/xhtml+xml")
 		reqNonTarget.Header.Set("User-Agent", "Mozilla/5.0")
 		reqNonTarget.Header.Set("X-Real-IP", clientIP)
-		reqNonTarget.Header.Set("X-JA4-Fingerprint", clientJA4)
+		reqNonTarget = reqNonTarget.WithContext(bot.WithJA4(reqNonTarget.Context(), clientJA4))
 		recNonTarget := httptest.NewRecorder()
 
 		_ = f.mw.ServeHTTP(recNonTarget, reqNonTarget, f.next)
@@ -289,7 +289,7 @@ func TestEndToEndRateLimit_WaitingRoomAndConcurrency(t *testing.T) {
 		reqTarget.Header.Set("Accept", "text/html,application/xhtml+xml")
 		reqTarget.Header.Set("User-Agent", "Mozilla/5.0")
 		reqTarget.Header.Set("X-Real-IP", clientIP)
-		reqTarget.Header.Set("X-JA4-Fingerprint", clientJA4)
+		reqTarget = reqTarget.WithContext(bot.WithJA4(reqTarget.Context(), clientJA4))
 		recTarget := httptest.NewRecorder()
 
 		_ = f.mw.ServeHTTP(recTarget, reqTarget, f.next)
@@ -302,7 +302,7 @@ func TestEndToEndRateLimit_WaitingRoomAndConcurrency(t *testing.T) {
 		reqBoundary.Header.Set("Accept", "text/html,application/xhtml+xml")
 		reqBoundary.Header.Set("User-Agent", "Mozilla/5.0")
 		reqBoundary.Header.Set("X-Real-IP", clientIP)
-		reqBoundary.Header.Set("X-JA4-Fingerprint", clientJA4)
+		reqBoundary = reqBoundary.WithContext(bot.WithJA4(reqBoundary.Context(), clientJA4))
 		recBoundary := httptest.NewRecorder()
 
 		_ = f.mw.ServeHTTP(recBoundary, reqBoundary, f.next)
@@ -331,7 +331,7 @@ func TestEndToEndRateLimit_WaitingRoomAndConcurrency(t *testing.T) {
 		reqAdmitted.Header.Set("Accept", "text/html,application/xhtml+xml")
 		reqAdmitted.Header.Set("User-Agent", "Mozilla/5.0")
 		reqAdmitted.Header.Set("X-Real-IP", clientIP)
-		reqAdmitted.Header.Set("X-JA4-Fingerprint", clientJA4)
+		reqAdmitted = reqAdmitted.WithContext(bot.WithJA4(reqAdmitted.Context(), clientJA4))
 		reqAdmitted.AddCookie(qCookie)
 		recAdmitted := httptest.NewRecorder()
 

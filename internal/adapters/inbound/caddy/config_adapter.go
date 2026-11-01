@@ -122,11 +122,15 @@ func httpApp(file *config.File, handler map[string]any) map[string]any {
 	}
 
 	if boolValue(file.Server.HTTP.Enabled, true) {
-		servers["http"] = map[string]any{
+		srv := map[string]any{
 			"listen":          []string{file.Server.HTTP.Listen},
 			"routes":          routes(httpHandler),
 			"automatic_https": map[string]any{"disable": !file.Server.AutoHTTPS},
 		}
+		if pp := proxyProtocolWrapper(file); pp != nil {
+			srv["listener_wrappers"] = []any{pp}
+		}
+		servers["http"] = srv
 	}
 
 	if boolValue(file.Server.HTTPS.Enabled, true) {
@@ -135,6 +139,7 @@ func httpApp(file *config.File, handler map[string]any) map[string]any {
 			"routes":                  routes(handler),
 			"tls_connection_policies": []any{tlsConnectionPolicy(file)},
 			"automatic_https":         map[string]any{"disable": !file.Server.AutoHTTPS},
+			"listener_wrappers":       httpsListenerWrappers(file),
 		}
 		if file.Server.HTTPS.HTTP3 {
 			srv["protocols"] = []string{"h1", "h2", "h3"}
@@ -143,6 +148,42 @@ func httpApp(file *config.File, handler map[string]any) map[string]any {
 	}
 
 	return map[string]any{"servers": servers}
+}
+
+// proxyProtocolWrapper returns Caddy's PROXY protocol listener wrapper limited
+// to the configured trusted peers, or nil when it is not enabled. Peers outside
+// the allow list that send a PROXY header are rejected, so the header can never
+// rewrite RemoteAddr for an untrusted client.
+func proxyProtocolWrapper(file *config.File) map[string]any {
+	pp := file.Server.ProxyProtocol
+	if !pp.Active() {
+		return nil
+	}
+	w := map[string]any{
+		"wrapper":         "proxy_protocol",
+		"allow":           pp.Allow,
+		"fallback_policy": "reject",
+	}
+	if pp.Timeout > 0 {
+		w["timeout"] = int64(pp.Timeout)
+	}
+	return w
+}
+
+// httpsListenerWrappers orders the TLS listener chain: PROXY protocol first so
+// later wrappers see the real stream, the JA4 capture before TLS (it needs the
+// raw ClientHello), then Caddy's tls placeholder, then the HTTP/2 frame capture
+// which needs decrypted bytes.
+func httpsListenerWrappers(file *config.File) []any {
+	var wrappers []any
+	if pp := proxyProtocolWrapper(file); pp != nil {
+		wrappers = append(wrappers, pp)
+	}
+	return append(wrappers,
+		map[string]any{"wrapper": "raiwall_ja4"},
+		map[string]any{"wrapper": "tls"},
+		map[string]any{"wrapper": "raiwall_h2"},
+	)
 }
 
 // withoutKey returns a shallow copy of m without the given key so a handler

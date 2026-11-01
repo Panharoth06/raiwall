@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/netip"
 	"strings"
 	"sync"
 	"time"
@@ -27,6 +28,11 @@ type ExtProcConfig struct {
 	MaxBodySize int
 	WAFEngine   waf.WAFEnginePort
 	RingBuffer  *telemetry.RingBuffer
+	// TrustedProxies lists CIDRs/IPs of hops in front of Envoy whose
+	// X-Forwarded-For entries are skipped when locating the client. Envoy
+	// appends the address it saw on the right, so the client is the first
+	// untrusted entry from the right; the left-most entry is client-supplied.
+	TrustedProxies []string
 }
 
 // ExtProcServer implements ExternalProcessorServer.
@@ -36,6 +42,7 @@ type ExtProcServer struct {
 	listener   net.Listener
 	mu         sync.Mutex
 	running    bool
+	trusted    []netip.Prefix
 }
 
 // NewServer initializes a new ExtProcServer.
@@ -51,7 +58,8 @@ func NewServer(cfg ExtProcConfig) *ExtProcServer {
 	}
 
 	return &ExtProcServer{
-		cfg: cfg,
+		cfg:     cfg,
+		trusted: parseTrustedPrefixes(cfg.TrustedProxies),
 	}
 }
 
@@ -119,23 +127,62 @@ func sendImmediateResponse(stream ExternalProcessor_ProcessServer, statusCode in
 	})
 }
 
-func extractClientIP(headers http.Header) net.IP {
+// extractClientIP picks the client address from Envoy's request headers. The
+// X-Forwarded-For chain is walked right to left, skipping trusted hops, because
+// Envoy appends the downstream address on the right while everything to its
+// left is supplied by the client. X-Real-IP is only used when no
+// X-Forwarded-For is present.
+func extractClientIP(headers http.Header, trusted []netip.Prefix) net.IP {
 	if xff := headers.Get("x-forwarded-for"); xff != "" {
 		parts := strings.Split(xff, ",")
-		if len(parts) > 0 {
-			ip := net.ParseIP(strings.TrimSpace(parts[0]))
-			if ip != nil {
+		var first net.IP
+		for i := len(parts) - 1; i >= 0; i-- {
+			ip := net.ParseIP(strings.TrimSpace(parts[i]))
+			if ip == nil {
+				continue
+			}
+			first = ip
+			if !ipTrusted(ip, trusted) {
 				return ip
 			}
 		}
+		if first != nil {
+			return first
+		}
 	}
 	if xrip := headers.Get("x-real-ip"); xrip != "" {
-		ip := net.ParseIP(strings.TrimSpace(xrip))
-		if ip != nil {
+		if ip := net.ParseIP(strings.TrimSpace(xrip)); ip != nil {
 			return ip
 		}
 	}
 	return net.ParseIP("127.0.0.1")
+}
+
+func parseTrustedPrefixes(raw []string) []netip.Prefix {
+	var out []netip.Prefix
+	for _, entry := range raw {
+		entry = strings.TrimSpace(entry)
+		if p, err := netip.ParsePrefix(entry); err == nil {
+			out = append(out, p)
+		} else if a, err := netip.ParseAddr(entry); err == nil {
+			out = append(out, netip.PrefixFrom(a, a.BitLen()))
+		}
+	}
+	return out
+}
+
+func ipTrusted(ip net.IP, prefixes []netip.Prefix) bool {
+	a, ok := netip.AddrFromSlice(ip)
+	if !ok {
+		return false
+	}
+	a = a.Unmap()
+	for _, p := range prefixes {
+		if p.Contains(a) {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *ExtProcServer) recordTelemetry(host, path, method string, ip net.IP, ruleID, action string, status int) {

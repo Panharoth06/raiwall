@@ -3,7 +3,6 @@ package bot
 import (
 	"context"
 	"crypto/tls"
-	"net"
 	"net/http"
 	"strings"
 
@@ -49,59 +48,23 @@ func ComputeJA4(hello *tls.ClientHelloInfo) string {
 	return ja4plus.JA4(hello)
 }
 
-// ExtractJA4 extracts the JA4 fingerprint from the request context,
-// or falls back to trusted upstream headers (X-JA4-Fingerprint, JA4).
+// ExtractJA4 returns the JA4 fingerprint captured from this connection's TLS
+// handshake, as stored in the request context by the data plane. It never
+// reads request headers: those are client-controlled unless the socket peer
+// is a trusted proxy, and only the caller knows that (see JA4FromHeaders).
 func ExtractJA4(r *http.Request) string {
 	if r == nil {
 		return ""
 	}
+	return GetJA4(r.Context())
+}
 
-	// 1. Check request context first
-	if ja4 := GetJA4(r.Context()); ja4 != "" {
+// JA4FromHeaders reads a JA4 fingerprint forwarded by an edge proxy or CDN
+// (X-JA4-Fingerprint, then JA4). Callers must only use it when the socket
+// peer is a configured trusted proxy.
+func JA4FromHeaders(h http.Header) string {
+	if ja4 := strings.TrimSpace(h.Get(HeaderXJA4Fingerprint)); ja4 != "" {
 		return ja4
 	}
-
-	// 2. Upstream header fallback: X-JA4-Fingerprint
-	if ja4 := strings.TrimSpace(r.Header.Get(HeaderXJA4Fingerprint)); ja4 != "" {
-		return ja4
-	}
-
-	// 3. Upstream header fallback: JA4
-	if ja4 := strings.TrimSpace(r.Header.Get(HeaderJA4)); ja4 != "" {
-		return ja4
-	}
-
-	return ""
-}
-
-// DirectTLSCapturer captures JA4 fingerprints during direct TLS handshakes
-// using ja4plus.JA4Middleware for listener/server integration.
-type DirectTLSCapturer struct {
-	middleware ja4plus.JA4Middleware
-}
-
-// NewDirectTLSCapturer constructs an initialized DirectTLSCapturer.
-func NewDirectTLSCapturer() *DirectTLSCapturer {
-	return &DirectTLSCapturer{}
-}
-
-// GetConfigForClient can be plugged into tls.Config.GetConfigForClient to capture
-// client TLS ClientHello fingerprints during the handshake.
-func (c *DirectTLSCapturer) GetConfigForClient(hello *tls.ClientHelloInfo) (*tls.Config, error) {
-	if hello != nil && hello.Conn != nil {
-		c.middleware.StoreFingerprintFromClientHello(hello)
-	}
-	return nil, nil
-}
-
-// ConnStateCallback can be registered with http.Server.ConnState to associate
-// connections with captured fingerprints.
-func (c *DirectTLSCapturer) ConnStateCallback(conn net.Conn, state http.ConnState) {
-	c.middleware.ConnStateCallback(conn, state)
-}
-
-// Wrap wraps an http.Handler to automatically inject the captured JA4 fingerprint
-// into the incoming request context.
-func (c *DirectTLSCapturer) Wrap(next http.Handler) http.Handler {
-	return c.middleware.Wrap(next)
+	return strings.TrimSpace(h.Get(HeaderJA4))
 }

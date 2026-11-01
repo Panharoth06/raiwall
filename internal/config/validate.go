@@ -84,6 +84,7 @@ func (f *File) validateServer(v *validator) {
 	if f.Caddy.Storage.Module != "file_system" {
 		v.add("caddy.storage.module %q is unsupported (expected file_system)", f.Caddy.Storage.Module)
 	}
+	f.validateProxyProtocol(v)
 }
 
 func (f *File) validateLogging(v *validator) {

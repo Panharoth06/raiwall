@@ -66,10 +66,13 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 		trustedProxies = appCfg.ProxySettings.TrustedProxies
 	}
 	clientIP := ExtractClientIPWithTrustedProxies(r, clientIPSource, trustedProxies)
-	ja4 := bot.ExtractJA4(r)
+	ja4, h2 := resolveFingerprints(r, trustedProxies)
 	ctx := WithClientIP(r.Context(), clientIP)
 	if ja4 != "" {
 		ctx = bot.WithJA4(ctx, ja4)
+	}
+	if h2 != nil {
+		ctx = bot.WithHTTP2Fingerprint(ctx, h2)
 	}
 	r = r.WithContext(ctx)
 

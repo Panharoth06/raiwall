@@ -52,12 +52,17 @@ func TestHTTP2Fingerprint_ContextAndHeaderExtraction(t *testing.T) {
 		t.Fatalf("Context extraction failed: %+v", extracted)
 	}
 
-	// 2. Header extraction
+	// 2. Headers are ignored by ExtractHTTP2Fingerprint (client-controlled)
 	req2 := httptest.NewRequest(http.MethodGet, "https://example.com/", nil)
 	req2.Header.Set("X-HTTP2-Fingerprint", "1:65536|65535|0|m,a,s,p")
-	extracted2 := ExtractHTTP2Fingerprint(req2)
-	if extracted2 == nil || extracted2.WindowUpdate != 65535 {
-		t.Fatalf("Header extraction failed: %+v", extracted2)
+	if got := ExtractHTTP2Fingerprint(req2); got != nil {
+		t.Fatalf("header must not be trusted by ExtractHTTP2Fingerprint, got %+v", got)
+	}
+
+	// 3. Explicit header parsing for trusted peers
+	extracted3 := HTTP2FingerprintFromHeaders(req2.Header)
+	if extracted3 == nil || extracted3.WindowUpdate != 65535 {
+		t.Fatalf("HTTP2FingerprintFromHeaders failed: %+v", extracted3)
 	}
 }
 
@@ -112,7 +117,11 @@ func TestHTTP2Fingerprint_Correlation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "https://example.com/search", nil)
 			req.Header.Set("User-Agent", tt.userAgent)
-			req.Header.Set("X-HTTP2-Fingerprint", tt.h2Raw)
+			fp, err := ParseH2Fingerprint(tt.h2Raw)
+			if err != nil {
+				t.Fatalf("parse fingerprint: %v", err)
+			}
+			req = req.WithContext(WithHTTP2Fingerprint(req.Context(), fp))
 
 			verdict := classifier.Classify(req, "")
 			if verdict.IsSpoofed != tt.wantSpoofed {

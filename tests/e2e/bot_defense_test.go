@@ -149,7 +149,7 @@ func TestEndToEndBotDefense(t *testing.T) {
 		verifyReq := httptest.NewRequest(http.MethodPost, bot.ChallengeVerifyPath, strings.NewReader(form.Encode()))
 		verifyReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		verifyReq.Header.Set("X-Real-IP", clientIP)
-		verifyReq.Header.Set("X-JA4-Fingerprint", ja4)
+		verifyReq = verifyReq.WithContext(bot.WithJA4(verifyReq.Context(), ja4))
 		verifyRec := httptest.NewRecorder()
 
 		if err := mw.ServeHTTP(verifyRec, verifyReq, next); err != nil {
@@ -176,7 +176,7 @@ func TestEndToEndBotDefense(t *testing.T) {
 		clearedReq := httptest.NewRequest(http.MethodGet, "https://example.com/static-page", nil)
 		clearedReq.Header.Set("Accept", "text/html")
 		clearedReq.Header.Set("X-Real-IP", clientIP)
-		clearedReq.Header.Set("X-JA4-Fingerprint", ja4)
+		clearedReq = clearedReq.WithContext(bot.WithJA4(clearedReq.Context(), ja4))
 		clearedReq.AddCookie(clearanceCookie)
 		clearedRec := httptest.NewRecorder()
 
@@ -196,7 +196,7 @@ func TestEndToEndBotDefense(t *testing.T) {
 	t.Run("User-Agent Spoofing Blocked with HTTP 403", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "https://example.com/search", nil)
 		req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
-		req.Header.Set("X-JA4-Fingerprint", "t13d1516h2_curl_default") // Known cURL JA4
+		req = req.WithContext(bot.WithJA4(req.Context(), "t13d1516h2_curl_default"))
 		rec := httptest.NewRecorder()
 
 		if err := mw.ServeHTTP(rec, req, next); err != nil {
@@ -221,7 +221,7 @@ func TestEndToEndBotDefense(t *testing.T) {
 		// 1. Crawler visits honeypot trap link
 		trapReq := httptest.NewRequest(http.MethodGet, "https://example.com/.raiwall/trap/crawler", nil)
 		trapReq.Header.Set("X-Real-IP", crawlerIP)
-		trapReq.Header.Set("X-JA4-Fingerprint", crawlerJA4)
+		trapReq = trapReq.WithContext(bot.WithJA4(trapReq.Context(), crawlerJA4))
 		trapRec := httptest.NewRecorder()
 
 		if err := mw.ServeHTTP(trapRec, trapReq, next); err != nil {
@@ -235,7 +235,7 @@ func TestEndToEndBotDefense(t *testing.T) {
 		// 2. Crawler attempts any other request -> immediately blocked by auto-ban
 		subsequentReq := httptest.NewRequest(http.MethodGet, "https://example.com/api/data", nil)
 		subsequentReq.Header.Set("X-Real-IP", crawlerIP)
-		subsequentReq.Header.Set("X-JA4-Fingerprint", crawlerJA4)
+		subsequentReq = subsequentReq.WithContext(bot.WithJA4(subsequentReq.Context(), crawlerJA4))
 		subsequentRec := httptest.NewRecorder()
 
 		if err := mw.ServeHTTP(subsequentRec, subsequentReq, next); err != nil {
