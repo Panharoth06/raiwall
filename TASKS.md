@@ -1,7 +1,7 @@
 # Raiwall Enterprise Tasks
 
-Actionable breakdown for [`ROADMAP.md`](ROADMAP.md). Last updated: **2026-10-31**
-(commit `c4af3e8`).
+Actionable breakdown for [`ROADMAP.md`](ROADMAP.md). Last updated: **2026-11-02**
+(commit `86b99d0`).
 
 Use this file as the working checklist. Each task is self-contained: implement,
 test, update `ROADMAP.md` status, run `graphify update .`, and commit with a
@@ -74,7 +74,8 @@ Status legend: `[x]` done · `[~]` partial · `[ ]` pending.
       `matched_rules`) plus existing response/attack fields.
 - [x] Implement retention worker and `Prune`.
 - [x] Direct `GetEventByID`; remove the 50-event scan.
-- [ ] Surface insert failures to the ring buffer/operator (metric/log) — follow-up.
+- [x] Surface insert failures to the ring buffer/operator (metric/log, `/status`
+      counters) — `fde5127`.
 - [x] Tests: schema bootstrap + upgrades, batch round-trip, lookup.
 - [ ] Live ClickHouse cluster integration (Phase 4).
 - [ ] Gate: ClickHouse serves forensic queries and prunes correctly.
@@ -93,16 +94,17 @@ Status legend: `[x]` done · `[~]` partial · `[ ]` pending.
 - [x] Invalid credentials get JSON 401; browsers still get the 467 portal.
 - [x] Tests for all bypass vectors and valid bearer.
 
-### 0.7 Trust boundaries `[~]`
-**Done:** client IP and trusted proxies (`13e8678`).
+### 0.7 Trust boundaries `[x]`
+**Done:** client IP and trusted proxies (`13e8678`); JA4/H2/PROXY capture
+(`9102e53`).
 - [x] Default to socket peer; ignore forwarded headers unless configured.
 - [x] Add `proxy.trusted_proxies`; XFF walked right-to-left past trusted hops.
 - [x] Tests: spoofed CF/X-Real-IP/XFF, trusted chain, all-trusted fallback.
-- [ ] Capture JA4 from the TLS handshake; remove client-controlled fallback
-      unless the peer is a trusted proxy.
-- [ ] Capture HTTP/2 frame fingerprint from the connection.
-- [ ] PROXY protocol v1/v2 listener with trusted-peer enforcement.
-- [ ] Gate: spoofed IP/JA4/h2 tests pass.
+- [x] Capture JA4 from the TLS handshake; header fallback is honored only from
+      trusted proxies.
+- [x] Capture HTTP/2 frame fingerprint from the connection.
+- [x] PROXY protocol v1/v2 listener with trusted-peer enforcement.
+- [x] Gate: spoofed IP/JA4/h2 tests pass.
 
 ### 0.8 Upstream reliability `[~]`
 **Targets:** `caddy/upstream.go`, `caddy/forwarding.go`, `caddy/proxy.go`,
@@ -115,7 +117,7 @@ Status legend: `[x]` done · `[~]` partial · `[ ]` pending.
 - [x] WebSocket/101 hijack path (`ProxyWebSocket`) for configured upstreams.
 - [ ] gRPC h2c/trailers support: deferred to 1B.5. `ProxyWithFailover` does not
       forward trailers yet.
-- [ ] Honor a per-target expected health-check status (probe still expects 200).
+- [x] Honor a per-target expected health-check status (`874e5ae`).
 - [x] Tests: backend down, failover, body replay, timeout, WebSocket echo,
       fail-timeout re-admission, registry starts probes; `-race` clean.
 - [x] Gate: no request can occupy a worker on a stalled upstream indefinitely
@@ -168,8 +170,8 @@ columns (`aaa12f3`, `34ea459`, `5d14d49`).
 - [x] Persist metadata in SQLite and PostgreSQL (migration 0010).
 - [x] Sanitize rule messages.
 - [x] Persist metadata in ClickHouse (0.4).
-- [ ] Add engine/score filters to the events API and UI.
-- [ ] Gate: CRS events are distinguishable and queryable.
+- [x] Add engine/score filters to the events API and UI (`6c3fd62`).
+- [x] Gate: CRS events are distinguishable and queryable.
 
 ### 1A.3 Per-site detection policy `[x]`
 **Done:** API/UI and snapshot storage in `8557bf7`; runtime per-app CRS

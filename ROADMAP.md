@@ -235,7 +235,7 @@ Priority: **P0** blocks enterprise use, **P1** major capability, **P2** maturity
 | 0.4 | ClickHouse: InitSchema, pruning, full columns (incl. CRS metadata), indexed event lookup | `storage/clickhouse/*`, `storage/registry.go` | M | **Done** (unit-tested; add live cluster integration in Phase 4) |
 | 0.5 | Envoy ext_proc field numbers + wire-format regression test | `grpc/proto_types.go` | M | **Done** `13e8678` |
 | 0.6 | Close per-site auth bypass; validate bearer/API-key claims | `core/auth/appgate.go`, `caddy/stage_auth_gate.go` | M | **Done** `13e8678` |
-| 0.7 | Client IP trust, trusted proxies, handshake JA4, PROXY protocol | `caddy/client_ip.go`, `core/bot/ja4.go`, new listener | M/L | **Partial** (`13e8678`: client IP; JA4/PROXY pending) |
+| 0.7 | Client IP trust, trusted proxies, handshake JA4, PROXY protocol | `caddy/conn_fingerprint.go`, `listener_ja4.go`, `listener_h2.go`, `proxy_protocol.go` | M/L | **Done** (`13e8678` client IP; `9102e53` handshake JA4, H2 frames, PROXY v1/v2) |
 | 0.8 | Start health checks, retries/timeouts/failover, WebSocket-capable proxy | `caddy/upstream.go`, `caddy/forwarding.go`, `caddy/proxy.go` | M | **Partial** (gRPC trailers deferred to 1B.5) |
 | 0.9 | Audit verdicts reach telemetry; response data sanitization | `caddy/stage_waf.go`, `caddy/stage_response.go`, `core/telemetry/sanitizer.go` | S/M | **Done** `13e8678` |
 | 0.10 | Secure/revocable sessions, login lockout, default-credential refusal, docs de-claim, LICENSE/SECURITY/CI | `http/auth.go`, `README.md`, `.github/` | M | **Partial** (sessions/lockout/defaults/docs done; LICENSE/SECURITY/CI pending) |
@@ -252,7 +252,7 @@ traffic; app-auth bypass tests pass; audit-mode events appear; docs match code.
 | ID | Deliverable | Targets | Size | Status |
 |---|---|---|---|---|
 | 1A.1 | Embed Coraza v3 + OWASP CRS 4.x behind `WAFEnginePort`; compiled policy cache | `core/waf/crs/*`, `core/waf/ports.go` | XL | **Done** `aaa12f3` |
-| 1A.2 | Composite engine + extended verdict + event schema/storage | `core/waf/composite.go`, `core/telemetry/event.go`, SQLite/PG/CH schemas | M | **Done** (`aaa12f3`, `34ea459`, `5d14d49`) |
+| 1A.2 | Composite engine + extended verdict + event schema/storage | `core/waf/composite.go`, `core/telemetry/event.go`, SQLite/PG/CH schemas | M | **Done** (`aaa12f3`, `34ea459`, `5d14d49`; engine/score filters `6c3fd62`) |
 | 1A.3 | Per-site detection policy: CRS off/audit/block, PL1–4, thresholds; API + UI + runtime selection | `core/control/models.go`, `compiler.go`, `http/detector.go`, `caddy/provision_crs_policies.go`, `web/` | M | **Done** (`8557bf7` API/UI; runtime cache now) |
 | 1A.4 | Exception → CRS exclusion translation; rule catalog/tags/severity; dry-run effects | `core/acl/exception.go`, `core/waf/crs/exceptions.go`, `http/exceptions_test_run.go` | M | **Done** |
 | 1A.5 | Rule test playground + go-ftw harness | `http/rules.go`, `tests/crs/` | M | **Done** (`34ea459` API, `5d14d49` UI; harness + CI gate now) |
@@ -453,7 +453,7 @@ containers; raw HTTP/2 frame smuggling beyond the front proxy.
 | Ristretto rate limiter | Not used | Remove |
 | Redis cluster sync | Wired (0.3) | Live Sentinel/Cluster in 4.1 |
 | Globe.gl / shadcn-vue | Custom router / radix-vue | Correct |
-| JA4 TLS fingerprinting | Header-derived | Mark planned until 0.7 |
+| JA4 TLS fingerprinting | Captured from the handshake (`0.7`) | Correct |
 | Enterprise-grade / HA | Replica 1, PDB off, RWO | Publish `STATUS.md`; pre-GA language |
 | SafeLine parity | Research only | Remove trademark/parity claims |
 | Zero-trust app auth | Fixed in `13e8678` | Publish advisory in release notes |
@@ -479,6 +479,11 @@ single-node; multi-replica requires PostgreSQL + Redis + shared cert storage.
 | `34ea459` | Phase 1A.2/1A.5: CRS event metadata (SQLite/PG), rule-test playground, matched-rule filtering |
 | `5d14d49` | ClickHouse repair (schema/retention/columns/lookup), Rule Tester UI, CRS metadata in the forensic drawer, viewer write-action guard, mock Command Center removed |
 | `e671812` | Instant configuration apply: `control.auto_apply`, server-side snapshot commit after mutations with buffered failure responses, cluster version publish, `GET /status` flag, Deployments UI notice/retry, full E2E suite re-aligned |
+| `6c3fd62` | Event query filters: detection engine, anomaly score, rank-based `min_severity` across SQLite/Postgres/ClickHouse, forensic UI |
+| `fde5127` | Telemetry write failures surface as `write_failed` counters, a rate-limited log, and Prometheus metric |
+| `874e5ae` | Per-target `health_check_status` for active upstream probes |
+| `9102e53` | Handshake JA4, HTTP/2 frame fingerprints, PROXY protocol v1/v2, trusted-proxy header gating |
+| `86b99d0` | Phase 2.3: audit hash chain, retention floor, Ed25519 anchors, `/audit/verify`, Audit Log verify action |
 
 ## 9. Change Control
 
