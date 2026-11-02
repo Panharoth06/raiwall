@@ -283,18 +283,29 @@ CI gate, and OpenAPI base in the current change.
 - [ ] Bounded disk spool, retry/backoff, dedupe by `event_id`.
 - [ ] Tests: encoder fixtures, outage replay, duplicate suppression.
 
-### 2.3 Administrative audit log `[~]`
-- [~] Append-only table with id, time, actor (server-derived), action, target,
-      method/path, status, request ID, client IP/UA, snapshot version. Hash
-      chain (`prev_hash`/`entry_hash`) and before/after hashes are pending.
+### 2.3 Administrative audit log `[x]`
+- [x] Append-only table with id, time, actor (server-derived), action, target,
+      method/path, status, request ID, client IP/UA, snapshot version. Each
+      event is linked into a SHA-256 hash chain (`prev_hash`/`hash`); the head
+      and retention floor are recorded separately so prefix pruning stays
+      verifiable.
 - [x] Server-derived actor only; request bodies and credentials are never
       recorded.
-- [ ] Ed25519 anchors every N entries or T.
+- [x] Ed25519 anchors every 100 events or one hour (whichever comes first),
+      signed with a deterministic key derived from `control.hmac_secret`.
+      Anchors and their public keys live in the database; the verify API checks
+      both the signature and the configured key.
 - [x] Read API (`GET /audit`, admin-only, time/actor/action filters and
       pagination) and a read-only Settings → Audit Log table. No update/delete
       path exists.
-- [~] Gate: forged authors are impossible by construction; cryptographic
-      tamper evidence (hash chain) remains pending.
+- [x] Verify API (`GET /audit/verify`, admin-only) and **Verify chain** action
+      in Settings → Audit Log. Reports the first broken sequence, checked
+      events, legacy unchained rows, and anchor/key fingerprints.
+- [x] Tests: modified row, removed row, truncated tail, retention prefix,
+      fully pruned chain, anchor tampering, foreign key, admin/viewer
+      authorization, UI success/broken states.
+- [x] Gate: forged authors are impossible by construction; cryptographic
+      tamper evidence is implemented and verified end-to-end.
 
 ### 2.4 Retention, legal hold, WORM `[~]`
 - [x] Retention config and prune worker for configuration snapshots

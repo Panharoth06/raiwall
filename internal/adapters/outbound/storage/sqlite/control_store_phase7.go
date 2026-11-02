@@ -12,7 +12,7 @@ import (
 // IP Groups
 
 func (s *Store) ListIPGroups(ctx context.Context) ([]control.IPGroupRecord, error) {
-	rows, err := s.db.QueryContext(ctx, "SELECT id, name, description, type, created_at, updated_at FROM raiwall_ip_groups ORDER BY created_at ASC")
+	rows, err := s.conn().QueryContext(ctx, "SELECT id, name, description, type, created_at, updated_at FROM raiwall_ip_groups ORDER BY created_at ASC")
 	if err != nil {
 		return nil, err
 	}
@@ -30,7 +30,7 @@ func (s *Store) ListIPGroups(ctx context.Context) ([]control.IPGroupRecord, erro
 }
 
 func (s *Store) GetIPGroup(ctx context.Context, id string) (control.IPGroupRecord, error) {
-	row := s.db.QueryRowContext(ctx, "SELECT id, name, description, type, created_at, updated_at FROM raiwall_ip_groups WHERE id = ?", id)
+	row := s.conn().QueryRowContext(ctx, "SELECT id, name, description, type, created_at, updated_at FROM raiwall_ip_groups WHERE id = ?", id)
 	var g control.IPGroupRecord
 	if err := row.Scan(&g.ID, &g.Name, &g.Description, &g.Type, &g.CreatedAt, &g.UpdatedAt); err != nil {
 		if err == sql.ErrNoRows {
@@ -42,7 +42,7 @@ func (s *Store) GetIPGroup(ctx context.Context, id string) (control.IPGroupRecor
 }
 
 func (s *Store) GetIPGroupByName(ctx context.Context, name string) (control.IPGroupRecord, error) {
-	row := s.db.QueryRowContext(ctx, "SELECT id, name, description, type, created_at, updated_at FROM raiwall_ip_groups WHERE name = ?", name)
+	row := s.conn().QueryRowContext(ctx, "SELECT id, name, description, type, created_at, updated_at FROM raiwall_ip_groups WHERE name = ?", name)
 	var g control.IPGroupRecord
 	if err := row.Scan(&g.ID, &g.Name, &g.Description, &g.Type, &g.CreatedAt, &g.UpdatedAt); err != nil {
 		if err == sql.ErrNoRows {
@@ -61,7 +61,7 @@ func (s *Store) CreateIPGroup(ctx context.Context, group control.IPGroupRecord) 
 	if group.UpdatedAt.IsZero() {
 		group.UpdatedAt = now
 	}
-	_, err := s.db.ExecContext(ctx,
+	_, err := s.conn().ExecContext(ctx,
 		"INSERT INTO raiwall_ip_groups (id, name, description, type, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
 		group.ID, group.Name, group.Description, group.Type, group.CreatedAt, group.UpdatedAt,
 	)
@@ -70,7 +70,7 @@ func (s *Store) CreateIPGroup(ctx context.Context, group control.IPGroupRecord) 
 
 func (s *Store) UpdateIPGroup(ctx context.Context, group control.IPGroupRecord) error {
 	group.UpdatedAt = time.Now().UTC()
-	_, err := s.db.ExecContext(ctx,
+	_, err := s.conn().ExecContext(ctx,
 		"UPDATE raiwall_ip_groups SET name = ?, description = ?, type = ?, updated_at = ? WHERE id = ?",
 		group.Name, group.Description, group.Type, group.UpdatedAt, group.ID,
 	)
@@ -78,12 +78,12 @@ func (s *Store) UpdateIPGroup(ctx context.Context, group control.IPGroupRecord) 
 }
 
 func (s *Store) DeleteIPGroup(ctx context.Context, id string) error {
-	_, err := s.db.ExecContext(ctx, "DELETE FROM raiwall_ip_groups WHERE id = ?", id)
+	_, err := s.conn().ExecContext(ctx, "DELETE FROM raiwall_ip_groups WHERE id = ?", id)
 	return err
 }
 
 func (s *Store) ListIPGroupEntries(ctx context.Context, groupID string) ([]control.IPGroupEntryRecord, error) {
-	rows, err := s.db.QueryContext(ctx, "SELECT id, group_id, cidr_or_ip, comment, created_at FROM raiwall_ip_group_entries WHERE group_id = ? ORDER BY created_at ASC", groupID)
+	rows, err := s.conn().QueryContext(ctx, "SELECT id, group_id, cidr_or_ip, comment, created_at FROM raiwall_ip_group_entries WHERE group_id = ? ORDER BY created_at ASC", groupID)
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +104,7 @@ func (s *Store) CreateIPGroupEntry(ctx context.Context, entry control.IPGroupEnt
 	if entry.CreatedAt.IsZero() {
 		entry.CreatedAt = time.Now().UTC()
 	}
-	_, err := s.db.ExecContext(ctx,
+	_, err := s.conn().ExecContext(ctx,
 		"INSERT INTO raiwall_ip_group_entries (id, group_id, cidr_or_ip, comment, created_at) VALUES (?, ?, ?, ?, ?)",
 		entry.ID, entry.GroupID, entry.CIDR, entry.Comment, entry.CreatedAt,
 	)
@@ -112,14 +112,14 @@ func (s *Store) CreateIPGroupEntry(ctx context.Context, entry control.IPGroupEnt
 }
 
 func (s *Store) DeleteIPGroupEntry(ctx context.Context, id string) error {
-	_, err := s.db.ExecContext(ctx, "DELETE FROM raiwall_ip_group_entries WHERE id = ?", id)
+	_, err := s.conn().ExecContext(ctx, "DELETE FROM raiwall_ip_group_entries WHERE id = ?", id)
 	return err
 }
 
 // Response Templates
 
 func (s *Store) ListTemplates(ctx context.Context) ([]control.TemplateRecord, error) {
-	rows, err := s.db.QueryContext(ctx, "SELECT id, status_code, title, content_html, custom_css, brand_name, logo_url, is_custom, created_at, updated_at FROM raiwall_response_templates ORDER BY status_code ASC")
+	rows, err := s.conn().QueryContext(ctx, "SELECT id, status_code, title, content_html, custom_css, brand_name, logo_url, is_custom, created_at, updated_at FROM raiwall_response_templates ORDER BY status_code ASC")
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +137,7 @@ func (s *Store) ListTemplates(ctx context.Context) ([]control.TemplateRecord, er
 }
 
 func (s *Store) GetTemplate(ctx context.Context, statusCode int) (control.TemplateRecord, error) {
-	row := s.db.QueryRowContext(ctx, "SELECT id, status_code, title, content_html, custom_css, brand_name, logo_url, is_custom, created_at, updated_at FROM raiwall_response_templates WHERE status_code = ?", statusCode)
+	row := s.conn().QueryRowContext(ctx, "SELECT id, status_code, title, content_html, custom_css, brand_name, logo_url, is_custom, created_at, updated_at FROM raiwall_response_templates WHERE status_code = ?", statusCode)
 	var t control.TemplateRecord
 	if err := row.Scan(&t.ID, &t.StatusCode, &t.Title, &t.ContentHTML, &t.CustomCSS, &t.BrandName, &t.LogoURL, &t.IsCustom, &t.CreatedAt, &t.UpdatedAt); err != nil {
 		if err == sql.ErrNoRows {
@@ -154,7 +154,7 @@ func (s *Store) UpsertTemplate(ctx context.Context, tmpl control.TemplateRecord)
 		tmpl.CreatedAt = now
 	}
 	tmpl.UpdatedAt = now
-	_, err := s.db.ExecContext(ctx,
+	_, err := s.conn().ExecContext(ctx,
 		"INSERT INTO raiwall_response_templates (id, status_code, title, content_html, custom_css, brand_name, logo_url, is_custom, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 		tmpl.ID, tmpl.StatusCode, tmpl.Title, tmpl.ContentHTML, tmpl.CustomCSS, tmpl.BrandName, tmpl.LogoURL, tmpl.IsCustom, tmpl.CreatedAt, tmpl.UpdatedAt,
 	)
@@ -162,6 +162,6 @@ func (s *Store) UpsertTemplate(ctx context.Context, tmpl control.TemplateRecord)
 }
 
 func (s *Store) DeleteTemplate(ctx context.Context, statusCode int) error {
-	_, err := s.db.ExecContext(ctx, "DELETE FROM raiwall_response_templates WHERE status_code = ?", statusCode)
+	_, err := s.conn().ExecContext(ctx, "DELETE FROM raiwall_response_templates WHERE status_code = ?", statusCode)
 	return err
 }

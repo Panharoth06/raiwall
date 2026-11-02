@@ -19,10 +19,11 @@ type DBTX interface {
 
 // ControlStore implements control.ControlStore backed by PostgreSQL.
 type ControlStore struct {
-	db     DBTX
-	rawDB  *sql.DB
-	isTx   bool
-	ownsDB bool
+	db          DBTX
+	rawDB       *sql.DB
+	isTx        bool
+	ownsDB      bool
+	auditAnchor *control.AuditAnchorer
 }
 
 var _ control.ControlStore = (*ControlStore)(nil)
@@ -59,10 +60,11 @@ func (s *ControlStore) WithTx(ctx context.Context, fn func(store control.Control
 	}
 
 	txStore := &ControlStore{
-		db:     tx,
-		rawDB:  s.rawDB,
-		isTx:   true,
-		ownsDB: false,
+		db:          tx,
+		rawDB:       s.rawDB,
+		isTx:        true,
+		ownsDB:      false,
+		auditAnchor: s.auditAnchor,
 	}
 
 	if err := fn(txStore); err != nil {

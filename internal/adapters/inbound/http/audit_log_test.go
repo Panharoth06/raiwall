@@ -108,3 +108,27 @@ func TestAuditReadAPIRequiresAdminAndFilters(t *testing.T) {
 	bad := operatorRequest(server, http.MethodGet, "/api/v1/audit?from=not-a-time", adminCookie, "", nil)
 	require.Equal(t, http.StatusBadRequest, bad.Code)
 }
+
+func TestAuditVerifyAPIRequiresAdminAndChecksChain(t *testing.T) {
+	server, store, adminCookie := operatorTestServer(t)
+	defer store.Close()
+	createOperator(t, store, "verifyviewer", "correct-horse-battery", RoleViewer)
+	viewerCookie := login(t, server, "verifyviewer", "correct-horse-battery")
+
+	denied := operatorRequest(server, http.MethodGet, "/api/v1/audit/verify", viewerCookie, "", nil)
+	require.Equal(t, http.StatusForbidden, denied.Code)
+
+	// Generate an audited mutation through the real middleware path.
+	ok := operatorRequest(server, http.MethodPut, "/api/v1/system/auto-apply", adminCookie, "", map[string]any{"auto_apply": true})
+	require.Equal(t, http.StatusOK, ok.Code)
+
+	verify := operatorRequest(server, http.MethodGet, "/api/v1/audit/verify", adminCookie, "", nil)
+	require.Equal(t, http.StatusOK, verify.Code, verify.Body.String())
+	var report control.AuditChainReport
+	require.NoError(t, json.Unmarshal(verify.Body.Bytes(), &report))
+	require.True(t, report.Valid, report.Reason)
+	require.Positive(t, report.Checked)
+	require.True(t, report.Anchors.Enabled)
+	require.True(t, report.Anchors.Valid, report.Anchors.Reason)
+	require.Positive(t, report.Anchors.Checked)
+}

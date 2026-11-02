@@ -11,12 +11,12 @@ import (
 
 func (s *Store) GetSetting(ctx context.Context, key string) (string, error) {
 	var value string
-	err := s.db.QueryRowContext(ctx, "SELECT value FROM raiwall_settings WHERE key = ?", key).Scan(&value)
+	err := s.conn().QueryRowContext(ctx, "SELECT value FROM raiwall_settings WHERE key = ?", key).Scan(&value)
 	return value, err
 }
 
 func (s *Store) PutSetting(ctx context.Context, key, value string) error {
-	_, err := s.db.ExecContext(ctx,
+	_, err := s.conn().ExecContext(ctx,
 		"INSERT OR REPLACE INTO raiwall_settings (key, value, updated_at) VALUES (?, ?, ?)",
 		key, value, time.Now().UTC())
 	return err
@@ -28,7 +28,7 @@ func (s *Store) RecordIdentityAuthEvent(ctx context.Context, event control.Ident
 	if event.CreatedAt.IsZero() {
 		event.CreatedAt = time.Now().UTC()
 	}
-	_, err := s.db.ExecContext(ctx,
+	_, err := s.conn().ExecContext(ctx,
 		"INSERT OR REPLACE INTO raiwall_identity_auth_log (created_at, username, app_id, host, method, result, client_ip, country, detail) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
 		event.CreatedAt, event.Username, event.AppID, event.Host, event.Method, event.Result,
 		event.ClientIP, event.Country, event.Detail)
@@ -39,7 +39,7 @@ func (s *Store) ListIdentityAuthEvents(ctx context.Context, limit int) ([]contro
 	if limit <= 0 || limit > 500 {
 		limit = 100
 	}
-	rows, err := s.db.QueryContext(ctx,
+	rows, err := s.conn().QueryContext(ctx,
 		"SELECT created_at, username, app_id, host, method, result, client_ip, country, detail FROM raiwall_identity_auth_log ORDER BY created_at DESC LIMIT ?",
 		limit)
 	if err != nil {

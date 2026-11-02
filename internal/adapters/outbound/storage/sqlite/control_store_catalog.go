@@ -30,7 +30,7 @@ func scanRulePack(scanner interface{ Scan(...any) error }) (control.RulePackReco
 }
 
 func (s *Store) ListRulePacks(ctx context.Context) ([]control.RulePackRecord, error) {
-	rows, err := s.db.QueryContext(ctx,
+	rows, err := s.conn().QueryContext(ctx,
 		"SELECT "+rulePackColumns+" FROM raiwall_rule_packs ORDER BY priority ASC, name ASC")
 	if err != nil {
 		return nil, err
@@ -49,7 +49,7 @@ func (s *Store) ListRulePacks(ctx context.Context) ([]control.RulePackRecord, er
 }
 
 func (s *Store) GetRulePack(ctx context.Context, id string) (control.RulePackRecord, error) {
-	row := s.db.QueryRowContext(ctx,
+	row := s.conn().QueryRowContext(ctx,
 		"SELECT "+rulePackColumns+" FROM raiwall_rule_packs WHERE id = ?", id)
 	return scanRulePack(row)
 }
@@ -60,7 +60,7 @@ func (s *Store) UpsertRulePack(ctx context.Context, rec control.RulePackRecord) 
 		rec.CreatedAt = now
 	}
 	rec.UpdatedAt = now
-	_, err := s.db.ExecContext(ctx, `
+	_, err := s.conn().ExecContext(ctx, `
 		INSERT INTO raiwall_rule_packs (
 			id, name, version, type, priority, enabled, replace_builtin,
 			rules_json, directives, files_json, checksum, created_at, updated_at
@@ -86,7 +86,7 @@ func (s *Store) UpsertRulePack(ctx context.Context, rec control.RulePackRecord) 
 }
 
 func (s *Store) DeleteRulePack(ctx context.Context, id string) error {
-	_, err := s.db.ExecContext(ctx, "DELETE FROM raiwall_rule_packs WHERE id = ?", id)
+	_, err := s.conn().ExecContext(ctx, "DELETE FROM raiwall_rule_packs WHERE id = ?", id)
 	return err
 }
 
@@ -106,7 +106,7 @@ func scanRuleOverride(scanner interface{ Scan(...any) error }) (control.RuleOver
 }
 
 func (s *Store) ListRuleOverrides(ctx context.Context) ([]control.RuleOverrideRecord, error) {
-	rows, err := s.db.QueryContext(ctx,
+	rows, err := s.conn().QueryContext(ctx,
 		"SELECT "+ruleOverrideColumns+" FROM raiwall_rule_overrides ORDER BY canonical_id ASC")
 	if err != nil {
 		return nil, err
@@ -125,7 +125,7 @@ func (s *Store) ListRuleOverrides(ctx context.Context) ([]control.RuleOverrideRe
 }
 
 func (s *Store) GetRuleOverride(ctx context.Context, canonicalID string) (control.RuleOverrideRecord, error) {
-	row := s.db.QueryRowContext(ctx,
+	row := s.conn().QueryRowContext(ctx,
 		"SELECT "+ruleOverrideColumns+" FROM raiwall_rule_overrides WHERE canonical_id = ?", canonicalID)
 	return scanRuleOverride(row)
 }
@@ -138,7 +138,7 @@ func (s *Store) UpsertRuleOverride(ctx context.Context, rec control.RuleOverride
 	if rec.Enabled != nil {
 		enabled = boolToInt(*rec.Enabled)
 	}
-	_, err := s.db.ExecContext(ctx, `
+	_, err := s.conn().ExecContext(ctx, `
 		INSERT INTO raiwall_rule_overrides (canonical_id, enabled, severity, action, updated_by, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?)
 		ON CONFLICT(canonical_id) DO UPDATE SET
@@ -153,12 +153,12 @@ func (s *Store) UpsertRuleOverride(ctx context.Context, rec control.RuleOverride
 }
 
 func (s *Store) DeleteRuleOverride(ctx context.Context, canonicalID string) error {
-	_, err := s.db.ExecContext(ctx, "DELETE FROM raiwall_rule_overrides WHERE canonical_id = ?", canonicalID)
+	_, err := s.conn().ExecContext(ctx, "DELETE FROM raiwall_rule_overrides WHERE canonical_id = ?", canonicalID)
 	return err
 }
 
 func (s *Store) ClearRuleOverrides(ctx context.Context) error {
-	_, err := s.db.ExecContext(ctx, "DELETE FROM raiwall_rule_overrides")
+	_, err := s.conn().ExecContext(ctx, "DELETE FROM raiwall_rule_overrides")
 	return err
 }
 
@@ -187,7 +187,7 @@ func scanWAFPolicy(scanner interface{ Scan(...any) error }) (control.WAFPolicyRe
 }
 
 func (s *Store) ListWAFPolicies(ctx context.Context) ([]control.WAFPolicyRecord, error) {
-	rows, err := s.db.QueryContext(ctx,
+	rows, err := s.conn().QueryContext(ctx,
 		"SELECT "+wafPolicyColumns+" FROM raiwall_waf_policies ORDER BY scope ASC, app_id ASC")
 	if err != nil {
 		return nil, err
@@ -206,7 +206,7 @@ func (s *Store) ListWAFPolicies(ctx context.Context) ([]control.WAFPolicyRecord,
 }
 
 func (s *Store) GetWAFPolicy(ctx context.Context, scope, appID string) (control.WAFPolicyRecord, error) {
-	row := s.db.QueryRowContext(ctx,
+	row := s.conn().QueryRowContext(ctx,
 		"SELECT "+wafPolicyColumns+" FROM raiwall_waf_policies WHERE scope = ? AND app_id = ?",
 		scope, appID)
 	return scanWAFPolicy(row)
@@ -220,7 +220,7 @@ func (s *Store) UpsertWAFPolicy(ctx context.Context, rec control.WAFPolicyRecord
 	if rec.CRSEnabled != nil {
 		crsEnabled = boolToInt(*rec.CRSEnabled)
 	}
-	_, err := s.db.ExecContext(ctx, `
+	_, err := s.conn().ExecContext(ctx, `
 		INSERT INTO raiwall_waf_policies (
 			id, scope, app_id, detection_mode, sensitivity, semantic_overrides,
 			crs_enabled, crs_paranoia_level, crs_inbound_threshold, crs_outbound_threshold,
@@ -244,7 +244,7 @@ func (s *Store) UpsertWAFPolicy(ctx context.Context, rec control.WAFPolicyRecord
 }
 
 func (s *Store) DeleteWAFPolicy(ctx context.Context, scope, appID string) error {
-	_, err := s.db.ExecContext(ctx,
+	_, err := s.conn().ExecContext(ctx,
 		"DELETE FROM raiwall_waf_policies WHERE scope = ? AND app_id = ?", scope, appID)
 	return err
 }

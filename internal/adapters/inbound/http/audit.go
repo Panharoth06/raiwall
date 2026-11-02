@@ -262,3 +262,17 @@ func (s *Server) handleListAuditEvents(w http.ResponseWriter, r *http.Request) {
 		"offset": filter.Normalized().Offset,
 	})
 }
+
+// handleVerifyAuditChain re-hashes the audit chain and checks its Ed25519
+// anchors (admin only). Verification is read-only.
+func (s *Server) handleVerifyAuditChain(w http.ResponseWriter, r *http.Request) {
+	if _, ok := requireOperatorAdmin(w, r); !ok {
+		return
+	}
+	report, err := s.store.VerifyAuditChain(r.Context())
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "failed to verify audit chain: "+err.Error())
+		return
+	}
+	respondJSON(w, http.StatusOK, report)
+}

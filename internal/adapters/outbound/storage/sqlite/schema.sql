@@ -355,3 +355,33 @@ CREATE TABLE IF NOT EXISTS raiwall_admin_audit (
 CREATE INDEX IF NOT EXISTS idx_raiwall_admin_audit_time ON raiwall_admin_audit(occurred_at DESC);
 CREATE INDEX IF NOT EXISTS idx_raiwall_admin_audit_actor ON raiwall_admin_audit(actor_id);
 CREATE INDEX IF NOT EXISTS idx_raiwall_admin_audit_action ON raiwall_admin_audit(action);
+
+-- Tamper-evident hash chain over the audit log (see migration 0014).
+CREATE TABLE IF NOT EXISTS raiwall_admin_audit_chain (
+    seq        INTEGER PRIMARY KEY,
+    event_id   TEXT NOT NULL UNIQUE,
+    prev_hash  TEXT NOT NULL,
+    hash       TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS raiwall_admin_audit_head (
+    id   INTEGER PRIMARY KEY CHECK (id = 1),
+    seq  INTEGER NOT NULL DEFAULT 0,
+    hash TEXT NOT NULL DEFAULT ''
+);
+INSERT OR IGNORE INTO raiwall_admin_audit_head (id, seq, hash) VALUES (1, 0, '');
+
+-- Retention floor and Ed25519 checkpoints (see migration 0015).
+CREATE TABLE IF NOT EXISTS raiwall_admin_audit_floor (
+    id   INTEGER PRIMARY KEY CHECK (id = 1),
+    seq  INTEGER NOT NULL DEFAULT 0,
+    hash TEXT NOT NULL DEFAULT ''
+);
+INSERT OR IGNORE INTO raiwall_admin_audit_floor (id, seq, hash) VALUES (1, 0, '');
+
+CREATE TABLE IF NOT EXISTS raiwall_admin_audit_anchors (
+    seq        INTEGER PRIMARY KEY,
+    hash       TEXT NOT NULL,
+    signed_at  TIMESTAMP NOT NULL,
+    public_key TEXT NOT NULL,
+    signature  TEXT NOT NULL
+);

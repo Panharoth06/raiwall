@@ -48,6 +48,7 @@ func (s *Server) routes() {
 			// Status, audit, and cluster
 			api.Get("/status", s.handleStatus)
 			api.Get("/audit", s.handleListAuditEvents)
+			api.Get("/audit/verify", s.handleVerifyAuditChain)
 			api.Put("/system/auto-apply", s.handleUpdateAutoApply)
 			api.Get("/cluster/status", s.handleClusterStatus)
 

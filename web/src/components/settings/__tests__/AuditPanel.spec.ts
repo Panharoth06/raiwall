@@ -4,7 +4,7 @@ import AuditPanel from '../AuditPanel.vue';
 import { api, type AuditEvent } from '@/api/client';
 
 vi.mock('@/api/client', () => ({
-  api: { listAuditEvents: vi.fn() },
+  api: { listAuditEvents: vi.fn(), verifyAuditChain: vi.fn() },
 }));
 
 const mocked = vi.mocked(api);
@@ -68,5 +68,58 @@ describe('AuditPanel.vue', () => {
     await retry?.trigger('click');
     await flushPromises();
     expect(wrapper.text()).toContain('alice');
+  });
+
+  it('verifies the hash chain on demand', async () => {
+    vi.mocked(mocked.verifyAuditChain).mockResolvedValue({
+      valid: true,
+      checked: 42,
+      unchained: 0,
+      first_seq: 1,
+      last_seq: 42,
+      anchors: {
+        enabled: true,
+        count: 2,
+        checked: 2,
+        valid: true,
+        key_fingerprint: 'sha256:0123456789abcdef',
+      },
+    });
+
+    wrapper = mount(AuditPanel);
+    await flushPromises();
+
+    const verify = wrapper.findAll('button').find((button) => button.text().includes('Verify chain'));
+    await verify?.trigger('click');
+    await flushPromises();
+
+    expect(mocked.verifyAuditChain).toHaveBeenCalledTimes(1);
+    expect(wrapper.text()).toContain('Chain intact');
+    expect(wrapper.text()).toContain('42 events');
+    expect(wrapper.text()).toContain('2 anchors');
+    expect(wrapper.text()).toContain('sha256:0123456789abcdef');
+  });
+
+  it('reports a broken chain with the failing sequence', async () => {
+    vi.mocked(mocked.verifyAuditChain).mockResolvedValue({
+      valid: false,
+      checked: 10,
+      unchained: 0,
+      first_seq: 1,
+      last_seq: 10,
+      broken_at_seq: 7,
+      reason: 'event contents do not match the recorded hash',
+      anchors: { enabled: true, count: 1, checked: 1, valid: true },
+    });
+
+    wrapper = mount(AuditPanel);
+    await flushPromises();
+
+    const verify = wrapper.findAll('button').find((button) => button.text().includes('Verify chain'));
+    await verify?.trigger('click');
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('Chain broken at sequence 7');
+    expect(wrapper.text()).toContain('event contents do not match the recorded hash');
   });
 });

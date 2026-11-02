@@ -14,9 +14,20 @@ var schemaSQL string
 
 // Store provides persistence for Raiwall Control Plane entities.
 type Store struct {
-	db     *sql.DB
-	ownsDB bool
+	db          *sql.DB
+	tx          *sql.Tx // set on the store handed to WithTx callbacks
+	ownsDB      bool
+	auditAnchor *control.AuditAnchorer
 	*Queries
+}
+
+// conn returns the handle hand-written SQL must use: the open transaction
+// inside WithTx, otherwise the pool.
+func (s *Store) conn() DBTX {
+	if s.tx != nil {
+		return s.tx
+	}
+	return s.db
 }
 
 // InitDB initializes database connection, applies WAL pragmas and executes migrations.
@@ -89,8 +100,10 @@ func (s *Store) WithTx(ctx context.Context, fn func(store control.ControlStore) 
 	}
 
 	txStore := &Store{
-		db:      s.db,
-		Queries: s.Queries.WithTx(tx),
+		db:          s.db,
+		tx:          tx,
+		auditAnchor: s.auditAnchor,
+		Queries:     s.Queries.WithTx(tx),
 	}
 	if err := fn(txStore); err != nil {
 		_ = tx.Rollback()

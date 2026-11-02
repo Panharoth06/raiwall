@@ -33,6 +33,8 @@ var migrations = []Migration{
 	{Version: 11, Description: "waf_rule_catalog", File: "0011_waf_rule_catalog.sql"},
 	{Version: 12, Description: "operator_sessions", File: "0012_operator_sessions.sql"},
 	{Version: 13, Description: "admin_audit", File: "0013_admin_audit.sql"},
+	{Version: 14, Description: "audit_chain", File: "0014_audit_chain.sql"},
+	{Version: 15, Description: "audit_anchors", File: "0015_audit_anchors.sql"},
 }
 
 // NormalizeDriver standardizes dialect names to "sqlite" or "postgres".

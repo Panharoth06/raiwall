@@ -81,6 +81,8 @@ type ControlStore interface {
 	CreateAuditEvent(ctx context.Context, event AuditEvent) error
 	ListAuditEvents(ctx context.Context, filter AuditFilter) ([]AuditEvent, error)
 	DeleteAuditEventsBefore(ctx context.Context, cutoff time.Time) (int64, error)
+	// VerifyAuditChain checks the tamper-evident hash chain over the audit log.
+	VerifyAuditChain(ctx context.Context) (AuditChainReport, error)
 
 	// Retention: delete snapshots outside the newest keep entries, except the
 	// active version, which must always remain rollback-able.

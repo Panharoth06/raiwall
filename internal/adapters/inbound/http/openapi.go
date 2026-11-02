@@ -218,6 +218,18 @@ func OpenAPISpec() map[string]any {
 			"/apikeys/{id}": map[string]any{
 				"delete": map[string]any{"summary": "Revoke API key (admin only)"},
 			},
+			"/audit": map[string]any{
+				"get": map[string]any{
+					"summary":     "List administrative audit records (admin only)",
+					"description": "Newest first. Filter by actor, action, and RFC3339 time range.",
+				},
+			},
+			"/audit/verify": map[string]any{
+				"get": map[string]any{
+					"summary":     "Verify the audit hash chain and Ed25519 anchors (admin only)",
+					"description": "Re-hashes every retained audit event and checks retained checkpoints. Reports the first broken sequence.",
+				},
+			},
 		},
 	})
 }

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { api, type AuditEvent } from '@/api/client';
+import { api, type AuditChainReport, type AuditEvent } from '@/api/client';
+import AuditVerifyBanner from './AuditVerifyBanner.vue';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -18,7 +19,7 @@ import {
   SelectContent,
   SelectItem,
 } from '@/components/ui/select';
-import { History, RefreshCw } from 'lucide-vue-next';
+import { History, RefreshCw, ShieldCheck } from 'lucide-vue-next';
 
 const ACTIONS = [
   'login_success',
@@ -43,6 +44,9 @@ const error = ref('');
 const action = ref('all');
 const limit = ref('50');
 const offset = ref(0);
+const verification = ref<AuditChainReport | null>(null);
+const verifyError = ref('');
+const verifying = ref(false);
 
 const hasNext = computed(() => events.value.length >= Number(limit.value));
 const hasPrevious = computed(() => offset.value > 0);
@@ -79,6 +83,19 @@ const previousPage = () => {
   void load();
 };
 
+const syncVerification = async () => {
+  verifying.value = true;
+  verifyError.value = '';
+  try {
+    verification.value = await api.verifyAuditChain();
+  } catch (e) {
+    verification.value = null;
+    verifyError.value = e instanceof Error ? e.message : 'Failed to verify the audit chain';
+  } finally {
+    verifying.value = false;
+  }
+};
+
 const formatTime = (value: string) => new Date(value).toISOString().replace('T', ' ').replace('.000Z', 'Z');
 
 onMounted(() => {
@@ -111,12 +128,23 @@ onMounted(() => {
             <SelectItem value="200">200 rows</SelectItem>
           </SelectContent>
         </Select>
+        <Button variant="outline" size="sm" class="gap-1.5" :disabled="verifying" @click="syncVerification">
+          <ShieldCheck class="h-3.5 w-3.5" />
+          Verify chain
+        </Button>
         <Button variant="outline" size="sm" class="gap-1.5" :disabled="loading" @click="load">
           <RefreshCw class="h-3.5 w-3.5" />
           Refresh
         </Button>
       </div>
     </div>
+
+    <AuditVerifyBanner
+      :report="verification"
+      :error="verifyError"
+      :loading="verifying"
+      @retry="syncVerification"
+    />
 
     <div v-if="loading" class="space-y-2" aria-busy="true" aria-label="Loading audit log">
       <div v-for="row in 4" :key="row" class="h-9 animate-pulse rounded-md bg-muted" />

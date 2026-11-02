@@ -216,6 +216,29 @@ export interface AuditEvent {
   detail?: string;
 }
 
+export interface AuditAnchorReport {
+  enabled: boolean;
+  count: number;
+  checked: number;
+  valid: boolean;
+  current_key?: string;
+  key_fingerprint?: string;
+  broken_at_seq?: number;
+  reason?: string;
+}
+
+export interface AuditChainReport {
+  valid: boolean;
+  checked: number;
+  unchained: number;
+  first_seq?: number;
+  last_seq?: number;
+  broken_at_seq?: number;
+  broken_event_id?: string;
+  reason?: string;
+  anchors: AuditAnchorReport;
+}
+
 export interface AuditQuery {
   from?: string;
   to?: string;
@@ -541,6 +564,7 @@ export const api = {
       `/audit${suffix ? `?${suffix}` : ''}`
     );
   },
+  verifyAuditChain: () => request<AuditChainReport>('/audit/verify'),
 
   // Deployments & Config
   getDraftDiff: () => request<{ has_changes: boolean; diffs: ConfigDiffItem[] }>('/config/draft/diff'),

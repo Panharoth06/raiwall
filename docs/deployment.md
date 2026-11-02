@@ -232,6 +232,29 @@ pruning (snapshots and audit rows are kept indefinitely).
 
 Test a restore into a scratch database before relying on a backup.
 
+### Audit tamper evidence
+
+Every administrative audit row is linked into a SHA-256 hash chain. An Ed25519
+checkpoint is signed every 100 events or one hour (whichever comes first), using
+a key derived from `control.hmac_secret`. Run verification from the dashboard
+(**Settings → Audit Log → Verify chain**) or with an admin API session:
+
+```bash
+curl -b cookies.txt https://raiwall.example.com/.raiwall/api/v1/audit/verify
+```
+
+The response reports `valid`, the number of checked events and anchors, the
+first broken sequence, and the signing key fingerprint. Retention pruning is
+expected: it advances a recorded floor, so the surviving prefix still verifies.
+Events written before the chain was introduced are counted as `unchained`.
+
+> [!WARNING]
+> Rotating `control.hmac_secret` changes the audit signing key. Verify and
+> export the report before rotating; checkpoints signed with the previous key
+> will then verify as "signed by a key other than the configured audit key".
+> Keep the secret in a secret manager and treat rotation as a deliberate audit
+> operation.
+
 ---
 
 ## 8. Security checklist before going live
@@ -246,6 +269,7 @@ Test a restore into a scratch database before relying on a backup.
 - [ ] Login lockout verified.
 - [ ] Probes return 200 and readiness goes 503 when the database is down.
 - [ ] Backups configured and a restore has been rehearsed.
+- [ ] Audit chain verification returns `valid: true` after a restart.
 - [ ] Logs/alerts reviewed; telemetry retention matches policy.
 
 ---

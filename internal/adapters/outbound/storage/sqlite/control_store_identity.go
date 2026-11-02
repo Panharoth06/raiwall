@@ -10,7 +10,7 @@ import (
 // Identity user directory (end-user accounts, separate from admin operators).
 
 func (s *Store) ListIdentityUsers(ctx context.Context) ([]control.IdentityUserRecord, error) {
-	rows, err := s.db.QueryContext(ctx,
+	rows, err := s.conn().QueryContext(ctx,
 		"SELECT id, username, password_hash, email, display_name, totp_secret, totp_enabled, app_ids, enabled, created_at, updated_at FROM raiwall_identity_users ORDER BY username ASC")
 	if err != nil {
 		return nil, err
@@ -31,7 +31,7 @@ func (s *Store) ListIdentityUsers(ctx context.Context) ([]control.IdentityUserRe
 
 func (s *Store) GetIdentityUserByID(ctx context.Context, id string) (control.IdentityUserRecord, error) {
 	var u control.IdentityUserRecord
-	err := s.db.QueryRowContext(ctx,
+	err := s.conn().QueryRowContext(ctx,
 		"SELECT id, username, password_hash, email, display_name, totp_secret, totp_enabled, app_ids, enabled, created_at, updated_at FROM raiwall_identity_users WHERE id = ?",
 		id).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Email, &u.DisplayName,
 		&u.TOTPSecret, &u.TOTPEnabled, &u.AppIDs, &u.Enabled, &u.CreatedAt, &u.UpdatedAt)
@@ -40,7 +40,7 @@ func (s *Store) GetIdentityUserByID(ctx context.Context, id string) (control.Ide
 
 func (s *Store) GetIdentityUserByUsername(ctx context.Context, username string) (control.IdentityUserRecord, error) {
 	var u control.IdentityUserRecord
-	err := s.db.QueryRowContext(ctx,
+	err := s.conn().QueryRowContext(ctx,
 		"SELECT id, username, password_hash, email, display_name, totp_secret, totp_enabled, app_ids, enabled, created_at, updated_at FROM raiwall_identity_users WHERE username = ?",
 		username).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Email, &u.DisplayName,
 		&u.TOTPSecret, &u.TOTPEnabled, &u.AppIDs, &u.Enabled, &u.CreatedAt, &u.UpdatedAt)
@@ -54,7 +54,7 @@ func (s *Store) UpsertIdentityUser(ctx context.Context, user control.IdentityUse
 	if user.CreatedAt.IsZero() {
 		user.CreatedAt = user.UpdatedAt
 	}
-	_, err := s.db.ExecContext(ctx,
+	_, err := s.conn().ExecContext(ctx,
 		"INSERT OR REPLACE INTO raiwall_identity_users (id, username, password_hash, email, display_name, totp_secret, totp_enabled, app_ids, enabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 		user.ID, user.Username, user.PasswordHash, user.Email, user.DisplayName,
 		user.TOTPSecret, user.TOTPEnabled, user.AppIDs, user.Enabled, user.CreatedAt, user.UpdatedAt)
@@ -62,14 +62,14 @@ func (s *Store) UpsertIdentityUser(ctx context.Context, user control.IdentityUse
 }
 
 func (s *Store) DeleteIdentityUser(ctx context.Context, id string) error {
-	_, err := s.db.ExecContext(ctx, "DELETE FROM raiwall_identity_users WHERE id = ?", id)
+	_, err := s.conn().ExecContext(ctx, "DELETE FROM raiwall_identity_users WHERE id = ?", id)
 	return err
 }
 
 // Identity provider connectors (external IdPs).
 
 func (s *Store) ListIdentityProviders(ctx context.Context) ([]control.IdentityProviderRecord, error) {
-	rows, err := s.db.QueryContext(ctx,
+	rows, err := s.conn().QueryContext(ctx,
 		"SELECT id, type, name, config, enabled, created_at, updated_at FROM raiwall_identity_providers ORDER BY name ASC")
 	if err != nil {
 		return nil, err
@@ -94,13 +94,13 @@ func (s *Store) UpsertIdentityProvider(ctx context.Context, provider control.Ide
 	if provider.CreatedAt.IsZero() {
 		provider.CreatedAt = provider.UpdatedAt
 	}
-	_, err := s.db.ExecContext(ctx,
+	_, err := s.conn().ExecContext(ctx,
 		"INSERT OR REPLACE INTO raiwall_identity_providers (id, type, name, config, enabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
 		provider.ID, provider.Type, provider.Name, provider.Config, provider.Enabled, provider.CreatedAt, provider.UpdatedAt)
 	return err
 }
 
 func (s *Store) DeleteIdentityProvider(ctx context.Context, id string) error {
-	_, err := s.db.ExecContext(ctx, "DELETE FROM raiwall_identity_providers WHERE id = ?", id)
+	_, err := s.conn().ExecContext(ctx, "DELETE FROM raiwall_identity_providers WHERE id = ?", id)
 	return err
 }

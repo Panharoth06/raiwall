@@ -92,6 +92,10 @@ func NewServer(store control.ControlStore, hmacSecret []byte) *Server {
 	authMgr := NewAuthManager(store, hmacSecret)
 	tmplMgr := templates.NewTemplateManager()
 	_ = tmplMgr.LoadFromStore(context.Background(), store)
+	// Checkpoint the audit chain with an Ed25519 key derived from the
+	// deployment secret, so tampering with the database is detectable even for
+	// an attacker who can rewrite every row.
+	control.ConfigureAuditAnchoring(store, control.AuditAnchorConfig{Secret: hmacSecret})
 
 	s := &Server{
 		store:       store,
