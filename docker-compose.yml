@@ -58,7 +58,7 @@ services:
     environment:
       # The canonical config is mounted read-only below. Environment variables
       # only carry secrets and deployment-specific values.
-      RAIWALL_DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-raiwall}?sslmode=disable
+      RAIWALL_DATABASE_URL: ${RAIWALL_DATABASE_URL:-postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-raiwall}?sslmode=disable}
       RAIWALL_ADMIN_USERNAME: ${RAIWALL_ADMIN_USERNAME:-admin}
       # Empty means the app generates a password and logs it once at WARN.
       RAIWALL_ADMIN_PASSWORD: ${RAIWALL_ADMIN_PASSWORD:-}

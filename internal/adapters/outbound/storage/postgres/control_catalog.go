@@ -187,7 +187,7 @@ func (s *ControlStore) ClearRuleOverrides(ctx context.Context) error {
 
 const wafPolicyColumns = `id, scope, app_id, detection_mode, sensitivity, semantic_overrides,
 	crs_enabled, crs_paranoia_level, crs_inbound_threshold, crs_outbound_threshold,
-	disabled_pack_ids, updated_at`
+	disabled_pack_ids, response_json, updated_at`
 
 func scanWAFPolicy(scanner interface{ Scan(...any) error }) (control.WAFPolicyRecord, error) {
 	var (
@@ -197,7 +197,8 @@ func scanWAFPolicy(scanner interface{ Scan(...any) error }) (control.WAFPolicyRe
 	)
 	err := scanner.Scan(
 		&rec.ID, &rec.Scope, &rec.AppID, &rec.DetectionMode, &rec.Sensitivity,
-		&rec.SemanticOverrides, &crsOn, &pl, &in, &out, &rec.DisabledPackIDs, &rec.UpdatedAt,
+		&rec.SemanticOverrides, &crsOn, &pl, &in, &out, &rec.DisabledPackIDs,
+		&rec.ResponseJSON, &rec.UpdatedAt,
 	)
 	if crsOn.Valid {
 		v := crsOn.Int64 == 1
@@ -250,8 +251,8 @@ func (s *ControlStore) UpsertWAFPolicy(ctx context.Context, rec control.WAFPolic
 	query := `INSERT INTO raiwall_waf_policies (
 			id, scope, app_id, detection_mode, sensitivity, semantic_overrides,
 			crs_enabled, crs_paranoia_level, crs_inbound_threshold, crs_outbound_threshold,
-			disabled_pack_ids, updated_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+			disabled_pack_ids, response_json, updated_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 		ON CONFLICT(scope, app_id) DO UPDATE SET
 			detection_mode = EXCLUDED.detection_mode,
 			sensitivity = EXCLUDED.sensitivity,
@@ -261,11 +262,12 @@ func (s *ControlStore) UpsertWAFPolicy(ctx context.Context, rec control.WAFPolic
 			crs_inbound_threshold = EXCLUDED.crs_inbound_threshold,
 			crs_outbound_threshold = EXCLUDED.crs_outbound_threshold,
 			disabled_pack_ids = EXCLUDED.disabled_pack_ids,
+			response_json = EXCLUDED.response_json,
 			updated_at = EXCLUDED.updated_at`
 	_, err := s.db.ExecContext(ctx, query,
 		rec.ID, rec.Scope, rec.AppID, rec.DetectionMode, rec.Sensitivity, rec.SemanticOverrides,
 		crsEnabled, intPtrValue(rec.CRSParanoiaLevel), intPtrValue(rec.CRSInboundThreshold),
-		intPtrValue(rec.CRSOutboundThreshold), rec.DisabledPackIDs, rec.UpdatedAt,
+		intPtrValue(rec.CRSOutboundThreshold), rec.DisabledPackIDs, rec.ResponseJSON, rec.UpdatedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("upsert waf policy: %w", err)

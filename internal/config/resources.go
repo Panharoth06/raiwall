@@ -193,8 +193,35 @@ type DetectorPolicy struct {
 	Mode          string            `yaml:"mode" json:"mode"`
 	Sensitivity   string            `yaml:"sensitivity" json:"sensitivity"`
 	CRS           *CRSPolicy        `yaml:"crs,omitempty" json:"crs,omitempty"`
+	Response      *DetectorResponse `yaml:"response,omitempty" json:"response,omitempty"`
 	DisabledPacks []string          `yaml:"disabled_packs,omitempty" json:"disabled_packs,omitempty"`
 	Semantic      map[string]string `yaml:"semantic,omitempty" json:"semantic,omitempty"`
+}
+
+// DetectorResponse is the per-site outbound inspection override.
+type DetectorResponse struct {
+	Enabled          *bool          `yaml:"enabled,omitempty" json:"enabled,omitempty"`
+	Mode             string         `yaml:"mode,omitempty" json:"mode,omitempty"`
+	InspectHeaders   *bool          `yaml:"inspect_headers,omitempty" json:"inspect_headers,omitempty"`
+	InspectBody      *bool          `yaml:"inspect_body,omitempty" json:"inspect_body,omitempty"`
+	BodyLimit        int            `yaml:"body_limit,omitempty" json:"body_limit,omitempty"`
+	HardCap          int            `yaml:"hard_cap,omitempty" json:"hard_cap,omitempty"`
+	Decompress       *bool          `yaml:"decompress,omitempty" json:"decompress,omitempty"`
+	ContentTypes     []string       `yaml:"content_types,omitempty" json:"content_types,omitempty"`
+	MaxInflightBytes int64          `yaml:"max_inflight_bytes,omitempty" json:"max_inflight_bytes,omitempty"`
+	DLP              *DetectorDLP   `yaml:"dlp,omitempty" json:"dlp,omitempty"`
+}
+
+// DetectorDLP is the per-site DLP override.
+type DetectorDLP struct {
+	Enabled           *bool  `yaml:"enabled,omitempty" json:"enabled,omitempty"`
+	Action            string `yaml:"action,omitempty" json:"action,omitempty"`
+	DetectPAN         *bool  `yaml:"detect_pan,omitempty" json:"detect_pan,omitempty"`
+	DetectSecrets     *bool  `yaml:"detect_secrets,omitempty" json:"detect_secrets,omitempty"`
+	DetectJWT         *bool  `yaml:"detect_jwt,omitempty" json:"detect_jwt,omitempty"`
+	DetectPrivateKeys *bool  `yaml:"detect_private_keys,omitempty" json:"detect_private_keys,omitempty"`
+	Redaction         string `yaml:"redaction,omitempty" json:"redaction,omitempty"`
+	MaxScanBytes      int    `yaml:"max_scan_bytes,omitempty" json:"max_scan_bytes,omitempty"`
 }
 
 // CRSPolicy tunes the Coraza ruleset inside a detection policy.

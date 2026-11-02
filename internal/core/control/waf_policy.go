@@ -57,6 +57,7 @@ func cloneWAFPolicy(p *WAFPolicySnapshot) WAFPolicySnapshot {
 	out.Sensitivity = NormalizePolicyValue(out.Sensitivity)
 	out.SemanticOverrides = cloneModuleModes(out.SemanticOverrides)
 	out.DisabledPacks = append([]string(nil), out.DisabledPacks...)
+	out.Response = cloneResponsePolicy(out.Response)
 	return out
 }
 
@@ -93,6 +94,12 @@ func overlayWAFPolicy(base, overlay *WAFPolicySnapshot) {
 	}
 	if len(overlay.DisabledPacks) > 0 {
 		base.DisabledPacks = append([]string(nil), overlay.DisabledPacks...)
+	}
+	if overlay.Response != nil {
+		if base.Response == nil {
+			base.Response = &ResponsePolicySnapshot{}
+		}
+		overlayResponsePolicy(base.Response, overlay.Response)
 	}
 }
 

@@ -5,7 +5,7 @@ COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_DATE := $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 LDFLAGS := -ldflags "-s -w -X main.Version=$(VERSION) -X main.Commit=$(COMMIT) -X main.BuildDate=$(BUILD_DATE)"
 
-.PHONY: all build test test-race test-integration test-all test-crs lint run validate-config clean web-dev web-build web-test
+.PHONY: all build test test-race test-integration test-all test-crs stress lint run validate-config clean web-dev web-build web-test
 
 DATA_DIR ?= $(CURDIR)/data
 
@@ -30,6 +30,10 @@ test-crs:
 
 test-all:
 	go test -v -race -tags=integration ./...
+
+STRESS_DURATION ?= 300s
+stress:
+	STRESS_DURATION=$(STRESS_DURATION) go test -v -tags=integration -run TestStress_BenignOnOff ./tests/e2e -timeout 15m
 
 lint:
 	go vet ./...

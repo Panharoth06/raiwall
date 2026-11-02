@@ -54,25 +54,32 @@ var VerdictAllow = &Verdict{
 
 // RequestContext encapsulates all incoming HTTP request attributes for inspection.
 type RequestContext struct {
-	ClientIP   net.IP          `json:"client_ip"`
-	Method     string          `json:"method"`
-	Host       string          `json:"host"`
-	Path       string          `json:"path"`
-	Query      string          `json:"query"`
-	Headers    http.Header     `json:"headers"`
-	Body       []byte          `json:"body,omitempty"`
-	TLSVersion uint16          `json:"tls_version,omitempty"`
-	UserAgent  string          `json:"user_agent,omitempty"`
-	JA4        string          `json:"ja4,omitempty"`
-	AppID      string          `json:"app_id,omitempty"`
-	Context    context.Context `json:"-"`
+	ClientIP        net.IP          `json:"client_ip"`
+	Method          string          `json:"method"`
+	Host            string          `json:"host"`
+	Path            string          `json:"path"`
+	Query           string          `json:"query"`
+	Headers         http.Header     `json:"headers"`
+	Body            []byte          `json:"body,omitempty"`
+	TLSVersion      uint16          `json:"tls_version,omitempty"`
+	UserAgent       string          `json:"user_agent,omitempty"`
+	JA4             string          `json:"ja4,omitempty"`
+	AppID           string          `json:"app_id,omitempty"`
+	Context         context.Context `json:"-"`
+	Session         any             `json:"-"`
+	InspectResponse bool            `json:"inspect_response,omitempty"`
 }
 
 // ResponseContext encapsulates upstream response attributes for inspection.
 type ResponseContext struct {
-	StatusCode int             `json:"status_code"`
-	Headers    http.Header     `json:"headers"`
-	Body       []byte          `json:"body,omitempty"`
-	Duration   time.Duration   `json:"duration"`
-	Context    context.Context `json:"-"`
+	StatusCode       int             `json:"status_code"`
+	Headers          http.Header     `json:"headers"`
+	Body             []byte          `json:"body,omitempty"`
+	Duration         time.Duration   `json:"duration"`
+	Context          context.Context `json:"-"`
+	Session          any             `json:"-"`
+	AppID            string          `json:"app_id,omitempty"`
+	ContentType      string          `json:"content_type,omitempty"`
+	InspectResponse  bool            `json:"inspect_response,omitempty"`
+	ResponseEligible bool            `json:"response_eligible,omitempty"`
 }

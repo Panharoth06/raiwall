@@ -48,9 +48,19 @@ func (e *crsPolicyEngine) InspectRequest(ctx *waf.RequestContext) (*waf.Verdict,
 	return engine.InspectRequest(ctx)
 }
 
-// InspectResponse stays allow-only until paired response transactions ship.
-func (e *crsPolicyEngine) InspectResponse(_ *waf.ResponseContext) (*waf.Verdict, error) {
-	return waf.VerdictAllow, nil
+// InspectResponse evaluates the compiled policy for the request's application.
+func (e *crsPolicyEngine) InspectResponse(ctx *waf.ResponseContext) (*waf.Verdict, error) {
+	set := e.current.Load()
+	if set == nil || set.global == nil || ctx == nil {
+		return waf.VerdictAllow, nil
+	}
+	engine := set.global
+	if ctx.AppID != "" {
+		if appEngine, ok := set.byApp[ctx.AppID]; ok {
+			engine = appEngine
+		}
+	}
+	return engine.InspectResponse(ctx)
 }
 
 // reloadCRSPolicies compiles the global policy plus every distinct per-app
@@ -186,6 +196,16 @@ func (m *Middleware) crsConfigFor(snap *control.ConfigSnapshot, appID string) cr
 	}
 
 	conf.Exceptions = crsExceptionsFromSnapshot(snap.Exceptions)
+
+	respCfg := m.responseConfigFor(snap, appID)
+	if respCfg.Enabled {
+		conf.InspectResponse = true
+		conf.ResponseBodyLimit = respCfg.BodyLimit
+		if len(respCfg.ContentTypes) > 0 {
+			conf.ResponseMimeTypes = append([]string(nil), respCfg.ContentTypes...)
+		}
+	}
+
 	return conf
 }
 

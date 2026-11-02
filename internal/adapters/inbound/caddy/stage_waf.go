@@ -1,6 +1,7 @@
 package caddy
 
 import (
+	"io"
 	"net"
 	"net/http"
 	"strings"
@@ -25,7 +26,7 @@ func (m *Middleware) inspectWAFRequest(
 	aclBypassWAF bool,
 	aclContinueInspection bool,
 	startTime time.Time,
-) (*waf.Verdict, []byte, bool, error) {
+) (*waf.Verdict, []byte, any, bool, error) {
 	// Inspect a bounded prefix of the body. Oversized bodies are no longer
 	// skipped entirely (a padding byte past 1 MB used to hide every payload),
 	// and the reconstructed body streams the remainder to the upstream.
@@ -65,8 +66,15 @@ func (m *Middleware) inspectWAFRequest(
 		JA4:       ja4,
 		Context:   r.Context(),
 	}
+	appID := ""
 	if appCfg != nil {
 		reqContext.AppID = appCfg.ID
+		appID = appCfg.ID
+	}
+	snap := control.GetActiveSnapshot()
+	respCfg := m.responseConfigFor(snap, appID)
+	if respCfg.Enabled {
+		reqContext.InspectResponse = true
 	}
 
 	var verdict *waf.Verdict
@@ -91,6 +99,9 @@ func (m *Middleware) inspectWAFRequest(
 	}
 
 	if verdict != nil && verdict.Action == waf.ActionBlock {
+		if closer, ok := reqContext.Session.(io.Closer); ok {
+			_ = closer.Close()
+		}
 		if aclContinueInspection {
 			eventID := uuid.New().String()
 			if m.logger != nil {
@@ -124,7 +135,7 @@ func (m *Middleware) inspectWAFRequest(
 			}
 			applyVerdictMetadata(event, verdict)
 			m.recordTelemetry(event)
-			return verdict, bodyBytes, false, nil
+			return verdict, bodyBytes, nil, false, nil
 		}
 
 		if currentMode == control.ModeDefense {
@@ -185,7 +196,7 @@ func (m *Middleware) inspectWAFRequest(
 			w.Header().Set("X-Raiwall-Event-ID", eventID)
 			w.WriteHeader(statusCode)
 			_, _ = w.Write([]byte(rendered))
-			return verdict, bodyBytes, true, nil
+			return verdict, bodyBytes, nil, true, nil
 		} else if currentMode == control.ModeAudit && m.logger != nil {
 			m.logger.Info("WAF audit event (threat detected, not blocked)",
 				zap.String("client_ip", clientIP.String()),
@@ -196,7 +207,7 @@ func (m *Middleware) inspectWAFRequest(
 		}
 	}
 
-	return verdict, bodyBytes, false, err
+	return verdict, bodyBytes, reqContext.Session, false, err
 }
 
 // severityForVerdict applies per-rule severity overrides to telemetry.

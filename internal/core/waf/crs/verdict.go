@@ -126,7 +126,12 @@ func anomalyScore(tx ctypes.Transaction) float64 {
 		return 0
 	}
 	txVars := vars.Variables().TX()
-	for _, key := range []string{"blocking_inbound_anomaly_score", "anomaly_score"} {
+	for _, key := range []string{
+		"blocking_inbound_anomaly_score",
+		"blocking_outbound_anomaly_score",
+		"outbound_anomaly_score",
+		"anomaly_score",
+	} {
 		values := txVars.Get(key)
 		if len(values) == 0 {
 			continue

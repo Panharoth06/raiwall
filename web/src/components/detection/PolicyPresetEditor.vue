@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import type { DetectionMode, Sensitivity, WAFPolicy } from '@/api/detection';
+import type { DetectionMode, ResponsePolicy, Sensitivity, WAFPolicy } from '@/api/detection';
 import { useAuthStore } from '@/stores/auth';
 import AdminOnly from '@/components/auth/AdminOnly.vue';
+import ResponsePolicyEditor from './ResponsePolicyEditor.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { NumberInput } from '@/components/ui/number-input';
@@ -59,6 +60,7 @@ const crsEnabled = ref(false);
 const paranoia = ref(1);
 const inbound = ref(5);
 const outbound = ref(4);
+const responsePolicy = ref<ResponsePolicy>({});
 const showAdvanced = ref(false);
 
 watch(
@@ -71,6 +73,7 @@ watch(
     paranoia.value = next.crs?.paranoia_level ?? 1;
     inbound.value = next.crs?.inbound_threshold ?? 5;
     outbound.value = next.crs?.outbound_threshold ?? 4;
+    responsePolicy.value = next.response ? JSON.parse(JSON.stringify(next.response)) : {};
   },
   { deep: true, immediate: true }
 );
@@ -157,6 +160,7 @@ const save = () => {
       inbound_threshold: inbound.value,
       outbound_threshold: outbound.value,
     },
+    response: responsePolicy.value,
   });
 };
 </script>
@@ -383,6 +387,13 @@ const save = () => {
             </label>
           </div>
         </div>
+
+        <!-- Outbound Inspection & DLP Engine -->
+        <ResponsePolicyEditor
+          v-model="responsePolicy"
+          :can-edit="canEdit"
+          :saving="saving"
+        />
       </div>
     </div>
 

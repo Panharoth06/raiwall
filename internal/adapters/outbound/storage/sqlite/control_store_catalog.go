@@ -164,7 +164,7 @@ func (s *Store) ClearRuleOverrides(ctx context.Context) error {
 
 const wafPolicyColumns = `id, scope, app_id, detection_mode, sensitivity, semantic_overrides,
 	crs_enabled, crs_paranoia_level, crs_inbound_threshold, crs_outbound_threshold,
-	disabled_pack_ids, updated_at`
+	disabled_pack_ids, response_json, updated_at`
 
 func scanWAFPolicy(scanner interface{ Scan(...any) error }) (control.WAFPolicyRecord, error) {
 	var (
@@ -174,7 +174,8 @@ func scanWAFPolicy(scanner interface{ Scan(...any) error }) (control.WAFPolicyRe
 	)
 	err := scanner.Scan(
 		&rec.ID, &rec.Scope, &rec.AppID, &rec.DetectionMode, &rec.Sensitivity,
-		&rec.SemanticOverrides, &crsOn, &pl, &in, &out, &rec.DisabledPackIDs, &rec.UpdatedAt,
+		&rec.SemanticOverrides, &crsOn, &pl, &in, &out, &rec.DisabledPackIDs,
+		&rec.ResponseJSON, &rec.UpdatedAt,
 	)
 	if crsOn.Valid {
 		v := crsOn.Int64 == 1
@@ -224,8 +225,8 @@ func (s *Store) UpsertWAFPolicy(ctx context.Context, rec control.WAFPolicyRecord
 		INSERT INTO raiwall_waf_policies (
 			id, scope, app_id, detection_mode, sensitivity, semantic_overrides,
 			crs_enabled, crs_paranoia_level, crs_inbound_threshold, crs_outbound_threshold,
-			disabled_pack_ids, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			disabled_pack_ids, response_json, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(scope, app_id) DO UPDATE SET
 			detection_mode = excluded.detection_mode,
 			sensitivity = excluded.sensitivity,
@@ -235,10 +236,11 @@ func (s *Store) UpsertWAFPolicy(ctx context.Context, rec control.WAFPolicyRecord
 			crs_inbound_threshold = excluded.crs_inbound_threshold,
 			crs_outbound_threshold = excluded.crs_outbound_threshold,
 			disabled_pack_ids = excluded.disabled_pack_ids,
+			response_json = excluded.response_json,
 			updated_at = excluded.updated_at`,
 		rec.ID, rec.Scope, rec.AppID, rec.DetectionMode, rec.Sensitivity, rec.SemanticOverrides,
 		crsEnabled, intPtrValue(rec.CRSParanoiaLevel), intPtrValue(rec.CRSInboundThreshold),
-		intPtrValue(rec.CRSOutboundThreshold), rec.DisabledPackIDs, rec.UpdatedAt,
+		intPtrValue(rec.CRSOutboundThreshold), rec.DisabledPackIDs, rec.ResponseJSON, rec.UpdatedAt,
 	)
 	return err
 }

@@ -114,6 +114,23 @@ waf:
     paranoia_level: 1           # 1-4
     inbound_threshold: 5        # anomaly score needed to interrupt
     outbound_threshold: 4
+  response:
+    enabled: true               # Outbound inspection & DLP (audit-by-default)
+    mode: audit                 # audit | redact | block
+    inspect_headers: true
+    inspect_body: true
+    body_limit: 1048576         # 1 MiB inspect limit
+    hard_cap: 8388608           # 8 MiB hard cap (larger payloads stream uninspected)
+    decompress: true
+    max_inflight_bytes: 67108864 # 64 MiB total concurrent in-flight buffer
+    dlp:
+      enabled: true
+      action: audit             # inherit | audit | redact | block
+      detect_pan: true          # Visa/Mastercard Luhn detection
+      detect_secrets: true      # API keys & passwords
+      detect_jwt: true          # JSON Web Tokens
+      detect_private_keys: true # RSA/EC private keys
+      redaction: "[REDACTED]"
 
 bot:
   defense: defense              # defense | challenge | strict | audit | off

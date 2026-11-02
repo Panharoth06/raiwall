@@ -85,6 +85,8 @@ func TestSubscriberRemoteApplyRunsDeployHooks(t *testing.T) {
 	require.NoError(t, sub.Start(ctx))
 	defer sub.Stop()
 
+	require.True(t, mock.WaitForSubscribers(DefaultClusterChannel, 1, 2*time.Second), "subscriber should be registered")
+
 	pub := NewPublisher(mock)
 	require.NoError(t, pub.PublishSnapshot(ctx, control.NewConfigSnapshot(2, control.ModeDefense, nil), "peer"))
 
@@ -205,6 +207,8 @@ func TestSubscriberMultipleReplicasConverge(t *testing.T) {
 			s.Stop()
 		}
 	})
+
+	require.True(t, mock.WaitForSubscribers(DefaultClusterChannel, 2, 2*time.Second), "both subscribers should be registered")
 
 	pub := NewPublisher(mock)
 	require.NoError(t, pub.PublishSnapshot(ctx, control.NewConfigSnapshot(4, control.ModeDefense, nil), "peer"))

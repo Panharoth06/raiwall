@@ -34,6 +34,22 @@ func validatePolicyDTO(req *wafPolicyDTO, snap *control.ConfigSnapshot) error {
 			return fmt.Errorf("crs thresholds cannot be negative")
 		}
 	}
+	if req.Response != nil {
+		if req.Response.Mode != "" && !control.IsValidResponseMode(req.Response.Mode) {
+			return fmt.Errorf("unknown response mode %q (expected inherit, audit, redact, or block)", req.Response.Mode)
+		}
+		if req.Response.BodyLimit < 0 || req.Response.HardCap < 0 {
+			return fmt.Errorf("response limits cannot be negative")
+		}
+		if req.Response.DLP != nil {
+			if req.Response.DLP.Action != "" && !control.IsValidResponseMode(req.Response.DLP.Action) {
+				return fmt.Errorf("unknown dlp action %q (expected inherit, audit, redact, or block)", req.Response.DLP.Action)
+			}
+			if req.Response.DLP.MaxScanBytes < 0 {
+				return fmt.Errorf("dlp max_scan_bytes cannot be negative")
+			}
+		}
+	}
 	if snap != nil {
 		for _, packID := range req.DisabledPacks {
 			found := false
@@ -68,6 +84,14 @@ func policyRecordFromDTO(req wafPolicyDTO, id, scope, appID string) (control.WAF
 	if err != nil {
 		return control.WAFPolicyRecord{}, fmt.Errorf("encode disabled_packs: %w", err)
 	}
+	respJSON := "{}"
+	if req.Response != nil {
+		bytes, err := json.Marshal(req.Response)
+		if err != nil {
+			return control.WAFPolicyRecord{}, fmt.Errorf("encode response: %w", err)
+		}
+		respJSON = string(bytes)
+	}
 	rec := control.WAFPolicyRecord{
 		ID:                id,
 		Scope:             scope,
@@ -76,6 +100,7 @@ func policyRecordFromDTO(req wafPolicyDTO, id, scope, appID string) (control.WAF
 		Sensitivity:       control.NormalizePolicyValue(req.Sensitivity),
 		SemanticOverrides: string(semanticJSON),
 		DisabledPackIDs:   string(packsJSON),
+		ResponseJSON:      respJSON,
 	}
 	if rec.DetectionMode == "" {
 		rec.DetectionMode = control.DetectionModeInherit
@@ -106,6 +131,7 @@ func policyFromDTO(req wafPolicyDTO) control.WAFPolicySnapshot {
 		DetectionMode: control.NormalizePolicyValue(req.DetectionMode),
 		Sensitivity:   control.NormalizePolicyValue(req.Sensitivity),
 		DisabledPacks: append([]string(nil), req.DisabledPacks...),
+		Response:      responseSnapshotFromDTO(req.Response),
 	}
 	if len(req.SemanticOverrides) > 0 {
 		policy.SemanticOverrides = make(map[waf.Module]waf.ModuleMode, len(req.SemanticOverrides))
@@ -129,6 +155,7 @@ func wafPolicyToDTO(policy control.WAFPolicySnapshot) wafPolicyDTO {
 	dto := wafPolicyDTO{
 		DetectionMode: policy.DetectionMode,
 		Sensitivity:   policy.Sensitivity,
+		Response:      responseDTOFromSnapshot(policy.Response),
 	}
 	if dto.DetectionMode == "" {
 		dto.DetectionMode = control.DetectionModeInherit
@@ -153,6 +180,66 @@ func wafPolicyToDTO(policy control.WAFPolicySnapshot) wafPolicyDTO {
 	}
 	if len(policy.DisabledPacks) > 0 {
 		dto.DisabledPacks = append([]string(nil), policy.DisabledPacks...)
+	}
+	return dto
+}
+
+func responseSnapshotFromDTO(req *responsePolicyDTO) *control.ResponsePolicySnapshot {
+	if req == nil {
+		return nil
+	}
+	snap := &control.ResponsePolicySnapshot{
+		Enabled:          req.Enabled,
+		Mode:             control.NormalizePolicyValue(req.Mode),
+		InspectHeaders:   req.InspectHeaders,
+		InspectBody:      req.InspectBody,
+		BodyLimit:        req.BodyLimit,
+		HardCap:          req.HardCap,
+		Decompress:       req.Decompress,
+		ContentTypes:     append([]string(nil), req.ContentTypes...),
+		MaxInflightBytes: req.MaxInflightBytes,
+	}
+	if req.DLP != nil {
+		snap.DLP = &control.DLPPolicySnapshot{
+			Enabled:           req.DLP.Enabled,
+			Action:            control.NormalizePolicyValue(req.DLP.Action),
+			DetectPAN:         req.DLP.DetectPAN,
+			DetectSecrets:     req.DLP.DetectSecrets,
+			DetectJWT:         req.DLP.DetectJWT,
+			DetectPrivateKeys: req.DLP.DetectPrivateKeys,
+			Redaction:         req.DLP.Redaction,
+			MaxScanBytes:      req.DLP.MaxScanBytes,
+		}
+	}
+	return snap
+}
+
+func responseDTOFromSnapshot(snap *control.ResponsePolicySnapshot) *responsePolicyDTO {
+	if snap == nil {
+		return nil
+	}
+	dto := &responsePolicyDTO{
+		Enabled:          snap.Enabled,
+		Mode:             snap.Mode,
+		InspectHeaders:   snap.InspectHeaders,
+		InspectBody:      snap.InspectBody,
+		BodyLimit:        snap.BodyLimit,
+		HardCap:          snap.HardCap,
+		Decompress:       snap.Decompress,
+		ContentTypes:     append([]string(nil), snap.ContentTypes...),
+		MaxInflightBytes: snap.MaxInflightBytes,
+	}
+	if snap.DLP != nil {
+		dto.DLP = &dlpPolicyDTO{
+			Enabled:           snap.DLP.Enabled,
+			Action:            snap.DLP.Action,
+			DetectPAN:         snap.DLP.DetectPAN,
+			DetectSecrets:     snap.DLP.DetectSecrets,
+			DetectJWT:         snap.DLP.DetectJWT,
+			DetectPrivateKeys: snap.DLP.DetectPrivateKeys,
+			Redaction:         snap.DLP.Redaction,
+			MaxScanBytes:      snap.DLP.MaxScanBytes,
+		}
 	}
 	return dto
 }

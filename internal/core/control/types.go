@@ -231,6 +231,9 @@ type WAFPolicySnapshot struct {
 	CRSInboundThreshold  int                           `json:"crs_inbound_threshold,omitempty"`
 	CRSOutboundThreshold int                           `json:"crs_outbound_threshold,omitempty"`
 	DisabledPacks        []string                      `json:"disabled_packs,omitempty"`
+	// Response carries outbound inspection and DLP overrides. Nil inherits
+	// the process-level response configuration.
+	Response *ResponsePolicySnapshot `json:"response,omitempty"`
 }
 
 // RulePackSnapshot is a self-contained imported rule pack. Files are retained

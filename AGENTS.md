@@ -42,7 +42,7 @@ The entire stack ships as a **single Go binary** with the Vue admin UI embedded 
 flowchart TD
     subgraph ControlPlane["CONTROL PLANE (Admin & API)"]
         UI["Vue 3 + radix-vue<br/>(d3)"] <--> API["REST API + OpenAPI 3.1"]
-        API <--> DB[("SQLite WAL (sqlc)")]
+        API <--> DB[("SQLite WAL / PostgreSQL (sqlc)")]
         API --> EngineConfig["Config Validation & Rollback"]
     end
 
@@ -58,29 +58,39 @@ flowchart TD
         
         Step4 --> Step5["5. Exception Gate<br/>(Path / Param False-Positive Bypass)"]
         Step5 --> Step6["6. Custom ACLs<br/>(expr-lang/expr + MaxMind GeoIP)"]
-        Step6 --> Step7["7. Stream Filter<br/>(Payloads >1MB Direct Stream)"]
+        Step6 --> Step7["7. Stream Filter<br/>(Payloads >1MB Bounded Prefix)"]
         Step7 --> Step8["8. Normalizer<br/>(Coraza: URL / HTML / Base64)"]
         
-        Step8 --> Step9{"9. Semantic WAF"}
+        Step8 --> Step9{"9. Semantic & CRS WAF"}
         Step9 -->|"Lexical Triage (<2µs)"| LibInj["libinjection-go (Pure Go)"]
         Step9 -->|"Suspicious Tokens"| AST["Bounded Context Verifier<br/>(SQL / shell / DOM-JS checks)"]
+        Step9 -->|"CRS Inbound (PL1-4)"| CRSIn["Coraza OWASP CRS"]
         
         LibInj -->|"Verdict: Allow"| Proxy["10. Reverse Proxy<br/>(Upstream SWRR + 403/404 Scanner Trap)"]
         AST -->|"Verdict: Allow"| Proxy
+        CRSIn -->|"Score < Threshold"| Proxy
         AST -->|"Verdict: Block"| Block403(["HTTP 403 Blocked"])
+        CRSIn -->|"Score >= Threshold"| Block403
         
         Proxy --> Upstreams[("Protected Backend Services")]
+        Upstreams --> Step11{"11. Response Gate<br/>(Content-Type & Size Filter)"}
+        Step11 -->|"Binary / SSE / >8MB"| DirectStream(["Direct Client Stream"])
+        Step11 -->|"Inspectable (<=8MB)"| DLP["12. Response DLP & Outbound CRS<br/>(PAN Luhn / JWT / Secrets / DB Leaks)"]
+        DLP -->|"Verdict: Allow / Redacted"| Resp200(["HTTP 200 to Client"])
+        DLP -->|"Verdict: Block"| Resp403(["HTTP 403 Leak Blocked"])
     end
 
     subgraph Telemetry["TELEMETRY & ALERTING PIPELINE"]
         RingBuffer["Async Ring Buffer<br/>(500ms Batch Flush)"]
         PII["PII / PCI-DSS Sanitizer<br/>(Auto-mask Tokens & Secrets)"]
-        Logs[("SQLite WAL / ClickHouse")]
+        Logs[("SQLite WAL / PostgreSQL / ClickHouse")]
         Alerts["Webhook Push Alerts<br/>(Slack, Discord, Telegram)"]
+        AuditChain["Tamper-Evident Audit Chain<br/>(Ed25519 Anchors)"]
         
         RingBuffer --> PII
         PII --> Logs
         PII --> Alerts
+        Logs --> AuditChain
     end
 
     EngineConfig -.->|"Hot-Reload (atomic.Pointer)"| DataPlane
@@ -94,7 +104,7 @@ flowchart TD
 | # | Domain | Summary |
 |---|--------|---------|
 | 1 | **Reverse Proxy & Gateway** | Caddy v2 data plane: multi-protocol proxying, automated SSL/ACME, `atomic.Pointer[ConfigSnapshot]` hot-reload, `sync.Pool` buffer pooling, weighted round-robin load balancing, active health checks. |
-| 2 | **Semantic Threat Detection** | Three-stage funnel: recursive normalization (Coraza) → pure-Go `libinjection-go` lexical triage (< 2 µs) → bounded in-tree context verification (SQL, shell, DOM/JS) with no external parser dependency. Hard 32 KB cap and 5 ms timeout per parameter. |
+| 2 | **Threat Detection & Response DLP** | Inbound: multi-pass normalizer → `libinjection-go` triage (< 2 µs) → bounded AST context verifiers (SQL/shell/XSS, 32 KB/5 ms cap) composed with embedded **OWASP CRS 4.30 via Coraza** (PL1–4 anomaly scoring, per-app policy, and exceptions). Outbound: bounded DLP engine (PAN via Luhn, JWT, RSA/EC private keys, AWS cloud keys, generic secrets) with audit/block/redact modes, paired CRS response transactions, 8 MiB hard cap, 64 MiB global in-flight concurrency budget, and 25 ms scan deadline. |
 | 3 | **Bot Mitigation & Active Defense** | JA4/JA4H TLS fingerprinting, HTTP/2 frame fingerprinting, intelligent API vs. browser route classification, stateless SHA-256 Proof-of-Work (HTTP 468), HMAC clearance cookies, SPA hydration protection. |
 | 4 | **DDoS & Rate Limiting** | Three-tiered rate limiting: Tier 1 (access velocity → PoW), Tier 2 (attack frequency → auto-ban), Tier 3 (scanner trap on upstream 403/404 → ban). Composite keys (IP + JA4 + Cookie) for CGNAT safety. In-memory local storage (single node) / Redis (cluster). |
 | 5 | **Access Control & Identity** | Parameter-level false-positive exception engine, compiled bytecode ACLs (`expr-lang/expr`, < 15 ns), balanced routing table CIDR matching (`gaissmai/bart`, ~15 ns for 500K+ IPs), MaxMind GeoIP, OIDC/SSO zero-code pre-auth. |
@@ -344,16 +354,39 @@ These are **hard constraints** that must be respected in every implementation:
 | **SPA Client Hydration Errors** | Medium | DOM rewriting breaks React/Vue/Next.js hydration | Never apply runtime DOM mutation on SPA routes. Rely on JA4 fingerprinting and PoW instead. |
 | **Go GC Latency** | High | GC pauses under > 50K QPS | Use `sync.Pool` byte-buffer pooling. Minimize allocations on the hot path. |
 | **Caddy API Breaking Changes** | Medium | Caddy module API changes across minor versions | Pin exact Caddy v2 minor version in `go.mod` (currently v2.8.4). |
+| **DLP Scan Latency / CPU Lockup** | High | Unanchored regexes on large responses spike latency | 25 ms hard timeout deadline per response scan. Zero-allocation candidate tokenization (`scanPAN`) evaluating only 13–30 digit runs at word boundaries. Hard 1 MiB scan window (`MaxScanBytes`). |
+| **RAM Exhaustion on Response Buffering** | High | High-concurrency 8 MiB streams exhaust gateway memory | Buffer only inspectable Content-Types (`text/*`, `application/xml`, `application/json`, `application/javascript`). Hard 8 MiB cap per response. Global 64 MiB in-flight concurrency budget (`inflight_budget.go`). SSE, WebSockets, media streams, and chunked overflows bypass buffering immediately. |
 
 ---
 
-## Engineering Roadmap
+## Engineering Roadmap & Current State
 
-| Milestone | Scope & Deliverables | Timeline | Status |
-|-----------|---------------------|----------|--------|
-| **1: Core Proxy & Control Plane** | Caddy Proxy + Auto-SSL + Normalization + `libinjection-go` • Minimal Control Plane API (`huma`) + Web UI Log Viewer + Rule Exception Engine | Weeks 1–8 | 🟢 Completed |
-| **2: Stateful Defense & AST Verification** | 3-Tier Composite Rate Limiting + Fast CIDR (`bart`) + MaxMind GeoIP + AST Verification (32KB/5ms cap) + ClickHouse batch logging + PII Sanitizer | Weeks 9–16 | 🟢 Completed |
-| **3: Active Defense & Sidecar Mode** | JA4 Fingerprinting + HTTP 468 PoW (`altcha`/`anubis` with API bypass) + Envoy/Nginx `ext_proc` sidecar connector + Web UI charts & alerts | Weeks 17–24 | 🟢 Completed |
+The authoritative roadmap and working checklists live in [`ROADMAP.md`](ROADMAP.md) and [`TASKS.md`](TASKS.md). Below is the consolidated progress across enterprise capabilities:
+
+### Current Implementation State (Wave 1 Completed)
+
+| Capability / Phase | Scope & Key Components | Status |
+|---|---|---|
+| **Phase 0: Security & Trust Foundations** | Authenticated telemetry/metrics/SSE, bounded-prefix request inspection with gzip/brotli bombs cap, HA ban hydration & snapshot sync, ClickHouse repairs, client IP trust, handshake JA4/H2/PROXY v1/v2, secure/revocable sessions. | 🟢 Completed |
+| **Phase 1A: OWASP CRS Core Engine** | Embedded Coraza v3 + OWASP CRS 4.30 behind `WAFEnginePort`, composite engine (semantic first, CRS fallback), PL1–4 anomaly scoring, per-app detection policies, rule exception → CRS exclusion translation, `/rules/test` playground. | 🟢 Completed |
+| **Phase 1B.1: Response Inspection & DLP** | Bounded outbound DLP engine (PAN Luhn, JWT, RSA/EC private keys, AWS cloud keys, generic secrets) with audit/block/redact modes, paired CRS response transactions (outbound threshold scoring), Content-Type gating, 8 MiB hard cap, 64 MiB global in-flight budget, 25 ms scan deadline. | 🟢 Completed |
+| **Phase 1A.6: Performance & Stress Gates** | 500 RPS stress test harness (`make stress`), p99 overhead ≤ 2 ms (actual ~1.0 ms), stable RSS net delta (< 5 MB), 0 false positives, 1 MiB DLP scan p99 ≤ 25 ms (actual 4.87 ms), 100 concurrent 1 MiB requests with 0 OOMs. | 🟢 Completed |
+| **Phase 2.3: Administrative Audit Trail** | Tamper-evident append-only audit log with SHA-256 hash chaining, Ed25519 cryptographic anchors, retention floors, and live verification endpoint (`/.raiwall/api/v1/audit/verify`). | 🟢 Completed |
+| **Phase 3.1 & 3.7: Control Plane Core** | DB-backed revocable sessions, login brute-force lockout, instant configuration apply with atomic snapshot swap, declarative YAML sync, responsive Vue 3 dashboard. | 🟢 Completed |
+
+### Remaining Features to Implement
+
+| Phase & Feature | Key Deliverables & Targets | Priority |
+|---|---|---|
+| **1B.2 Normalization Depth** | Base64 and hex decoding pipelines, JSON-in-JSON recursive extraction, configurable body-prefix inspection policy, encoded SQLi/XSS evasions test suite. | **P1 (Immediate Next)** |
+| **1B.3 Content Parsers & Schema Validation** | XML parser with XXE protection/entity caps, GraphQL depth/complexity/alias explosion limits, per-site OpenAPI 3.0/3.1 request contract validation. | P1 |
+| **1B.4 Upload Content & Malware Inspection** | Multipart file magic-byte validation, polyglot upload detection (GIF/PHP, PNG/JS), outbound antivirus scanning hook (ClamAV / ICAP). | P1 |
+| **1B.5 Protocol & Transport Security** | HTTP request smuggling mitigations on raw frontends, WebSocket/gRPC streaming upstream support (trailers and h2c handling), client mTLS authentication per site. | P1 |
+| **1B.6 Detection Operations** | Per-host rate limiting and bot mitigation policy enforcement, expansion of CVE virtual patches from 87 to 193 rules, dynamic threat intelligence IP feeds. | P1 |
+| **Phase 2: Observability & Compliance** | OpenTelemetry distributed tracing (2.1), Enterprise SIEM pipeline (RFC 5424, CEF, LEEF, Splunk, Sentinel, Elastic) (2.2), WORM compliance storage & legal hold (2.4), Automated compliance reports (PCI-DSS 4.0, SOC 2, GDPR) (2.5), Alerting delivery history & deduplication (2.6). | P2 |
+| **Phase 3: Identity & Multi-Tenancy** | Operator OIDC SSO with PKCE + TOTP 2FA (3.2), Granular 5-role RBAC matrix & scoped API keys (3.3), Secrets keyring with external KMS (Vault/AWS/GCP) (3.4), `tenant_id` row-level isolation & multi-tenancy quotas (3.5), Physical split admin listener (3.6). | P1 / P2 |
+| **Phase 4: Clustering, HA & Kubernetes** | Production `go-redis/v9` driver with Sentinel/Cluster (4.1), Distributed apply locks & leader election (4.2), Shared multi-node TLS storage (4.3), Distributed virtual waiting room (4.4), Production Helm HA chart with PDB/HPA (4.5), Disaster recovery backup/restore CLI (4.6). | P0 / P1 |
+| **Phase 5: Supply Chain & Distribution** | GitHub Actions CI/CD workflows (5.1), Syft SBOM & Cosign image signing (5.2), Air-gapped deployment bundle (offline fonts/rules/GeoIP) (5.3), Official Apache-2.0 LICENSE & notices (5.5). | P0 / P1 |
 
 ---
 

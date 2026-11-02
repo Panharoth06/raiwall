@@ -77,6 +77,25 @@ waf:
     paranoia_level: 1
     inbound_threshold: 5
     outbound_threshold: 4
+  # Outbound response inspection & Data Loss Prevention (DLP).
+  # Intercepts upstream responses before clients receive them.
+  response:
+    enabled: true
+    mode: audit                 # audit | redact | block
+    inspect_headers: true
+    inspect_body: true
+    body_limit: 1048576         # inspect up to 1 MiB body
+    hard_cap: 8388608           # stream payloads >8 MiB directly to client
+    decompress: true
+    max_inflight_bytes: 67108864 # 64 MiB concurrent buffer budget across connections
+    dlp:
+      enabled: true
+      action: audit             # inherit | audit | redact | block
+      detect_pan: true          # Visa/Mastercard Luhn-validated credit card numbers
+      detect_secrets: true      # generic passwords, bearer tokens, AWS keys
+      detect_jwt: true          # JSON Web Tokens
+      detect_private_keys: true # RSA, EC, and OPENSSH private key blocks
+      redaction: "[REDACTED]"
 
 bot:
   defense: defense

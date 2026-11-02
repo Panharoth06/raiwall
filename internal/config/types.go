@@ -195,8 +195,36 @@ type WAF struct {
 	OfflineResponseBody string   `yaml:"offline_response_body" json:"offline_response_body"`
 	StripHeaders        []string `yaml:"strip_headers" json:"strip_headers"`
 	ASTTimeout          Duration `yaml:"ast_timeout" json:"ast_timeout"`
-	MaxParamSize        int      `yaml:"max_param_size" json:"max_param_size"`
-	CRS                 CRS      `yaml:"crs" json:"crs"`
+	MaxParamSize        int       `yaml:"max_param_size" json:"max_param_size"`
+	CRS                 CRS       `yaml:"crs" json:"crs"`
+	Response            Response  `yaml:"response" json:"response"`
+}
+
+// Response configures outbound inspection and DLP. Nil booleans and zero
+// values fall back to the policy defaults.
+type Response struct {
+	Enabled          *bool          `yaml:"enabled,omitempty" json:"enabled,omitempty"`
+	Mode             string         `yaml:"mode" json:"mode"`
+	InspectHeaders   *bool          `yaml:"inspect_headers,omitempty" json:"inspect_headers,omitempty"`
+	InspectBody      *bool          `yaml:"inspect_body,omitempty" json:"inspect_body,omitempty"`
+	BodyLimit        int            `yaml:"body_limit" json:"body_limit"`
+	HardCap          int            `yaml:"hard_cap" json:"hard_cap"`
+	Decompress       *bool          `yaml:"decompress,omitempty" json:"decompress,omitempty"`
+	ContentTypes     []string       `yaml:"content_types,omitempty" json:"content_types,omitempty"`
+	MaxInflightBytes int64          `yaml:"max_inflight_bytes" json:"max_inflight_bytes"`
+	DLP              *DLP           `yaml:"dlp,omitempty" json:"dlp,omitempty"`
+}
+
+// DLP configures outbound data-loss prevention.
+type DLP struct {
+	Enabled           *bool  `yaml:"enabled,omitempty" json:"enabled,omitempty"`
+	Action            string `yaml:"action" json:"action"`
+	DetectPAN         *bool  `yaml:"detect_pan,omitempty" json:"detect_pan,omitempty"`
+	DetectSecrets     *bool  `yaml:"detect_secrets,omitempty" json:"detect_secrets,omitempty"`
+	DetectJWT         *bool  `yaml:"detect_jwt,omitempty" json:"detect_jwt,omitempty"`
+	DetectPrivateKeys *bool  `yaml:"detect_private_keys,omitempty" json:"detect_private_keys,omitempty"`
+	Redaction         string `yaml:"redaction,omitempty" json:"redaction,omitempty"`
+	MaxScanBytes      int    `yaml:"max_scan_bytes" json:"max_scan_bytes"`
 }
 
 // CRS configures the optional OWASP Core Rule Set engine (Coraza).

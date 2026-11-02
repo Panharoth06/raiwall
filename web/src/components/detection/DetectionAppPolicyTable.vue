@@ -70,6 +70,7 @@ const modeClass = (mode: string) => {
           <TableHead class="text-xs uppercase font-semibold">Application</TableHead>
           <TableHead class="w-36 text-xs uppercase font-semibold">Effective Mode</TableHead>
           <TableHead class="w-36 text-xs uppercase font-semibold">Sensitivity</TableHead>
+          <TableHead class="w-32 text-xs uppercase font-semibold">Outbound DLP</TableHead>
           <TableHead class="w-28 text-xs uppercase font-semibold">Source</TableHead>
           <TableHead class="w-24 text-right text-xs uppercase font-semibold">Reset</TableHead>
         </TableRow>
@@ -139,6 +140,32 @@ const modeClass = (mode: string) => {
             <span v-else class="text-xs font-mono text-muted-foreground">
               {{ row.policy.sensitivity }}
             </span>
+          </TableCell>
+          <TableCell>
+            <div class="flex items-center gap-1.5">
+              <Badge
+                v-if="row.policy.response?.enabled"
+                variant="outline"
+                class="font-mono text-xs"
+                :class="row.policy.response.mode === 'block' ? 'border-threat/30 bg-threat/10 text-threat' : row.policy.response.mode === 'redact' ? 'border-warning/30 bg-warning/10 text-warning' : 'border-info/30 bg-info/10 text-info'"
+              >
+                {{ (row.policy.response.mode || 'audit').toUpperCase() }}
+              </Badge>
+              <Badge
+                v-else
+                variant="outline"
+                class="font-mono text-xs border-border bg-muted text-muted-foreground"
+              >
+                OFF
+              </Badge>
+              <Badge
+                v-if="row.policy.response?.dlp?.enabled"
+                variant="outline"
+                class="font-mono text-xs border-primary/30 bg-primary/10 text-primary"
+              >
+                DLP
+              </Badge>
+            </div>
           </TableCell>
           <TableCell>
             <Badge

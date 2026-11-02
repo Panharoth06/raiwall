@@ -114,6 +114,7 @@ type WAFPolicyRecord struct {
 	CRSInboundThreshold  *int
 	CRSOutboundThreshold *int
 	DisabledPackIDs      string
+	ResponseJSON         string
 	UpdatedAt            time.Time
 }
 

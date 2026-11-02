@@ -3,6 +3,7 @@
 export type DetectionMode = 'inherit' | 'off' | 'alert' | 'block';
 export type Sensitivity = 'inherit' | 'low' | 'medium' | 'high';
 export type ModuleMode = 'disabled' | 'audit' | 'balance' | 'strict';
+export type ResponseMode = 'inherit' | 'audit' | 'redact' | 'block';
 
 export interface CRSPolicy {
   enabled?: boolean;
@@ -11,12 +12,37 @@ export interface CRSPolicy {
   outbound_threshold?: number;
 }
 
+export interface DLPPolicy {
+  enabled?: boolean;
+  action?: ResponseMode;
+  detect_pan?: boolean;
+  detect_secrets?: boolean;
+  detect_jwt?: boolean;
+  detect_private_keys?: boolean;
+  redaction?: string;
+  max_scan_bytes?: number;
+}
+
+export interface ResponsePolicy {
+  enabled?: boolean;
+  mode?: ResponseMode;
+  inspect_headers?: boolean;
+  inspect_body?: boolean;
+  body_limit?: number;
+  hard_cap?: number;
+  decompress?: boolean;
+  content_types?: string[];
+  max_inflight_bytes?: number;
+  dlp?: DLPPolicy;
+}
+
 export interface WAFPolicy {
   detection_mode: DetectionMode;
   sensitivity: Sensitivity;
   semantic_overrides?: Record<string, ModuleMode>;
   crs?: CRSPolicy;
   disabled_packs?: string[];
+  response?: ResponsePolicy;
 }
 
 export interface DetectionStatus {

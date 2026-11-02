@@ -151,6 +151,13 @@ func policySnapshotFromRecord(rec WAFPolicyRecord) (*WAFPolicySnapshot, error) {
 			return nil, fmt.Errorf("invalid disabled_pack_ids JSON: %w", err)
 		}
 	}
+	if rec.ResponseJSON != "" && rec.ResponseJSON != "{}" {
+		var resp ResponsePolicySnapshot
+		if err := json.Unmarshal([]byte(rec.ResponseJSON), &resp); err != nil {
+			return nil, fmt.Errorf("invalid response_json: %w", err)
+		}
+		policy.Response = NormalizeResponsePolicy(&resp)
+	}
 	return policy, nil
 }
 

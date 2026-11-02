@@ -219,11 +219,11 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 	}
 
 	// 13. WAF Request Inspection
-	verdict, bodyBytes, handledWAF, _ := m.inspectWAFRequest(w, r, clientIP, ja4, appCfg, currentMode, aclBypassWAF, aclContinueInspection, startTime)
+	verdict, bodyBytes, session, handledWAF, _ := m.inspectWAFRequest(w, r, clientIP, ja4, appCfg, currentMode, aclBypassWAF, aclContinueInspection, startTime)
 	if handledWAF {
 		return nil
 	}
 
 	// 14. Response Interception & Forwarding
-	return m.forwardAndInspectResponse(w, r, clientIP, ja4, appCfg, currentMode, verdict, bodyBytes, startTime, next)
+	return m.forwardAndInspectResponse(w, r, clientIP, ja4, appCfg, currentMode, verdict, bodyBytes, session, startTime, next)
 }

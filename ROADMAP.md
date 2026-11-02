@@ -69,8 +69,7 @@ Priority: **P0** blocks enterprise use, **P1** major capability, **P2** maturity
 2. Configuration changes do not propagate to other replicas.
 3. ClickHouse telemetry is non-functional (no schema init, no pruning, missing
    columns, broken event lookup).
-4. Response inspection is a no-op; CRS response rules are disabled until paired
-   request/response transactions exist.
+4. Response inspection and paired CRS outbound transactions are now implemented (1B.1); recursive multi-layer normalization (1B.2) and XML/GraphQL parsers (1B.3) remain.
 5. Upstream health checks never start; WebSocket/gRPC upstream proxying and
    PROXY protocol are incomplete.
 6. JA4 is header-derived, not captured from the TLS handshake.
@@ -102,7 +101,7 @@ Priority: **P0** blocks enterprise use, **P1** major capability, **P2** maturity
 | CVE virtual patches | Partial | P1 | 87 rules; `Signature.Prefix` unused; method index bug |
 | Rule catalog / test playground | Partial | P1 | `/rules/test` API done; catalog, UI, go-ftw harness pending |
 | False-positive exceptions | Partial | P1 | Semantic rules only; CRS exclusion translation pending |
-| Response inspection / DLP | Absent | P1 | `InspectResponse` always allows |
+| Response inspection / DLP | Full | — | Bounded DLP (PAN Luhn/JWT/keys/secrets) + paired CRS outbound transactions (1B.1) |
 | XML/XXE, GraphQL, OpenAPI schema validation | Absent | P1 | Not implemented |
 | Request decompression / Base64 normalization | Partial | P1 | gzip/deflate/br inspection done; Base64 normalization pending |
 | Multipart content/magic/AV inspection | Partial | P1 | Extension checks only |
@@ -256,13 +255,13 @@ traffic; app-auth bypass tests pass; audit-mode events appear; docs match code.
 | 1A.3 | Per-site detection policy: CRS off/audit/block, PL1–4, thresholds; API + UI + runtime selection | `core/control/models.go`, `compiler.go`, `http/detector.go`, `caddy/provision_crs_policies.go`, `web/` | M | **Done** (`8557bf7` API/UI; runtime cache now) |
 | 1A.4 | Exception → CRS exclusion translation; rule catalog/tags/severity; dry-run effects | `core/acl/exception.go`, `core/waf/crs/exceptions.go`, `http/exceptions_test_run.go` | M | **Done** |
 | 1A.5 | Rule test playground + go-ftw harness | `http/rules.go`, `tests/crs/` | M | **Done** (`34ea459` API, `5d14d49` UI; harness + CI gate now) |
-| 1A.6 | Performance: semantic-first, static exclusions, body pre-caps, benchmarks | `caddy/stage_waf.go`, `core/waf/benchmark_test.go` | M | **Pending** |
+| 1A.6 | Performance: semantic-first, static exclusions, body pre-caps, benchmarks | `caddy/stage_waf.go`, `core/waf/benchmark_test.go`, `tests/e2e/stress_test.go` | M | **Done** (500 RPS stress gate, p99 overhead ~1.0 ms ≤ 2 ms, stable RSS) |
 
 #### 1B Detection depth (10–12 weeks)
 
 | ID | Deliverable | Targets | Size | Status |
 |---|---|---|---|---|
-| 1B.1 | Response inspection + DLP/redaction | `caddy/stage_response.go`, `core/waf/response/dlp.go` | L | **Pending** |
+| 1B.1 | Response inspection + DLP/redaction | `caddy/stage_response.go`, `core/waf/response/dlp.go`, `caddy/inflight_budget.go` | L | **Done** (PAN Luhn/JWT/keys/secrets, audit/block/redact, paired CRS response) |
 | 1B.2 | Base64/hex/JSON-in-JSON normalization; body-prefix policy | `core/waf/normalizer/*`, `caddy/body_inspector.go` | M | **Pending** |
 | 1B.3 | XML/XXE, GraphQL depth/complexity, OpenAPI schema validation | new `core/waf/{xmlinspect,graphql}.go`, `core/api/openapi_validate.go` | L | **Pending** |
 | 1B.4 | Multipart magic-byte/polyglot + AV hook (ClamAV/ICAP) | `core/waf/detectors_http.go`, `adapters/outbound/av` | M | **Pending** |

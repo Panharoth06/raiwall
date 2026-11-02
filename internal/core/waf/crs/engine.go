@@ -12,6 +12,7 @@ import (
 
 	"github.com/Panharoth06/raiwall/internal/core/waf"
 	"github.com/corazawaf/coraza/v3"
+	ctypes "github.com/corazawaf/coraza/v3/types"
 )
 
 // Default anomaly thresholds mirror the CRS defaults.
@@ -55,6 +56,9 @@ type Config struct {
 	InboundThreshold  int
 	OutboundThreshold int
 	MaxBodySize       int
+	InspectResponse   bool
+	ResponseBodyLimit int
+	ResponseMimeTypes []string
 	// Disabled skips inspection entirely without recompiling.
 	Disabled  bool
 	Packs     []Pack
@@ -62,6 +66,24 @@ type Config struct {
 	// Exceptions are translated into phase-1 ctl actions that remove scoped
 	// CRS rules before they run.
 	Exceptions []Exception
+}
+
+// Session holds an active Coraza transaction for paired request/response inspection.
+type Session struct {
+	tx     ctypes.Transaction
+	set    *compiledSet
+	closed atomic.Bool
+}
+
+// Close releases the Coraza transaction resources exactly once.
+func (s *Session) Close() error {
+	if s == nil {
+		return nil
+	}
+	if s.closed.CompareAndSwap(false, true) {
+		return s.tx.Close()
+	}
+	return nil
 }
 
 // compiledSet is one immutable Coraza instance and its associated policy.
@@ -106,8 +128,21 @@ func compile(conf Config) (*compiledSet, error) {
 		WithRootFS(buildOverlayFS(conf)).
 		WithRequestBodyAccess().
 		WithRequestBodyLimit(conf.MaxBodySize).
-		WithRequestBodyInMemoryLimit(conf.MaxBodySize).
-		WithDirectives(directives(conf))
+		WithRequestBodyInMemoryLimit(conf.MaxBodySize)
+
+	if conf.InspectResponse {
+		limit := conf.ResponseBodyLimit
+		if limit <= 0 {
+			limit = DefaultMaxBodySize
+		}
+		cfg = cfg.WithResponseBodyAccess().
+			WithResponseBodyLimit(limit)
+		if len(conf.ResponseMimeTypes) > 0 {
+			cfg = cfg.WithResponseBodyMimeTypes(conf.ResponseMimeTypes)
+		}
+	}
+
+	cfg = cfg.WithDirectives(directives(conf))
 
 	instance, err := coraza.NewWAF(cfg)
 	if err != nil {
@@ -142,6 +177,9 @@ func normalizeConfig(conf Config) Config {
 	if conf.MaxBodySize <= 0 {
 		conf.MaxBodySize = DefaultMaxBodySize
 	}
+	if conf.ResponseBodyLimit <= 0 {
+		conf.ResponseBodyLimit = DefaultMaxBodySize
+	}
 	switch Mode(strings.ToLower(string(conf.Mode))) {
 	case ModeBlock:
 		conf.Mode = ModeBlock
@@ -157,8 +195,8 @@ func (e *Engine) Name() string {
 }
 
 // InspectRequest feeds the request into Coraza and maps the interruption to a
-// Raiwall verdict. The transaction runs all request phases, including body
-// inspection, before the verdict is produced.
+// Raiwall verdict. When response inspection is enabled, the transaction is
+// preserved in ctx.Session for paired response evaluation.
 func (e *Engine) InspectRequest(ctx *waf.RequestContext) (*waf.Verdict, error) {
 	set := e.set.Load()
 	if set == nil || set.conf.Disabled || ctx == nil {
@@ -166,7 +204,13 @@ func (e *Engine) InspectRequest(ctx *waf.RequestContext) (*waf.Verdict, error) {
 	}
 
 	tx := set.waf.NewTransaction()
-	defer func() { _ = tx.Close() }()
+	session := &Session{tx: tx, set: set}
+	shouldClose := true
+	defer func() {
+		if shouldClose {
+			_ = session.Close()
+		}
+	}()
 
 	client := ""
 	if ctx.ClientIP != nil {
@@ -221,13 +265,61 @@ func (e *Engine) InspectRequest(ctx *waf.RequestContext) (*waf.Verdict, error) {
 		it = tx.Interruption()
 	}
 	if it == nil {
+		if ctx.InspectResponse && set.conf.InspectResponse {
+			shouldClose = false
+			ctx.Session = session
+		}
 		return waf.VerdictAllow, nil
 	}
 	return verdict(set, tx, it), nil
 }
 
-// InspectResponse is intentionally disabled until response inspection is
-// implemented as a paired request/response transaction.
-func (e *Engine) InspectResponse(_ *waf.ResponseContext) (*waf.Verdict, error) {
-	return waf.VerdictAllow, nil
+// InspectResponse evaluates response headers and body using the paired Coraza transaction.
+func (e *Engine) InspectResponse(ctx *waf.ResponseContext) (*waf.Verdict, error) {
+	if ctx == nil || ctx.Session == nil {
+		return waf.VerdictAllow, nil
+	}
+	sess, ok := ctx.Session.(*Session)
+	if !ok || sess == nil {
+		return waf.VerdictAllow, nil
+	}
+	defer func() { _ = sess.Close() }()
+
+	set := sess.set
+	tx := sess.tx
+	if set == nil || set.conf.Disabled || tx == nil {
+		return waf.VerdictAllow, nil
+	}
+
+	for key, values := range ctx.Headers {
+		for _, value := range values {
+			tx.AddResponseHeader(key, value)
+		}
+	}
+
+	if it := tx.ProcessResponseHeaders(ctx.StatusCode, "HTTP/1.1"); it != nil {
+		return verdict(set, tx, it), nil
+	}
+
+	if len(ctx.Body) > 0 {
+		it, _, err := tx.WriteResponseBody(ctx.Body)
+		if err != nil {
+			return nil, fmt.Errorf("crs response body: %w", err)
+		}
+		if it != nil {
+			return verdict(set, tx, it), nil
+		}
+	}
+
+	it, err := tx.ProcessResponseBody()
+	if err != nil {
+		return nil, fmt.Errorf("crs response evaluation: %w", err)
+	}
+	if it == nil {
+		it = tx.Interruption()
+	}
+	if it == nil {
+		return waf.VerdictAllow, nil
+	}
+	return verdict(set, tx, it), nil
 }

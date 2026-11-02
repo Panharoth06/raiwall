@@ -230,6 +230,13 @@ func policyRecord(id, scope, appID string, policy *config.DetectorPolicy) contro
 	}
 	packsJSON, _ := json.Marshal(packs)
 
+	respJSON := "{}"
+	if policy.Response != nil {
+		if b, err := json.Marshal(policy.Response); err == nil {
+			respJSON = string(b)
+		}
+	}
+
 	record := control.WAFPolicyRecord{
 		ID:                id,
 		Scope:             scope,
@@ -238,6 +245,7 @@ func policyRecord(id, scope, appID string, policy *config.DetectorPolicy) contro
 		Sensitivity:       normalizePolicyValue(policy.Sensitivity),
 		SemanticOverrides: string(semanticJSON),
 		DisabledPackIDs:   string(packsJSON),
+		ResponseJSON:      respJSON,
 		UpdatedAt:         time.Now().UTC(),
 	}
 	if policy.CRS != nil {

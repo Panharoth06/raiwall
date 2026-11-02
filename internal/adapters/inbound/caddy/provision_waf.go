@@ -82,5 +82,11 @@ func (m *Middleware) provisionWAF(_ caddy.Context) error {
 		setter.SetExceptionEngine(m.exceptionEngine.Load())
 	}
 
+	maxInflight := int64(control.DefaultResponseMaxInflight)
+	if m.ResponseConfig != nil && m.ResponseConfig.MaxInflightBytes > 0 {
+		maxInflight = m.ResponseConfig.MaxInflightBytes
+	}
+	m.inflightBudget = NewInflightBudget(maxInflight)
+
 	return nil
 }

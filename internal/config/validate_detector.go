@@ -124,6 +124,32 @@ func validateDetectorPolicy(v *validator, prefix string, policy *DetectorPolicy)
 			v.add("%s.crs thresholds cannot be negative", prefix)
 		}
 	}
+	if policy.Response != nil {
+		switch strings.ToLower(strings.TrimSpace(policy.Response.Mode)) {
+		case "", "inherit", "audit", "redact", "block":
+		default:
+			v.add("%s.response.mode %q must be inherit, audit, redact, or block", prefix, policy.Response.Mode)
+		}
+		if policy.Response.BodyLimit < 0 {
+			v.add("%s.response.body_limit cannot be negative", prefix)
+		}
+		if policy.Response.HardCap < 0 {
+			v.add("%s.response.hard_cap cannot be negative", prefix)
+		}
+		if policy.Response.MaxInflightBytes < 0 {
+			v.add("%s.response.max_inflight_bytes cannot be negative", prefix)
+		}
+		if policy.Response.DLP != nil {
+			switch strings.ToLower(strings.TrimSpace(policy.Response.DLP.Action)) {
+			case "", "inherit", "audit", "redact", "block":
+			default:
+				v.add("%s.response.dlp.action %q must be inherit, audit, redact, or block", prefix, policy.Response.DLP.Action)
+			}
+			if policy.Response.DLP.MaxScanBytes < 0 {
+				v.add("%s.response.dlp.max_scan_bytes cannot be negative", prefix)
+			}
+		}
+	}
 	for module, mode := range policy.Semantic {
 		if !waf.IsValidModule(waf.Module(module)) {
 			v.add("%s.semantic.%s is not a known semantic module", prefix, module)

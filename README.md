@@ -48,11 +48,15 @@ Built natively as a **Caddy v2** module, Raiwall combines extreme proxy throughp
 - **Upstream Resilience:** Four selection policies — smooth weighted round-robin, least connections, IP hash, and primary-backup — with background active health probes and automatic failover.
 - **Accurate Client Attribution:** Extracts real client IPs through `CF-Connecting-IP`, `X-Real-IP`, `X-Forwarded-For`, and HAProxy `PROXY` protocol v1/v2.
 
-### 🧠 2. Semantic Threat Detection Engine (Core WAF)
-- **Three-Stage Funnel:**
+### 🧠 2. Threat Detection Engine & Response DLP (Core WAF)
+- **Inbound Three-Stage Funnel:**
   1. *Recursive Normalization:* Multi-pass decoding of URL, HTML entities, Base64, and Unicode escapes with SQL/script comment stripping.
   2. *Pure-Go Lexical Triage:* Ultra-fast token analysis using pure-Go `libinjection-go` ($<2\text{ µs}$) for immediate SQLi/XSS triage with zero CGO overhead.
   3. *Bounded AST Context Verification:* Runs bounded, in-tree context checks to detect execution breakouts (SQL, shell, DOM/JS) without external parser dependencies.
+- **Embedded OWASP CRS 4.30 via Coraza:** Native integration of Core Rule Set v4.30 with anomaly scoring (PL1–4), per-application detection policies, and rule exception translation.
+- **Outbound Response Inspection & DLP:** Bounded DLP detector scanning response headers and bodies for Payment Card PANs (via Luhn validation, $p99 < 5\text{ ms}$ on 1 MiB), JWT tokens, RSA/EC private keys, AWS access keys (`AKIA`/`ASIA`), and generic secrets. Supports `audit`, `block` (HTTP 403), and `redact` (in-place `[REDACTED]` masking).
+- **Paired CRS Response Transactions:** Keeps Coraza transactions alive across the request-response cycle to evaluate outbound leakage rules (e.g. database error disclosures) before release.
+- **Response Gate Safeguards:** Hard 8 MiB per-response cap, 64 MiB global in-flight concurrency budget, 25 ms scan timeout deadline, and strict Content-Type gating (`text/*`, `application/xml`, `application/json`, `application/javascript`). Media, SSE streams, and WebSockets pass through directly without RAM buffering.
 - **CPU Starvation Defenses:** Hard 32 KB per-parameter caps and strict 5 ms parser timeouts maintain $p99 < 15\text{ ms}$ under heavy load.
 
 ### 🤖 3. Bot Mitigation & Dynamic Active Defense
@@ -73,10 +77,11 @@ Built natively as a **Caddy v2** module, Raiwall combines extreme proxy throughp
 - **Sub-Microsecond CIDR Feeds:** Matches 500,000+ threat IPs via Balanced Routing Tables (`gaissmai/bart`) in $\sim 15\text{ ns}$.
 - **Zero-Code Pre-Auth:** OIDC / Simple Auth login barrier in front of legacy or staging services.
 
-### 📊 6. Observability, Forensics & Real-Time Alerting
+### 📊 6. Observability, Forensics & Audit Trail
 - **Non-Blocking Telemetry:** Async in-memory ring buffer batch-flushed every 500 ms.
 - **Dual-Tier Storage:** Embedded SQLite WAL mode by default; batch-ingested ClickHouse for enterprise scale.
-- **Privacy Compliance:** In-stream automated scrubbing of PII & PCI-DSS 4.0 data (`passwords`, `tokens`, `cvv`).
+- **Tamper-Evident Audit Chain:** Append-only cryptographic audit trail linked with SHA-256 hash chaining, Ed25519 digital signatures every 100 events or 1 hour, and verification API (`/.raiwall/api/v1/audit/verify`).
+- **Privacy Compliance:** In-stream automated scrubbing of PII & PCI-DSS 4.0 data (`passwords`, `tokens`, `cvv`) across requests and responses.
 - **Visual Attack Map:** 3D threat origin arcs powered by Three.js / `globe.gl` and Apache ECharts.
 - **Multi-Channel ChatOps:** Instant push alerts to Telegram, Discord, Slack, and generic webhooks through the built-in HTTP sender.
 
@@ -144,13 +149,13 @@ flowchart TD
     OutboundPorts -->|"Implemented by"| DrivenAdapters
 ```
 
-### 2. Data Plane Request Inspection Funnel
+### 2. Data Plane Request & Response Inspection Funnel
 
 ```mermaid
 flowchart TD
     subgraph ControlPlane["CONTROL PLANE (Admin & API)"]
         UI["Vue 3 + radix-vue<br/>(d3)"] <--> API["REST API + OpenAPI 3.1"]
-        API <--> DB[("SQLite / PostgreSQL<br/>(sqlc)")]
+        API <--> DB[("SQLite WAL / PostgreSQL (sqlc)")]
         API --> EngineConfig["Config Validation & Rollback"]
     end
 
@@ -166,29 +171,39 @@ flowchart TD
         
         Step4 --> Step5["5. Exception Gate<br/>(Path / Param False-Positive Bypass)"]
         Step5 --> Step6["6. Custom ACLs<br/>(expr-lang/expr + MaxMind GeoIP)"]
-        Step6 --> Step7["7. Stream Filter<br/>(Payloads >1MB Direct Stream)"]
+        Step6 --> Step7["7. Stream Filter<br/>(Payloads >1MB Bounded Prefix)"]
         Step7 --> Step8["8. Normalizer<br/>(Coraza: URL / HTML / Base64)"]
         
-        Step8 --> Step9{"9. Semantic WAF"}
+        Step8 --> Step9{"9. Semantic & CRS WAF"}
         Step9 -->|"Lexical Triage (<2µs)"| LibInj["libinjection-go (Pure Go)"]
         Step9 -->|"Suspicious Tokens"| AST["Bounded Context Verifier<br/>(SQL / shell / DOM-JS checks)"]
+        Step9 -->|"CRS Inbound (PL1-4)"| CRSIn["Coraza OWASP CRS"]
         
         LibInj -->|"Verdict: Allow"| Proxy["10. Router<br/>(Proxy / Static / Redirect<br/>+ 4 LB Policies + Scanner Trap)"]
         AST -->|"Verdict: Allow"| Proxy
+        CRSIn -->|"Score < Threshold"| Proxy
         AST -->|"Verdict: Block"| Block403(["HTTP 403 Blocked"])
+        CRSIn -->|"Score >= Threshold"| Block403
         
         Proxy --> Upstreams[("Protected Backend Services")]
+        Upstreams --> Step11{"11. Response Gate<br/>(Content-Type & Size Filter)"}
+        Step11 -->|"Binary / SSE / >8MB"| DirectStream(["Direct Client Stream"])
+        Step11 -->|"Inspectable (<=8MB)"| DLP["12. Response DLP & Outbound CRS<br/>(PAN Luhn / JWT / Secrets / DB Leaks)"]
+        DLP -->|"Verdict: Allow / Redacted"| Resp200(["HTTP 200 to Client"])
+        DLP -->|"Verdict: Block"| Resp403(["HTTP 403 Leak Blocked"])
     end
 
     subgraph Telemetry["TELEMETRY & ALERTING PIPELINE"]
         RingBuffer["Async Ring Buffer<br/>(500ms Batch Flush)"]
         PII["PII / PCI-DSS Sanitizer<br/>(Auto-mask Tokens & Secrets)"]
-        Logs[("SQLite WAL / ClickHouse")]
+        Logs[("SQLite WAL / PostgreSQL / ClickHouse")]
         Alerts["Webhook Push Alerts<br/>(Slack, Discord, Telegram)"]
+        AuditChain["Tamper-Evident Audit Chain<br/>(Ed25519 Anchors)"]
         
         RingBuffer --> PII
         PII --> Logs
         PII --> Alerts
+        Logs --> AuditChain
     end
 
     EngineConfig -.->|"Hot-Reload (atomic.Pointer)"| DataPlane
@@ -586,6 +601,8 @@ cd web && pnpm test
 | **API Disruption**| B2B clients crashing on bot challenges | Route classifier exempts `/api/*`, bearer tokens, and JSON requests |
 | **CGNAT Ban** | Banning an entire campus on bad client IP | Composite rate-limiting keys: `ClientIP + JA4 + SessionCookie` |
 | **SPA Errors** | DOM manipulation breaking client hydration | Strict non-rewriting of HTML for modern SPA/SSR frameworks |
+| **DLP Latency** | Regex over 1 MiB bodies causing CPU spikes | 25 ms hard timeout deadline per scan; zero-allocation word-boundary candidate tokenization (`scanPAN`) evaluating only 13–30 digit runs; $p99 < 5\text{ ms}$ on 1 MiB |
+| **Response OOM**| Buffering high-throughput responses | Buffer only inspectable Content-Types (`text/*`, `application/xml`, `application/json`, `application/javascript`); 8 MiB hard cap; 64 MiB global in-flight concurrency budget; media, SSE, and WebSockets bypass buffering |
 
 ---
 
@@ -597,25 +614,39 @@ cd web && pnpm test
 
 ---
 
-## Roadmap
+## Roadmap & Current Status
 
-The authoritative capability matrix, architecture decisions, and phased plan
-live in **[ROADMAP.md](ROADMAP.md)**. The working checklist with acceptance
-criteria and commit references lives in **[TASKS.md](TASKS.md)**.
+The authoritative capability matrix, architecture decisions, and phased plan live in **[ROADMAP.md](ROADMAP.md)**. The working checklist with acceptance criteria and commit references lives in **[TASKS.md](TASKS.md)**.
 
-- **Phase 0** — security and correctness blockers. Telemetry auth, body trust,
-  Envoy wire format, app-auth bypass, client-IP trust, ClickHouse telemetry, HA
-  state, and upstream failover are done; JA4/PROXY and the remaining safety-net
-  items are tracked in TASKS.md.
-- **Phase 1** — detection and rule engine. OWASP CRS 4.30 runs through Coraza
-  with per-request anomaly scoring, per-site policy, CRS exclusions, and a
-  go-ftw parity gate; response inspection and DLP remain.
-- **Phase 2** — observability and compliance (OTel, SIEM, audit chain, reports).
-- **Phase 3** — enterprise control plane (sessions, SSO/MFA, RBAC, tenancy).
-- **Phase 4** — HA and Kubernetes.
-- **Phase 5** — ecosystem, supply chain, air-gap, and docs truth.
+### 🟢 Current Features (Implemented & Verified)
 
-> Historical SafeLine-parity notes under `tasks/` are no longer authoritative.
+- **Reverse Proxy & Gateway (Data Plane):** Multi-protocol termination (HTTP/1.1, HTTP/2, HTTP/3/QUIC, WebSockets, gRPC), smooth weighted round-robin / least-connections / IP-hash / primary-backup load balancing, active health checks, CertMagic automated ACME & managed certificates with AES-256-GCM encrypted keys at rest, accurate client IP extraction (`trusted_proxies`, PROXY protocol v1/v2).
+- **Inbound Threat Detection Core:** Three-stage semantic funnel (recursive normalization → `libinjection-go` triage $< 2\text{ µs}$ → bounded AST execution breakout verifiers for SQL/shell/XSS), composed with embedded **OWASP CRS 4.30 via Coraza** (PL1–4 anomaly scoring, per-app policies, rule exception $\to$ CRS exclusion translation, and `/rules/test` interactive playground).
+- **Outbound Response Inspection & Bounded DLP (Wave 1):** Scans response headers and bodies for Payment Card PANs (via Luhn validation, $p99 < 5\text{ ms}$ on 1 MiB), JWTs, RSA/EC private keys, AWS access keys (`AKIA`/`ASIA`), and generic secrets with `audit`, `block` (HTTP 403), and `redact` (`[REDACTED]` masking). Includes paired CRS response transactions, Content-Type gating (`text/*`, `application/xml`, `application/json`, `application/javascript`), 8 MiB hard cap, 64 MiB global in-flight concurrency budget, and 25 ms scan deadline.
+- **Active Bot Defense & Dynamic Rate Limiting:** Passive TLS JA4/JA4H fingerprinting, HTTP/2 settings frame inspection, route classification (API fast-path bypassing bot checks), WebCrypto SHA-256 Proof-of-Work (`altcha`/`anubis` HTTP 468), and 3-tiered composite rate limiting (`ClientIP + JA4 + Cookie`) with anti-CGNAT protection.
+- **Granular Access Control:** Parameter-level false-positive exceptions, sub-15ns boolean bytecode ACLs (`expr-lang/expr`), dynamic BART routing table CIDR matching ($\sim 15\text{ ns}$ across 500K+ IPs), MaxMind GeoIP, and zero-code pre-application authentication.
+- **Observability & Cryptographic Audit Trail:** Non-blocking async ring buffer (500 ms flush), dual-tier storage (SQLite WAL / ClickHouse), PII/PCI-DSS automated masking, 3D WebGL attack globe, multi-channel alerting (Slack, Discord, Telegram, webhooks), and an append-only audit log with SHA-256 hash chaining, Ed25519 digital signatures, and live verification (`/.raiwall/api/v1/audit/verify`).
+- **Control Plane & High Availability:** Unified single-binary distribution with embedded Vue 3 dashboard (`go:embed`), atomic zero-downtime hot-swap configuration via `atomic.Pointer[ConfigSnapshot]`, declarative YAML configuration (`raiwall.yaml`), multi-replica Redis ban hydration and config notification fan-out, and Envoy `ext_proc/v3` gRPC sidecar mode.
+- **Performance & Stress Verification:** 500 RPS sustained benign on/off stress gate with $p99 \le 1.0\text{ ms}$ overhead ($\le 2\text{ ms}$ ceiling) and stable RSS ($< 5\text{ MB}$ delta); 1 MiB DLP scan $p99 = 4.87\text{ ms}$ ($\le 25\text{ ms}$ ceiling); 100 concurrent 1 MiB responses with zero OOMs.
+
+---
+
+### 🚀 Next Future Plan (Phased Roadmap)
+
+| Phase & Feature | Scope & Key Deliverables | Priority |
+| :--- | :--- | :--- |
+| **1B.2 Normalization Depth** | Base64 and hex decoding pipelines, JSON-in-JSON recursive extraction, configurable body-prefix inspection policy, encoded SQLi/XSS evasion corpus. | **P1 (Immediate Next)** |
+| **1B.3 Content Parsers & Schemas** | XML parser with XXE protection & entity caps, GraphQL depth/complexity/alias limits, per-site OpenAPI 3.0/3.1 request schema validation. | P1 |
+| **1B.4 Uploads & Malware Scanning** | Multipart file magic-byte validation, polyglot upload detection (GIF/PHP, PNG/JS), antivirus hook for ClamAV / ICAP daemons. | P1 |
+| **1B.5 Protocol & Transport Security**| Request smuggling mitigations on raw frontends, full WebSocket/gRPC streaming upstream proxying with trailers and h2c, client mTLS per site. | P1 |
+| **1B.6 Detection Operations** | Per-host rate/bot policies, expansion of CVE virtual patches from 87 to 193 rules, threat intelligence IP feeds and JA4 reputation lists. | P1 |
+| **Phase 2: Observability & SIEM** | OpenTelemetry distributed tracing (WAF phases, upstream, response), Enterprise SIEM pipeline (RFC 5424, CEF, LEEF, Splunk HEC, Sentinel DCR, Elastic), WORM compliance storage (S3 Object Lock), automated PCI-DSS/SOC2 compliance reports. | P2 |
+| **Phase 3: Identity & Multi-Tenancy** | Operator OIDC SSO with PKCE + TOTP 2FA, granular 5-role RBAC matrix & scoped API keys, secrets keyring with external KMS (Vault/AWS/GCP), `tenant_id` row-level isolation. | P1 / P2 |
+| **Phase 4: Clustering & Kubernetes** | Production `go-redis/v9` driver with Sentinel/Cluster, distributed apply locks & leader election, shared TLS storage, distributed waiting room, production Helm HA chart with PDB/HPA. | P0 / P1 |
+| **Phase 5: Supply Chain & Distribution** | GitHub Actions CI/CD workflows, Syft SBOM & Cosign container signing, air-gapped deployment bundle (offline fonts, GeoIP, and CRS rules), official Apache-2.0 license. | P0 / P1 |
+
+> [!NOTE]
+> Historical SafeLine-parity notes under `tasks/` are no longer authoritative. Please refer to [`ROADMAP.md`](ROADMAP.md) and [`TASKS.md`](TASKS.md).
 
 ---
 

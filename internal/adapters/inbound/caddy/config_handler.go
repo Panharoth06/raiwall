@@ -29,6 +29,7 @@ func handlerFromConfig(file *config.File) (*Middleware, error) {
 		CRSParanoiaLevel:     file.WAF.CRS.ParanoiaLevel,
 		CRSInboundThreshold:  file.WAF.CRS.InboundThreshold,
 		CRSOutboundThreshold: file.WAF.CRS.OutboundThreshold,
+		ResponseConfig:       responseSettingsFromConfig(file.WAF.Response),
 
 		BotDefense:    file.Bot.Defense,
 		PoWDifficulty: file.Bot.PoWDifficulty,

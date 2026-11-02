@@ -216,6 +216,21 @@ func (m *MockRedisClient) Subscribe(ctx context.Context, channel string) (<-chan
 	return ch, nil
 }
 
+// WaitForSubscribers waits until at least count channels are subscribed to channel, or timeout expires.
+func (m *MockRedisClient) WaitForSubscribers(channel string, count int, timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		m.mu.RLock()
+		n := len(m.subscribers[channel])
+		m.mu.RUnlock()
+		if n >= count {
+			return true
+		}
+		time.Sleep(2 * time.Millisecond)
+	}
+	return false
+}
+
 func (m *MockRedisClient) Ping(ctx context.Context) error {
 	m.mu.RLock()
 	defer m.mu.RUnlock()

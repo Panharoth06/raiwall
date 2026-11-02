@@ -48,7 +48,7 @@ services:
       - "${RAIWALL_HTTPS_PORT:-443}:8443"
       - "${RAIWALL_HTTPS_PORT:-443}:8443/udp" # HTTP/3
     environment:
-      RAIWALL_DATABASE_URL: postgres://${POSTGRES_USER:-raiwall}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-raiwall}?sslmode=disable
+      RAIWALL_DATABASE_URL: ${RAIWALL_DATABASE_URL:-postgres://${POSTGRES_USER:-raiwall}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-raiwall}?sslmode=disable}
       RAIWALL_PUBLIC_URL: ${RAIWALL_PUBLIC_URL:?set RAIWALL_PUBLIC_URL, e.g. https://raiwall.example.com}
       RAIWALL_ACME_EMAIL: ${RAIWALL_ACME_EMAIL:?set RAIWALL_ACME_EMAIL}
       RAIWALL_ADMIN_USERNAME: ${RAIWALL_ADMIN_USERNAME:-admin}

@@ -16,13 +16,40 @@ type crsPolicyDTO struct {
 	OutboundThreshold int   `json:"outbound_threshold,omitempty"`
 }
 
+// dlpPolicyDTO is the DLP tuning block of an outbound response policy.
+type dlpPolicyDTO struct {
+	Enabled           *bool  `json:"enabled,omitempty"`
+	Action            string `json:"action,omitempty"`
+	DetectPAN         *bool  `json:"detect_pan,omitempty"`
+	DetectSecrets     *bool  `json:"detect_secrets,omitempty"`
+	DetectJWT         *bool  `json:"detect_jwt,omitempty"`
+	DetectPrivateKeys *bool  `json:"detect_private_keys,omitempty"`
+	Redaction         string `json:"redaction,omitempty"`
+	MaxScanBytes      int    `json:"max_scan_bytes,omitempty"`
+}
+
+// responsePolicyDTO is the outbound inspection tuning block of a detection policy.
+type responsePolicyDTO struct {
+	Enabled          *bool         `json:"enabled,omitempty"`
+	Mode             string        `json:"mode,omitempty"`
+	InspectHeaders   *bool         `json:"inspect_headers,omitempty"`
+	InspectBody      *bool         `json:"inspect_body,omitempty"`
+	BodyLimit        int           `json:"body_limit,omitempty"`
+	HardCap          int           `json:"hard_cap,omitempty"`
+	Decompress       *bool         `json:"decompress,omitempty"`
+	ContentTypes     []string      `json:"content_types,omitempty"`
+	MaxInflightBytes int64         `json:"max_inflight_bytes,omitempty"`
+	DLP              *dlpPolicyDTO `json:"dlp,omitempty"`
+}
+
 // wafPolicyDTO is the API representation of a global or per-site policy.
 type wafPolicyDTO struct {
-	DetectionMode     string            `json:"detection_mode"`
-	Sensitivity       string            `json:"sensitivity"`
-	SemanticOverrides map[string]string `json:"semantic_overrides,omitempty"`
-	CRS               *crsPolicyDTO     `json:"crs,omitempty"`
-	DisabledPacks     []string          `json:"disabled_packs,omitempty"`
+	DetectionMode     string             `json:"detection_mode"`
+	Sensitivity       string             `json:"sensitivity"`
+	SemanticOverrides map[string]string  `json:"semantic_overrides,omitempty"`
+	CRS               *crsPolicyDTO      `json:"crs,omitempty"`
+	DisabledPacks     []string           `json:"disabled_packs,omitempty"`
+	Response          *responsePolicyDTO `json:"response,omitempty"`
 }
 
 // detectionStatusDTO summarizes the active detection posture.
@@ -108,7 +135,7 @@ func (s *Server) handleGetDetectionPolicy(w http.ResponseWriter, r *http.Request
 	})
 }
 
-// resolvePolicyDefaults fills unset CRS fields from the process configuration.
+// resolvePolicyDefaults fills unset CRS and Response fields from the process configuration.
 func (s *Server) resolvePolicyDefaults(policy control.WAFPolicySnapshot) control.WAFPolicySnapshot {
 	resolved := policy
 	if resolved.CRSEnabled == nil {
@@ -124,6 +151,16 @@ func (s *Server) resolvePolicyDefaults(policy control.WAFPolicySnapshot) control
 	if resolved.CRSOutboundThreshold <= 0 {
 		resolved.CRSOutboundThreshold = s.crsDefaultOutbound
 	}
+
+	defaultResp := control.DefaultResponsePolicySnapshot()
+	if resolved.Response == nil {
+		resolved.Response = defaultResp
+	} else {
+		base := control.DefaultResponsePolicySnapshot()
+		control.OverlayResponsePolicy(base, resolved.Response)
+		resolved.Response = base
+	}
+
 	return resolved
 }
 

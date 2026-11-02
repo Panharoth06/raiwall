@@ -178,6 +178,7 @@ type Middleware struct {
 	CRSParanoiaLevel     int            `json:"crs_paranoia_level,omitempty"`
 	CRSInboundThreshold  int            `json:"crs_inbound_threshold,omitempty"`
 	CRSOutboundThreshold int            `json:"crs_outbound_threshold,omitempty"`
+	ResponseConfig       *ResponseSettings `json:"response,omitempty"`
 
 	// Domain 3: Bot Mitigation & Chaos Engine configuration
 	BotDefense    string         `json:"bot_defense,omitempty"`
@@ -244,6 +245,9 @@ type Middleware struct {
 	crsEngine *crs.Engine
 	// crsPolicies selects the compiled policy for each app at request time.
 	crsPolicies *crsPolicyEngine
+	// Outbound response inspection budget and cached DLP engines.
+	inflightBudget *InflightBudget
+	dlpEngines     sync.Map
 	bartTable   *acl.BARTTable
 	ipGroupMgr  *acl.IPGroupManager
 	geoIPReader acl.GeoIPReader

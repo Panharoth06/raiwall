@@ -12,8 +12,21 @@ import (
 	"github.com/Panharoth06/raiwall/internal/core/bot"
 )
 
+// ResponseInspectionConfig controls outbound body buffering and gating in the interceptor.
+type ResponseInspectionConfig struct {
+	Enabled        bool
+	InspectHeaders bool
+	InspectBody    bool
+	BodyLimit      int
+	HardCap        int
+	Decompress     bool
+	ContentTypes   []string
+	Budget         *InflightBudget
+}
+
 // ResponseInterceptor wraps an http.ResponseWriter to capture the status code,
-// count bytes written, strip sensitive upstream headers, and optionally inject honeypot traps.
+// count bytes written, strip sensitive upstream headers, optionally inject honeypot traps,
+// and buffer eligible responses for WAF and DLP outbound inspection.
 type ResponseInterceptor struct {
 	http.ResponseWriter
 	statusCode   int
@@ -25,6 +38,12 @@ type ResponseInterceptor struct {
 	bufferedBody     *bytes.Buffer
 	isHTML           bool
 	headerCommitted  bool
+
+	inspectionCfg  ResponseInspectionConfig
+	inspecting     bool
+	streamed       bool
+	overflowed     bool
+	reservedBudget int64
 }
 
 // NewResponseInterceptor creates a ResponseInterceptor wrapping w.
@@ -44,6 +63,11 @@ func (ri *ResponseInterceptor) SetHoneypotInjector(inj *bot.HoneypotInjector) {
 	ri.honeypotInjector = inj
 }
 
+// SetInspectionConfig enables response body buffering for outbound WAF/DLP inspection.
+func (ri *ResponseInterceptor) SetInspectionConfig(cfg ResponseInspectionConfig) {
+	ri.inspectionCfg = cfg
+}
+
 // StatusCode returns the recorded HTTP status code.
 func (ri *ResponseInterceptor) StatusCode() int {
 	return ri.statusCode
@@ -57,6 +81,24 @@ func (ri *ResponseInterceptor) BytesWritten() int64 {
 // Header returns the header map from the underlying ResponseWriter.
 func (ri *ResponseInterceptor) Header() http.Header {
 	return ri.ResponseWriter.Header()
+}
+
+// BufferedBody returns a slice of buffered body bytes if available.
+func (ri *ResponseInterceptor) BufferedBody() []byte {
+	if ri.bufferedBody == nil {
+		return nil
+	}
+	return ri.bufferedBody.Bytes()
+}
+
+// IsStreamed reports whether the response was flushed or hijacked directly.
+func (ri *ResponseInterceptor) IsStreamed() bool {
+	return ri.streamed
+}
+
+// IsOverflowed reports whether the response exceeded the hard cap or budget.
+func (ri *ResponseInterceptor) IsOverflowed() bool {
+	return ri.overflowed
 }
 
 func (ri *ResponseInterceptor) commitHeaders(statusCode int) {
@@ -91,21 +133,29 @@ func (ri *ResponseInterceptor) WriteHeader(statusCode int) {
 	ri.statusCode = statusCode
 	ri.wroteHeader = true
 
-	// If honeypot injection is active and response is uncompressed HTML, buffer the body before writing headers
-	if ri.honeypotInjector != nil {
-		if statusCode != http.StatusNoContent && statusCode != http.StatusNotModified && !(statusCode >= 100 && statusCode < 200) {
-			ce := strings.ToLower(ri.Header().Get("Content-Encoding"))
-			isCompressed := ce != "" && ce != "identity"
-			cd := strings.ToLower(ri.Header().Get("Content-Disposition"))
-			isAttachment := strings.Contains(cd, "attachment")
+	// Check if body buffering is eligible
+	if statusCode != http.StatusNoContent && statusCode != http.StatusNotModified && !(statusCode >= 100 && statusCode < 200) {
+		ce := strings.ToLower(ri.Header().Get("Content-Encoding"))
+		isCompressed := ce != "" && ce != "identity"
+		cd := strings.ToLower(ri.Header().Get("Content-Disposition"))
+		isAttachment := strings.Contains(cd, "attachment")
 
-			if !isCompressed && !isAttachment {
-				ct := strings.ToLower(ri.Header().Get("Content-Type"))
-				if strings.Contains(ct, "text/html") {
-					ri.isHTML = true
-					ri.bufferedBody = new(bytes.Buffer)
-					return
-				}
+		if !isAttachment {
+			ct := ri.Header().Get("Content-Type")
+			isHTML := strings.Contains(strings.ToLower(ct), "text/html")
+			isInspectable := ri.inspectionCfg.Enabled && ri.inspectionCfg.InspectBody && isInspectableContentType(ct, ri.inspectionCfg.ContentTypes)
+			if isCompressed && !ri.inspectionCfg.Decompress {
+				isInspectable = false
+			}
+
+			shouldBufferHoneypot := ri.honeypotInjector != nil && isHTML && !isCompressed
+			shouldBufferInspect := isInspectable
+
+			if shouldBufferHoneypot || shouldBufferInspect {
+				ri.isHTML = isHTML && shouldBufferHoneypot
+				ri.inspecting = shouldBufferInspect
+				ri.bufferedBody = new(bytes.Buffer)
+				return
 			}
 		}
 	}
@@ -119,12 +169,25 @@ func (ri *ResponseInterceptor) Write(b []byte) (int, error) {
 		ri.WriteHeader(http.StatusOK)
 	}
 
-	if ri.isHTML && ri.bufferedBody != nil {
-		if ri.bufferedBody.Len()+len(b) <= 2*1024*1024 {
-			return ri.bufferedBody.Write(b)
+	if ri.bufferedBody != nil && !ri.streamed && !ri.overflowed {
+		hardCap := ri.inspectionCfg.HardCap
+		if hardCap <= 0 {
+			hardCap = 8 * 1024 * 1024
 		}
-		// Over 2MB limit: flush buffer directly without honeypot mutation
-		ri.flushBufferedHTMLDirect()
+		if ri.isHTML && !ri.inspecting && hardCap > 2*1024*1024 {
+			hardCap = 2 * 1024 * 1024
+		}
+
+		if ri.bufferedBody.Len()+len(b) <= hardCap {
+			if ri.inspectionCfg.Budget == nil || ri.inspectionCfg.Budget.Reserve(int64(len(b))) {
+				ri.reservedBudget += int64(len(b))
+				return ri.bufferedBody.Write(b)
+			}
+		}
+
+		// Over limit or budget exhausted: overflow and stream directly
+		ri.overflowed = true
+		ri.flushBufferedDirect()
 	}
 
 	n, err := ri.ResponseWriter.Write(b)
@@ -132,13 +195,24 @@ func (ri *ResponseInterceptor) Write(b []byte) (int, error) {
 	return n, err
 }
 
-func (ri *ResponseInterceptor) flushBufferedHTMLDirect() {
-	if !ri.isHTML || ri.bufferedBody == nil {
+func (ri *ResponseInterceptor) releaseBudget() {
+	if ri.reservedBudget > 0 {
+		if ri.inspectionCfg.Budget != nil {
+			ri.inspectionCfg.Budget.Release(ri.reservedBudget)
+		}
+		ri.reservedBudget = 0
+	}
+}
+
+func (ri *ResponseInterceptor) flushBufferedDirect() {
+	if ri.bufferedBody == nil {
 		return
 	}
-	ri.isHTML = false
 	buf := ri.bufferedBody.Bytes()
 	ri.bufferedBody = nil
+	ri.isHTML = false
+	ri.inspecting = false
+	ri.releaseBudget()
 	ri.commitHeaders(ri.statusCode)
 	if len(buf) > 0 {
 		n, _ := ri.ResponseWriter.Write(buf)
@@ -146,22 +220,24 @@ func (ri *ResponseInterceptor) flushBufferedHTMLDirect() {
 	}
 }
 
-// Finish flushes any buffered HTML response with honeypot injection applied.
+// Finish flushes any buffered response with honeypot injection applied if HTML.
 func (ri *ResponseInterceptor) Finish() {
-	if !ri.isHTML || ri.bufferedBody == nil {
+	if ri.bufferedBody == nil {
 		return
 	}
 
 	body := ri.bufferedBody.Bytes()
 	ri.bufferedBody = nil
-	ri.isHTML = false
+	ri.inspecting = false
+	ri.releaseBudget()
 
-	if ri.honeypotInjector != nil {
+	if ri.isHTML && ri.honeypotInjector != nil {
 		injectedBody, ok := ri.honeypotInjector.Inject(body)
 		if ok {
 			body = injectedBody
 		}
 	}
+	ri.isHTML = false
 
 	if ri.Header().Get("Content-Length") != "" {
 		ri.Header().Set("Content-Length", strconv.Itoa(len(body)))
@@ -174,10 +250,52 @@ func (ri *ResponseInterceptor) Finish() {
 	}
 }
 
+// WriteBlockResponse writes a WAF/DLP block page instead of the buffered upstream response.
+func (ri *ResponseInterceptor) WriteBlockResponse(statusCode int, body string, eventID string) {
+	ri.bufferedBody = nil
+	ri.isHTML = false
+	ri.inspecting = false
+	ri.releaseBudget()
+
+	ri.statusCode = statusCode
+	header := ri.ResponseWriter.Header()
+	for _, h := range ri.stripHeaders {
+		header.Del(h)
+	}
+	header.Set("Content-Type", "text/html; charset=utf-8")
+	header.Set("Content-Length", strconv.Itoa(len(body)))
+	if eventID != "" {
+		header.Set("X-Raiwall-Event-ID", eventID)
+	}
+	ri.headerCommitted = true
+	ri.ResponseWriter.WriteHeader(statusCode)
+	n, _ := ri.ResponseWriter.Write([]byte(body))
+	ri.bytesWritten += int64(n)
+}
+
+// ReplaceBody replaces the buffered response body with modified content (e.g. DLP redaction).
+func (ri *ResponseInterceptor) ReplaceBody(newBody []byte) {
+	if ri.bufferedBody == nil {
+		return
+	}
+	diff := int64(len(newBody)) - int64(ri.bufferedBody.Len())
+	if diff > 0 && ri.inspectionCfg.Budget != nil {
+		if ri.inspectionCfg.Budget.Reserve(diff) {
+			ri.reservedBudget += diff
+		}
+	} else if diff < 0 && ri.inspectionCfg.Budget != nil {
+		ri.inspectionCfg.Budget.Release(-diff)
+		ri.reservedBudget += diff
+	}
+	ri.bufferedBody.Reset()
+	ri.bufferedBody.Write(newBody)
+}
+
 // Flush implements http.Flusher to support streaming, SSE, and chunked transfer.
 func (ri *ResponseInterceptor) Flush() {
-	if ri.isHTML && ri.bufferedBody != nil {
-		ri.flushBufferedHTMLDirect()
+	if ri.bufferedBody != nil {
+		ri.streamed = true
+		ri.flushBufferedDirect()
 	}
 	if f, ok := ri.ResponseWriter.(http.Flusher); ok {
 		f.Flush()
@@ -186,8 +304,9 @@ func (ri *ResponseInterceptor) Flush() {
 
 // Hijack implements http.Hijacker to support WebSockets.
 func (ri *ResponseInterceptor) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	if ri.isHTML && ri.bufferedBody != nil {
-		ri.flushBufferedHTMLDirect()
+	if ri.bufferedBody != nil {
+		ri.streamed = true
+		ri.flushBufferedDirect()
 	}
 	if h, ok := ri.ResponseWriter.(http.Hijacker); ok {
 		return h.Hijack()
@@ -198,27 +317,4 @@ func (ri *ResponseInterceptor) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 // Unwrap returns the underlying ResponseWriter.
 func (ri *ResponseInterceptor) Unwrap() http.ResponseWriter {
 	return ri.ResponseWriter
-}
-
-// DefaultSensitiveHeaders are headers commonly stripped to prevent backend reconnaissance.
-var DefaultSensitiveHeaders = []string{
-	"Server",
-	"X-Powered-By",
-	"X-AspNet-Version",
-	"X-AspNetMvc-Version",
-}
-
-// CanonicalizeHeaderList normalizes header names for stripping.
-func CanonicalizeHeaderList(headers []string) []string {
-	if len(headers) == 0 {
-		return DefaultSensitiveHeaders
-	}
-	res := make([]string, 0, len(headers))
-	for _, h := range headers {
-		trimmed := strings.TrimSpace(h)
-		if trimmed != "" {
-			res = append(res, http.CanonicalHeaderKey(trimmed))
-		}
-	}
-	return res
 }

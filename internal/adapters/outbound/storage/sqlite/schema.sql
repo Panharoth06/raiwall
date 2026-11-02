@@ -310,6 +310,7 @@ CREATE TABLE IF NOT EXISTS raiwall_waf_policies (
     crs_inbound_threshold  INTEGER,
     crs_outbound_threshold INTEGER,
     disabled_pack_ids      TEXT NOT NULL DEFAULT '[]',
+    response_json          TEXT NOT NULL DEFAULT '{}',
     updated_at             TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_raiwall_waf_policies_scope_app
